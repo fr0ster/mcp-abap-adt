@@ -247,7 +247,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getabapgitbranchinfo-high-level-abapgit"></a>
 #### GetAbapGitBranchInfo (High-Level / Abapgit)
-**Description:** Gets the abapGit branch information of a remote repository for the package it would be linked to. Whether the remote repository is public or private. For the branch: its name and how its folders map to packages.
+**Description:** Reads the abapGit branch information of a remote repository for the package it would be linked to.
 
 **Source:** `src/handlers/abapgit/high/handleGetAbapGitBranchInfo.ts`
 
@@ -261,7 +261,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="linkabapgitrepo-high-level-abapgit"></a>
 #### LinkAbapGitRepo (High-Level / Abapgit)
-**Description:** Links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
+**Description:** Links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport.
 
 **Source:** `src/handlers/abapgit/high/handleLinkAbapGitRepo.ts`
 
@@ -272,7 +272,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `transport_request` (string, optional) - The transport request that records the objects written.
 - `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
 
-**On ABAP Cloud (`cloud`):** Links an ABAP package to a remote abapGit repository on a branch, mapping its folders to subpackages as asked. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
+**On ABAP Cloud (`cloud`):** Links an ABAP package to a remote abapGit repository on a branch, mapping its folders to subpackages as asked.
 
 **Parameters (`cloud`):**
 - `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
@@ -285,7 +285,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="pullabapgitrepo-high-level-abapgit"></a>
 #### PullAbapGitRepo (High-Level / Abapgit)
-**Description:** Pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
+**Description:** Pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport.
 
 **Source:** `src/handlers/abapgit/high/handlePullAbapGitRepo.ts`
 
@@ -294,7 +294,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 - `transport_request` (string, optional) - The transport request that records the objects written.
 
-**On ABAP Cloud (`cloud`):** Pulls an abapGit repository from the branch it is linked on as an SAP job, recorded in a transport, its imported objects left inactive. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
+**On ABAP Cloud (`cloud`):** Pulls an abapGit repository from the branch it is linked on as an SAP job, recorded in a transport, its imported objects left inactive.
 
 **Parameters (`cloud`):**
 - `overwrite` (array, optional) - The objects listed by GetAbapGitModifiedObjects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused, within one list or across both: SAP matches by name within each list, so a collision inside one list could take an object not named. SAP selects by name when its job runs, against the list as it stands then: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state; SAP leaves a package warning with action 5 (delete and re-create) out of every pull. Without it the job takes every other listed object.
@@ -305,7 +305,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="pushabapgitrepo-high-level-abapgit"></a>
 #### PushAbapGitRepo (High-Level / Abapgit)
-**Description:** Commits the objects and files chosen from an abapGit repository's staging, with its comment, author and committer, and pushes the commit to its remote branch. SAP's status and whether SAP made the change or accepted it as its own job.
+**Description:** Pushes the objects and files chosen from an abapGit repository's staging to its remote branch, as a commit with its comment, author and committer.
 
 **Source:** `src/handlers/abapgit/high/handlePushAbapGitRepo.ts`
 
@@ -317,7 +317,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `objects` (array, required) - The objects and files to commit, each as GetAbapGitStaging with detail "medium" answers it.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 
-**On ABAP Cloud (`cloud`):** Commits the objects and files chosen from an abapGit repository's staging and pushes the commit to its remote branch, as an SAP job. SAP's status and whether SAP made the change or accepted it as its own job.
+**On ABAP Cloud (`cloud`):** Pushes the objects and files chosen from an abapGit repository's staging to its remote branch as a commit, run as an SAP job.
 
 **Parameters (`cloud`):**
 - `author` (object, required) - The commit author: name and email (GetAbapGitStaging answers the proposal of this system).
@@ -330,7 +330,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="switchabapgitbranch-high-level-abapgit"></a>
 #### SwitchAbapGitBranch (High-Level / Abapgit)
-**Description:** Switches an abapGit repository to a branch, creating the branch in the remote first when asked. SAP's status and whether SAP made the change or accepted it as its own job.
+**Description:** Switches an abapGit repository to a branch, creating the branch in the remote first when asked.
 
 **Source:** `src/handlers/abapgit/high/handleSwitchAbapGitBranch.ts`
 
@@ -357,7 +357,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. The worklist ID. How many objects the run covered. How many findings there are. What an empty worklist means, while the run is still filling it. How many findings each priority has. For each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
@@ -370,7 +370,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getatcresult-high-level-atc"></a>
 #### GetATCResult (High-Level / Atc)
-**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. The result ID. Its title. Its check variant. When it was created. How many objects it covered. How many findings there are. How many findings each priority has. For each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCResult.ts`
 
@@ -383,7 +383,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getatcrunstatus-high-level-atc"></a>
 #### GetATCRunStatus (High-Level / Atc)
-**Description:** [read-only] Reads the status of an ATC run by its id, and whether it has ended. The run's id, SAP's status of the run, whether the run has ended, the worklist holding its findings and the id of its result.
+**Description:** [read-only] Reads the status of an ATC run by its id, and whether it has ended.
 
 **Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
 
@@ -394,7 +394,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="listatcresults-high-level-atc"></a>
 #### ListATCResults (High-Level / Atc)
-**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. How many results the system holds. For each result, newest first: its display id, its title, its check variant, its run series, when it was created, its finding counts per priority and its failure count. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleListATCResults.ts`
 
@@ -409,7 +409,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist. The check variant it ran, the worklist holding its findings, whether the call waited for the checks to end, the finding counts of a run waited for and the id of a started run to read its status by. For each object checked: its name, its type, the function group of a function include and the include of a class include.
+**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
@@ -454,7 +454,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Creates a managed, unmanaged, abstract or projection RAP behavior definition for a root entity in a package, recorded in the transport given.
+**Description:** Creates a managed, unmanaged, abstract or projection RAP behavior definition for a root entity, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
 
@@ -490,7 +490,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinition-high-level-behavior-definition"></a>
 #### GetBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Reads the source of a RAP behavior definition at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a RAP behavior definition, or its metadata.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
@@ -527,7 +527,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Creates the RAP behavior implementation class of a behavior definition in a package, with its description, recorded in the transport given.
+**Description:** Creates the RAP behavior implementation class of a behavior definition, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
@@ -560,7 +560,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviorimplementation-high-level-behavior-implementation"></a>
 #### GetBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** [read-only] Reads the source of a RAP behavior implementation class at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a RAP behavior implementation class, or its metadata.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
@@ -627,7 +627,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Creates an ABAP class in a package, with its description, its superclass and its FINAL and CREATE PROTECTED settings, recorded in the transport given.
+**Description:** Creates an ABAP class, with its description, its superclass and its FINAL and CREATE PROTECTED settings, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -663,7 +663,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocaldefinitions-high-level-class"></a>
 #### DeleteLocalDefinitions (High-Level / Class)
-**Description:** Clears the local definitions of an ABAP class, activating the class when asked.
+**Description:** Deletes the local definitions of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalDefinitions.ts`
 
@@ -679,7 +679,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocalmacros-high-level-class"></a>
 #### DeleteLocalMacros (High-Level / Class)
-**Description:** Clears the local macros of an ABAP class, activating the class when asked.
+**Description:** Deletes the local macros of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalMacros.ts`
 
@@ -695,7 +695,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocaltestclass-high-level-class"></a>
 #### DeleteLocalTestClass (High-Level / Class)
-**Description:** Clears the local test classes of an ABAP class, activating the class when asked.
+**Description:** Deletes the local test classes of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
 
@@ -711,7 +711,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocaltypes-high-level-class"></a>
 #### DeleteLocalTypes (High-Level / Class)
-**Description:** Clears the local types of an ABAP class, activating the class when asked.
+**Description:** Deletes the local types of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTypes.ts`
 
@@ -727,7 +727,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclass-high-level-class"></a>
 #### GetClass (High-Level / Class)
-**Description:** [read-only] Reads the source of an ABAP class at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP class, or its metadata.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -744,7 +744,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocaldefinitions-high-level-class"></a>
 #### GetLocalDefinitions (High-Level / Class)
-**Description:** [read-only] Reads the source of the local definitions include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
+**Description:** [read-only] Reads the local definitions of an ABAP class.
 
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
 
@@ -760,7 +760,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocalmacros-high-level-class"></a>
 #### GetLocalMacros (High-Level / Class)
-**Description:** [read-only] Reads the source of the local macros include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
+**Description:** [read-only] Reads the local macros of an ABAP class.
 
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
 
@@ -776,7 +776,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
-**Description:** [read-only] Reads the source of the local test classes include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
+**Description:** [read-only] Reads the local test classes of an ABAP class.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
@@ -792,7 +792,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocaltypes-high-level-class"></a>
 #### GetLocalTypes (High-Level / Class)
-**Description:** [read-only] Reads the source of the local types (implementations) include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
+**Description:** [read-only] Reads the local types and implementations of an ABAP class.
 
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
 
@@ -916,7 +916,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinitionversiondiff-high-level-common"></a>
 #### GetBehaviorDefinitionVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same RAP behavior definition, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same RAP behavior definition from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -928,7 +928,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinitionversions-high-level-common"></a>
 #### GetBehaviorDefinitionVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of a RAP behavior definition. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of a RAP behavior definition.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -939,7 +939,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinitionversionsource-high-level-common"></a>
 #### GetBehaviorDefinitionVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of a RAP behavior definition, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of a RAP behavior definition's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -950,7 +950,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclassversiondiff-high-level-common"></a>
 #### GetClassVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP class, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP class from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -962,7 +962,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclassversions-high-level-common"></a>
 #### GetClassVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP class. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP class.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -973,7 +973,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclassversionsource-high-level-common"></a>
 #### GetClassVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP class, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of an ABAP class's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -984,7 +984,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getddlversiondiff-high-level-common"></a>
 #### GetDdlVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same CDS view (DDL source), taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same CDS view (DDL source) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -996,7 +996,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getddlversions-high-level-common"></a>
 #### GetDdlVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of a CDS view (DDL source). For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of a CDS view (DDL source).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1007,7 +1007,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getddlversionsource-high-level-common"></a>
 #### GetDdlVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of a CDS view (DDL source), from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of the source of a CDS view (DDL source) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1018,7 +1018,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctionmoduleversiondiff-high-level-common"></a>
 #### GetFunctionModuleVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP function module, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP function module from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1030,7 +1030,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctionmoduleversions-high-level-common"></a>
 #### GetFunctionModuleVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP function module. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP function module.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1042,7 +1042,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctionmoduleversionsource-high-level-common"></a>
 #### GetFunctionModuleVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP function module, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of an ABAP function module's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1053,7 +1053,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterfaceversiondiff-high-level-common"></a>
 #### GetInterfaceVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP interface, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP interface from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1065,7 +1065,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterfaceversions-high-level-common"></a>
 #### GetInterfaceVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP interface. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP interface.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1076,7 +1076,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterfaceversionsource-high-level-common"></a>
 #### GetInterfaceVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP interface, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of an ABAP interface's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1087,7 +1087,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextensionversiondiff-high-level-common"></a>
 #### GetMetadataExtensionVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same CDS metadata extension, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same CDS metadata extension from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1099,7 +1099,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextensionversions-high-level-common"></a>
 #### GetMetadataExtensionVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of a CDS metadata extension. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of a CDS metadata extension.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1110,7 +1110,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextensionversionsource-high-level-common"></a>
 #### GetMetadataExtensionVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of a CDS metadata extension, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of a CDS metadata extension's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1121,7 +1121,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogramversiondiff-high-level-common"></a>
 #### GetProgramVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP program, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP program from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1133,7 +1133,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogramversions-high-level-common"></a>
 #### GetProgramVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP program, on ABAP Cloud one of SAP's standard programs. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP program, on ABAP Cloud one of SAP's standard programs.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1144,7 +1144,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogramversionsource-high-level-common"></a>
 #### GetProgramVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP program, on ABAP Cloud one of SAP's standard programs, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of the source of an ABAP program, on ABAP Cloud one of SAP's standard programs from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1155,7 +1155,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getstructureversiondiff-high-level-common"></a>
 #### GetStructureVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP structure, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP structure from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1167,7 +1167,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getstructureversions-high-level-common"></a>
 #### GetStructureVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP structure. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP structure.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1178,7 +1178,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getstructureversionsource-high-level-common"></a>
 #### GetStructureVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP structure, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of an ABAP structure's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1189,7 +1189,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettabletypeversions-high-level-common"></a>
 #### GetTableTypeVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP table type. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP table type.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1200,7 +1200,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettableversiondiff-high-level-common"></a>
 #### GetTableVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP table, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP table from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1212,7 +1212,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettableversions-high-level-common"></a>
 #### GetTableVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP table. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP table.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1223,7 +1223,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettableversionsource-high-level-common"></a>
 #### GetTableVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP table, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of an ABAP table's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1265,7 +1265,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createdataelement-high-level-data-element"></a>
 #### CreateDataElement (High-Level / Data Element)
-**Description:** Creates an ABAP data element in a package, typed by a domain, a built-in type or a reference, with its labels and search help, recorded in the transport given.
+**Description:** Creates an ABAP data element, typed by a domain, a built-in type or a reference, with its labels and search help, recorded in the transport given.
 
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
 
@@ -1310,7 +1310,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getdataelement-high-level-data-element"></a>
 #### GetDataElement (High-Level / Data Element)
-**Description:** [read-only] Reads an ABAP data element at the version asked, with its domain or built-in type, its labels, search help, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP data element at the version asked, with its domain or built-in type, its labels, search help, package and description.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -1386,7 +1386,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Creates a CDS view or classic DDL view in a package, with its description, recorded in the transport given.
+**Description:** Creates a CDS view or classic DDL view, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
@@ -1419,7 +1419,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getddl-high-level-ddl"></a>
 #### GetDdl (High-Level / Ddl)
-**Description:** [read-only] Reads the source of a CDS view or classic DDL view at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a CDS view or classic DDL view, or its metadata.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
@@ -1484,7 +1484,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
-**Description:** Creates a CDS metadata extension in a package, with its description, activating it when asked, recorded in the transport given.
+**Description:** Creates a CDS metadata extension, with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
 
@@ -1551,7 +1551,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createdomain-high-level-domain"></a>
 #### CreateDomain (High-Level / Domain)
-**Description:** Creates an ABAP domain in a package, with its data type, length, decimals, conversion exit, value table and fixed values, recorded in the transport given.
+**Description:** Creates an ABAP domain, with its data type, length, decimals, conversion exit, value table and fixed values, recorded in the transport given.
 
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
 
@@ -1593,7 +1593,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getdomain-high-level-domain"></a>
 #### GetDomain (High-Level / Domain)
-**Description:** [read-only] Reads an ABAP domain at the version asked, with its data type, length, output format, value table, fixed values, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP domain at the version asked, with its data type, length, output format, value table, fixed values, package and description.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -1694,7 +1694,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
-**Description:** Creates an ABAP function group in a package, with its description, activating it when asked, recorded in the transport given.
+**Description:** Creates an ABAP function group, with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionGroup.ts`
 
@@ -1782,7 +1782,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctiongroup-high-level-function-group"></a>
 #### GetFunctionGroup (High-Level / Function Group)
-**Description:** [read-only] Reads an ABAP function group at the version asked, with its package, description and contents. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP function group at the version asked, with its package, description and contents.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
@@ -1828,7 +1828,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatefunctioninclude-high-level-function-include"></a>
 #### UpdateFunctionInclude (High-Level / Function Include)
-**Description:** Writes new source code into an existing include of an ABAP function group, activating it when asked.
+**Description:** Updates the source code of an existing include of an ABAP function group, activating it when asked.
 
 **Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
 
@@ -1863,7 +1863,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** [read-only] Reads the source of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -1898,7 +1898,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createinclude-high-level-include"></a>
 #### CreateInclude (High-Level / Include)
-**Description:** Creates an ABAP include in a package, with its description and the comment header SAP writes into it, recorded in the transport given.
+**Description:** Creates an ABAP include, with its description and the comment header SAP writes into it, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleCreateInclude.ts`
 
@@ -1993,7 +1993,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
-**Description:** Creates an ABAP interface in a package, with its description, recorded in the transport given.
+**Description:** Creates an ABAP interface, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
 
@@ -2026,7 +2026,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterface-high-level-interface"></a>
 #### GetInterface (High-Level / Interface)
-**Description:** [read-only] Reads the source of an ABAP interface at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP interface, or its metadata.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
@@ -2063,7 +2063,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createmessageclass-high-level-message-class"></a>
 #### CreateMessageClass (High-Level / Message Class)
-**Description:** Creates an ABAP message class (T100) in a package, with its description, recorded in the transport given.
+**Description:** Creates an ABAP message class (T100), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
 
@@ -2132,7 +2132,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** [read-only] Reads one message of an ABAP message class at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time. SAP's data as it came.
+**Description:** [read-only] Reads one message of an ABAP message class at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -2193,7 +2193,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextension-high-level-metadata-extension"></a>
 #### GetMetadataExtension (High-Level / Metadata Extension)
-**Description:** [read-only] Reads the source of a CDS metadata extension at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a CDS metadata extension, or its metadata.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
@@ -2266,7 +2266,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** [read-only] Reads an ABAP package at the version asked: its name, description, type, super package, software component, application component, transport layer, language version and person responsible; for each subpackage: its name and its description.
+**Description:** [read-only] Reads an ABAP package at the version asked.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -2328,7 +2328,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
-**Description:** Creates an executable ABAP program (report) in a package, with its description and application area, recorded in the transport given.
+**Description:** Creates an executable ABAP program (report), with its description and application area, recorded in the transport given.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
@@ -2362,7 +2362,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** [read-only] Reads the source of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, or its metadata.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -2413,7 +2413,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
-**Description:** Creates an OData V2 or V4 service binding, UI or Web API, for a service definition in a package, with its service name and version.
+**Description:** Creates an OData V2 or V4 service binding, UI or Web API, for a service definition, with its service name and version.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
@@ -2453,7 +2453,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getservicebinding-high-level-service-binding"></a>
 #### GetServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Reads an OData service binding at its active version, with its binding definition, or its package, person responsible and description, in the format asked. SAP's data as it came.
+**Description:** [read-only] Reads an OData service binding at its active version, with its binding definition, or its package, person responsible and description, in the format asked.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
@@ -2468,7 +2468,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="listservicebindingtypes-high-level-service-binding"></a>
 #### ListServiceBindingTypes (High-Level / Service Binding)
-**Description:** [read-only] Lists the service binding types the system offers, such as OData V2 and OData V4, in the format asked. SAP's data as it came.
+**Description:** [read-only] Lists the service binding types the system offers, such as OData V2 and OData V4, in the format asked.
 
 **Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
 
@@ -2531,7 +2531,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
-**Description:** Creates a service definition exposing CDS views as an OData service in a package, with its source code when given, activating it when asked.
+**Description:** Creates a service definition exposing CDS views as an OData service, with its source code when given, activating it when asked.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
 
@@ -2566,7 +2566,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getservicedefinition-high-level-service-definition"></a>
 #### GetServiceDefinition (High-Level / Service Definition)
-**Description:** [read-only] Reads the source of a service definition at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a service definition, or its metadata.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
@@ -2632,7 +2632,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createstructure-high-level-structure"></a>
 #### CreateStructure (High-Level / Structure)
-**Description:** Creates an ABAP structure in a package, with its description, activating it when asked, recorded in the transport given.
+**Description:** Creates an ABAP structure, with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/structure/high/handleCreateStructure.ts`
 
@@ -2668,7 +2668,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getstructure-high-level-structure"></a>
 #### GetStructure (High-Level / Structure)
-**Description:** [read-only] Reads an ABAP structure at the version asked, with its definition source, or its package, person responsible and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP structure at the version asked, with its definition source, or its package, person responsible and description.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
@@ -2705,7 +2705,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
-**Description:** [read-only] Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level. For each subpackage and object below it, at its depth: its type, its name, its technical name when SAP lists it nameless, its URI when SAP lists it nameless and its description, with descriptions asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
@@ -2723,7 +2723,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimecreateprofilertraceparameters-high-level-system"></a>
 #### RuntimeCreateProfilerTraceParameters (High-Level / System)
-**Description:** Schedules an ABAP profiler trace with its parameters, for a later profiled run of a class or a report. The profiler id a profiled run names.
+**Description:** Creates the parameters of an ABAP profiler trace, scheduling it for a later profiled run of a class or a report.
 
 **Source:** `src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts`
 
@@ -2747,7 +2747,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimerunclass-high-level-system"></a>
 #### RuntimeRunClass (High-Level / System)
-**Description:** Runs an ABAP class implementing if_oo_adt_classrun and gives its console output, under the ABAP profiler when asked. The class that ran, its console output and the profiler and trace ids of a profiled run.
+**Description:** Runs an ABAP class implementing if_oo_adt_classrun and gives its console output, under the ABAP profiler when asked.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunClass.ts`
 
@@ -2777,7 +2777,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimerunprogram-high-level-system"></a>
 #### RuntimeRunProgram (High-Level / System)
-**Description:** Runs an ABAP report and gives its output, under the ABAP profiler when asked. The report that ran, its output and the profiler id of a profiled run.
+**Description:** Runs an ABAP report and gives its output, under the ABAP profiler when asked.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunProgram.ts`
 
@@ -2836,7 +2836,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
-**Description:** Creates an ABAP database table by its name in a package, recorded in the transport given.
+**Description:** Creates an ABAP database table by its name, recorded in the transport given.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
@@ -2869,7 +2869,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettable-high-level-table"></a>
 #### GetTable (High-Level / Table)
-**Description:** [read-only] Reads an ABAP database table at the version asked, with its definition source, or its package, person responsible and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP database table at the version asked, with its definition source, or its package, person responsible and description.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
@@ -2973,7 +2973,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtabletype-high-level-table-type"></a>
 #### CreateTableType (High-Level / Table Type)
-**Description:** Creates an ABAP table type in a package, with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given.
+**Description:** Creates an ABAP table type, with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/table_type/high/handleCreateTableType.ts`
 
@@ -3014,7 +3014,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettabletype-high-level-table-type"></a>
 #### GetTableType (High-Level / Table Type)
-**Description:** [read-only] Reads an ABAP table type at the version asked, with its element type, access, key, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP table type at the version asked, with its element type, access, key, package and description.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
@@ -3089,7 +3089,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="addtransportobject-high-level-transport"></a>
 #### AddTransportObject (High-Level / Transport)
-**Description:** Adds an existing ABAP object to a transport task, so it travels with the task's transport. Whether SAP took the change, that SAP's answer leaves the attachment unconfirmed, the transport task, the object named and where the change is confirmed.
+**Description:** Adds an existing ABAP object to a transport task, so it travels with the task's transport.
 
 **Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
 
@@ -3106,7 +3106,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtransport-high-level-transport"></a>
 #### CreateTransport (High-Level / Transport)
-**Description:** Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked. The number of the transport created, the number of its task, SAP's refusal of the task type and what is left to do when the task stays untyped.
+**Description:** Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked.
 
 **Source:** `src/handlers/transport/high/handleCreateTransport.ts`
 
@@ -3124,7 +3124,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtransporttask-high-level-transport"></a>
 #### CreateTransportTask (High-Level / Transport)
-**Description:** Creates a task of the type asked under an existing transport, owned by the SAP user named. The number of the task created, its type, SAP's refusal of the task type and what is left to do when the task stays untyped.
+**Description:** Creates a task of the type asked under an existing transport, owned by the SAP user named.
 
 **Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
 
@@ -3140,7 +3140,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="movetransportobjects-high-level-transport"></a>
 #### MoveTransportObjects (High-Level / Transport)
-**Description:** Moves objects from one transport task to another, each at its position in the task it leaves. Whether SAP took the change, the task they leave, the task they move to and where the change is confirmed. For each object sent: the object named and its position in the task it leaves.
+**Description:** Moves objects from one transport task to another, each at its position in the task it leaves.
 
 **Source:** `src/handlers/transport/high/handleMoveTransportObjects.ts`
 
@@ -3156,7 +3156,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="removetransportobject-high-level-transport"></a>
 #### RemoveTransportObject (High-Level / Transport)
-**Description:** Removes a named object from a transport task, at its position among the task's objects. Whether SAP took the change, that SAP's answer leaves the removal unconfirmed, the transport task, the object named, its position in the task and where the change is confirmed.
+**Description:** Removes a named object from a transport task, at its position among the task's objects.
 
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
 
@@ -3174,7 +3174,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="sortandcompresstransporttask-high-level-transport"></a>
 #### SortAndCompressTransportTask (High-Level / Transport)
-**Description:** Sorts the objects of a transport task and merges its duplicates. Whether SAP took the change, the transport task and where the change is confirmed.
+**Description:** Sorts the objects of a transport task and merges its duplicates.
 
 **Source:** `src/handlers/transport/high/handleSortAndCompressTransportTask.ts`
 
@@ -3191,7 +3191,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Creates an ABAP Unit test class for a CDS view in a package, from the test class source given, once the view supports CDS test doubles.
+**Description:** Creates an ABAP Unit test class for a CDS view, from the test class source given, once the view supports CDS test doubles.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
@@ -3283,7 +3283,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on. The run's id, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
+**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -3299,7 +3299,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runabapunit-high-level-unit-test"></a>
 #### RunAbapUnit (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of a class, report, function group, function module's group, CDS view, package, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs the ABAP Unit tests of a class, report, function group, function module's group, CDS view, package, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
 
@@ -3317,7 +3317,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runcdsunittest-high-level-unit-test"></a>
 #### RunCdsUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of a CDS view test class, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs the ABAP Unit tests of a CDS view test class, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
 
@@ -3330,7 +3330,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Runs every ABAP Unit test of a function group, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs every ABAP Unit test of a function group, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
@@ -3347,7 +3347,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the function group holding a function module, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs the ABAP Unit tests of the function group holding a function module, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
@@ -3365,7 +3365,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of an ABAP report, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs the ABAP Unit tests of an ABAP report, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
@@ -3382,7 +3382,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of an ABAP class, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs the ABAP Unit tests of an ABAP class, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 

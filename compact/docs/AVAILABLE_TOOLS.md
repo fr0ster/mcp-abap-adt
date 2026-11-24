@@ -25,7 +25,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Reads one part of the ABAP repository object of the type object_type names, of the repository by ADT address, or of an activation run by its id. part source: reads the source of the object at the version asked: its source code and the version read. part metadata: reads the metadata of the object at the version asked, as its type keeps it. part urls: builds the Fiori preview URL of a published OData service binding, with its service and $metadata URLs: its service's live state, OData protocol, service, service definition, service version, entity sets, binding category, client, logon language, associations, service URL, service URL source, $metadata URL, annotation URL, preview URL, preview descriptor, notes, whether it is published, whether the system's HTTP origin is known, what the preview URL still needs and the failure of reading the system's client and language. part contents: lists the objects of one or more ABAP packages, with the objects of their subpackages when asked: for each object of the package or a subpackage, under its own package: its type, its name, its technical name where it differs, its URI when SAP lists it nameless and its description, with descriptions asked. part main_programs: finds the main programs of an ABAP include: each program that includes it, or the function group it belongs to: the include's name; for each main program: whether it is a program or a function group and its name. part draft: tells whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose: whether the object holds an unactivated change of any user; for each part, its main source or metadata or a class include: its name, its state (active, the caller's change, another user's change or undetermined), when that change was last written, how many seconds ago and the ETags of its active, inactive and working versions. part object_structure: reads the structure of an ABAP repository object, such as a CDS view: its parts and their parts, down to the last level: each part of the object, such as an element, an association or an annotation, is named by its type and its name or description, at its depth. part node_structure: reads one level of the repository browser of a package, class, program or other repository object, at its root or the node asked: whether SAP could load the level and what an empty package level means; for each object: its name, type, description, technical name and ADT URI; for each child node: its type and node ID. part virtual_folders: reads the virtual folders that group ABAP repository objects by package, group, type and other facets, for a name pattern: SAP's data as it came. part activation_status: reads the status of an activation run by its id: the run's id, the part read, the run's status, finished, error, failed or its progress and its status as SAP gave it. part activation_results: reads the results of an activation run by its id: SAP's verdict and the messages the run produced: the run's id, the part read, whether SAP activated it, by the results' verdict, whether it was already active and its results as SAP gave them; for each message of the run: its severity, its text, the object it is about, the address of that object, the object and its part as SAP describes them, the source it names, its position there and SAP's message code. object_type required: PACKAGE(package_name*; part contents: package_name* or package_names*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), TABLE_TYPE(table_type_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INCLUDE(include_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*), TABLE_SETTINGS(table_name*), PROGRAM_TEXT_ELEMENTS(program_name*), FUNCTION_GROUP_TEXT_ELEMENTS(function_group_name*), CLASS_TEXT_ELEMENTS(class_name*). Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the source code, metadata, contents, structure or unactivated change of an ABAP package, domain, data element, table, structure, table type, CDS view, service definition, service binding, class, local test class, class local types, class local definitions, class local macros, program, include, interface, function group, function module, behavior definition, behavior implementation, metadata extension, class unit test, CDS unit test, transport, table technical settings, program text elements, function group text elements or class text elements, or the status and results of an activation run. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Available in:** cloud, onprem
 
@@ -71,7 +71,7 @@ per request.
 - `with_versions` — Include versions (virtual_folders).
 - `ignore_short_descriptions` — Leave out short descriptions (virtual_folders).
 
-**On ABAP Cloud (`cloud`):** [read-only] Reads one part of the ABAP repository object of the type object_type names, of the repository by ADT address, or of an activation run by its id. part source: reads the source of the object at the version asked: its source code and the version read. part metadata: reads the metadata of the object at the version asked, as its type keeps it. part urls: builds the Fiori preview URL of a published OData service binding, with its service and $metadata URLs: its service's live state, OData protocol, service, service definition, service version, entity sets, binding category, client, logon language, associations, service URL, service URL source, $metadata URL, annotation URL, preview URL, preview descriptor, notes, whether it is published, whether the system's HTTP origin is known, what the preview URL still needs and the failure of reading the system's client and language. part contents: lists the objects of one or more ABAP packages, with the objects of their subpackages when asked: for each object of the package or a subpackage, under its own package: its type, its name, its technical name where it differs, its URI when SAP lists it nameless and its description, with descriptions asked. part draft: tells whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose: whether the object holds an unactivated change of any user; for each part, its main source or metadata or a class include: its name, its state (active, the caller's change, another user's change or undetermined), when that change was last written, how many seconds ago and the ETags of its active, inactive and working versions. part object_structure: reads the structure of an ABAP repository object, such as a CDS view: its parts and their parts, down to the last level: each part of the object, such as an element, an association or an annotation, is named by its type and its name or description, at its depth. part node_structure: reads one level of the repository browser of a package, class, program or other repository object, at its root or the node asked: whether SAP could load the level and what an empty package level means; for each object: its name, type, description, technical name and ADT URI; for each child node: its type and node ID. part virtual_folders: reads the virtual folders that group ABAP repository objects by package, group, type and other facets, for a name pattern: SAP's data as it came. part activation_status: reads the status of an activation run by its id: the run's id, the part read, the run's status, finished, error, failed or its progress and its status as SAP gave it. part activation_results: reads the results of an activation run by its id: SAP's verdict and the messages the run produced: the run's id, the part read, whether SAP activated it, by the results' verdict, whether it was already active and its results as SAP gave them; for each message of the run: its severity, its text, the object it is about, the address of that object, the object and its part as SAP describes them, the source it names, its position there and SAP's message code. object_type required: PACKAGE(package_name*; part contents: package_name* or package_names*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), TABLE_TYPE(table_type_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INCLUDE(include_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*), TABLE_SETTINGS(table_name*), PROGRAM_TEXT_ELEMENTS(program_name*), FUNCTION_GROUP_TEXT_ELEMENTS(function_group_name*), CLASS_TEXT_ELEMENTS(class_name*). Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**On ABAP Cloud (`cloud`):** [read-only] Reads the source code, metadata, contents, structure or unactivated change of an ABAP package, domain, data element, table, structure, table type, CDS view, service definition, service binding, class, local test class, class local types, class local definitions, class local macros, program, include, interface, function group, function module, behavior definition, behavior implementation, metadata extension, class unit test, CDS unit test, transport, table technical settings, program text elements, function group text elements or class text elements, or the status and results of an activation run. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Parameters (`cloud`):**
 
@@ -119,7 +119,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Reads across the ABAP system: source code, objects by name, usages, package hierarchies, transport orders, ATC findings, ATC results and one ATC result. action search_source: searches the ABAP source code of one or more packages for a text: programs, includes, function groups, classes, interfaces and CDS sources: how many objects and sources were searched, and how many objects matched; which limit stopped the search, when one did; the package parts SAP left unloaded are named, each by its package and type; the nameless objects SAP lists, left unsearched, are named by what tells them apart; for each match, under its object named by package, type and name: its include, its position in the source and the source code that matched, when snippets are asked; with objects asked, for each object it matched in, named by package, type and name: its include and how many matches it has. action search_object: finds ABAP repository objects by name or name pattern, of any type or of one: classes, programs, tables, interfaces and every other kind: for each object found: its name, its type, its description and its package. action where_used: finds where an ABAP class, function module, table or other repository object is used: every object that uses, calls or references it: how many references SAP counts; for each object that uses it, under its package: its type, its name, its URI when SAP lists it nameless and how it uses the object, where SAP tells it. action package_tree: reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level: for each subpackage and object below it, at its depth: its type, its name, its technical name when SAP lists it nameless, its URI when SAP lists it nameless and its description, with descriptions asked. action transports: lists a user's transports, workbench, customizing and transport-of-copies alike, that the user owns or holds a task in: how many there are; for each transport: its number, its type, its status, its owner, its target system and its description. action atc_findings: reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background: the worklist ID; how many objects the run covered; how many findings there are; what an empty worklist means, while the run is still filling it; how many findings each priority has; for each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. action atc_results: lists the ATC results the system holds for a user or for every user, newest first, within an age range in days: how many results the system holds; for each result, newest first: its display id, its title, its check variant, its run series, when it was created, its finding counts per priority and its failure count. action atc_result: reads a stored ATC result by its display ID: its findings and the counts per priority: the result ID; its title; its check variant; when it was created; how many objects it covered; how many findings there are; how many findings each priority has; for each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Finds source code text, objects by name, where objects are used and package contents, and reads transport orders, ATC findings, ATC results and one ATC result. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Available in:** cloud, onprem
 
@@ -166,7 +166,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Validates the name of a new ABAP repository object of the type object_type names, before it is created. object_type required: CLASS(object_name*, superclass), PROGRAM(object_name*, package_name*), INCLUDE(object_name*, package_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE, description*), TABLE(object_name*), STRUCTURE(object_name*), TABLE_TYPE(object_name*, description), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*, package_name*, description*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(object_name*, package_name*, behavior_definition), METADATA_EXTENSION(object_name*, description*, package_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*, package_name*).
+**Description:** [read-only] Validates the name of a new ABAP class, program, include, interface, function group, function module, table, structure, table type, CDS view, domain, data element, package, behavior definition, behavior implementation, metadata extension or service binding, before it is created.
 
 **Available in:** cloud, onprem
 
@@ -184,7 +184,7 @@ per request.
 - `service_definition_name` — Required when object_type=SERVICE_BINDING. Service definition paired with the binding.
 - `service_binding_version` — Optional service binding version for SERVICE_BINDING.
 
-**On ABAP Cloud (`cloud`):** [read-only] Validates the name of a new ABAP repository object of the type object_type names, before it is created. object_type required: CLASS(object_name*, superclass), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE, description*), TABLE(object_name*), STRUCTURE(object_name*), TABLE_TYPE(object_name*, description), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*, package_name*, description*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(object_name*, package_name*, behavior_definition), METADATA_EXTENSION(object_name*, description*, package_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*, package_name*).
+**On ABAP Cloud (`cloud`):** [read-only] Validates the name of a new ABAP class, interface, function group, function module, table, structure, table type, CDS view, domain, data element, package, behavior definition, behavior implementation, metadata extension or service binding, before it is created.
 
 **Parameters (`cloud`):**
 
@@ -204,7 +204,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Checks the syntax of the ABAP repository object of the type object_type names, as stored or as the source given. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), TABLE_TYPE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), METADATA_EXTENSION(object_name*).
+**Description:** [read-only] Checks the syntax of an ABAP class, program, interface, function group, function module, table, structure, table type, CDS view, domain, data element, package, behavior definition or metadata extension, as stored or as the source given.
 
 **Available in:** cloud, onprem
 
@@ -219,7 +219,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Asks SAP whether the ABAP repository object of the type object_type names can be deleted. Whether SAP lets the object be deleted, its name and SAP's message about it. object_type and object_name required: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST (its test class), PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE (object_name GROUP|MODULE), BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.
+**Description:** [read-only] Checks whether SAP lets an ABAP package, domain, data element, table, structure, table type, CDS view, service definition, service binding, class, CDS unit test, program, include, interface, function group, function module, behavior definition, behavior implementation or metadata extension be deleted.
 
 **Available in:** cloud, onprem
 
@@ -232,7 +232,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Reads the status of an ABAP Unit test run by its id. The run's id, whether the run finished and SAP's progress status of the run.
+**Description:** [read-only] Reads the status of an ABAP Unit test run by its id.
 
 **Available in:** cloud, onprem
 
@@ -245,7 +245,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Reads the result of an ABAP Unit test run by its id. The run's id and the run's result as SAP gave it.
+**Description:** [read-only] Reads the result of an ABAP Unit test run by its id.
 
 **Available in:** cloud, onprem
 
@@ -260,7 +260,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Reads the status of a CDS unit test run by its id. The run's id, whether the run finished and SAP's progress status of the run.
+**Description:** [read-only] Reads the status of a CDS unit test run by its id.
 
 **Available in:** cloud, onprem
 
@@ -273,7 +273,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Reads the result of a CDS unit test run by its id. The run's id and the run's result as SAP gave it.
+**Description:** [read-only] Reads the result of a CDS unit test run by its id.
 
 **Available in:** cloud, onprem
 
@@ -288,7 +288,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Lists the ABAP profiler traces recorded in the system: how many there are; for each trace: its ID, when it was recorded, the object it traced, its state and its runtime.
+**Description:** [read-only] Lists the ABAP profiler traces recorded in the system.
 
 **Available in:** cloud, onprem
 
@@ -300,7 +300,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Reads one view of an ABAP profiler trace, its hit list, its statements or its database accesses, as recorded or summarised. mode raw: reads one view of an ABAP profiler trace: its hit list, its statements or its database accesses: the view read, the trace and the view's data as the profiler read it. mode analyze: summarises one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time: the trace, the view read, the view's record count and its top records by time and the view's data as the profiler read it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads one view of an ABAP profiler trace, its hit list, its statements or its database accesses, as recorded or summarised. mode raw: reads one view of an ABAP profiler trace: its hit list, its statements or its database accesses. mode analyze: analyzes one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Available in:** cloud, onprem
 
@@ -320,7 +320,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Reads one page of the short dumps, system messages or SAP Gateway errors of an ABAP system, newest first, by user, object and time. For the feed read: how many items it holds, where the next read starts when more remain and the second holding more items than one read gives. For each short dump, newest first: its dump ID, when it happened and its title. For each system message: its ID, when it was created, its author and its title. For each SAP Gateway error: its operation ID, the kind of its detail, when it happened, its type, its short text and the user it happened to. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists one page of the short dumps, system messages or SAP Gateway errors of an ABAP system, newest first, by user, object and time. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Available in:** cloud, onprem
 
@@ -343,7 +343,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Reads an ABAP runtime dump by its id, with a summary of where and why its program terminated. The dump's id, the view read, the summary of where and why its program terminated and the dump as SAP gave it.
+**Description:** [read-only] Reads an ABAP runtime dump by its id, with a summary of where and why its program terminated.
 
 **Available in:** cloud, onprem
 
@@ -356,7 +356,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Lists the service binding types the system offers, such as OData V2 and OData V4, in the format asked. SAP's data as it came.
+**Description:** [read-only] Lists the service binding types the system offers, such as OData V2 and OData V4, in the format asked.
 
 **Available in:** cloud, onprem
 
@@ -384,7 +384,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries` (`compactDataEntries`). **Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.
 
-**Description:** [read-only] Reads the data of an ABAP database table or CDS view, or the data an ABAP SQL SELECT selects, up to the number of records asked. SAP's data as it came. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data of an ABAP database table or CDS view, or the data an ABAP SQL SELECT selects, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Available in:** cloud, onprem
 
@@ -399,7 +399,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Creates the ABAP repository object of the type object_type names, inactive, or a transport. Whether SAP took the change. For TRANSPORT: the number of the transport created, the number of its task, SAP's refusal of the task type and what is left to do when the task stays untyped. object_type required: PACKAGE(package_name*, super_package), DOMAIN(domain_name*, package_name*), DATA_ELEMENT(data_element_name*, package_name*), TRANSPORT(description*), TABLE(table_name*, package_name*), STRUCTURE(structure_name*, package_name*), TABLE_TYPE(table_type_name*, package_name*), DDL(ddl_name*, package_name*), SERVICE_DEFINITION(service_definition_name*, package_name*), SERVICE_BINDING(service_binding_name*, service_definition_name*, package_name*), CLASS(class_name*, package_name*), PROGRAM(program_name*, package_name*), INCLUDE(include_name*, package_name*), INTERFACE(interface_name*, package_name*), FUNCTION_GROUP(function_group_name*, package_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*).
+**Description:** Creates an ABAP package, domain, data element, transport, table, structure, table type, CDS view, service definition, service binding, class, program, include, interface, function group, function module, behavior definition, behavior implementation or metadata extension, inactive where it is activated.
 
 **Available in:** cloud, onprem
 
@@ -446,7 +446,7 @@ per request.
 - `implementation_type` — Behavior definition implementation type.
 - `detail` — How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
-**On ABAP Cloud (`cloud`):** Creates the ABAP repository object of the type object_type names, inactive, or a transport. Whether SAP took the change. For TRANSPORT: the number of the transport created, the number of its task, SAP's refusal of the task type and what is left to do when the task stays untyped. object_type required: PACKAGE(package_name*, super_package), DOMAIN(domain_name*, package_name*), DATA_ELEMENT(data_element_name*, package_name*), TRANSPORT(description*), TABLE(table_name*, package_name*), STRUCTURE(structure_name*, package_name*), TABLE_TYPE(table_type_name*, package_name*), DDL(ddl_name*, package_name*), SERVICE_DEFINITION(service_definition_name*, package_name*), SERVICE_BINDING(service_binding_name*, service_definition_name*, package_name*), CLASS(class_name*, package_name*), INTERFACE(interface_name*, package_name*), FUNCTION_GROUP(function_group_name*, package_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*).
+**On ABAP Cloud (`cloud`):** Creates an ABAP package, domain, data element, transport, table, structure, table type, CDS view, service definition, service binding, class, interface, function group, function module, behavior definition, behavior implementation or metadata extension, inactive where it is activated.
 
 **Parameters (`cloud`):**
 
@@ -492,7 +492,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Writes the whole content of the ABAP repository object of the type object_type names, under the lock its lock handle names. Whether SAP took the change and a lock left held when its release failed. For SERVICE_BINDING: whether SAP made the change or started it, whether it has completed or runs in the background, SAP's severity, SAP's status text, what a started change means for the service and a lock left held when its release failed. object_type required: PACKAGE(package_name*, source_code*, transport_request), DOMAIN(domain_name*, source_code*, transport_request), DATA_ELEMENT(data_element_name*, source_code*, transport_request), TABLE_TYPE(table_type_name*, source_code*, transport_request), FUNCTION_GROUP(function_group_name*, source_code*, transport_request), TABLE(table_name*, ddl_code*, transport_request), STRUCTURE(structure_name*, ddl_code*, transport_request), DDL(ddl_name*, ddl_source*, transport_request), SERVICE_DEFINITION(service_definition_name*, source_code*, transport_request), CLASS(class_name*, source_code*, transport_request), LOCAL_TEST_CLASS(class_name*, test_class_code*, transport_request), LOCAL_TYPES(class_name*, local_types_code*, transport_request), LOCAL_DEFINITIONS(class_name*, definitions_code*, transport_request), LOCAL_MACROS(class_name*, macros_code*, transport_request), UNIT_TEST(class_name*, test_class_source*, transport_request), CDS_UNIT_TEST(class_name*, test_class_source*, transport_request), PROGRAM(program_name*, source_code*, transport_request), INCLUDE(include_name*, source_code*, part, transport_request), INTERFACE(interface_name*, source_code*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, source_code*, transport_request), BEHAVIOR_DEFINITION(name*, source_code*, transport_request), BEHAVIOR_IMPLEMENTATION(class_name*, implementation_code*, transport_request), METADATA_EXTENSION(name*, source_code*, transport_request), SERVICE_BINDING(service_binding_name*, desired_publication_state*, binding_variant*, service_name, service_version), TABLE_SETTINGS(table_name*, data_class, size_category, buffering, storage_type, sharing_type, load_unit, translation, logging_enabled, is_writable_by_amdp, transport_request), PROGRAM_TEXT_ELEMENTS(program_name*, symbols, selections, headings, transport_request), FUNCTION_GROUP_TEXT_ELEMENTS(function_group_name*, symbols, selections, headings, transport_request), CLASS_TEXT_ELEMENTS(class_name*, symbols, transport_request). Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
+**Description:** Updates an ABAP package, domain, data element, table type, function group, table, structure, CDS view, service definition, class, local test class, class local types, class local definitions, class local macros, class unit test, CDS unit test, program, include, interface, function module, behavior definition, behavior implementation, metadata extension, service binding, table technical settings, program text elements, function group text elements or class text elements, under its lock. Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
 
 **Available in:** cloud, onprem
 
@@ -544,7 +544,7 @@ per request.
 - `selections` — The selection texts (programs and function groups): the whole list; texts left out are deleted.
 - `headings` — The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.
 
-**On ABAP Cloud (`cloud`):** Writes the whole content of the ABAP repository object of the type object_type names, under the lock its lock handle names. Whether SAP took the change and a lock left held when its release failed. For SERVICE_BINDING: whether SAP made the change or started it, whether it has completed or runs in the background, SAP's severity, SAP's status text, what a started change means for the service and a lock left held when its release failed. object_type required: PACKAGE(package_name*, source_code*, transport_request), DOMAIN(domain_name*, source_code*, transport_request), DATA_ELEMENT(data_element_name*, source_code*, transport_request), TABLE_TYPE(table_type_name*, source_code*, transport_request), FUNCTION_GROUP(function_group_name*, source_code*, transport_request), TABLE(table_name*, ddl_code*, transport_request), STRUCTURE(structure_name*, ddl_code*, transport_request), DDL(ddl_name*, ddl_source*, transport_request), SERVICE_DEFINITION(service_definition_name*, source_code*, transport_request), CLASS(class_name*, source_code*, transport_request), LOCAL_TEST_CLASS(class_name*, test_class_code*, transport_request), LOCAL_TYPES(class_name*, local_types_code*, transport_request), LOCAL_DEFINITIONS(class_name*, definitions_code*, transport_request), LOCAL_MACROS(class_name*, macros_code*, transport_request), UNIT_TEST(class_name*, test_class_source*, transport_request), CDS_UNIT_TEST(class_name*, test_class_source*, transport_request), INTERFACE(interface_name*, source_code*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, source_code*, transport_request), BEHAVIOR_DEFINITION(name*, source_code*, transport_request), BEHAVIOR_IMPLEMENTATION(class_name*, implementation_code*, transport_request), METADATA_EXTENSION(name*, source_code*, transport_request), SERVICE_BINDING(service_binding_name*, desired_publication_state*, binding_variant*, service_name, service_version), TABLE_SETTINGS(table_name*, data_class, size_category, buffering, storage_type, sharing_type, load_unit, translation, logging_enabled, is_writable_by_amdp, transport_request), FUNCTION_GROUP_TEXT_ELEMENTS(function_group_name*, symbols, selections, headings, transport_request), CLASS_TEXT_ELEMENTS(class_name*, symbols, transport_request). Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
+**On ABAP Cloud (`cloud`):** Updates an ABAP package, domain, data element, table type, function group, table, structure, CDS view, service definition, class, local test class, class local types, class local definitions, class local macros, class unit test, CDS unit test, interface, function module, behavior definition, behavior implementation, metadata extension, service binding, table technical settings, function group text elements or class text elements, under its lock. Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
 
 **Parameters (`cloud`):**
 
@@ -595,7 +595,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Deletes the ABAP repository object of the type object_type names, or empties a class include under the class's lock. Whether SAP deleted the object, its name and SAP's message about it. object_type required: PACKAGE(package_name*, transport_request), DOMAIN(domain_name*, transport_request), DATA_ELEMENT(data_element_name*, transport_request), TABLE(table_name*, transport_request), STRUCTURE(structure_name*, transport_request), TABLE_TYPE(table_type_name*, transport_request), DDL(ddl_name*, transport_request), SERVICE_DEFINITION(service_definition_name*, transport_request), SERVICE_BINDING(service_binding_name*, transport_request), CLASS(class_name*, transport_request), CDS_UNIT_TEST(class_name*, transport_request), PROGRAM(program_name*, transport_request), INCLUDE(include_name*, transport_request), INTERFACE(interface_name*, transport_request), FUNCTION_GROUP(function_group_name*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, transport_request), BEHAVIOR_DEFINITION(behavior_definition_name*, transport_request), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*, transport_request), METADATA_EXTENSION(metadata_extension_name*, transport_request), LOCAL_TEST_CLASS(class_name*, lock_handle*, transport_request), LOCAL_TYPES(class_name*, lock_handle*, transport_request), LOCAL_DEFINITIONS(class_name*, lock_handle*, transport_request), LOCAL_MACROS(class_name*, lock_handle*, transport_request), UNIT_TEST(class_name*, lock_handle*, transport_request). Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
+**Description:** Deletes an ABAP package, domain, data element, table, structure, table type, CDS view, service definition, service binding, class, CDS unit test, program, include, interface, function group, function module, behavior definition, behavior implementation, metadata extension, local test class, class local types, class local definitions, class local macros or class unit test, a class include under the class's lock. Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
 
 **Available in:** cloud, onprem
 
@@ -623,7 +623,7 @@ per request.
 - `behavior_implementation_name` — Behavior implementation name.
 - `metadata_extension_name` — Metadata extension name.
 
-**On ABAP Cloud (`cloud`):** Deletes the ABAP repository object of the type object_type names, or empties a class include under the class's lock. Whether SAP deleted the object, its name and SAP's message about it. object_type required: PACKAGE(package_name*, transport_request), DOMAIN(domain_name*, transport_request), DATA_ELEMENT(data_element_name*, transport_request), TABLE(table_name*, transport_request), STRUCTURE(structure_name*, transport_request), TABLE_TYPE(table_type_name*, transport_request), DDL(ddl_name*, transport_request), SERVICE_DEFINITION(service_definition_name*, transport_request), SERVICE_BINDING(service_binding_name*, transport_request), CLASS(class_name*, transport_request), CDS_UNIT_TEST(class_name*, transport_request), INTERFACE(interface_name*, transport_request), FUNCTION_GROUP(function_group_name*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, transport_request), BEHAVIOR_DEFINITION(behavior_definition_name*, transport_request), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*, transport_request), METADATA_EXTENSION(metadata_extension_name*, transport_request), LOCAL_TEST_CLASS(class_name*, lock_handle*, transport_request), LOCAL_TYPES(class_name*, lock_handle*, transport_request), LOCAL_DEFINITIONS(class_name*, lock_handle*, transport_request), LOCAL_MACROS(class_name*, lock_handle*, transport_request), UNIT_TEST(class_name*, lock_handle*, transport_request). Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
+**On ABAP Cloud (`cloud`):** Deletes an ABAP package, domain, data element, table, structure, table type, CDS view, service definition, service binding, class, CDS unit test, interface, function group, function module, behavior definition, behavior implementation, metadata extension, local test class, class local types, class local definitions, class local macros or class unit test, a class include under the class's lock. Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
 
 **Parameters (`cloud`):**
 
@@ -651,7 +651,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Activates the ABAP repository object named, by its type or its ADT type, or the objects listed, at once or by an activation run it starts. object_type: CLASS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, TABLE_TYPE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING, FUNCTION_MODULE(object_name* as GROUP|MODULE, or object_name* with function_group_name*), BEHAVIOR_IMPLEMENTATION, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS.
+**Description:** Activates an ABAP class, program, include, interface, function group, table, structure, table type, CDS view, domain, data element, behavior definition, metadata extension, package, service definition, service binding, function module, behavior implementation, program text elements, function group text elements or class text elements, another object by its ADT type, or several objects together by an activation run.
 
 **Available in:** cloud, onprem
 
@@ -665,7 +665,7 @@ per request.
 - `objects` — The objects activated together (list form).
 - `preaudit` — Run pre-audit checks before activation.
 
-**On ABAP Cloud (`cloud`):** Activates the ABAP repository object named, by its type or its ADT type, or the objects listed, at once or by an activation run it starts. object_type: CLASS, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, TABLE_TYPE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING, FUNCTION_MODULE(object_name* as GROUP|MODULE, or object_name* with function_group_name*), BEHAVIOR_IMPLEMENTATION, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS.
+**On ABAP Cloud (`cloud`):** Activates an ABAP class, interface, function group, table, structure, table type, CDS view, domain, data element, behavior definition, metadata extension, package, service definition, service binding, function module, behavior implementation, program text elements, function group text elements or class text elements, another object by its ADT type, or several objects together by an activation run.
 
 **Parameters (`cloud`):**
 
@@ -681,7 +681,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked. The number of the transport created, the number of its task, SAP's refusal of the task type and what is left to do when the task stays untyped.
+**Description:** Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked.
 
 **Available in:** cloud, onprem
 
@@ -698,7 +698,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Sorts the objects of a transport task and merges its duplicates. Whether SAP took the change, the transport task and where the change is confirmed.
+**Description:** Sorts the objects of a transport task and merges its duplicates.
 
 **Available in:** cloud, onprem
 
@@ -710,7 +710,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Moves objects from one transport task to another, each at its position in the task it leaves. Whether SAP took the change, the task they leave, the task they move to and where the change is confirmed. For each object sent: the object named and its position in the task it leaves.
+**Description:** Moves objects from one transport task to another, each at its position in the task it leaves.
 
 **Available in:** cloud, onprem
 
@@ -724,7 +724,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Locks the ABAP repository object of the type object_type names on the server instance that then holds the lock for its write, delete and unlock. The lock handle its write, delete and unlock take and the state handle of the instance that holds it: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header). object_type required: CLASS(object_name*), PROGRAM(object_name*), INCLUDE(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), TABLE_TYPE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_DEFINITION(object_name*), SERVICE_BINDING(object_name*), TABLE_SETTINGS(object_name*), PROGRAM_TEXT_ELEMENTS(object_name*), FUNCTION_GROUP_TEXT_ELEMENTS(object_name*), CLASS_TEXT_ELEMENTS(object_name*).
+**Description:** Locks an ABAP class, program, include, interface, function group, function module, table, structure, table type, CDS view, domain, data element, package, behavior definition, behavior implementation, metadata extension, service definition, service binding, table technical settings, program text elements, function group text elements or class text elements for its update, delete and unlock on the server instance that holds the lock. Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).
 
 **Available in:** cloud, onprem
 
@@ -734,7 +734,7 @@ per request.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `super_package` — PACKAGE: accepted for compatibility; the lock uses the package's name.
 
-**On ABAP Cloud (`cloud`):** Locks the ABAP repository object of the type object_type names on the server instance that then holds the lock for its write, delete and unlock. The lock handle its write, delete and unlock take and the state handle of the instance that holds it: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header). object_type required: CLASS(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), TABLE_TYPE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_DEFINITION(object_name*), SERVICE_BINDING(object_name*), TABLE_SETTINGS(object_name*), FUNCTION_GROUP_TEXT_ELEMENTS(object_name*), CLASS_TEXT_ELEMENTS(object_name*).
+**On ABAP Cloud (`cloud`):** Locks an ABAP class, interface, function group, function module, table, structure, table type, CDS view, domain, data element, package, behavior definition, behavior implementation, metadata extension, service definition, service binding, table technical settings, function group text elements or class text elements for its update, delete and unlock on the server instance that holds the lock. Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).
 
 **Parameters (`cloud`):**
 
@@ -746,7 +746,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Releases the lock this server instance holds on the ABAP repository object of the type object_type names, under its lock handle. Whether SAP took the change, that the lock was already released and why. object_type required: CLASS(object_name*, lock_handle*), PROGRAM(object_name*, lock_handle*), INCLUDE(object_name*, lock_handle*), INTERFACE(object_name*, lock_handle*), FUNCTION_GROUP(object_name*, lock_handle*), FUNCTION_MODULE(object_name*, lock_handle*), TABLE(object_name*, lock_handle*), STRUCTURE(object_name*, lock_handle*), TABLE_TYPE(object_name*, lock_handle*), DDL(object_name*, lock_handle*), DOMAIN(object_name*, lock_handle*), DATA_ELEMENT(object_name*, lock_handle*), PACKAGE(object_name*, lock_handle*), BEHAVIOR_DEFINITION(object_name*, lock_handle*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*), METADATA_EXTENSION(object_name*, lock_handle*), SERVICE_DEFINITION(object_name*, lock_handle*), SERVICE_BINDING(object_name*, lock_handle*), TABLE_SETTINGS(object_name*, lock_handle*), PROGRAM_TEXT_ELEMENTS(object_name*, lock_handle*), FUNCTION_GROUP_TEXT_ELEMENTS(object_name*, lock_handle*), CLASS_TEXT_ELEMENTS(object_name*, lock_handle*). Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
+**Description:** Unlocks an ABAP class, program, include, interface, function group, function module, table, structure, table type, CDS view, domain, data element, package, behavior definition, behavior implementation, metadata extension, service definition, service binding, table technical settings, program text elements, function group text elements or class text elements, releasing the lock this server instance holds. Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
 
 **Available in:** cloud, onprem
 
@@ -756,7 +756,7 @@ per request.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `lock_handle` (required) — Lock handle returned by lock.
 
-**On ABAP Cloud (`cloud`):** Releases the lock this server instance holds on the ABAP repository object of the type object_type names, under its lock handle. Whether SAP took the change, that the lock was already released and why. object_type required: CLASS(object_name*, lock_handle*), INTERFACE(object_name*, lock_handle*), FUNCTION_GROUP(object_name*, lock_handle*), FUNCTION_MODULE(object_name*, lock_handle*), TABLE(object_name*, lock_handle*), STRUCTURE(object_name*, lock_handle*), TABLE_TYPE(object_name*, lock_handle*), DDL(object_name*, lock_handle*), DOMAIN(object_name*, lock_handle*), DATA_ELEMENT(object_name*, lock_handle*), PACKAGE(object_name*, lock_handle*), BEHAVIOR_DEFINITION(object_name*, lock_handle*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*), METADATA_EXTENSION(object_name*, lock_handle*), SERVICE_DEFINITION(object_name*, lock_handle*), SERVICE_BINDING(object_name*, lock_handle*), TABLE_SETTINGS(object_name*, lock_handle*), FUNCTION_GROUP_TEXT_ELEMENTS(object_name*, lock_handle*), CLASS_TEXT_ELEMENTS(object_name*, lock_handle*). Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
+**On ABAP Cloud (`cloud`):** Unlocks an ABAP class, interface, function group, function module, table, structure, table type, CDS view, domain, data element, package, behavior definition, behavior implementation, metadata extension, service definition, service binding, table technical settings, function group text elements or class text elements, releasing the lock this server instance holds. Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
 
 **Parameters (`cloud`):**
 
@@ -768,7 +768,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Runs the ABAP Unit tests of chosen test classes, of a repository object or of a package, giving the run's id at once or the finished result of the test classes. The run's id to read its status and result by, the runner that ran it, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs the ABAP Unit tests of chosen test classes, of a repository object or of a package, giving the run's id at once or the finished result of the test classes.
 
 **Available in:** cloud, onprem
 
@@ -787,7 +787,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Schedules an ABAP profiler trace with its parameters, for a later profiled run of a class or a report. The profiler id a profiled run names.
+**Description:** Creates the parameters of an ABAP profiler trace, scheduling it for a later profiled run of a class or a report.
 
 **Available in:** cloud, onprem
 
@@ -812,7 +812,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Runs an ABAP class or an ABAP report, under a scheduled profiler trace when its profiler id is given. target_type CLASS: runs an ABAP class implementing if_oo_adt_classrun and gives its console output: the class that ran, its console output and the profiler and trace ids of a profiled run. target_type PROGRAM: runs an ABAP report and gives its output: the report that ran, its output and the profiler id of a profiled run.
+**Description:** Runs an ABAP class or an ABAP report, under a scheduled profiler trace when its profiler id is given. target_type CLASS: runs an ABAP class implementing if_oo_adt_classrun and gives its console output. target_type PROGRAM: runs an ABAP report and gives its output.
 
 **Available in:** cloud, onprem
 
@@ -824,7 +824,7 @@ per request.
 - `profiler_id` — The profiler id of a scheduled trace. Given, the run goes under that trace; absent, the run is plain.
 - `background` — When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
 
-**On ABAP Cloud (`cloud`):** Runs an ABAP class, under a scheduled profiler trace when its profiler id is given. target_type CLASS: runs an ABAP class implementing if_oo_adt_classrun and gives its console output: the class that ran, its console output and the profiler and trace ids of a profiled run.
+**On ABAP Cloud (`cloud`):** Runs an ABAP class, under a scheduled profiler trace when its profiler id is given. target_type CLASS: runs an ABAP class implementing if_oo_adt_classrun and gives its console output.
 
 **Parameters (`cloud`):**
 
@@ -837,7 +837,7 @@ per request.
 
 **Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** [debug] Sets, rewrites and deletes the ABAP and AMDP debugger breakpoints, and the watchpoints of the attached ABAP debuggee. The debug state's handle while it holds something: send it as the state_handle argument of every call (or in the x-mcp-state-handle header), the terminal id the runs carry, the IDE id the runs carry, the debugging mode and the user whose runs are caught. operation setBreakpoints: sets the ABAP breakpoint set of this debugging identity, shared by every IDE of the SAP user. operation syncBreakpoints: rewrites the ABAP breakpoints of the objects named or the whole set, or the breakpoints of the running AMDP session. operation deleteBreakpoint: deletes one ABAP breakpoint by its id: the id deleted. operation createWatchpoint: watches a variable of the attached ABAP debuggee. operation listWatchpoints: shows the watchpoints of the attached ABAP debuggee. operation deleteWatchpoint: removes a watchpoint of the attached ABAP debuggee.
+**Description:** [debug] Sets, rewrites and deletes the ABAP and AMDP debugger breakpoints, and the watchpoints of the attached ABAP debuggee. operation setBreakpoints: sets the ABAP breakpoint set of this debugging identity, shared by every IDE of the SAP user. operation syncBreakpoints: rewrites the ABAP breakpoints of the objects named or the whole set, or the breakpoints of the running AMDP session. operation deleteBreakpoint: deletes one ABAP breakpoint by its id. operation createWatchpoint: watches a variable of the attached ABAP debuggee. operation listWatchpoints: shows the watchpoints of the attached ABAP debuggee. operation deleteWatchpoint: removes a watchpoint of the attached ABAP debuggee.
 
 **Available in:** cloud, onprem
 
@@ -861,7 +861,7 @@ per request.
 
 **Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** [debug] Listens for, attaches and ends ABAP debuggees, and opens and ends AMDP debug sessions, one SAP call per operation. The debug state's handle while it holds something: send it as the state_handle argument of every call (or in the x-mcp-state-handle header), the terminal id the runs carry, the IDE id the runs carry, the debugging mode and the user whose runs are caught. operation checkListener: checks whether another debugger holds the ABAP debugging of this identity: that the debugging of this identity is free to take. operation listen: listens for an ABAP debuggee for the seconds asked and gives the one caught. operation stopListener: stops the ABAP listener and deletes the identity's breakpoints: that the listener stopped. operation attach: attaches the caught ABAP debuggee, so it can be stepped and read. operation detachDebugger: detaches the debugger from the ABAP debuggee, which runs on: that the debugger let the debuggee go. operation terminateDebuggee: ends the ABAP debuggee where it stands: that the debuggee ended. operation terminateDebugger: frees the ABAP debugger: that the debugger is free. operation setDebuggerSettings: sets the debugger settings given at the attached ABAP debuggee: whether system programs are debugged, whether update tasks are debugged, whether exception objects are created, whether background RFC is debugged and whether shared objects are debugged. operation start: opens an AMDP debug session for the connected SAP user. operation getEvents: reads the events of the AMDP debug session: its breaks, its breakpoint confirmations and its close. operation stop: ends the AMDP debug session: the id SAP confirms it by in an event. operation deleteDebuggee: cancels the execution of an AMDP debuggee: the id SAP confirms it by in an event. operation end: logs off every connection of the debug state and ends it, the user's breakpoints staying set: that the debug state ended and how many connections were logged off.
+**Description:** [debug] Listens for, attaches and ends ABAP debuggees, and opens and ends AMDP debug sessions, one SAP call per operation. operation checkListener: checks whether another debugger holds the ABAP debugging of this identity. operation listen: listens for an ABAP debuggee for the seconds asked and gives the one caught. operation stopListener: stops the ABAP listener and deletes the identity's breakpoints. operation attach: attaches the caught ABAP debuggee, so it can be stepped and read. operation detachDebugger: detaches the debugger from the ABAP debuggee, which runs on. operation terminateDebuggee: ends the ABAP debuggee where it stands. operation terminateDebugger: frees the ABAP debugger. operation setDebuggerSettings: sets the debugger settings given at the attached ABAP debuggee. operation start: opens an AMDP debug session for the connected SAP user. operation getEvents: reads the events of the AMDP debug session: its breaks, its breakpoint confirmations and its close. operation stop: ends the AMDP debug session. operation deleteDebuggee: cancels the execution of an AMDP debuggee. operation end: logs off every connection of the debug state and ends it, the user's breakpoints staying set.
 
 **Available in:** cloud, onprem
 
@@ -883,7 +883,7 @@ per request.
 
 **Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** [debug] Moves the stopped ABAP or AMDP debuggee by one step, one SAP call per operation. The debug state's handle while it holds something: send it as the state_handle argument of every call (or in the x-mcp-state-handle header), the terminal id the runs carry, the IDE id the runs carry, the debugging mode and the user whose runs are caught. operation stepInto: steps the ABAP debuggee into the call where it stands. operation stepOver: steps the ABAP or AMDP debuggee over the statement where it stands. operation stepReturn: steps the ABAP debuggee out of the current call. operation stepContinue: lets the ABAP or AMDP debuggee run on to its next stop. operation stepRunToLine: runs the ABAP debuggee to the source position named. operation stepJumpToLine: moves the ABAP debuggee to the source position named, skipping what lies between. operation setStackPosition: selects the stack frame of the ABAP debuggee whose variables are read: the frame selected.
+**Description:** [debug] Steps the stopped ABAP or AMDP debuggee, one SAP call per operation. operation stepInto: steps the ABAP debuggee into the call where it stands. operation stepOver: steps the ABAP or AMDP debuggee over the statement where it stands. operation stepReturn: steps the ABAP debuggee out of the current call. operation stepContinue: lets the ABAP or AMDP debuggee run on to its next stop. operation stepRunToLine: runs the ABAP debuggee to the source position named. operation stepJumpToLine: moves the ABAP debuggee to the source position named, skipping what lies between. operation setStackPosition: selects the stack frame of the ABAP debuggee whose variables are read.
 
 **Available in:** cloud, onprem
 
@@ -905,7 +905,7 @@ per request.
 
 **Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** [debug] Reads and changes the stopped ABAP or AMDP debuggee: its stack, its variables, its memory and its table variables. The debug state's handle while it holds something: send it as the state_handle argument of every call (or in the x-mcp-state-handle header), the terminal id the runs carry, the IDE id the runs carry, the debugging mode and the user whose runs are caught. operation getStack: reads the call stack of the ABAP debuggee, the stopped position on top. operation getVariables: reads variables of the ABAP debuggee by name, a component or a table record by its path. operation getChildVariables: reads the members of variables of the ABAP debuggee, or its scopes. operation getMemorySizes: reads how much memory the ABAP debuggee uses. operation createMemorySnapshot: writes a memory snapshot of the ABAP debuggee. operation setVariableValue: sets the value of a variable of the ABAP debuggee. operation getDataPreview: reads the records of a table variable at an AMDP break.
+**Description:** [debug] Reads and changes the stopped ABAP or AMDP debuggee: its stack, its variables, its memory and its table variables. operation getStack: reads the call stack of the ABAP debuggee, the stopped position on top. operation getVariables: reads variables of the ABAP debuggee by name, a component or a table record by its path. operation getChildVariables: reads the members of variables of the ABAP debuggee, or its scopes. operation getMemorySizes: reads how much memory the ABAP debuggee uses. operation createMemorySnapshot: writes a memory snapshot of the ABAP debuggee. operation setVariableValue: sets the value of a variable of the ABAP debuggee. operation getDataPreview: reads the records of a table variable at an AMDP break.
 
 **Available in:** cloud, onprem
 
@@ -927,7 +927,7 @@ per request.
 
 **Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** [debug] Records the debugger calls at the stopped ABAP debuggee or the AMDP break and sends them together, then reads each call's outcome by its number. action begin: starts recording the debugger calls at the stopped ABAP debuggee or at the AMDP break, each under the next number, to send them together: that recording is on and the state handle: send it as the state_handle argument of every call (or in the x-mcp-state-handle header). action end: sends the recorded debugger calls together on the session they were recorded on, and splits SAP's answer by call: how many calls were recorded, how many were sent and how many parts SAP's answer held. action answers: reads the outcome of each recorded debugger call of the last sending, by its number: for each number asked: the number, whether it is an error, that the number is unanswered and why; for each block of the answer of a number: its kind, its text, its annotations and its metadata; for each part of SAP's answer a number kept: its status, its status text, its headers and its body.
+**Description:** [debug] Records the debugger calls at the stopped ABAP debuggee or the AMDP break and sends them together, then reads each call's outcome by its number. action begin: starts recording the debugger calls at the stopped ABAP debuggee or at the AMDP break, each under the next number, to send them together. action end: ends the recording of debugger calls, sending them together on the session they were recorded on, and splits SAP's answer by call. action answers: reads the outcome of each recorded debugger call of the last sending, by its number. Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).
 
 **Available in:** cloud, onprem
 
@@ -941,7 +941,7 @@ per request.
 
 **Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)
 
-**Description:** [read-only] Reads one of the caller's background runs by its run handle, with the answer of a run that has ended. Its run handle, whether it is running, finished or cancelled, the tool it runs, the object it runs, when it started, when it ended and what its tool answered once the run ended.
+**Description:** [read-only] Reads one of the caller's background runs by its run handle, with the answer of a run that has ended.
 
 **Available in:** all
 
@@ -953,7 +953,7 @@ per request.
 
 **Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)
 
-**Description:** [read-only] Lists the caller's background runs, running, finished and cancelled. For each run: its run handle, whether it is running, finished or cancelled, the tool it runs, the object it runs, when it started and when it ended.
+**Description:** [read-only] Lists the caller's background runs, running, finished and cancelled.
 
 **Available in:** all
 
@@ -963,7 +963,7 @@ per request.
 
 **Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)
 
-**Description:** [read-only] Ends a background run by its run handle: a running read is cancelled and its session logged off, an ended run's answer deleted. Its run handle and whether it was cancelled or its answer deleted.
+**Description:** [read-only] Discards a background run by its run handle: a running read is cancelled and its session logged off, an ended run's answer deleted.
 
 **Available in:** all
 
@@ -975,7 +975,7 @@ per request.
 
 **Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both)
 
-**Description:** [read-only] Lists the SAP sessions of this server's destination left open by an ended server process, which may still hold locks. For each leftover session: its handle, whether it served an instance or a debug session, its destination, its SAP user and when it was last recorded.
+**Description:** [read-only] Lists the SAP sessions of this server's destination left open by an ended server process, which may still hold locks.
 
 **Available in:** all
 
@@ -985,7 +985,7 @@ per request.
 
 **Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both)
 
-**Description:** Logs off a leftover SAP session by its handle, releasing every lock it holds and deleting its record. The session's handle and that it is logged off.
+**Description:** Logs off a leftover SAP session by its handle, releasing every lock it holds and deleting its record.
 
 **Available in:** all
 
@@ -997,7 +997,7 @@ per request.
 
 **Half:** batch mode of `@mcp-abap-adt/lib`, in every compact binary
 
-**Description:** [read-only] Records the calls of the tools that allow it and sends them to SAP together, then reads each call's answer by its number. action begin: starts recording the calls of the tools that allow it, each under the next number, to send them together: that recording is on and the state handle: send it as the state_handle argument of every call (or in the x-mcp-state-handle header). action end: sends the recorded calls to SAP together, with the credentials in force, and splits SAP's answer by call: how many calls were recorded, how many were sent and how many parts SAP's answer held. action answers: reads the answer of each recorded call of the last sending, by its number: for each number asked: the number, whether it is an error, that the number is unanswered and why; for each block of the answer of a number: its kind, its text, its annotations and its metadata; for each part of SAP's answer a number kept: its status, its status text, its headers and its body.
+**Description:** [read-only] Records the calls of the tools that allow it and sends them to SAP together, then reads each call's answer by its number. action begin: starts recording the calls of the tools that allow it, each under the next number, to send them together. action end: sends the recorded calls to SAP together, with the credentials in force, and splits SAP's answer by call. action answers: reads the answer of each recorded call of the last sending, by its number. Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).
 
 **Available in:** all
 
@@ -1011,7 +1011,7 @@ per request.
 
 **Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), always listed; a call on a system whose discovery does not list abapGit is refused `abapgit_not_served`
 
-**Description:** [read-only] Reads abapGit repositories: the linked ones, a remote, the staged objects, the connection to a remote and a file. action repos: lists the abapGit repositories linked in the system, or the one with a key or of one package: for each repository linked: its key, its package, its branch, its remote URL and the state of its last pull or push on the cloud (blank initial, R running, S, W, E or A ended). action external_repo: checks an external git repository for abapGit before it is linked: its access and its branches: whether the remote repository is public or private; for each branch of the remote repository: its name and whether it is the head. action staging: gets the abapGit staging of a linked repository: what changed, to choose what a push commits: the author and the committer SAP proposes; for each changed file left unstaged, each staged file and each ignored file: its object's type, its object's name, its object's package, its file name, its state in the system and its state in the remote. action checks: checks that the system reaches an abapGit repository's remote and is let in. action file: reads one file of an abapGit repository, as the system holds it or as the remote branch holds it: the file's text as it is.
+**Description:** [read-only] Reads abapGit repositories: the linked ones, a remote, the staged objects, the connection to a remote and a file. action repos: lists the abapGit repositories linked in the system, or the one with a key or of one package. action external_repo: checks an external git repository for abapGit before it is linked: its access and its branches. action staging: reads the abapGit staging of a linked repository: what changed, to choose what a push commits. action checks: checks that the system reaches an abapGit repository's remote and is let in. action file: reads one file of an abapGit repository, as the system holds it or as the remote branch holds it.
 
 **Available in:** all
 
@@ -1025,7 +1025,7 @@ per request.
 - `version` — file: required, local (the system's) or remote (the remote branch's).
 - `detail` — repos: How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer. external_repo: How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer. staging: How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
 
-**On ABAP Cloud (`cloud`):** [read-only] Reads abapGit repositories: the linked ones, a remote, a pull's changes, the staged objects, the connection to a remote, a file and a run's error log. action repos: lists the abapGit repositories linked in the system, or the one with a key or of one package: for each repository linked: its key, its package, its branch, its remote URL and the state of its last pull or push on the cloud (blank initial, R running, S, W, E or A ended). action external_repo: checks an external git repository for abapGit before it is linked: its access and its branches: whether the remote repository is public or private; for each branch of the remote repository: its name and whether it is the head. action modified_objects: gets the objects a pull of an abapGit repository would modify in the system, before it runs: for each object a pull would overwrite and each object a pull would move to another package: its type, its name and its package. action staging: gets the abapGit staging of a linked repository: what changed, to choose what a push commits: the author and the committer SAP proposes; for each changed file left unstaged, each staged file and each ignored file: its object's type, its object's name, its object's package, its file name, its state in the system and its state in the remote. action checks: checks that the system reaches an abapGit repository's remote and is let in. action file: reads one file of an abapGit repository, as the system holds it or as the remote branch holds it: the file's text as it is. action error_log: gets the error log of the last abapGit pull or push of a repository, object by object: for each object the run handled: its type, its name and the severity of SAP's message for it (S, I, W, E or A).
+**On ABAP Cloud (`cloud`):** [read-only] Reads abapGit repositories: the linked ones, a remote, a pull's changes, the staged objects, the connection to a remote, a file and a run's error log. action repos: lists the abapGit repositories linked in the system, or the one with a key or of one package. action external_repo: checks an external git repository for abapGit before it is linked: its access and its branches. action modified_objects: reads the objects a pull of an abapGit repository would modify in the system, before it runs. action staging: reads the abapGit staging of a linked repository: what changed, to choose what a push commits. action checks: checks that the system reaches an abapGit repository's remote and is let in. action file: reads one file of an abapGit repository, as the system holds it or as the remote branch holds it. action error_log: reads the error log of the last abapGit pull or push of a repository, object by object.
 
 **Parameters (`cloud`):**
 
@@ -1042,7 +1042,7 @@ per request.
 
 **Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), always listed; a call on a system whose discovery does not list abapGit is refused `abapgit_not_served`
 
-**Description:** Changes abapGit repositories and their remotes: links a package to a remote, unlinks a package, pulls, pushes and switches the branch. action link: links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport: SAP's status and whether SAP made the change or accepted it as its own job; for each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it. action unlink: unlinks an abapGit repository by its key, keeping its objects in the system and its remote as it is. action pull: pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport: SAP's status and whether SAP made the change or accepted it as its own job; for each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it. action push: commits the objects and files chosen from an abapGit repository's staging, with its comment, author and committer, and pushes the commit to its remote branch: SAP's status and whether SAP made the change or accepted it as its own job. action switch_branch: switches an abapGit repository to a branch, creating the branch in the remote first when asked: SAP's status and whether SAP made the change or accepted it as its own job.
+**Description:** Changes abapGit repositories and their remotes: links a package to a remote, unlinks a package, pulls, pushes and switches the branch. action link: links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport. action unlink: unlinks an abapGit repository by its key, keeping its objects in the system and its remote as it is. action pull: pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport. action push: pushes the objects and files chosen from an abapGit repository's staging to its remote branch, as a commit with its comment, author and committer. action switch_branch: switches an abapGit repository to a branch, creating the branch in the remote first when asked.
 
 **Available in:** all
 
@@ -1061,7 +1061,7 @@ per request.
 - `create` — switch_branch: required, true creates the branch in the remote when it does not exist.
 - `background` — link: When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end. pull: When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end. push: When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
 
-**On ABAP Cloud (`cloud`):** Changes abapGit repositories and their remotes: links a package to a remote, unlinks a package, pulls, pushes and reads a remote branch. action link: links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport: SAP's status and whether SAP made the change or accepted it as its own job; for each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it. action unlink: unlinks an abapGit repository by its key, keeping its objects in the system and its remote as it is. action pull: pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport: SAP's status and whether SAP made the change or accepted it as its own job; for each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it. action push: commits the objects and files chosen from an abapGit repository's staging, with its comment, author and committer, and pushes the commit to its remote branch: SAP's status and whether SAP made the change or accepted it as its own job. action branch_info: gets the abapGit branch information of a remote repository for the package it would be linked to: whether the remote repository is public or private; for the branch: its name and how its folders map to packages.
+**On ABAP Cloud (`cloud`):** Changes abapGit repositories and their remotes: links a package to a remote, unlinks a package, pulls, pushes and reads a remote branch. action link: links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport. action unlink: unlinks an abapGit repository by its key, keeping its objects in the system and its remote as it is. action pull: pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport. action push: pushes the objects and files chosen from an abapGit repository's staging to its remote branch, as a commit with its comment, author and committer. action branch_info: reads the abapGit branch information of a remote repository for the package it would be linked to.
 
 **Parameters (`cloud`):**
 
@@ -1088,7 +1088,7 @@ per request.
 
 ### HandlerSession (Streamable HTTP)
 
-**Description:** [read-only] Opens or closes a long session on this server, which keeps its server instance and SAP connection between calls. action open: opens a long session on this server, keeping its server instance and SAP connection for every call that carries its state handle: the state handle every call of the session carries. action close: closes the long session a state handle names, logging off its SAP sessions and so releasing their locks: whether the session is closed and the locks, recorded calls and debug session it held.
+**Description:** [read-only] Opens or closes a long session on this server, which keeps its server instance and SAP connection between calls. action open: opens a long session on this server, keeping its server instance and SAP connection for every call that carries its state handle. action close: closes the long session a state handle names, logging off its SAP sessions and so releasing their locks.
 
 **Parameters:**
 

@@ -137,7 +137,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listabapgitrepos-read-only-abapgit"></a>
 #### ListAbapGitRepos (Read-Only / Abapgit)
-**Description:** [read-only] Lists the abapGit repositories linked in the system, or the one with a key or of one package. For each repository linked: its key, its package, its branch, its remote URL and the state of its last pull or push on the cloud (blank initial, R running, S, W, E or A ended).
+**Description:** [read-only] Lists the abapGit repositories linked in the system, or the one with a key or of one package.
 
 **Source:** `src/handlers/abapgit/readonly/handleListAbapGitRepos.ts`
 
@@ -150,7 +150,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="checkabapgitexternalrepo-read-only-abapgit"></a>
 #### CheckAbapGitExternalRepo (Read-Only / Abapgit)
-**Description:** [read-only] Checks an external git repository for abapGit before it is linked: its access and its branches. Whether the remote repository is public or private. For each branch of the remote repository: its name and whether it is the head.
+**Description:** [read-only] Checks an external git repository for abapGit before it is linked: its access and its branches.
 
 **Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitExternalRepo.ts`
 
@@ -162,7 +162,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getabapgitmodifiedobjects-read-only-abapgit"></a>
 #### GetAbapGitModifiedObjects (Read-Only / Abapgit)
-**Description:** [read-only] Gets the objects a pull of an abapGit repository would modify in the system, before it runs. For each object a pull would overwrite and each object a pull would move to another package: its type, its name and its package.
+**Description:** [read-only] Reads the objects a pull of an abapGit repository would modify in the system, before it runs.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitModifiedObjects.ts`
 
@@ -174,7 +174,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getabapgitstaging-read-only-abapgit"></a>
 #### GetAbapGitStaging (Read-Only / Abapgit)
-**Description:** [read-only] Gets the abapGit staging of a linked repository: what changed, to choose what a push commits. The author and the committer SAP proposes. For each changed file left unstaged, each staged file and each ignored file: its object's type, its object's name, its object's package, its file name, its state in the system and its state in the remote.
+**Description:** [read-only] Reads the abapGit staging of a linked repository: what changed, to choose what a push commits.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitStaging.ts`
 
@@ -197,7 +197,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getabapgitfile-read-only-abapgit"></a>
 #### GetAbapGitFile (Read-Only / Abapgit)
-**Description:** [read-only] Reads one file of an abapGit repository, as the system holds it or as the remote branch holds it. The file's text as it is.
+**Description:** [read-only] Reads one file of an abapGit repository, as the system holds it or as the remote branch holds it.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitFile.ts`
 
@@ -210,7 +210,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getabapgiterrorlog-read-only-abapgit"></a>
 #### GetAbapGitErrorLog (Read-Only / Abapgit)
-**Description:** [read-only] Gets the error log of the last abapGit pull or push of a repository, object by object. For each object the run handled: its type, its name and the severity of SAP's message for it (S, I, W, E or A).
+**Description:** [read-only] Reads the error log of the last abapGit pull or push of a repository, object by object.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitErrorLog.ts`
 
@@ -226,7 +226,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runatc-read-only-atc"></a>
 #### RunATC (Read-Only / Atc)
-**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist. The check variant it ran, the worklist holding its findings, whether the call waited for the checks to end, the finding counts of a run waited for and the id of a started run to read its status by. For each object checked: its name, its type, the function group of a function include and the include of a class include.
+**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
@@ -240,7 +240,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getatcrunstatus-read-only-atc"></a>
 #### GetATCRunStatus (Read-Only / Atc)
-**Description:** [read-only] Reads the status of an ATC run by its id, and whether it has ended. The run's id, SAP's status of the run, whether the run has ended, the worklist holding its findings and the id of its result.
+**Description:** [read-only] Reads the status of an ATC run by its id, and whether it has ended.
 
 **Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
 
@@ -251,7 +251,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getatcfindings-read-only-atc"></a>
 #### GetATCFindings (Read-Only / Atc)
-**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. The worklist ID. How many objects the run covered. How many findings there are. What an empty worklist means, while the run is still filling it. How many findings each priority has. For each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
@@ -264,7 +264,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listatcresults-read-only-atc"></a>
 #### ListATCResults (Read-Only / Atc)
-**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. How many results the system holds. For each result, newest first: its display id, its title, its check variant, its run series, when it was created, its finding counts per priority and its failure count. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleListATCResults.ts`
 
@@ -279,7 +279,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getatcresult-read-only-atc"></a>
 #### GetATCResult (Read-Only / Atc)
-**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. The result ID. Its title. Its check variant. When it was created. How many objects it covered. How many findings there are. How many findings each priority has. For each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCResult.ts`
 
@@ -295,7 +295,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getbackgroundrun-read-only-background-run"></a>
 #### GetBackgroundRun (Read-Only / Background Run)
-**Description:** [read-only] Reads one of the caller's background runs by its run handle, with the answer of a run that has ended. Its run handle, whether it is running, finished or cancelled, the tool it runs, the object it runs, when it started, when it ended and what its tool answered once the run ended.
+**Description:** [read-only] Reads one of the caller's background runs by its run handle, with the answer of a run that has ended.
 
 **Source:** `src/handlers/background_run/readonly/handleGetBackgroundRun.ts`
 
@@ -306,7 +306,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listbackgroundruns-read-only-background-run"></a>
 #### ListBackgroundRuns (Read-Only / Background Run)
-**Description:** [read-only] Lists the caller's background runs, running, finished and cancelled. For each run: its run handle, whether it is running, finished or cancelled, the tool it runs, the object it runs, when it started and when it ended.
+**Description:** [read-only] Lists the caller's background runs, running, finished and cancelled.
 
 **Source:** `src/handlers/background_run/readonly/handleListBackgroundRuns.ts`
 
@@ -317,7 +317,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="discardbackgroundrun-read-only-background-run"></a>
 #### DiscardBackgroundRun (Read-Only / Background Run)
-**Description:** [read-only] Ends a background run by its run handle: a running read is cancelled and its session logged off, an ended run's answer deleted. Its run handle and whether it was cancelled or its answer deleted.
+**Description:** [read-only] Discards a background run by its run handle: a running read is cancelled and its session logged off, an ended run's answer deleted.
 
 **Source:** `src/handlers/background_run/readonly/handleDiscardBackgroundRun.ts`
 
@@ -331,7 +331,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getbehaviordefinition-read-only-behavior-definition"></a>
 #### GetBehaviorDefinition (Read-Only / Behavior Definition)
-**Description:** [read-only] Reads the source of a RAP behavior definition at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a RAP behavior definition, or its metadata.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
@@ -351,7 +351,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getbehaviorimplementation-read-only-behavior-implementation"></a>
 #### GetBehaviorImplementation (Read-Only / Behavior Implementation)
-**Description:** [read-only] Reads the source of a RAP behavior implementation class at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a RAP behavior implementation class, or its metadata.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
@@ -371,7 +371,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getclass-read-only-class"></a>
 #### GetClass (Read-Only / Class)
-**Description:** [read-only] Reads the source of an ABAP class at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP class, or its metadata.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -391,7 +391,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
-**Description:** [read-only] Lists the version history of an ABAP class, program, interface, function module, table, structure, CDS view or other versioned object. The object's type and name. For each version: its ID, its author, when it was saved, the transport that produced it and the URI of its source.
+**Description:** [read-only] Reads the version history of an ABAP class, program, interface, function module, table, structure, CDS view or other versioned object.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
@@ -405,7 +405,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectdraft-read-only-common"></a>
 #### GetObjectDraft (Read-Only / Common)
-**Description:** [read-only] Tells whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose. Whether the object holds an unactivated change of any user. For each part, its main source or metadata or a class include: its name, its state (active, the caller's change, another user's change or undetermined), when that change was last written, how many seconds ago and the ETags of its active, inactive and working versions.
+**Description:** [read-only] Reads whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectDraft.ts`
 
@@ -414,7 +414,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `PROGRAM`, `INCLUDE`, `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
 
-**On ABAP Cloud (`cloud`):** [read-only] Tells whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose. Whether the object holds an unactivated change of any user. For each part, its main source or metadata or a class include: its name, its state (active, the caller's change, another user's change or undetermined), when that change was last written, how many seconds ago and the ETags of its active, inactive and working versions.
+**On ABAP Cloud (`cloud`):** [read-only] Reads whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose.
 
 **Parameters (`cloud`):**
 - `function_group_name` (string, optional) - The function group of a FUNCTION_MODULE (required for it).
@@ -425,7 +425,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectversionsource-read-only-common"></a>
 #### GetObjectVersionSource (Read-Only / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP class, program, interface, function module, table, CDS view or other versioned object, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of the source of an ABAP class, program, interface, function module, table, CDS view or other versioned object from its version history.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
 
@@ -437,7 +437,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectversiondiff-read-only-common"></a>
 #### GetObjectVersionDiff (Read-Only / Common)
-**Description:** [read-only] Compares two versions of a class, program, CDS view or other source object, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of a class, program, CDS view or other source object from its version history and compares them.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
 
@@ -453,7 +453,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getdataelement-read-only-data-element"></a>
 #### GetDataElement (Read-Only / Data Element)
-**Description:** [read-only] Reads an ABAP data element at the version asked, with its domain or built-in type, its labels, search help, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP data element at the version asked, with its domain or built-in type, its labels, search help, package and description.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -470,7 +470,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getddl-read-only-ddl"></a>
 #### GetDdl (Read-Only / Ddl)
-**Description:** [read-only] Reads the source of a CDS view or classic DDL view at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a CDS view or classic DDL view, or its metadata.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
@@ -490,7 +490,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getdomain-read-only-domain"></a>
 #### GetDomain (Read-Only / Domain)
-**Description:** [read-only] Reads an ABAP domain at the version asked, with its data type, length, output format, value table, fixed values, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP domain at the version asked, with its data type, length, output format, value table, fixed values, package and description.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -507,7 +507,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getenhancements-read-only-enhancement"></a>
 #### GetEnhancements (Read-Only / Enhancement)
-**Description:** [read-only] Lists the enhancement implementations of ABAP programs, includes, function groups or classes at their active version, and of their includes when asked. For each object read: its type and name, the main program of an include, how many enhancements it has and the total found across its includes. For each enhancement: its name, its type and its description. What SAP answered to each read it refused while finding the kind of an object. The includes whose enhancements SAP refused to read, with what it answered.
+**Description:** [read-only] Reads the enhancement implementations of ABAP programs, includes, function groups or classes at their active version, and of their includes when asked.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancements.ts`
 
@@ -525,7 +525,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getenhancementspot-read-only-enhancement"></a>
 #### GetEnhancementSpot (Read-Only / Enhancement)
-**Description:** [read-only] Reads an enhancement spot at its active version: its name, description, type, package and interface; for each BAdI definition: its name, short text and interface; for each related link: its address, relation, media type and title.
+**Description:** [read-only] Reads an enhancement spot at its active version.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancementSpot.ts`
 
@@ -536,7 +536,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getenhancementimpl-read-only-enhancement"></a>
 #### GetEnhancementImpl (Read-Only / Enhancement)
-**Description:** [read-only] Reads the active source of an ABAP enhancement implementation, by its name and enhancement spot. The enhancement spot, implementation's name and its source code.
+**Description:** [read-only] Reads the active source of an ABAP enhancement implementation, by its name and enhancement spot.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancementImpl.ts`
 
@@ -551,7 +551,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getfunctiongroup-read-only-function-group"></a>
 #### GetFunctionGroup (Read-Only / Function Group)
-**Description:** [read-only] Reads an ABAP function group at the version asked, with its package, description and contents. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP function group at the version asked, with its package, description and contents.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
@@ -568,7 +568,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listfunctiongroupincludes-read-only-function-include"></a>
 #### ListFunctionGroupIncludes (Read-Only / Function Include)
-**Description:** [read-only] Lists the includes of an ABAP function group, its TOP include among them, at its active version. The function group's name. How many there are. For each include: its name, its URI when SAP lists it nameless and its description.
+**Description:** [read-only] Lists the includes of an ABAP function group, its TOP include among them, at its active version.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
 
@@ -580,7 +580,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listfunctionmodules-read-only-function-include"></a>
 #### ListFunctionModules (Read-Only / Function Include)
-**Description:** [read-only] Lists the function modules of an ABAP function group, at its active version. The function group's name. How many there are. For each function module: its name, its URI when SAP lists it nameless and its description.
+**Description:** [read-only] Lists the function modules of an ABAP function group, at its active version.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
 
@@ -592,7 +592,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getfunctioninclude-read-only-function-include"></a>
 #### GetFunctionInclude (Read-Only / Function Include)
-**Description:** [read-only] Reads the source of an include of an ABAP function group at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an include of an ABAP function group, or its metadata.
 
 **Source:** `src/handlers/function_include/readonly/handleGetFunctionInclude.ts`
 
@@ -611,7 +611,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getfunctionmodule-read-only-function-module"></a>
 #### GetFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Reads the source of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -632,7 +632,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getinclude-read-only-include"></a>
 #### GetInclude (Read-Only / Include)
-**Description:** [read-only] Reads the source of an ABAP include at the version asked, or its metadata. Its source code. With a range asked, only that part of the source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP include, or its metadata.
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
@@ -649,7 +649,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getincludeslist-read-only-include"></a>
 #### GetIncludesList (Read-Only / Include)
-**Description:** [read-only] Lists every include of an ABAP program or include, with the includes each one includes, down to the last. The object's type and name. The includes left unread are named. The object itself, its root and for each include it includes: its name and whether it includes itself again or was met before elsewhere. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads every include of an ABAP program or include, with the includes each one includes, down to the last. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
 
@@ -665,7 +665,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getmainprograms-read-only-include"></a>
 #### GetMainPrograms (Read-Only / Include)
-**Description:** [read-only] Finds the main programs of an ABAP include: each program that includes it, or the function group it belongs to. The include's name. For each main program: whether it is a program or a function group and its name.
+**Description:** [read-only] Reads the main programs of an ABAP include: each program that includes it, or the function group it belongs to.
 
 **Source:** `src/handlers/include/readonly/handleGetMainPrograms.ts`
 
@@ -680,7 +680,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getinterface-read-only-interface"></a>
 #### GetInterface (Read-Only / Interface)
-**Description:** [read-only] Reads the source of an ABAP interface at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP interface, or its metadata.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
@@ -700,7 +700,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listleftoversessions-read-only-leftover-session"></a>
 #### ListLeftoverSessions (Read-Only / Leftover Session)
-**Description:** [read-only] Lists the SAP sessions of this server's destination left open by an ended server process, which may still hold locks. For each leftover session: its handle, whether it served an instance or a debug session, its destination, its SAP user and when it was last recorded.
+**Description:** [read-only] Lists the SAP sessions of this server's destination left open by an ended server process, which may still hold locks.
 
 **Source:** `src/handlers/leftover_session/session/handleListLeftoverSessions.ts`
 
@@ -725,7 +725,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getmessageclassmessage-read-only-message-class"></a>
 #### GetMessageClassMessage (Read-Only / Message Class)
-**Description:** [read-only] Reads one message of an ABAP message class at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time. SAP's data as it came.
+**Description:** [read-only] Reads one message of an ABAP message class at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -741,7 +741,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getmetadataextension-read-only-metadata-extension"></a>
 #### GetMetadataExtension (Read-Only / Metadata Extension)
-**Description:** [read-only] Reads the source of a CDS metadata extension at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a CDS metadata extension, or its metadata.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
@@ -761,7 +761,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getpackagecontents-read-only-package"></a>
 #### GetPackageContents (Read-Only / Package)
-**Description:** [read-only] Lists the objects of one or more ABAP packages, with the objects of their subpackages when asked. For each object of the package or a subpackage, under its own package: its type, its name, its technical name where it differs, its URI when SAP lists it nameless and its description, with descriptions asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the objects of one or more ABAP packages, with the objects of their subpackages when asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/package/readonly/handleGetPackageContents.ts`
 
@@ -778,7 +778,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getpackage-read-only-package"></a>
 #### GetPackage (Read-Only / Package)
-**Description:** [read-only] Reads an ABAP package at the version asked: its name, description, type, super package, software component, application component, transport layer, language version and person responsible; for each subpackage: its name and its description.
+**Description:** [read-only] Reads an ABAP package at the version asked.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -796,7 +796,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getprogram-read-only-program"></a>
 #### GetProgram (Read-Only / Program)
-**Description:** [read-only] Reads the source of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, or its metadata.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -816,7 +816,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
-**Description:** [read-only] Finds ABAP repository objects by name or name pattern, of any type or of one: classes, programs, tables, interfaces and every other kind. For each object found: its name, its type, its description and its package. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Finds ABAP repository objects by name or name pattern, of any type or of one: classes, programs, tables, interfaces and every other kind. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
@@ -831,7 +831,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectslist-read-only-search"></a>
 #### GetObjectsList (Read-Only / Search)
-**Description:** [read-only] Lists every object inside an ABAP program, function group, class, package or other composite object, down to its nested includes and subcomponents: the parent's type and name and number of objects; for each object inside it: its type, its name, its technical name where it differs and its URI when SAP lists it nameless. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads every object inside an ABAP program, function group, class, package or other composite object, down to its nested includes and subcomponents. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsList.ts`
 
@@ -848,7 +848,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectsbytype-read-only-search"></a>
 #### GetObjectsByType (Read-Only / Search)
-**Description:** [read-only] Lists the objects of one type, such as classes, tables, programs or interfaces, in an ABAP package or other composite object: the parent's type and name, node ID and number of objects; for each object of the type: its type, its name, its technical name where it differs, its URI when SAP lists it nameless and its short description, by default; the nodes SAP left unloaded are named; the nodes below it are named by their type and node ID.
+**Description:** [read-only] Reads the objects of one type, such as classes, tables, programs or interfaces, in an ABAP package or other composite object.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 
@@ -867,7 +867,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getservicebinding-read-only-service-binding"></a>
 #### GetServiceBinding (Read-Only / Service Binding)
-**Description:** [read-only] Reads an OData service binding at its active version, with its binding definition, or its package, person responsible and description, in the format asked. SAP's data as it came.
+**Description:** [read-only] Reads an OData service binding at its active version, with its binding definition, or its package, person responsible and description, in the format asked.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
@@ -885,7 +885,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getservicedefinition-read-only-service-definition"></a>
 #### GetServiceDefinition (Read-Only / Service Definition)
-**Description:** [read-only] Reads the source of a service definition at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a service definition, or its metadata.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
@@ -905,7 +905,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
-**Description:** [read-only] Reads the structures embedded in one or more ABAP structures, through their includes and appends, down to the last, at the version asked. The name of the structure read and whether its appends could be found. The appends SAP refused to read are named. For the structure itself and for each structure it embeds: its name, whether it is an include or an append, the component it is embedded under, whether it embeds itself again and whether SAP refused to read it. What SAP answered for each structure it refused to read. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the structures embedded in one or more ABAP structures, through their includes and appends, down to the last, at the version asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
 
@@ -921,7 +921,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getstructure-read-only-structure"></a>
 #### GetStructure (Read-Only / Structure)
-**Description:** [read-only] Reads an ABAP structure at the version asked, with its definition source, or its package, person responsible and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP structure at the version asked, with its definition source, or its package, person responsible and description.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
@@ -941,7 +941,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getservicebindingpreviewurl-read-only-system"></a>
 #### GetServiceBindingPreviewUrl (Read-Only / System)
-**Description:** [read-only] Builds the Fiori preview URL of a published OData service binding, with its service and $metadata URLs: its service's live state, OData protocol, service, service definition, service version, entity sets, binding category, client, logon language, associations, service URL, service URL source, $metadata URL, annotation URL, preview URL, preview descriptor, notes, whether it is published, whether the system's HTTP origin is known, what the preview URL still needs and the failure of reading the system's client and language.
+**Description:** [read-only] Reads the Fiori preview URL of a published OData service binding, with its service and $metadata URLs.
 
 **Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
 
@@ -969,7 +969,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettransaction-read-only-system"></a>
 #### GetTransaction (Read-Only / System)
-**Description:** [read-only] Reads the properties of an ABAP transaction code: the transaction's name, text and package; for each property, such as its application component, package, type, owner or language: its facet, its name and its text.
+**Description:** [read-only] Reads the properties of an ABAP transaction code.
 
 **Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
 
@@ -981,7 +981,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimelistprofilertracefiles-read-only-system"></a>
 #### RuntimeListProfilerTraceFiles (Read-Only / System)
-**Description:** [read-only] Lists the ABAP profiler traces recorded in the system: how many there are; for each trace: its ID, when it was recorded, the object it traced, its state and its runtime.
+**Description:** [read-only] Lists the ABAP profiler traces recorded in the system.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
 
@@ -992,7 +992,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimegetprofilertracedata-read-only-system"></a>
 #### RuntimeGetProfilerTraceData (Read-Only / System)
-**Description:** [read-only] Reads one view of an ABAP profiler trace: its hit list, its statements or its database accesses. The view read, the trace and the view's data as the profiler read it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads one view of an ABAP profiler trace: its hit list, its statements or its database accesses. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts`
 
@@ -1009,7 +1009,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimegetdumpbyid-read-only-system"></a>
 #### RuntimeGetDumpById (Read-Only / System)
-**Description:** [read-only] Reads an ABAP runtime dump by its id, with a summary of where and why its program terminated. The dump's id, the view read, the summary of where and why its program terminated and the dump as SAP gave it.
+**Description:** [read-only] Reads an ABAP runtime dump by its id, with a summary of where and why its program terminated.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
 
@@ -1022,7 +1022,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimeanalyzeprofilertrace-read-only-system"></a>
 #### RuntimeAnalyzeProfilerTrace (Read-Only / System)
-**Description:** [read-only] Summarises one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time. The trace, the view read, the view's record count and its top records by time and the view's data as the profiler read it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Analyzes one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
 
@@ -1037,7 +1037,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimelistfeeds-read-only-system"></a>
 #### RuntimeListFeeds (Read-Only / System)
-**Description:** [read-only] Reads the runtime feeds of an ABAP system: its short dumps, system messages or SAP Gateway errors by user and time, or the feeds there are and their variants. For the feed read: how many items it holds, where the next read starts when more remain and the second holding more items than one read gives. For each feed there is: its ID, its title and its category. For each variant of a feed: its feed, its title, its query and whether it is the default. For each short dump, newest first: its dump ID, when it happened and its title. For each system message: its ID, when it was created, its author and its title. For each SAP Gateway error: its operation ID, the kind of its detail, when it happened, its type, its short text and the user it happened to. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists the short dumps, system messages or SAP Gateway errors of an ABAP system by user and time, or the runtime feeds there are and their variants. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
 
@@ -1060,7 +1060,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimelistsystemmessages-read-only-system"></a>
 #### RuntimeListSystemMessages (Read-Only / System)
-**Description:** [read-only] Lists the system messages of the SAP system, the ones SM02 shows, optionally by one author: how many there are; for each system message: its ID, when it was created, its author and its title.
+**Description:** [read-only] Lists the system messages of the SAP system, the ones SM02 shows, optionally by one author.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
 
@@ -1075,7 +1075,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimegetgatewayerrorlog-read-only-system"></a>
 #### RuntimeGetGatewayErrorLog (Read-Only / System)
-**Description:** [read-only] Lists the errors of the SAP Gateway error log, the one /IWFND/ERROR_LOG shows, or reads the detail of one error: how many there are; for each error: its operation ID, the kind of its detail, when it happened, its type, its short text and the user it happened to.
+**Description:** [read-only] Reads the errors of the SAP Gateway error log, the one /IWFND/ERROR_LOG shows, or the detail of one error.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
 
@@ -1093,7 +1093,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Finds where an ABAP class, function module, table or other repository object is used: every object that uses, calls or references it. How many references SAP counts. For each object that uses it, under its package: its type, its name, its URI when SAP lists it nameless and how it uses the object, where SAP tells it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads where an ABAP class, function module, table or other repository object is used: every object that uses, calls or references it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
@@ -1114,7 +1114,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectinfo-read-only-system"></a>
 #### GetObjectInfo (Read-Only / System)
-**Description:** [read-only] Reads the repository browser of a package, class, program, function group or other repository object, with descriptions and packages when asked: for each object: its type, name, description, package and objects it holds, down to the depth asked; for each object whose read failed: its type, name and failure. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the repository browser of a package, class, program, function group or other repository object, with descriptions and packages when asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectInfo.ts`
 
@@ -1131,7 +1131,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getinactiveobjects-read-only-system"></a>
 #### GetInactiveObjects (Read-Only / System)
-**Description:** [read-only] Lists the inactive ABAP objects of the system: classes, tables, CDS views and other objects changed and awaiting activation: how many there are; for each inactive object: its type, its name and the object it belongs to, such as a function group.
+**Description:** [read-only] Reads the inactive ABAP objects of the system: classes, tables, CDS views and other objects changed and awaiting activation.
 
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
 
@@ -1142,7 +1142,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getadttypes-read-only-system"></a>
 #### GetAdtTypes (Read-Only / System)
-**Description:** [read-only] Lists the repository object types the ABAP system knows, by their type codes: how many there are; for each object type: its code and its description.
+**Description:** [read-only] Reads the repository object types the ABAP system knows, by their type codes.
 
 **Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
 
@@ -1154,7 +1154,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectstructure-read-only-system"></a>
 #### GetObjectStructure (Read-Only / System)
-**Description:** [read-only] Reads the structure of an ABAP repository object, such as a CDS view: its parts and their parts, down to the last level. Each part of the object, such as an element, an association or an annotation, is named by its type and its name or description, at its depth.
+**Description:** [read-only] Reads the structure of an ABAP repository object, such as a CDS view: its parts and their parts, down to the last level.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
 
@@ -1167,7 +1167,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectoutline-read-only-system"></a>
 #### GetObjectOutline (Read-Only / System)
-**Description:** [read-only] Lists the components of an ABAP class, interface, program or function group, with where each one is defined in its source. The object's type and name. The include its components are defined in. For each component, such as a type, attribute, method, event, local class, form or module, at its depth: its name, its kind, its visibility, where its definition starts and the include it is defined in, where that differs.
+**Description:** [read-only] Reads the components of an ABAP class, interface, program or function group, with where each one is defined in its source.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectOutline.ts`
 
@@ -1177,7 +1177,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `PROG/P`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, PROG/P, FUGR/F (class, interface, program, function group).
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
-**On ABAP Cloud (`cloud`):** [read-only] Lists the components of an ABAP class, interface, program or function group, with where each one is defined in its source. The object's type and name. The include its components are defined in. For each component, such as a type, attribute, method, event, local class, form or module, at its depth: its name, its kind, its visibility, where its definition starts and the include it is defined in, where that differs.
+**On ABAP Cloud (`cloud`):** [read-only] Reads the components of an ABAP class, interface, program or function group, with where each one is defined in its source.
 
 **Parameters (`cloud`):**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
@@ -1202,7 +1202,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="describebylist-read-only-system"></a>
 #### DescribeByList (Read-Only / System)
-**Description:** [read-only] Describes several ABAP repository objects named in one call, each by its name and, when known, its type. For each object found: its name, its type, its description and its package. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Describes several ABAP repository objects named in one call, each by its name and, when known, its type. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
 
@@ -1215,7 +1215,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getpackagetree-read-only-system"></a>
 #### GetPackageTree (Read-Only / System)
-**Description:** [read-only] Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level. For each subpackage and object below it, at its depth: its type, its name, its technical name when SAP lists it nameless, its URI when SAP lists it nameless and its description, with descriptions asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
@@ -1233,7 +1233,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getsqlquery-read-only-system"></a>
 #### GetSqlQuery (Read-Only / System)
-**Description:** [read-only] Runs an ABAP SQL SELECT over database tables and CDS views and reads the data it selects, up to the number of records asked. SAP's data as it came. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data an ABAP SQL SELECT selects from database tables and CDS views, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
 
@@ -1249,7 +1249,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="searchsource-read-only-system"></a>
 #### SearchSource (Read-Only / System)
-**Description:** [read-only] Searches the ABAP source code of one or more packages for a text: programs, includes, function groups, classes, interfaces and CDS sources. How many objects and sources were searched, and how many objects matched. Which limit stopped the search, when one did. The package parts SAP left unloaded are named, each by its package and type. The nameless objects SAP lists, left unsearched, are named by what tells them apart. For each match, under its object named by package, type and name: its include, its position in the source and the source code that matched, when snippets are asked. With objects asked, for each object it matched in, named by package, type and name: its include and how many matches it has. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Searches the ABAP source code of one or more packages for a text: programs, includes, function groups, classes, interfaces and CDS sources. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleSearchSource.ts`
 
@@ -1276,7 +1276,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettablesettings-read-only-table"></a>
 #### GetTableSettings (Read-Only / Table)
-**Description:** [read-only] Reads the technical settings of an ABAP database table at the version asked: its description, data class, size category, buffering, storage type, sharing type, load unit, translation, logging and whether AMDP may write to it on ABAP Cloud.
+**Description:** [read-only] Reads the technical settings of an ABAP database table at the version asked.
 
 **Source:** `src/handlers/table/readonly/handleGetTableSettings.ts`
 
@@ -1288,7 +1288,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettable-read-only-table"></a>
 #### GetTable (Read-Only / Table)
-**Description:** [read-only] Reads an ABAP database table at the version asked, with its definition source, or its package, person responsible and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP database table at the version asked, with its definition source, or its package, person responsible and description.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
@@ -1305,7 +1305,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
-**Description:** [read-only] Reads the data of an ABAP database table or CDS view, as SE16 previews it, up to the number of records asked. SAP's data as it came. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data of an ABAP database table or CDS view, as SE16 previews it, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
 
@@ -1324,7 +1324,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettabletype-read-only-table-type"></a>
 #### GetTableType (Read-Only / Table Type)
-**Description:** [read-only] Reads an ABAP table type at the version asked, with its element type, access, key, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP table type at the version asked, with its element type, access, key, package and description.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
@@ -1341,7 +1341,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettextelements-read-only-text-elements"></a>
 #### GetTextElements (Read-Only / Text Elements)
-**Description:** [read-only] Reads the text elements of an ABAP program, function group or class in its original language at the version asked: text symbols, selection texts and headings. For each text symbol: its key, its text and its maximum length. For each selection text: its name, its text and whether it is the dictionary's label. Its headings: the list heading, the first of the four headings below it, the second, the third and the fourth.
+**Description:** [read-only] Reads the text elements of an ABAP program, function group or class in its original language at the version asked: text symbols, selection texts and headings.
 
 **Source:** `src/handlers/text_elements/readonly/handleGetTextElements.ts`
 
@@ -1358,7 +1358,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettransport-read-only-transport"></a>
 #### GetTransport (Read-Only / Transport)
-**Description:** [read-only] Reads an ABAP transport or one of its tasks by its number, and says which of the two it is. For a transport: its number, description, type, status, owner and target system and how many tasks it has. For each of its tasks: its number, owner, status, description and how many objects it holds. For a task: its number, its transport, description, type, status and owner, its transport's number, type, status and target system and how many objects it holds. For each of its objects: its program ID, type, name and position. The objects SAP lists only in part, with what it gives of each.
+**Description:** [read-only] Reads an ABAP transport or one of its tasks by its number, and says which of the two it is.
 
 **Source:** `src/handlers/transport/readonly/handleGetTransport.ts`
 
@@ -1374,7 +1374,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listtransports-read-only-transport"></a>
 #### ListTransports (Read-Only / Transport)
-**Description:** [read-only] Lists a user's transports, workbench, customizing and transport-of-copies alike, that the user owns or holds a task in: how many there are; for each transport: its number, its type, its status, its owner, its target system and its description. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists a user's transports, workbench, customizing and transport-of-copies alike, that the user owns or holds a task in. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/transport/readonly/handleListTransports.ts`
 
@@ -1390,7 +1390,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="readtransportobjects-read-only-transport"></a>
 #### ReadTransportObjects (Read-Only / Transport)
-**Description:** [read-only] Lists the objects a transport or one of its tasks holds, each with the position a removal names: the transport number and number of objects; for each object, under its task and its program ID: its type, its name and its position, which a removal names; the objects SAP lists nameless or untyped are named by what they carry.
+**Description:** [read-only] Reads the objects a transport or one of its tasks holds, each with the position a removal names.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
 
@@ -1404,7 +1404,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="readtransportactionlog-read-only-transport"></a>
 #### ReadTransportActionLog (Read-Only / Transport)
-**Description:** [read-only] Reads the action log of a transport or task: every event of its life, its objects added and taken out among them: the transport number and number of events; for each event, such as created, object added, object deleted or owner changed: its text.
+**Description:** [read-only] Reads the action log of a transport or task: every event of its life, its objects added and taken out among them.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
 
@@ -1421,7 +1421,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getunittestresult-read-only-unit-test"></a>
 #### GetUnitTestResult (Read-Only / Unit Test)
-**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on. The run's id, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
+**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -1445,7 +1445,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="sessionopen-streamable-http"></a>
 ### SessionOpen (Streamable HTTP)
-**Description:** [read-only] Opens a long session on this server, keeping its server instance and SAP connection for every call that carries its state handle. The state handle every call of the session carries.
+**Description:** [read-only] Opens a long session on this server, keeping its server instance and SAP connection for every call that carries its state handle.
 
 **Parameters:**
 - `state_handle` (string, optional) - The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance.
@@ -1454,7 +1454,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="sessionclose-streamable-http"></a>
 ### SessionClose (Streamable HTTP)
-**Description:** [read-only] Closes the long session a state handle names, logging off its SAP sessions and so releasing their locks. Whether the session is closed and the locks, recorded calls and debug session it held.
+**Description:** [read-only] Closes the long session a state handle names, logging off its SAP sessions and so releasing their locks.
 
 **Parameters:**
 - `state_handle` (string, optional) - The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance.

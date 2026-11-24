@@ -408,7 +408,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkabapgitexternalrepo-read-only-abapgit"></a>
 #### CheckAbapGitExternalRepo (Read-Only / Abapgit)
-**Description:** [read-only] Checks an external git repository for abapGit before it is linked: its access and its branches. Whether the remote repository is public or private. For each branch of the remote repository: its name and whether it is the head.
+**Description:** [read-only] Checks an external git repository for abapGit before it is linked: its access and its branches.
 
 **Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitExternalRepo.ts`
 
@@ -431,7 +431,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getabapgiterrorlog-read-only-abapgit"></a>
 #### GetAbapGitErrorLog (Read-Only / Abapgit)
-**Description:** [read-only] Gets the error log of the last abapGit pull or push of a repository, object by object. For each object the run handled: its type, its name and the severity of SAP's message for it (S, I, W, E or A).
+**Description:** [read-only] Reads the error log of the last abapGit pull or push of a repository, object by object.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitErrorLog.ts`
 
@@ -444,7 +444,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getabapgitfile-read-only-abapgit"></a>
 #### GetAbapGitFile (Read-Only / Abapgit)
-**Description:** [read-only] Reads one file of an abapGit repository, as the system holds it or as the remote branch holds it. The file's text as it is.
+**Description:** [read-only] Reads one file of an abapGit repository, as the system holds it or as the remote branch holds it.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitFile.ts`
 
@@ -457,7 +457,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getabapgitmodifiedobjects-read-only-abapgit"></a>
 #### GetAbapGitModifiedObjects (Read-Only / Abapgit)
-**Description:** [read-only] Gets the objects a pull of an abapGit repository would modify in the system, before it runs. For each object a pull would overwrite and each object a pull would move to another package: its type, its name and its package.
+**Description:** [read-only] Reads the objects a pull of an abapGit repository would modify in the system, before it runs.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitModifiedObjects.ts`
 
@@ -469,7 +469,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getabapgitstaging-read-only-abapgit"></a>
 #### GetAbapGitStaging (Read-Only / Abapgit)
-**Description:** [read-only] Gets the abapGit staging of a linked repository: what changed, to choose what a push commits. The author and the committer SAP proposes. For each changed file left unstaged, each staged file and each ignored file: its object's type, its object's name, its object's package, its file name, its state in the system and its state in the remote.
+**Description:** [read-only] Reads the abapGit staging of a linked repository: what changed, to choose what a push commits.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitStaging.ts`
 
@@ -481,7 +481,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listabapgitrepos-read-only-abapgit"></a>
 #### ListAbapGitRepos (Read-Only / Abapgit)
-**Description:** [read-only] Lists the abapGit repositories linked in the system, or the one with a key or of one package. For each repository linked: its key, its package, its branch, its remote URL and the state of its last pull or push on the cloud (blank initial, R running, S, W, E or A ended).
+**Description:** [read-only] Lists the abapGit repositories linked in the system, or the one with a key or of one package.
 
 **Source:** `src/handlers/abapgit/readonly/handleListAbapGitRepos.ts`
 
@@ -497,7 +497,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="discardbackgroundrun-read-only-background-run"></a>
 #### DiscardBackgroundRun (Read-Only / Background Run)
-**Description:** [read-only] Ends a background run by its run handle: a running read is cancelled and its session logged off, an ended run's answer deleted. Its run handle and whether it was cancelled or its answer deleted.
+**Description:** [read-only] Discards a background run by its run handle: a running read is cancelled and its session logged off, an ended run's answer deleted.
 
 **Source:** `src/handlers/background_run/readonly/handleDiscardBackgroundRun.ts`
 
@@ -508,7 +508,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbackgroundrun-read-only-background-run"></a>
 #### GetBackgroundRun (Read-Only / Background Run)
-**Description:** [read-only] Reads one of the caller's background runs by its run handle, with the answer of a run that has ended. Its run handle, whether it is running, finished or cancelled, the tool it runs, the object it runs, when it started, when it ended and what its tool answered once the run ended.
+**Description:** [read-only] Reads one of the caller's background runs by its run handle, with the answer of a run that has ended.
 
 **Source:** `src/handlers/background_run/readonly/handleGetBackgroundRun.ts`
 
@@ -519,7 +519,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listbackgroundruns-read-only-background-run"></a>
 #### ListBackgroundRuns (Read-Only / Background Run)
-**Description:** [read-only] Lists the caller's background runs, running, finished and cancelled. For each run: its run handle, whether it is running, finished or cancelled, the tool it runs, the object it runs, when it started and when it ended.
+**Description:** [read-only] Lists the caller's background runs, running, finished and cancelled.
 
 **Source:** `src/handlers/background_run/readonly/handleListBackgroundRuns.ts`
 
@@ -533,7 +533,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviordefinition-read-only-behavior-definition"></a>
 #### GetBehaviorDefinition (Read-Only / Behavior Definition)
-**Description:** [read-only] Reads the source of a RAP behavior definition at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a RAP behavior definition, or its metadata.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
@@ -553,7 +553,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviorimplementation-read-only-behavior-implementation"></a>
 #### GetBehaviorImplementation (Read-Only / Behavior Implementation)
-**Description:** [read-only] Reads the source of a RAP behavior implementation class at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a RAP behavior implementation class, or its metadata.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
@@ -573,7 +573,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclass-read-only-class"></a>
 #### GetClass (Read-Only / Class)
-**Description:** [read-only] Reads the source of an ABAP class at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP class, or its metadata.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -593,7 +593,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectdraft-read-only-common"></a>
 #### GetObjectDraft (Read-Only / Common)
-**Description:** [read-only] Tells whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose. Whether the object holds an unactivated change of any user. For each part, its main source or metadata or a class include: its name, its state (active, the caller's change, another user's change or undetermined), when that change was last written, how many seconds ago and the ETags of its active, inactive and working versions.
+**Description:** [read-only] Reads whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectDraft.ts`
 
@@ -602,7 +602,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `PROGRAM`, `INCLUDE`, `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
 
-**On ABAP Cloud (`cloud`):** [read-only] Tells whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose. Whether the object holds an unactivated change of any user. For each part, its main source or metadata or a class include: its name, its state (active, the caller's change, another user's change or undetermined), when that change was last written, how many seconds ago and the ETags of its active, inactive and working versions.
+**On ABAP Cloud (`cloud`):** [read-only] Reads whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose.
 
 **Parameters (`cloud`):**
 - `function_group_name` (string, optional) - The function group of a FUNCTION_MODULE (required for it).
@@ -613,7 +613,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectversiondiff-read-only-common"></a>
 #### GetObjectVersionDiff (Read-Only / Common)
-**Description:** [read-only] Compares two versions of a class, program, CDS view or other source object, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of a class, program, CDS view or other source object from its version history and compares them.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
 
@@ -626,7 +626,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
-**Description:** [read-only] Lists the version history of an ABAP class, program, interface, function module, table, structure, CDS view or other versioned object. The object's type and name. For each version: its ID, its author, when it was saved, the transport that produced it and the URI of its source.
+**Description:** [read-only] Reads the version history of an ABAP class, program, interface, function module, table, structure, CDS view or other versioned object.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
@@ -640,7 +640,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectversionsource-read-only-common"></a>
 #### GetObjectVersionSource (Read-Only / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP class, program, interface, function module, table, CDS view or other versioned object, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of the source of an ABAP class, program, interface, function module, table, CDS view or other versioned object from its version history.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
 
@@ -655,7 +655,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getdataelement-read-only-data-element"></a>
 #### GetDataElement (Read-Only / Data Element)
-**Description:** [read-only] Reads an ABAP data element at the version asked, with its domain or built-in type, its labels, search help, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP data element at the version asked, with its domain or built-in type, its labels, search help, package and description.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -672,7 +672,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getddl-read-only-ddl"></a>
 #### GetDdl (Read-Only / Ddl)
-**Description:** [read-only] Reads the source of a CDS view or classic DDL view at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a CDS view or classic DDL view, or its metadata.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
@@ -692,7 +692,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getdomain-read-only-domain"></a>
 #### GetDomain (Read-Only / Domain)
-**Description:** [read-only] Reads an ABAP domain at the version asked, with its data type, length, output format, value table, fixed values, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP domain at the version asked, with its data type, length, output format, value table, fixed values, package and description.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -709,7 +709,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getenhancementimpl-read-only-enhancement"></a>
 #### GetEnhancementImpl (Read-Only / Enhancement)
-**Description:** [read-only] Reads the active source of an ABAP enhancement implementation, by its name and enhancement spot. The enhancement spot, implementation's name and its source code.
+**Description:** [read-only] Reads the active source of an ABAP enhancement implementation, by its name and enhancement spot.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancementImpl.ts`
 
@@ -721,7 +721,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getenhancements-read-only-enhancement"></a>
 #### GetEnhancements (Read-Only / Enhancement)
-**Description:** [read-only] Lists the enhancement implementations of ABAP programs, includes, function groups or classes at their active version, and of their includes when asked. For each object read: its type and name, the main program of an include, how many enhancements it has and the total found across its includes. For each enhancement: its name, its type and its description. What SAP answered to each read it refused while finding the kind of an object. The includes whose enhancements SAP refused to read, with what it answered.
+**Description:** [read-only] Reads the enhancement implementations of ABAP programs, includes, function groups or classes at their active version, and of their includes when asked.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancements.ts`
 
@@ -739,7 +739,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getenhancementspot-read-only-enhancement"></a>
 #### GetEnhancementSpot (Read-Only / Enhancement)
-**Description:** [read-only] Reads an enhancement spot at its active version: its name, description, type, package and interface; for each BAdI definition: its name, short text and interface; for each related link: its address, relation, media type and title.
+**Description:** [read-only] Reads an enhancement spot at its active version.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancementSpot.ts`
 
@@ -753,7 +753,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctiongroup-read-only-function-group"></a>
 #### GetFunctionGroup (Read-Only / Function Group)
-**Description:** [read-only] Reads an ABAP function group at the version asked, with its package, description and contents. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP function group at the version asked, with its package, description and contents.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
@@ -770,7 +770,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctioninclude-read-only-function-include"></a>
 #### GetFunctionInclude (Read-Only / Function Include)
-**Description:** [read-only] Reads the source of an include of an ABAP function group at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an include of an ABAP function group, or its metadata.
 
 **Source:** `src/handlers/function_include/readonly/handleGetFunctionInclude.ts`
 
@@ -786,7 +786,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listfunctiongroupincludes-read-only-function-include"></a>
 #### ListFunctionGroupIncludes (Read-Only / Function Include)
-**Description:** [read-only] Lists the includes of an ABAP function group, its TOP include among them, at its active version. The function group's name. How many there are. For each include: its name, its URI when SAP lists it nameless and its description.
+**Description:** [read-only] Lists the includes of an ABAP function group, its TOP include among them, at its active version.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
 
@@ -798,7 +798,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listfunctionmodules-read-only-function-include"></a>
 #### ListFunctionModules (Read-Only / Function Include)
-**Description:** [read-only] Lists the function modules of an ABAP function group, at its active version. The function group's name. How many there are. For each function module: its name, its URI when SAP lists it nameless and its description.
+**Description:** [read-only] Lists the function modules of an ABAP function group, at its active version.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
 
@@ -813,7 +813,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctionmodule-read-only-function-module"></a>
 #### GetFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Reads the source of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -834,7 +834,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinclude-read-only-include"></a>
 #### GetInclude (Read-Only / Include)
-**Description:** [read-only] Reads the source of an ABAP include at the version asked, or its metadata. Its source code. With a range asked, only that part of the source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP include, or its metadata.
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
@@ -851,7 +851,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getincludeslist-read-only-include"></a>
 #### GetIncludesList (Read-Only / Include)
-**Description:** [read-only] Lists every include of an ABAP program or include, with the includes each one includes, down to the last. The object's type and name. The includes left unread are named. The object itself, its root and for each include it includes: its name and whether it includes itself again or was met before elsewhere. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads every include of an ABAP program or include, with the includes each one includes, down to the last. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
 
@@ -867,7 +867,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmainprograms-read-only-include"></a>
 #### GetMainPrograms (Read-Only / Include)
-**Description:** [read-only] Finds the main programs of an ABAP include: each program that includes it, or the function group it belongs to. The include's name. For each main program: whether it is a program or a function group and its name.
+**Description:** [read-only] Reads the main programs of an ABAP include: each program that includes it, or the function group it belongs to.
 
 **Source:** `src/handlers/include/readonly/handleGetMainPrograms.ts`
 
@@ -882,7 +882,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterface-read-only-interface"></a>
 #### GetInterface (Read-Only / Interface)
-**Description:** [read-only] Reads the source of an ABAP interface at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP interface, or its metadata.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
@@ -913,7 +913,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmessageclassmessage-read-only-message-class"></a>
 #### GetMessageClassMessage (Read-Only / Message Class)
-**Description:** [read-only] Reads one message of an ABAP message class at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time. SAP's data as it came.
+**Description:** [read-only] Reads one message of an ABAP message class at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -929,7 +929,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextension-read-only-metadata-extension"></a>
 #### GetMetadataExtension (Read-Only / Metadata Extension)
-**Description:** [read-only] Reads the source of a CDS metadata extension at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a CDS metadata extension, or its metadata.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
@@ -949,7 +949,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackage-read-only-package"></a>
 #### GetPackage (Read-Only / Package)
-**Description:** [read-only] Reads an ABAP package at the version asked: its name, description, type, super package, software component, application component, transport layer, language version and person responsible; for each subpackage: its name and its description.
+**Description:** [read-only] Reads an ABAP package at the version asked.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -964,7 +964,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackagecontents-read-only-package"></a>
 #### GetPackageContents (Read-Only / Package)
-**Description:** [read-only] Lists the objects of one or more ABAP packages, with the objects of their subpackages when asked. For each object of the package or a subpackage, under its own package: its type, its name, its technical name where it differs, its URI when SAP lists it nameless and its description, with descriptions asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the objects of one or more ABAP packages, with the objects of their subpackages when asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/package/readonly/handleGetPackageContents.ts`
 
@@ -984,7 +984,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogram-read-only-program"></a>
 #### GetProgram (Read-Only / Program)
-**Description:** [read-only] Reads the source of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, or its metadata.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -1004,7 +1004,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectsbytype-read-only-search"></a>
 #### GetObjectsByType (Read-Only / Search)
-**Description:** [read-only] Lists the objects of one type, such as classes, tables, programs or interfaces, in an ABAP package or other composite object: the parent's type and name, node ID and number of objects; for each object of the type: its type, its name, its technical name where it differs, its URI when SAP lists it nameless and its short description, by default; the nodes SAP left unloaded are named; the nodes below it are named by their type and node ID.
+**Description:** [read-only] Reads the objects of one type, such as classes, tables, programs or interfaces, in an ABAP package or other composite object.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 
@@ -1020,7 +1020,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectslist-read-only-search"></a>
 #### GetObjectsList (Read-Only / Search)
-**Description:** [read-only] Lists every object inside an ABAP program, function group, class, package or other composite object, down to its nested includes and subcomponents: the parent's type and name and number of objects; for each object inside it: its type, its name, its technical name where it differs and its URI when SAP lists it nameless. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads every object inside an ABAP program, function group, class, package or other composite object, down to its nested includes and subcomponents. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsList.ts`
 
@@ -1037,7 +1037,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
-**Description:** [read-only] Finds ABAP repository objects by name or name pattern, of any type or of one: classes, programs, tables, interfaces and every other kind. For each object found: its name, its type, its description and its package. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Finds ABAP repository objects by name or name pattern, of any type or of one: classes, programs, tables, interfaces and every other kind. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
@@ -1055,7 +1055,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicebinding-read-only-service-binding"></a>
 #### GetServiceBinding (Read-Only / Service Binding)
-**Description:** [read-only] Reads an OData service binding at its active version, with its binding definition, or its package, person responsible and description, in the format asked. SAP's data as it came.
+**Description:** [read-only] Reads an OData service binding at its active version, with its binding definition, or its package, person responsible and description, in the format asked.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
@@ -1073,7 +1073,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicedefinition-read-only-service-definition"></a>
 #### GetServiceDefinition (Read-Only / Service Definition)
-**Description:** [read-only] Reads the source of a service definition at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a service definition, or its metadata.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
@@ -1093,7 +1093,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructure-read-only-structure"></a>
 #### GetStructure (Read-Only / Structure)
-**Description:** [read-only] Reads an ABAP structure at the version asked, with its definition source, or its package, person responsible and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP structure at the version asked, with its definition source, or its package, person responsible and description.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
@@ -1110,7 +1110,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
-**Description:** [read-only] Reads the structures embedded in one or more ABAP structures, through their includes and appends, down to the last, at the version asked. The name of the structure read and whether its appends could be found. The appends SAP refused to read are named. For the structure itself and for each structure it embeds: its name, whether it is an include or an append, the component it is embedded under, whether it embeds itself again and whether SAP refused to read it. What SAP answered for each structure it refused to read. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the structures embedded in one or more ABAP structures, through their includes and appends, down to the last, at the version asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
 
@@ -1129,7 +1129,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="describebylist-read-only-system"></a>
 #### DescribeByList (Read-Only / System)
-**Description:** [read-only] Describes several ABAP repository objects named in one call, each by its name and, when known, its type. For each object found: its name, its type, its description and its package. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Describes several ABAP repository objects named in one call, each by its name and, when known, its type. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
 
@@ -1142,7 +1142,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getadttypes-read-only-system"></a>
 #### GetAdtTypes (Read-Only / System)
-**Description:** [read-only] Lists the repository object types the ABAP system knows, by their type codes: how many there are; for each object type: its code and its description.
+**Description:** [read-only] Reads the repository object types the ABAP system knows, by their type codes.
 
 **Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
 
@@ -1154,7 +1154,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinactiveobjects-read-only-system"></a>
 #### GetInactiveObjects (Read-Only / System)
-**Description:** [read-only] Lists the inactive ABAP objects of the system: classes, tables, CDS views and other objects changed and awaiting activation: how many there are; for each inactive object: its type, its name and the object it belongs to, such as a function group.
+**Description:** [read-only] Reads the inactive ABAP objects of the system: classes, tables, CDS views and other objects changed and awaiting activation.
 
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
 
@@ -1165,7 +1165,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectinfo-read-only-system"></a>
 #### GetObjectInfo (Read-Only / System)
-**Description:** [read-only] Reads the repository browser of a package, class, program, function group or other repository object, with descriptions and packages when asked: for each object: its type, name, description, package and objects it holds, down to the depth asked; for each object whose read failed: its type, name and failure. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the repository browser of a package, class, program, function group or other repository object, with descriptions and packages when asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectInfo.ts`
 
@@ -1195,7 +1195,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectoutline-read-only-system"></a>
 #### GetObjectOutline (Read-Only / System)
-**Description:** [read-only] Lists the components of an ABAP class, interface, program or function group, with where each one is defined in its source. The object's type and name. The include its components are defined in. For each component, such as a type, attribute, method, event, local class, form or module, at its depth: its name, its kind, its visibility, where its definition starts and the include it is defined in, where that differs.
+**Description:** [read-only] Reads the components of an ABAP class, interface, program or function group, with where each one is defined in its source.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectOutline.ts`
 
@@ -1205,7 +1205,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `PROG/P`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, PROG/P, FUGR/F (class, interface, program, function group).
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
-**On ABAP Cloud (`cloud`):** [read-only] Lists the components of an ABAP class, interface, program or function group, with where each one is defined in its source. The object's type and name. The include its components are defined in. For each component, such as a type, attribute, method, event, local class, form or module, at its depth: its name, its kind, its visibility, where its definition starts and the include it is defined in, where that differs.
+**On ABAP Cloud (`cloud`):** [read-only] Reads the components of an ABAP class, interface, program or function group, with where each one is defined in its source.
 
 **Parameters (`cloud`):**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
@@ -1217,7 +1217,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectstructure-read-only-system"></a>
 #### GetObjectStructure (Read-Only / System)
-**Description:** [read-only] Reads the structure of an ABAP repository object, such as a CDS view: its parts and their parts, down to the last level. Each part of the object, such as an element, an association or an annotation, is named by its type and its name or description, at its depth.
+**Description:** [read-only] Reads the structure of an ABAP repository object, such as a CDS view: its parts and their parts, down to the last level.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
 
@@ -1230,7 +1230,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicebindingpreviewurl-read-only-system"></a>
 #### GetServiceBindingPreviewUrl (Read-Only / System)
-**Description:** [read-only] Builds the Fiori preview URL of a published OData service binding, with its service and $metadata URLs: its service's live state, OData protocol, service, service definition, service version, entity sets, binding category, client, logon language, associations, service URL, service URL source, $metadata URL, annotation URL, preview URL, preview descriptor, notes, whether it is published, whether the system's HTTP origin is known, what the preview URL still needs and the failure of reading the system's client and language.
+**Description:** [read-only] Reads the Fiori preview URL of a published OData service binding, with its service and $metadata URLs.
 
 **Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
 
@@ -1246,7 +1246,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getsqlquery-read-only-system"></a>
 #### GetSqlQuery (Read-Only / System)
-**Description:** [read-only] Runs an ABAP SQL SELECT over database tables and CDS views and reads the data it selects, up to the number of records asked. SAP's data as it came. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data an ABAP SQL SELECT selects from database tables and CDS views, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
 
@@ -1262,7 +1262,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettransaction-read-only-system"></a>
 #### GetTransaction (Read-Only / System)
-**Description:** [read-only] Reads the properties of an ABAP transaction code: the transaction's name, text and package; for each property, such as its application component, package, type, owner or language: its facet, its name and its text.
+**Description:** [read-only] Reads the properties of an ABAP transaction code.
 
 **Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
 
@@ -1286,7 +1286,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Finds where an ABAP class, function module, table or other repository object is used: every object that uses, calls or references it. How many references SAP counts. For each object that uses it, under its package: its type, its name, its URI when SAP lists it nameless and how it uses the object, where SAP tells it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads where an ABAP class, function module, table or other repository object is used: every object that uses, calls or references it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
@@ -1307,7 +1307,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimeanalyzeprofilertrace-read-only-system"></a>
 #### RuntimeAnalyzeProfilerTrace (Read-Only / System)
-**Description:** [read-only] Summarises one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time. The trace, the view read, the view's record count and its top records by time and the view's data as the profiler read it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Analyzes one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
 
@@ -1322,7 +1322,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetdumpbyid-read-only-system"></a>
 #### RuntimeGetDumpById (Read-Only / System)
-**Description:** [read-only] Reads an ABAP runtime dump by its id, with a summary of where and why its program terminated. The dump's id, the view read, the summary of where and why its program terminated and the dump as SAP gave it.
+**Description:** [read-only] Reads an ABAP runtime dump by its id, with a summary of where and why its program terminated.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
 
@@ -1335,7 +1335,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetgatewayerrorlog-read-only-system"></a>
 #### RuntimeGetGatewayErrorLog (Read-Only / System)
-**Description:** [read-only] Lists the errors of the SAP Gateway error log, the one /IWFND/ERROR_LOG shows, or reads the detail of one error: how many there are; for each error: its operation ID, the kind of its detail, when it happened, its type, its short text and the user it happened to.
+**Description:** [read-only] Reads the errors of the SAP Gateway error log, the one /IWFND/ERROR_LOG shows, or the detail of one error.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
 
@@ -1353,7 +1353,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetprofilertracedata-read-only-system"></a>
 #### RuntimeGetProfilerTraceData (Read-Only / System)
-**Description:** [read-only] Reads one view of an ABAP profiler trace: its hit list, its statements or its database accesses. The view read, the trace and the view's data as the profiler read it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads one view of an ABAP profiler trace: its hit list, its statements or its database accesses. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts`
 
@@ -1370,7 +1370,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimelistfeeds-read-only-system"></a>
 #### RuntimeListFeeds (Read-Only / System)
-**Description:** [read-only] Reads the runtime feeds of an ABAP system: its short dumps, system messages or SAP Gateway errors by user and time, or the feeds there are and their variants. For the feed read: how many items it holds, where the next read starts when more remain and the second holding more items than one read gives. For each feed there is: its ID, its title and its category. For each variant of a feed: its feed, its title, its query and whether it is the default. For each short dump, newest first: its dump ID, when it happened and its title. For each system message: its ID, when it was created, its author and its title. For each SAP Gateway error: its operation ID, the kind of its detail, when it happened, its type, its short text and the user it happened to. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists the short dumps, system messages or SAP Gateway errors of an ABAP system by user and time, or the runtime feeds there are and their variants. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
 
@@ -1393,7 +1393,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimelistprofilertracefiles-read-only-system"></a>
 #### RuntimeListProfilerTraceFiles (Read-Only / System)
-**Description:** [read-only] Lists the ABAP profiler traces recorded in the system: how many there are; for each trace: its ID, when it was recorded, the object it traced, its state and its runtime.
+**Description:** [read-only] Lists the ABAP profiler traces recorded in the system.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
 
@@ -1404,7 +1404,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimelistsystemmessages-read-only-system"></a>
 #### RuntimeListSystemMessages (Read-Only / System)
-**Description:** [read-only] Lists the system messages of the SAP system, the ones SM02 shows, optionally by one author: how many there are; for each system message: its ID, when it was created, its author and its title.
+**Description:** [read-only] Lists the system messages of the SAP system, the ones SM02 shows, optionally by one author.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
 
@@ -1419,7 +1419,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="searchsource-read-only-system"></a>
 #### SearchSource (Read-Only / System)
-**Description:** [read-only] Searches the ABAP source code of one or more packages for a text: programs, includes, function groups, classes, interfaces and CDS sources. How many objects and sources were searched, and how many objects matched. Which limit stopped the search, when one did. The package parts SAP left unloaded are named, each by its package and type. The nameless objects SAP lists, left unsearched, are named by what tells them apart. For each match, under its object named by package, type and name: its include, its position in the source and the source code that matched, when snippets are asked. With objects asked, for each object it matched in, named by package, type and name: its include and how many matches it has. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Searches the ABAP source code of one or more packages for a text: programs, includes, function groups, classes, interfaces and CDS sources. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleSearchSource.ts`
 
@@ -1446,7 +1446,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettable-read-only-table"></a>
 #### GetTable (Read-Only / Table)
-**Description:** [read-only] Reads an ABAP database table at the version asked, with its definition source, or its package, person responsible and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP database table at the version asked, with its definition source, or its package, person responsible and description.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
@@ -1463,7 +1463,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
-**Description:** [read-only] Reads the data of an ABAP database table or CDS view, as SE16 previews it, up to the number of records asked. SAP's data as it came. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data of an ABAP database table or CDS view, as SE16 previews it, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
 
@@ -1479,7 +1479,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettablesettings-read-only-table"></a>
 #### GetTableSettings (Read-Only / Table)
-**Description:** [read-only] Reads the technical settings of an ABAP database table at the version asked: its description, data class, size category, buffering, storage type, sharing type, load unit, translation, logging and whether AMDP may write to it on ABAP Cloud.
+**Description:** [read-only] Reads the technical settings of an ABAP database table at the version asked.
 
 **Source:** `src/handlers/table/readonly/handleGetTableSettings.ts`
 
@@ -1494,7 +1494,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettabletype-read-only-table-type"></a>
 #### GetTableType (Read-Only / Table Type)
-**Description:** [read-only] Reads an ABAP table type at the version asked, with its element type, access, key, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP table type at the version asked, with its element type, access, key, package and description.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
@@ -1511,7 +1511,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettextelements-read-only-text-elements"></a>
 #### GetTextElements (Read-Only / Text Elements)
-**Description:** [read-only] Reads the text elements of an ABAP program, function group or class in its original language at the version asked: text symbols, selection texts and headings. For each text symbol: its key, its text and its maximum length. For each selection text: its name, its text and whether it is the dictionary's label. Its headings: the list heading, the first of the four headings below it, the second, the third and the fourth.
+**Description:** [read-only] Reads the text elements of an ABAP program, function group or class in its original language at the version asked: text symbols, selection texts and headings.
 
 **Source:** `src/handlers/text_elements/readonly/handleGetTextElements.ts`
 
@@ -1528,7 +1528,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettransport-read-only-transport"></a>
 #### GetTransport (Read-Only / Transport)
-**Description:** [read-only] Reads an ABAP transport or one of its tasks by its number, and says which of the two it is. For a transport: its number, description, type, status, owner and target system and how many tasks it has. For each of its tasks: its number, owner, status, description and how many objects it holds. For a task: its number, its transport, description, type, status and owner, its transport's number, type, status and target system and how many objects it holds. For each of its objects: its program ID, type, name and position. The objects SAP lists only in part, with what it gives of each.
+**Description:** [read-only] Reads an ABAP transport or one of its tasks by its number, and says which of the two it is.
 
 **Source:** `src/handlers/transport/readonly/handleGetTransport.ts`
 
@@ -1544,7 +1544,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listtransports-read-only-transport"></a>
 #### ListTransports (Read-Only / Transport)
-**Description:** [read-only] Lists a user's transports, workbench, customizing and transport-of-copies alike, that the user owns or holds a task in: how many there are; for each transport: its number, its type, its status, its owner, its target system and its description. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists a user's transports, workbench, customizing and transport-of-copies alike, that the user owns or holds a task in. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/transport/readonly/handleListTransports.ts`
 
@@ -1560,7 +1560,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="readtransportactionlog-read-only-transport"></a>
 #### ReadTransportActionLog (Read-Only / Transport)
-**Description:** [read-only] Reads the action log of a transport or task: every event of its life, its objects added and taken out among them: the transport number and number of events; for each event, such as created, object added, object deleted or owner changed: its text.
+**Description:** [read-only] Reads the action log of a transport or task: every event of its life, its objects added and taken out among them.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
 
@@ -1574,7 +1574,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="readtransportobjects-read-only-transport"></a>
 #### ReadTransportObjects (Read-Only / Transport)
-**Description:** [read-only] Lists the objects a transport or one of its tasks holds, each with the position a removal names: the transport number and number of objects; for each object, under its task and its program ID: its type, its name and its position, which a removal names; the objects SAP lists nameless or untyped are named by what they carry.
+**Description:** [read-only] Reads the objects a transport or one of its tasks holds, each with the position a removal names.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
 
@@ -1591,7 +1591,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getunittestresult-read-only-unit-test"></a>
 #### GetUnitTestResult (Read-Only / Unit Test)
-**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on. The run's id, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
+**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -1613,7 +1613,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getabapgitbranchinfo-high-level-abapgit"></a>
 #### GetAbapGitBranchInfo (High-Level / Abapgit)
-**Description:** Gets the abapGit branch information of a remote repository for the package it would be linked to. Whether the remote repository is public or private. For the branch: its name and how its folders map to packages.
+**Description:** Reads the abapGit branch information of a remote repository for the package it would be linked to.
 
 **Source:** `src/handlers/abapgit/high/handleGetAbapGitBranchInfo.ts`
 
@@ -1627,7 +1627,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="linkabapgitrepo-high-level-abapgit"></a>
 #### LinkAbapGitRepo (High-Level / Abapgit)
-**Description:** Links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
+**Description:** Links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport.
 
 **Source:** `src/handlers/abapgit/high/handleLinkAbapGitRepo.ts`
 
@@ -1638,7 +1638,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `transport_request` (string, optional) - The transport request that records the objects written.
 - `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
 
-**On ABAP Cloud (`cloud`):** Links an ABAP package to a remote abapGit repository on a branch, mapping its folders to subpackages as asked. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
+**On ABAP Cloud (`cloud`):** Links an ABAP package to a remote abapGit repository on a branch, mapping its folders to subpackages as asked.
 
 **Parameters (`cloud`):**
 - `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
@@ -1651,7 +1651,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="pullabapgitrepo-high-level-abapgit"></a>
 #### PullAbapGitRepo (High-Level / Abapgit)
-**Description:** Pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
+**Description:** Pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport.
 
 **Source:** `src/handlers/abapgit/high/handlePullAbapGitRepo.ts`
 
@@ -1660,7 +1660,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 - `transport_request` (string, optional) - The transport request that records the objects written.
 
-**On ABAP Cloud (`cloud`):** Pulls an abapGit repository from the branch it is linked on as an SAP job, recorded in a transport, its imported objects left inactive. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
+**On ABAP Cloud (`cloud`):** Pulls an abapGit repository from the branch it is linked on as an SAP job, recorded in a transport, its imported objects left inactive.
 
 **Parameters (`cloud`):**
 - `overwrite` (array, optional) - The objects listed by GetAbapGitModifiedObjects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused, within one list or across both: SAP matches by name within each list, so a collision inside one list could take an object not named. SAP selects by name when its job runs, against the list as it stands then: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state; SAP leaves a package warning with action 5 (delete and re-create) out of every pull. Without it the job takes every other listed object.
@@ -1671,7 +1671,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="pushabapgitrepo-high-level-abapgit"></a>
 #### PushAbapGitRepo (High-Level / Abapgit)
-**Description:** Commits the objects and files chosen from an abapGit repository's staging, with its comment, author and committer, and pushes the commit to its remote branch. SAP's status and whether SAP made the change or accepted it as its own job.
+**Description:** Pushes the objects and files chosen from an abapGit repository's staging to its remote branch, as a commit with its comment, author and committer.
 
 **Source:** `src/handlers/abapgit/high/handlePushAbapGitRepo.ts`
 
@@ -1683,7 +1683,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `objects` (array, required) - The objects and files to commit, each as GetAbapGitStaging with detail "medium" answers it.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 
-**On ABAP Cloud (`cloud`):** Commits the objects and files chosen from an abapGit repository's staging and pushes the commit to its remote branch, as an SAP job. SAP's status and whether SAP made the change or accepted it as its own job.
+**On ABAP Cloud (`cloud`):** Pushes the objects and files chosen from an abapGit repository's staging to its remote branch as a commit, run as an SAP job.
 
 **Parameters (`cloud`):**
 - `author` (object, required) - The commit author: name and email (GetAbapGitStaging answers the proposal of this system).
@@ -1696,7 +1696,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="switchabapgitbranch-high-level-abapgit"></a>
 #### SwitchAbapGitBranch (High-Level / Abapgit)
-**Description:** Switches an abapGit repository to a branch, creating the branch in the remote first when asked. SAP's status and whether SAP made the change or accepted it as its own job.
+**Description:** Switches an abapGit repository to a branch, creating the branch in the remote first when asked.
 
 **Source:** `src/handlers/abapgit/high/handleSwitchAbapGitBranch.ts`
 
@@ -1723,7 +1723,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. The worklist ID. How many objects the run covered. How many findings there are. What an empty worklist means, while the run is still filling it. How many findings each priority has. For each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
@@ -1736,7 +1736,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getatcresult-high-level-atc"></a>
 #### GetATCResult (High-Level / Atc)
-**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. The result ID. Its title. Its check variant. When it was created. How many objects it covered. How many findings there are. How many findings each priority has. For each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCResult.ts`
 
@@ -1749,7 +1749,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getatcrunstatus-high-level-atc"></a>
 #### GetATCRunStatus (High-Level / Atc)
-**Description:** [read-only] Reads the status of an ATC run by its id, and whether it has ended. The run's id, SAP's status of the run, whether the run has ended, the worklist holding its findings and the id of its result.
+**Description:** [read-only] Reads the status of an ATC run by its id, and whether it has ended.
 
 **Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
 
@@ -1760,7 +1760,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listatcresults-high-level-atc"></a>
 #### ListATCResults (High-Level / Atc)
-**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. How many results the system holds. For each result, newest first: its display id, its title, its check variant, its run series, when it was created, its finding counts per priority and its failure count. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleListATCResults.ts`
 
@@ -1775,7 +1775,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist. The check variant it ran, the worklist holding its findings, whether the call waited for the checks to end, the finding counts of a run waited for and the id of a started run to read its status by. For each object checked: its name, its type, the function group of a function include and the include of a class include.
+**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
@@ -1820,7 +1820,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Creates a managed, unmanaged, abstract or projection RAP behavior definition for a root entity in a package, recorded in the transport given.
+**Description:** Creates a managed, unmanaged, abstract or projection RAP behavior definition for a root entity, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
 
@@ -1856,7 +1856,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviordefinition-high-level-behavior-definition"></a>
 #### GetBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Reads the source of a RAP behavior definition at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a RAP behavior definition, or its metadata.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
@@ -1893,7 +1893,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Creates the RAP behavior implementation class of a behavior definition in a package, with its description, recorded in the transport given.
+**Description:** Creates the RAP behavior implementation class of a behavior definition, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
@@ -1926,7 +1926,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviorimplementation-high-level-behavior-implementation"></a>
 #### GetBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** [read-only] Reads the source of a RAP behavior implementation class at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a RAP behavior implementation class, or its metadata.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
@@ -1993,7 +1993,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Creates an ABAP class in a package, with its description, its superclass and its FINAL and CREATE PROTECTED settings, recorded in the transport given.
+**Description:** Creates an ABAP class, with its description, its superclass and its FINAL and CREATE PROTECTED settings, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -2029,7 +2029,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletelocaldefinitions-high-level-class"></a>
 #### DeleteLocalDefinitions (High-Level / Class)
-**Description:** Clears the local definitions of an ABAP class, activating the class when asked.
+**Description:** Deletes the local definitions of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalDefinitions.ts`
 
@@ -2045,7 +2045,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletelocalmacros-high-level-class"></a>
 #### DeleteLocalMacros (High-Level / Class)
-**Description:** Clears the local macros of an ABAP class, activating the class when asked.
+**Description:** Deletes the local macros of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalMacros.ts`
 
@@ -2061,7 +2061,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletelocaltestclass-high-level-class"></a>
 #### DeleteLocalTestClass (High-Level / Class)
-**Description:** Clears the local test classes of an ABAP class, activating the class when asked.
+**Description:** Deletes the local test classes of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
 
@@ -2077,7 +2077,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletelocaltypes-high-level-class"></a>
 #### DeleteLocalTypes (High-Level / Class)
-**Description:** Clears the local types of an ABAP class, activating the class when asked.
+**Description:** Deletes the local types of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTypes.ts`
 
@@ -2093,7 +2093,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclass-high-level-class"></a>
 #### GetClass (High-Level / Class)
-**Description:** [read-only] Reads the source of an ABAP class at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP class, or its metadata.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -2110,7 +2110,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getlocaldefinitions-high-level-class"></a>
 #### GetLocalDefinitions (High-Level / Class)
-**Description:** [read-only] Reads the source of the local definitions include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
+**Description:** [read-only] Reads the local definitions of an ABAP class.
 
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
 
@@ -2126,7 +2126,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getlocalmacros-high-level-class"></a>
 #### GetLocalMacros (High-Level / Class)
-**Description:** [read-only] Reads the source of the local macros include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
+**Description:** [read-only] Reads the local macros of an ABAP class.
 
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
 
@@ -2142,7 +2142,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
-**Description:** [read-only] Reads the source of the local test classes include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
+**Description:** [read-only] Reads the local test classes of an ABAP class.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
@@ -2158,7 +2158,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getlocaltypes-high-level-class"></a>
 #### GetLocalTypes (High-Level / Class)
-**Description:** [read-only] Reads the source of the local types (implementations) include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
+**Description:** [read-only] Reads the local types and implementations of an ABAP class.
 
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
 
@@ -2282,7 +2282,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviordefinitionversiondiff-high-level-common"></a>
 #### GetBehaviorDefinitionVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same RAP behavior definition, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same RAP behavior definition from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2294,7 +2294,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviordefinitionversions-high-level-common"></a>
 #### GetBehaviorDefinitionVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of a RAP behavior definition. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of a RAP behavior definition.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2305,7 +2305,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviordefinitionversionsource-high-level-common"></a>
 #### GetBehaviorDefinitionVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of a RAP behavior definition, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of a RAP behavior definition's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2316,7 +2316,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclassversiondiff-high-level-common"></a>
 #### GetClassVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP class, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP class from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2328,7 +2328,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclassversions-high-level-common"></a>
 #### GetClassVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP class. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP class.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2339,7 +2339,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclassversionsource-high-level-common"></a>
 #### GetClassVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP class, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of an ABAP class's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2350,7 +2350,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getddlversiondiff-high-level-common"></a>
 #### GetDdlVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same CDS view (DDL source), taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same CDS view (DDL source) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2362,7 +2362,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getddlversions-high-level-common"></a>
 #### GetDdlVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of a CDS view (DDL source). For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of a CDS view (DDL source).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2373,7 +2373,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getddlversionsource-high-level-common"></a>
 #### GetDdlVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of a CDS view (DDL source), from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of the source of a CDS view (DDL source) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2384,7 +2384,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctionmoduleversiondiff-high-level-common"></a>
 #### GetFunctionModuleVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP function module, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP function module from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2396,7 +2396,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctionmoduleversions-high-level-common"></a>
 #### GetFunctionModuleVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP function module. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP function module.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2408,7 +2408,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctionmoduleversionsource-high-level-common"></a>
 #### GetFunctionModuleVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP function module, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of an ABAP function module's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2419,7 +2419,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterfaceversiondiff-high-level-common"></a>
 #### GetInterfaceVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP interface, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP interface from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2431,7 +2431,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterfaceversions-high-level-common"></a>
 #### GetInterfaceVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP interface. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP interface.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2442,7 +2442,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterfaceversionsource-high-level-common"></a>
 #### GetInterfaceVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP interface, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of an ABAP interface's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2453,7 +2453,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextensionversiondiff-high-level-common"></a>
 #### GetMetadataExtensionVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same CDS metadata extension, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same CDS metadata extension from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2465,7 +2465,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextensionversions-high-level-common"></a>
 #### GetMetadataExtensionVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of a CDS metadata extension. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of a CDS metadata extension.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2476,7 +2476,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextensionversionsource-high-level-common"></a>
 #### GetMetadataExtensionVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of a CDS metadata extension, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of a CDS metadata extension's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2487,7 +2487,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogramversiondiff-high-level-common"></a>
 #### GetProgramVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP program, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP program from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2499,7 +2499,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogramversions-high-level-common"></a>
 #### GetProgramVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP program, on ABAP Cloud one of SAP's standard programs. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP program, on ABAP Cloud one of SAP's standard programs.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2510,7 +2510,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogramversionsource-high-level-common"></a>
 #### GetProgramVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP program, on ABAP Cloud one of SAP's standard programs, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of the source of an ABAP program, on ABAP Cloud one of SAP's standard programs from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2521,7 +2521,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructureversiondiff-high-level-common"></a>
 #### GetStructureVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP structure, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP structure from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2533,7 +2533,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructureversions-high-level-common"></a>
 #### GetStructureVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP structure. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP structure.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2544,7 +2544,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructureversionsource-high-level-common"></a>
 #### GetStructureVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP structure, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of an ABAP structure's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2555,7 +2555,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettabletypeversions-high-level-common"></a>
 #### GetTableTypeVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP table type. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP table type.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2566,7 +2566,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettableversiondiff-high-level-common"></a>
 #### GetTableVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares two versions of the same ABAP table, taken from its version history: the changes between their sources, whether they are identical and which source came back empty.
+**Description:** [read-only] Reads two versions of the same ABAP table from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2578,7 +2578,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettableversions-high-level-common"></a>
 #### GetTableVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of an ABAP table. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
+**Description:** [read-only] Reads the version history of an ABAP table.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2589,7 +2589,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettableversionsource-high-level-common"></a>
 #### GetTableVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of one version of an ABAP table, from its version history. The reference of the version read and its source code.
+**Description:** [read-only] Reads an older version of an ABAP table's source from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2631,7 +2631,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createdataelement-high-level-data-element"></a>
 #### CreateDataElement (High-Level / Data Element)
-**Description:** Creates an ABAP data element in a package, typed by a domain, a built-in type or a reference, with its labels and search help, recorded in the transport given.
+**Description:** Creates an ABAP data element, typed by a domain, a built-in type or a reference, with its labels and search help, recorded in the transport given.
 
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
 
@@ -2676,7 +2676,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getdataelement-high-level-data-element"></a>
 #### GetDataElement (High-Level / Data Element)
-**Description:** [read-only] Reads an ABAP data element at the version asked, with its domain or built-in type, its labels, search help, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP data element at the version asked, with its domain or built-in type, its labels, search help, package and description.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -2752,7 +2752,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Creates a CDS view or classic DDL view in a package, with its description, recorded in the transport given.
+**Description:** Creates a CDS view or classic DDL view, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
@@ -2785,7 +2785,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getddl-high-level-ddl"></a>
 #### GetDdl (High-Level / Ddl)
-**Description:** [read-only] Reads the source of a CDS view or classic DDL view at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a CDS view or classic DDL view, or its metadata.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
@@ -2850,7 +2850,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
-**Description:** Creates a CDS metadata extension in a package, with its description, activating it when asked, recorded in the transport given.
+**Description:** Creates a CDS metadata extension, with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
 
@@ -2917,7 +2917,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createdomain-high-level-domain"></a>
 #### CreateDomain (High-Level / Domain)
-**Description:** Creates an ABAP domain in a package, with its data type, length, decimals, conversion exit, value table and fixed values, recorded in the transport given.
+**Description:** Creates an ABAP domain, with its data type, length, decimals, conversion exit, value table and fixed values, recorded in the transport given.
 
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
 
@@ -2959,7 +2959,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getdomain-high-level-domain"></a>
 #### GetDomain (High-Level / Domain)
-**Description:** [read-only] Reads an ABAP domain at the version asked, with its data type, length, output format, value table, fixed values, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP domain at the version asked, with its data type, length, output format, value table, fixed values, package and description.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -3060,7 +3060,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
-**Description:** Creates an ABAP function group in a package, with its description, activating it when asked, recorded in the transport given.
+**Description:** Creates an ABAP function group, with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionGroup.ts`
 
@@ -3148,7 +3148,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctiongroup-high-level-function-group"></a>
 #### GetFunctionGroup (High-Level / Function Group)
-**Description:** [read-only] Reads an ABAP function group at the version asked, with its package, description and contents. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP function group at the version asked, with its package, description and contents.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
@@ -3194,7 +3194,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatefunctioninclude-high-level-function-include"></a>
 #### UpdateFunctionInclude (High-Level / Function Include)
-**Description:** Writes new source code into an existing include of an ABAP function group, activating it when asked.
+**Description:** Updates the source code of an existing include of an ABAP function group, activating it when asked.
 
 **Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
 
@@ -3229,7 +3229,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** [read-only] Reads the source of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -3264,7 +3264,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createinclude-high-level-include"></a>
 #### CreateInclude (High-Level / Include)
-**Description:** Creates an ABAP include in a package, with its description and the comment header SAP writes into it, recorded in the transport given.
+**Description:** Creates an ABAP include, with its description and the comment header SAP writes into it, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleCreateInclude.ts`
 
@@ -3359,7 +3359,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
-**Description:** Creates an ABAP interface in a package, with its description, recorded in the transport given.
+**Description:** Creates an ABAP interface, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
 
@@ -3392,7 +3392,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterface-high-level-interface"></a>
 #### GetInterface (High-Level / Interface)
-**Description:** [read-only] Reads the source of an ABAP interface at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP interface, or its metadata.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
@@ -3429,7 +3429,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createmessageclass-high-level-message-class"></a>
 #### CreateMessageClass (High-Level / Message Class)
-**Description:** Creates an ABAP message class (T100) in a package, with its description, recorded in the transport given.
+**Description:** Creates an ABAP message class (T100), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
 
@@ -3498,7 +3498,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** [read-only] Reads one message of an ABAP message class at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time. SAP's data as it came.
+**Description:** [read-only] Reads one message of an ABAP message class at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -3559,7 +3559,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextension-high-level-metadata-extension"></a>
 #### GetMetadataExtension (High-Level / Metadata Extension)
-**Description:** [read-only] Reads the source of a CDS metadata extension at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a CDS metadata extension, or its metadata.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
@@ -3632,7 +3632,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** [read-only] Reads an ABAP package at the version asked: its name, description, type, super package, software component, application component, transport layer, language version and person responsible; for each subpackage: its name and its description.
+**Description:** [read-only] Reads an ABAP package at the version asked.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -3694,7 +3694,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
-**Description:** Creates an executable ABAP program (report) in a package, with its description and application area, recorded in the transport given.
+**Description:** Creates an executable ABAP program (report), with its description and application area, recorded in the transport given.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
@@ -3728,7 +3728,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** [read-only] Reads the source of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, or its metadata.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -3779,7 +3779,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
-**Description:** Creates an OData V2 or V4 service binding, UI or Web API, for a service definition in a package, with its service name and version.
+**Description:** Creates an OData V2 or V4 service binding, UI or Web API, for a service definition, with its service name and version.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
@@ -3819,7 +3819,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicebinding-high-level-service-binding"></a>
 #### GetServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Reads an OData service binding at its active version, with its binding definition, or its package, person responsible and description, in the format asked. SAP's data as it came.
+**Description:** [read-only] Reads an OData service binding at its active version, with its binding definition, or its package, person responsible and description, in the format asked.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
@@ -3834,7 +3834,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listservicebindingtypes-high-level-service-binding"></a>
 #### ListServiceBindingTypes (High-Level / Service Binding)
-**Description:** [read-only] Lists the service binding types the system offers, such as OData V2 and OData V4, in the format asked. SAP's data as it came.
+**Description:** [read-only] Lists the service binding types the system offers, such as OData V2 and OData V4, in the format asked.
 
 **Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
 
@@ -3897,7 +3897,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
-**Description:** Creates a service definition exposing CDS views as an OData service in a package, with its source code when given, activating it when asked.
+**Description:** Creates a service definition exposing CDS views as an OData service, with its source code when given, activating it when asked.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
 
@@ -3932,7 +3932,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicedefinition-high-level-service-definition"></a>
 #### GetServiceDefinition (High-Level / Service Definition)
-**Description:** [read-only] Reads the source of a service definition at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
+**Description:** [read-only] Reads the current source code of a service definition, or its metadata.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
@@ -3998,7 +3998,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createstructure-high-level-structure"></a>
 #### CreateStructure (High-Level / Structure)
-**Description:** Creates an ABAP structure in a package, with its description, activating it when asked, recorded in the transport given.
+**Description:** Creates an ABAP structure, with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/structure/high/handleCreateStructure.ts`
 
@@ -4034,7 +4034,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructure-high-level-structure"></a>
 #### GetStructure (High-Level / Structure)
-**Description:** [read-only] Reads an ABAP structure at the version asked, with its definition source, or its package, person responsible and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP structure at the version asked, with its definition source, or its package, person responsible and description.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
@@ -4071,7 +4071,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
-**Description:** [read-only] Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level. For each subpackage and object below it, at its depth: its type, its name, its technical name when SAP lists it nameless, its URI when SAP lists it nameless and its description, with descriptions asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
@@ -4089,7 +4089,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimecreateprofilertraceparameters-high-level-system"></a>
 #### RuntimeCreateProfilerTraceParameters (High-Level / System)
-**Description:** Schedules an ABAP profiler trace with its parameters, for a later profiled run of a class or a report. The profiler id a profiled run names.
+**Description:** Creates the parameters of an ABAP profiler trace, scheduling it for a later profiled run of a class or a report.
 
 **Source:** `src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts`
 
@@ -4113,7 +4113,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimerunclass-high-level-system"></a>
 #### RuntimeRunClass (High-Level / System)
-**Description:** Runs an ABAP class implementing if_oo_adt_classrun and gives its console output, under the ABAP profiler when asked. The class that ran, its console output and the profiler and trace ids of a profiled run.
+**Description:** Runs an ABAP class implementing if_oo_adt_classrun and gives its console output, under the ABAP profiler when asked.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunClass.ts`
 
@@ -4143,7 +4143,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimerunprogram-high-level-system"></a>
 #### RuntimeRunProgram (High-Level / System)
-**Description:** Runs an ABAP report and gives its output, under the ABAP profiler when asked. The report that ran, its output and the profiler id of a profiled run.
+**Description:** Runs an ABAP report and gives its output, under the ABAP profiler when asked.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunProgram.ts`
 
@@ -4202,7 +4202,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
-**Description:** Creates an ABAP database table by its name in a package, recorded in the transport given.
+**Description:** Creates an ABAP database table by its name, recorded in the transport given.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
@@ -4235,7 +4235,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettable-high-level-table"></a>
 #### GetTable (High-Level / Table)
-**Description:** [read-only] Reads an ABAP database table at the version asked, with its definition source, or its package, person responsible and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP database table at the version asked, with its definition source, or its package, person responsible and description.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
@@ -4339,7 +4339,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createtabletype-high-level-table-type"></a>
 #### CreateTableType (High-Level / Table Type)
-**Description:** Creates an ABAP table type in a package, with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given.
+**Description:** Creates an ABAP table type, with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/table_type/high/handleCreateTableType.ts`
 
@@ -4380,7 +4380,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettabletype-high-level-table-type"></a>
 #### GetTableType (High-Level / Table Type)
-**Description:** [read-only] Reads an ABAP table type at the version asked, with its element type, access, key, package and description. SAP's data as it came.
+**Description:** [read-only] Reads an ABAP table type at the version asked, with its element type, access, key, package and description.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
@@ -4455,7 +4455,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="addtransportobject-high-level-transport"></a>
 #### AddTransportObject (High-Level / Transport)
-**Description:** Adds an existing ABAP object to a transport task, so it travels with the task's transport. Whether SAP took the change, that SAP's answer leaves the attachment unconfirmed, the transport task, the object named and where the change is confirmed.
+**Description:** Adds an existing ABAP object to a transport task, so it travels with the task's transport.
 
 **Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
 
@@ -4472,7 +4472,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createtransport-high-level-transport"></a>
 #### CreateTransport (High-Level / Transport)
-**Description:** Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked. The number of the transport created, the number of its task, SAP's refusal of the task type and what is left to do when the task stays untyped.
+**Description:** Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked.
 
 **Source:** `src/handlers/transport/high/handleCreateTransport.ts`
 
@@ -4490,7 +4490,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createtransporttask-high-level-transport"></a>
 #### CreateTransportTask (High-Level / Transport)
-**Description:** Creates a task of the type asked under an existing transport, owned by the SAP user named. The number of the task created, its type, SAP's refusal of the task type and what is left to do when the task stays untyped.
+**Description:** Creates a task of the type asked under an existing transport, owned by the SAP user named.
 
 **Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
 
@@ -4506,7 +4506,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="movetransportobjects-high-level-transport"></a>
 #### MoveTransportObjects (High-Level / Transport)
-**Description:** Moves objects from one transport task to another, each at its position in the task it leaves. Whether SAP took the change, the task they leave, the task they move to and where the change is confirmed. For each object sent: the object named and its position in the task it leaves.
+**Description:** Moves objects from one transport task to another, each at its position in the task it leaves.
 
 **Source:** `src/handlers/transport/high/handleMoveTransportObjects.ts`
 
@@ -4522,7 +4522,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="removetransportobject-high-level-transport"></a>
 #### RemoveTransportObject (High-Level / Transport)
-**Description:** Removes a named object from a transport task, at its position among the task's objects. Whether SAP took the change, that SAP's answer leaves the removal unconfirmed, the transport task, the object named, its position in the task and where the change is confirmed.
+**Description:** Removes a named object from a transport task, at its position among the task's objects.
 
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
 
@@ -4540,7 +4540,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="sortandcompresstransporttask-high-level-transport"></a>
 #### SortAndCompressTransportTask (High-Level / Transport)
-**Description:** Sorts the objects of a transport task and merges its duplicates. Whether SAP took the change, the transport task and where the change is confirmed.
+**Description:** Sorts the objects of a transport task and merges its duplicates.
 
 **Source:** `src/handlers/transport/high/handleSortAndCompressTransportTask.ts`
 
@@ -4557,7 +4557,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Creates an ABAP Unit test class for a CDS view in a package, from the test class source given, once the view supports CDS test doubles.
+**Description:** Creates an ABAP Unit test class for a CDS view, from the test class source given, once the view supports CDS test doubles.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
@@ -4649,7 +4649,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on. The run's id, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
+**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -4665,7 +4665,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runabapunit-high-level-unit-test"></a>
 #### RunAbapUnit (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of a class, report, function group, function module's group, CDS view, package, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs the ABAP Unit tests of a class, report, function group, function module's group, CDS view, package, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
 
@@ -4683,7 +4683,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runcdsunittest-high-level-unit-test"></a>
 #### RunCdsUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of a CDS view test class, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs the ABAP Unit tests of a CDS view test class, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
 
@@ -4696,7 +4696,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Runs every ABAP Unit test of a function group, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs every ABAP Unit test of a function group, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
@@ -4713,7 +4713,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the function group holding a function module, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs the ABAP Unit tests of the function group holding a function module, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
@@ -4731,7 +4731,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of an ABAP report, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs the ABAP Unit tests of an ABAP report, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
@@ -4748,7 +4748,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of an ABAP class, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
+**Description:** Runs the ABAP Unit tests of an ABAP class, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
@@ -4843,7 +4843,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebuggettable-debug-debugger"></a>
 #### AmdpDebugGetTable (Debug / Debugger)
-**Description:** [read-only] Reads the records of a table variable at the AMDP stop, up to 100, through a SELECT over it when one is set. SAP's data as it came.
+**Description:** [read-only] Reads the records of a table variable at the AMDP stop, up to 100, through a SELECT over it when one is set.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugGetTable.ts`
 
@@ -4857,7 +4857,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugsetbreakpoints-debug-debugger"></a>
 #### AmdpDebugSetBreakpoints (Debug / Debugger)
-**Description:** [debug] Sets the AMDP breakpoints of a debug session to the set asked, as the system confirms them. For each breakpoint: its class, its source position, its state and SAP's reason for an invalid one.
+**Description:** [debug] Sets the AMDP breakpoints of a debug session to the set asked, as the system confirms them.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugSetBreakpoints.ts`
 
@@ -4870,7 +4870,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstart-debug-debugger"></a>
 #### AmdpDebugStart (Debug / Debugger)
-**Description:** [debug] Opens an AMDP debug session of the connected SAP user with breakpoints in SQLScript methods, starting a background run once they are confirmed. The session's main id and the session's state handle. For each breakpoint the system confirmed: its class, its source position, its state and SAP's reason for an invalid one.
+**Description:** [debug] Starts an AMDP debug session of the connected SAP user with breakpoints in SQLScript methods, starting a background run once they are confirmed.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStart.ts`
 
@@ -4884,7 +4884,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstep-debug-debugger"></a>
 #### AmdpDebugStep (Debug / Debugger)
-**Description:** [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop. The state after the step.
+**Description:** [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStep.ts`
 
@@ -4897,7 +4897,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstop-debug-debugger"></a>
 #### AmdpDebugStop (Debug / Debugger)
-**Description:** [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first.
+**Description:** [debug] Stops the AMDP part of a debug session, releasing a suspended debuggee first.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStop.ts`
 
@@ -4909,7 +4909,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugwait-debug-debugger"></a>
 #### AmdpDebugWait (Debug / Debugger)
-**Description:** [read-only] Waits for the AMDP events of a debug session, up to the seconds asked. Whether the session is idle, waiting, at an event or ended, why it ended and the outcome of the run it started. For each event: its kind, its id, the debuggee, its source position and the depth of a stack cut to its top frames. For each variable an event carries: its name and its value. For each breakpoint an event reports: its class, its source position, its state and SAP's reason for an invalid one. For each frame of an event from the top: its database procedure, its ADT object address, its position in the database procedure and that its procedure lacks debug compilation.
+**Description:** [read-only] Waits for the AMDP events of a debug session, up to the seconds asked.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugWait.ts`
 
@@ -4922,7 +4922,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchanswers-debug-debugger"></a>
 #### DebugBatchAnswers (Debug / Debugger)
-**Description:** [read-only] Reads the outcome of each recorded debugger call of the last sending, by its number. For each number asked: the number, whether it is an error, that the number is unanswered and why. For each block of the answer of a number: its kind, its text, its annotations and its metadata. For each part of SAP's answer a number kept: its status, its status text, its headers and its body.
+**Description:** [read-only] Reads the outcome of each recorded debugger call of the last sending, by its number.
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchAnswers.ts`
 
@@ -4934,7 +4934,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchbegin-debug-debugger"></a>
 #### DebugBatchBegin (Debug / Debugger)
-**Description:** [read-only] Starts recording the debugger calls at the stopped ABAP debuggee or at the AMDP break, each under the next number, to send them together. That recording is on and the state handle: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).
+**Description:** [read-only] Starts recording the debugger calls at the stopped ABAP debuggee or at the AMDP break, each under the next number, to send them together. Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchBegin.ts`
 
@@ -4945,7 +4945,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchend-debug-debugger"></a>
 #### DebugBatchEnd (Debug / Debugger)
-**Description:** [debug] Sends the recorded debugger calls together on the session they were recorded on, and splits SAP's answer by call. How many calls were recorded, how many were sent and how many parts SAP's answer held.
+**Description:** [debug] Ends the recording of debugger calls, sending them together on the session they were recorded on, and splits SAP's answer by call.
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchEnd.ts`
 
@@ -4956,7 +4956,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugcreatememorysnapshot-debug-debugger"></a>
 #### DebugCreateMemorySnapshot (Debug / Debugger)
-**Description:** [debug] Writes a memory snapshot of the stopped ABAP debuggee. SAP's data as it came.
+**Description:** [debug] Creates a memory snapshot of the stopped ABAP debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateMemorySnapshot.ts`
 
@@ -4968,7 +4968,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugcreatewatchpoint-debug-debugger"></a>
 #### DebugCreateWatchpoint (Debug / Debugger)
-**Description:** [debug] Watches a variable of the stopped ABAP debuggee, stopping it when the variable changes, under a condition when one is set. SAP's data as it came.
+**Description:** [debug] Creates a watchpoint on a variable of the stopped ABAP debuggee, stopping it when the variable changes, under a condition when one is set.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateWatchpoint.ts`
 
@@ -4982,7 +4982,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugdeletebreakpoint-debug-debugger"></a>
 #### DebugDeleteBreakpoint (Debug / Debugger)
-**Description:** [debug] Removes one breakpoint of an ABAP debug session by its id, the rest staying armed. The id deleted.
+**Description:** [debug] Deletes one breakpoint of an ABAP debug session by its id, the rest staying armed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteBreakpoint.ts`
 
@@ -4995,7 +4995,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugdeletewatchpoint-debug-debugger"></a>
 #### DebugDeleteWatchpoint (Debug / Debugger)
-**Description:** [debug] Removes a watchpoint of the stopped ABAP debuggee by its id. The id deleted.
+**Description:** [debug] Deletes a watchpoint of the stopped ABAP debuggee by its id.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteWatchpoint.ts`
 
@@ -5008,7 +5008,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuggetmemorysizes-debug-debugger"></a>
 #### DebugGetMemorySizes (Debug / Debugger)
-**Description:** [read-only] Reads how much memory the stopped ABAP debuggee uses. The memory its ABAP objects use, the internal memory it uses and the peak of its internal memory.
+**Description:** [read-only] Reads how much memory the stopped ABAP debuggee uses.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetMemorySizes.ts`
 
@@ -5020,7 +5020,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuggetstack-debug-debugger"></a>
 #### DebugGetStack (Debug / Debugger)
-**Description:** [read-only] Reads the call stack of the stopped ABAP debuggee, each frame with its ADT object address and its place in the source. Where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive and whether the step reached another debuggee. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
+**Description:** [read-only] Reads the call stack of the stopped ABAP debuggee, each frame with its ADT object address and its place in the source.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetStack.ts`
 
@@ -5032,7 +5032,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuggetvariables-debug-debugger"></a>
 #### DebugGetVariables (Debug / Debugger)
-**Description:** [read-only] Reads variables of the stopped ABAP debuggee by name, or the members of parent variables. For each variable: its id, the parent id of its members, its name, its declared type, its value, the size of a table variable, the label of a member and the parent of a member, when several parents are read.
+**Description:** [read-only] Reads variables of the stopped ABAP debuggee by name, or the members of parent variables.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetVariables.ts`
 
@@ -5046,7 +5046,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuglistbreakpoints-debug-debugger"></a>
 #### DebugListBreakpoints (Debug / Debugger)
-**Description:** [read-only] Shows the breakpoints an ABAP debug session armed. For each breakpoint: its id, its kind, its source position, its exception class, its statement, its message class, its message number, its message type, its condition, the tag it was sent with and SAP's reason for refusing it.
+**Description:** [read-only] Lists the breakpoints an ABAP debug session armed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugListBreakpoints.ts`
 
@@ -5058,7 +5058,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuglistwatchpoints-debug-debugger"></a>
 #### DebugListWatchpoints (Debug / Debugger)
-**Description:** [read-only] Shows the watchpoints of the stopped ABAP debuggee. SAP's data as it came.
+**Description:** [read-only] Lists the watchpoints of the stopped ABAP debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugListWatchpoints.ts`
 
@@ -5070,7 +5070,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetbreakpoints-debug-debugger"></a>
 #### DebugSetBreakpoints (Debug / Debugger)
-**Description:** [debug] Adds breakpoints to an ABAP debug session: at a source position, optionally conditional, on an exception class, an ABAP statement or a message. For each breakpoint of the set placed: its id, its kind, its source position, its exception class, its statement, its message class, its message number, its message type, its condition, the tag it was sent with and SAP's reason for refusing it. For each breakpoint of this call SAP refused: the breakpoint sent and SAP's reason. For each earlier breakpoint that dropped out of the set: the breakpoint sent and SAP's reason. For each answer SAP gave beside the breakpoints sent: its kind, its id, its tag and SAP's reason.
+**Description:** [debug] Sets breakpoints in an ABAP debug session: at a source position, optionally conditional, on an exception class, an ABAP statement or a message.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetBreakpoints.ts`
 
@@ -5083,7 +5083,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetsettings-debug-debugger"></a>
 #### DebugSetSettings (Debug / Debugger)
-**Description:** [debug] Changes the debugger settings of an ABAP debug session at its current stop, applied again after each later attach. Whether system programs are debugged, whether update tasks are debugged, whether exception objects are created, whether background RFC is debugged and whether shared objects are debugged.
+**Description:** [debug] Sets the debugger settings of an ABAP debug session at its current stop, applied again after each later attach.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetSettings.ts`
 
@@ -5100,7 +5100,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetstackposition-debug-debugger"></a>
 #### DebugSetStackPosition (Debug / Debugger)
-**Description:** [debug] Selects the stack frame of a stopped debuggee whose variables are then shown, execution going on from the same point.
+**Description:** [debug] Sets the stack frame of a stopped debuggee whose variables are then shown, execution going on from the same point.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetStackPosition.ts`
 
@@ -5113,7 +5113,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetvariable-debug-debugger"></a>
 #### DebugSetVariable (Debug / Debugger)
-**Description:** [debug] Sets the value of a variable of the stopped ABAP debuggee. For each variable: its id, the parent id of its members, its name, its declared type, its value and the size of a table variable.
+**Description:** [debug] Sets the value of a variable of the stopped ABAP debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetVariable.ts`
 
@@ -5127,7 +5127,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstartlistener-debug-debugger"></a>
 #### DebugStartListener (Debug / Debugger)
-**Description:** [debug] Opens an ABAP debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force, why the settings could be applied only in part, the breakpoints placed and refused, the session's state handle, the terminal id its runs carry, the IDE id its runs carry, its debugging mode and the user whose runs it catches. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
+**Description:** [debug] Starts an ABAP debug session: arms breakpoints, listens for a debuggee and attaches the first one caught.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStartListener.ts`
 
@@ -5143,7 +5143,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstep-debug-debugger"></a>
 #### DebugStep (Debug / Debugger)
-**Description:** [debug] Steps the stopped ABAP debuggee into a call, over it, out of it or on to the next stop, or leaves it running by detaching or freeing the debugger. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force and why the settings could be applied only in part. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
+**Description:** [debug] Steps the stopped ABAP debuggee into a call, over it, out of it or on to the next stop, or leaves it running by detaching or freeing the debugger.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStep.ts`
 
@@ -5156,7 +5156,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsteptoline-debug-debugger"></a>
 #### DebugStepToLine (Debug / Debugger)
-**Description:** [debug] Runs or jumps the stopped ABAP debuggee to a source position. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force and why the settings could be applied only in part. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
+**Description:** [debug] Steps the stopped ABAP debuggee to a source position, running or jumping there.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStepToLine.ts`
 
@@ -5174,7 +5174,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstop-debug-debugger"></a>
 #### DebugStop (Debug / Debugger)
-**Description:** [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes its connections. That the session stopped. For each part that failed to undo: the step it failed at and its error as it came.
+**Description:** [debug] Stops a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes its connections.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStop.ts`
 
@@ -5186,7 +5186,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugtakeoverlistener-debug-debugger"></a>
 #### DebugTakeOverListener (Debug / Debugger)
-**Description:** [debug] Opens an ABAP debug session taking its user over from another debugger: arms breakpoints, listens for a debuggee and attaches the first one caught. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force, why the settings could be applied only in part, the breakpoints placed and refused, the session's state handle, the terminal id its runs carry, the IDE id its runs carry, its debugging mode and the user whose runs it catches. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
+**Description:** [debug] Takes the ABAP debugging of a user over from another debugger: arms breakpoints, listens for a debuggee and attaches the first one caught.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTakeOverListener.ts`
 
@@ -5202,7 +5202,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugterminate-debug-debugger"></a>
 #### DebugTerminate (Debug / Debugger)
-**Description:** [debug] Ends the stopped ABAP debuggee and its program where it stands. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force and why the settings could be applied only in part. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
+**Description:** [debug] Terminates the stopped ABAP debuggee and its program where it stands.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTerminate.ts`
 
@@ -5214,7 +5214,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugwait-debug-debugger"></a>
 #### DebugWait (Debug / Debugger)
-**Description:** [read-only] Waits for the next stop or end of an ABAP debug session, up to the seconds asked, and tells its state. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force and why the settings could be applied only in part. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
+**Description:** [read-only] Waits for the next stop or end of an ABAP debug session, up to the seconds asked, and tells its state.
 
 **Source:** `src/handlers/debugger/debug/handleDebugWait.ts`
 
@@ -5227,7 +5227,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotdelta-debug-debugger"></a>
 #### MemorySnapshotDelta (Debug / Debugger)
-**Description:** [read-only] Compares two memory snapshots in a view: memory by kind, largest objects, an object's children or its referrers. SAP's data as it came.
+**Description:** [read-only] Compares two memory snapshots in a view: memory by kind, largest objects, an object's children or its referrers.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotDelta.ts`
 
@@ -5243,7 +5243,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotget-debug-debugger"></a>
 #### MemorySnapshotGet (Debug / Debugger)
-**Description:** [read-only] Reads one memory snapshot in a view: its header, memory by kind, largest objects, an object's children or its referrers. SAP's data as it came.
+**Description:** [read-only] Reads one memory snapshot in a view: its header, memory by kind, largest objects, an object's children or its referrers.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotGet.ts`
 
@@ -5258,7 +5258,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotlist-debug-debugger"></a>
 #### MemorySnapshotList (Debug / Debugger)
-**Description:** [read-only] Lists the memory snapshots the system holds, of one user when asked. Beside an empty set, that a user lacking the memory snapshot authorization gets one too. For each snapshot: its id, its user, when it was written, its size and the program it was written in.
+**Description:** [read-only] Lists the memory snapshots the system holds, of one user when asked.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotList.ts`
 
@@ -5276,7 +5276,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listleftoversessions-session-leftover-session"></a>
 #### ListLeftoverSessions (Session / Leftover Session)
-**Description:** [read-only] Lists the SAP sessions of this server's destination left open by an ended server process, which may still hold locks. For each leftover session: its handle, whether it served an instance or a debug session, its destination, its SAP user and when it was last recorded.
+**Description:** [read-only] Lists the SAP sessions of this server's destination left open by an ended server process, which may still hold locks.
 
 **Source:** `src/handlers/leftover_session/session/handleListLeftoverSessions.ts`
 
@@ -5287,7 +5287,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="logoffleftoversession-session-leftover-session"></a>
 #### LogoffLeftoverSession (Session / Leftover Session)
-**Description:** Logs off a leftover SAP session by its handle, releasing every lock it holds and deleting its record. The session's handle and that it is logged off.
+**Description:** Logs off a leftover SAP session by its handle, releasing every lock it holds and deleting its record.
 
 **Source:** `src/handlers/leftover_session/session/handleLogoffLeftoverSession.ts`
 
@@ -5306,7 +5306,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="sessionopen-streamable-http"></a>
 ### SessionOpen (Streamable HTTP)
-**Description:** [read-only] Opens a long session on this server, keeping its server instance and SAP connection for every call that carries its state handle. The state handle every call of the session carries.
+**Description:** [read-only] Opens a long session on this server, keeping its server instance and SAP connection for every call that carries its state handle.
 
 **Parameters:**
 - `state_handle` (string, optional) - The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance.
@@ -5315,7 +5315,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="sessionclose-streamable-http"></a>
 ### SessionClose (Streamable HTTP)
-**Description:** [read-only] Closes the long session a state handle names, logging off its SAP sessions and so releasing their locks. Whether the session is closed and the locks, recorded calls and debug session it held.
+**Description:** [read-only] Closes the long session a state handle names, logging off its SAP sessions and so releasing their locks.
 
 **Parameters:**
 - `state_handle` (string, optional) - The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance.

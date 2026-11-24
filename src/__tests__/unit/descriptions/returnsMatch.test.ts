@@ -6,7 +6,10 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { IInactiveObjectsResponse } from '@mcp-abap-adt/adt-strategies';
+import type {
+  IAbapTraceEntry,
+  IInactiveObjectsResponse,
+} from '@mcp-abap-adt/adt-strategies';
 import { abapGitFacts } from '@mcp-abap-adt/adt-strategies';
 import { TOOL_DEFINITION as BRANCH_INFO } from '../../../handlers/abapgit/high/handleGetAbapGitBranchInfo';
 import { TOOL_DEFINITION as EXTERNAL_REPO } from '../../../handlers/abapgit/readonly/handleCheckAbapGitExternalRepo';
@@ -85,6 +88,21 @@ import {
   WHERE_USED_HEADS,
   WHERE_USED_LISTS,
 } from '../../../handlers/system/readonly/handleGetWhereUsed';
+import {
+  TOOL_DEFINITION as GATEWAY_ERRORS,
+  GATEWAY_ERRORS_HEADS,
+  GATEWAY_ERRORS_LISTS,
+} from '../../../handlers/system/readonly/handleRuntimeGetGatewayErrorLog';
+import {
+  TOOL_DEFINITION as TRACE_FILES,
+  TRACE_FILES_HEADS,
+  TRACE_FILES_LISTS,
+} from '../../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
+import {
+  TOOL_DEFINITION as SYSTEM_MESSAGES,
+  SYSTEM_MESSAGES_HEADS,
+  SYSTEM_MESSAGES_LISTS,
+} from '../../../handlers/system/readonly/handleRuntimeListSystemMessages';
 import {
   TOOL_DEFINITION as SEARCH_SOURCE,
   SEARCH_SOURCE_HEADS,
@@ -192,6 +210,9 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   ReadTransportObjects: TRANSPORT_OBJECTS.description,
   ListTransports: TRANSPORTS.description,
   ReadTransportActionLog: ACTION_LOG.description,
+  RuntimeListSystemMessages: SYSTEM_MESSAGES.description,
+  RuntimeGetGatewayErrorLog: GATEWAY_ERRORS.description,
+  RuntimeListProfilerTraceFiles: TRACE_FILES.description,
 };
 
 /** A writer tool's tie: its lists (every variant), its heads, its fixtures' lines. */
@@ -290,6 +311,92 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  RuntimeListSystemMessages: () => {
+    const reading = {
+      messages: [
+        {
+          id: 'M1',
+          createdOn: '2026-01-01',
+          author: 'ADMIN',
+          title: 'Downtime',
+        },
+      ],
+    };
+    const heads = [{ head: 'count', value: '1' }];
+    return writtenTie(
+      'RuntimeListSystemMessages',
+      [SYSTEM_MESSAGES_LISTS],
+      SYSTEM_MESSAGES_HEADS,
+      [
+        {
+          reading,
+          lines: writtenLines({ heads, reading, lists: SYSTEM_MESSAGES_LISTS }),
+        },
+      ],
+    );
+  },
+  RuntimeGetGatewayErrorLog: () => {
+    const reading = {
+      errors: [
+        {
+          opid: 'OP1',
+          detailUri: '/sap/bc/adt/gw/errorlog/Frontend/OP1',
+          dateTime: '2026-01-01T00:00:00Z',
+          type: 'Frontend',
+          shortText: 'Failed',
+          username: 'DEV',
+        },
+      ],
+    };
+    const heads = [{ head: 'count', value: '1' }];
+    return writtenTie(
+      'RuntimeGetGatewayErrorLog',
+      [GATEWAY_ERRORS_LISTS],
+      GATEWAY_ERRORS_HEADS,
+      [
+        {
+          reading,
+          lines: writtenLines({ heads, reading, lists: GATEWAY_ERRORS_LISTS }),
+        },
+      ],
+    );
+  },
+  RuntimeListProfilerTraceFiles: () => {
+    const reading: { entries: IAbapTraceEntry[] } = {
+      entries: [
+        {
+          id: 'T1',
+          recordedAt: '2026-01-01T00:00:00Z',
+          user: 'DEV',
+          objectName: 'ZPROG',
+          state: { value: 'R', text: 'Ready' },
+          expiresAt: '2026-02-01T00:00:00Z',
+          system: 'DEV',
+          client: '001',
+          host: 'h',
+          size: 1,
+          runtime: 10,
+          runtimeABAP: 5,
+          runtimeSystem: 3,
+          runtimeDatabase: 2,
+          isAggregated: false,
+          amdpFileSize: 0,
+        },
+      ],
+    };
+    const heads = [{ head: 'count', value: '1' }];
+    return writtenTie(
+      'RuntimeListProfilerTraceFiles',
+      [TRACE_FILES_LISTS],
+      TRACE_FILES_HEADS,
+      [
+        {
+          reading,
+          lines: writtenLines({ heads, reading, lists: TRACE_FILES_LISTS }),
+        },
+      ],
+    );
+  },
   ReadTransportObjects: () => {
     // A request's entries under two tasks and both program IDs, and one SAP
     // lists untyped.

@@ -6,15 +6,20 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 import {
+  about,
   answered,
   type DetailTable,
   entries,
   formatted,
+  headShape,
   type ListDetailTable,
+  type RowSchemas,
   rawLevel,
   readingAt,
   rows,
+  shapesOf,
   writeJson,
   writeListing,
   written,
@@ -27,11 +32,58 @@ import {
 } from '../../../lib/strategies/detail';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 
+/** The lists the listing writes: what the description states. */
+export const TRACE_FILES_LISTS: RowSchemas<{ entries: IAbapTraceEntry[] }> = {
+  entries: about(
+    'for each trace',
+    rows('entries', {
+      columns: [
+        {
+          name: 'id',
+          means: 'its ID',
+          cell: (entry: IAbapTraceEntry) => entry.id,
+        },
+        {
+          name: 'recordedAt',
+          means: 'when it was recorded',
+          cell: (entry: IAbapTraceEntry) => entry.recordedAt,
+        },
+        {
+          name: 'objectName',
+          means: 'the object it traced',
+          cell: (entry: IAbapTraceEntry) => entry.objectName,
+        },
+        {
+          name: 'state',
+          means: 'its state',
+          cell: (entry: IAbapTraceEntry) => entry.state?.text ?? '',
+        },
+        {
+          name: 'runtime',
+          means: 'its runtime',
+          cell: (entry: IAbapTraceEntry) => String(entry.runtime),
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** The heads the listing opens with. */
+export const TRACE_FILES_HEADS = [headShape('count', 'how many there are')];
+
 export const TOOL_DEFINITION = {
   name: 'RuntimeListProfilerTraceFiles',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] [runtime] List ABAP profiler trace files available in ADT runtime. Returns each trace: by default as TSV (id, recordedAt, objectName, state, runtime); with detail medium or full every field (user, expiresAt, system, client, host, size and the runtime split).',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose('Lists the ABAP profiler traces recorded in the system.'),
+    returns: returnsOf({
+      heads: TRACE_FILES_HEADS,
+      shapes: [shapesOf(TRACE_FILES_LISTS)],
+    }),
+    inline: true,
+  }),
   inputSchema: z.object({ ...DETAIL_SHAPE }),
 } as const;
 
@@ -60,30 +112,7 @@ const TRACE_READINGS: ListDetailTable<string | object> = {
     writeListing({
       heads: [{ head: 'count', value: String(entries.length) }],
       reading: { entries },
-      lists: {
-        entries: rows('entries', {
-          columns: [
-            { name: 'id', cell: (entry: IAbapTraceEntry) => entry.id },
-            {
-              name: 'recordedAt',
-              cell: (entry: IAbapTraceEntry) => entry.recordedAt,
-            },
-            {
-              name: 'objectName',
-              cell: (entry: IAbapTraceEntry) => entry.objectName,
-            },
-            {
-              name: 'state',
-              cell: (entry: IAbapTraceEntry) => entry.state?.text ?? '',
-            },
-            {
-              name: 'runtime',
-              cell: (entry: IAbapTraceEntry) => String(entry.runtime),
-            },
-          ],
-          header: 'always',
-        }),
-      },
+      lists: TRACE_FILES_LISTS,
     }),
   ),
   medium: written(profilerTraceEntries, (traces: IAbapTraceEntry[]) =>

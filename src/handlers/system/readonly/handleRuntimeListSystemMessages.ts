@@ -6,14 +6,19 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 import {
+  about,
   answered,
   type DetailTable,
   formatted,
+  headShape,
   type ListDetailTable,
+  type RowSchemas,
   rawLevel,
   readingAt,
   rows,
+  shapesOf,
   whole,
   writeListing,
   written,
@@ -26,11 +31,57 @@ import {
 } from '../../../lib/strategies/detail';
 import { ourFeeds } from '../../../lib/strategies/resultSets';
 
+/** The lists the listing writes: what the description states. */
+export const SYSTEM_MESSAGES_LISTS: RowSchemas<{
+  messages: ISystemMessageEntry[];
+}> = {
+  messages: about(
+    'for each system message',
+    rows('messages', {
+      columns: [
+        {
+          name: 'id',
+          means: 'its ID',
+          cell: (m: ISystemMessageEntry) => m.id ?? m.messageId ?? '',
+        },
+        {
+          name: 'createdOn',
+          means: 'when it was created',
+          cell: (m: ISystemMessageEntry) => m.createdOn ?? '',
+        },
+        {
+          name: 'author',
+          means: 'its author',
+          cell: (m: ISystemMessageEntry) => m.author ?? m.createdBy ?? '',
+        },
+        {
+          name: 'title',
+          means: 'its title',
+          cell: (m: ISystemMessageEntry) => m.title ?? '',
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** The heads the listing opens with. */
+export const SYSTEM_MESSAGES_HEADS = [headShape('count', 'how many there are')];
+
 export const TOOL_DEFINITION = {
   name: 'RuntimeListSystemMessages',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] [runtime] List SM02 system messages. By default (detail terse) TSV under a # count line: id, createdOn, author, title per message; with detail medium or full each message as SAP writes it: id, messageId, title, text, createdOn, updated, createdBy and author; raw the feed as ADT sent it.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Lists the system messages of the SAP system, the ones SM02 shows, optionally by one author.',
+    ),
+    returns: returnsOf({
+      heads: SYSTEM_MESSAGES_HEADS,
+      shapes: [shapesOf(SYSTEM_MESSAGES_LISTS)],
+    }),
+    inline: true,
+  }),
   inputSchema: z.object({
     user: z.string().optional().describe('Filter by author username.'),
     max_results: z
@@ -99,29 +150,7 @@ const SYSTEM_MESSAGE_READINGS: ListDetailTable<string | object> = (() => {
       writeListing({
         heads: [{ head: 'count', value: String(messages.length) }],
         reading: { messages },
-        lists: {
-          messages: rows('messages', {
-            columns: [
-              {
-                name: 'id',
-                cell: (m: ISystemMessageEntry) => m.id ?? m.messageId ?? '',
-              },
-              {
-                name: 'createdOn',
-                cell: (m: ISystemMessageEntry) => m.createdOn ?? '',
-              },
-              {
-                name: 'author',
-                cell: (m: ISystemMessageEntry) => m.author ?? m.createdBy ?? '',
-              },
-              {
-                name: 'title',
-                cell: (m: ISystemMessageEntry) => m.title ?? '',
-              },
-            ],
-            header: 'always',
-          }),
-        },
+        lists: SYSTEM_MESSAGES_LISTS,
       }),
     ),
     // The feed's messages whole, as read.

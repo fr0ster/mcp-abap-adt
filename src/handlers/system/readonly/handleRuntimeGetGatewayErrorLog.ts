@@ -7,14 +7,19 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 import {
+  about,
   answered,
   type DetailTable,
   formatted,
+  headShape,
   type ListDetailTable,
+  type RowSchemas,
   rawLevel,
   readingAt,
   rows,
+  shapesOf,
   type Written,
   writeListing,
   writeWhole,
@@ -29,11 +34,67 @@ import {
 import { ourFeeds } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
+/** The lists the listing writes: what the description states. */
+export const GATEWAY_ERRORS_LISTS: RowSchemas<{
+  errors: readonly IGatewayErrorEntry[];
+}> = {
+  errors: about(
+    'for each error',
+    rows('errors', {
+      columns: [
+        {
+          name: 'opid',
+          means: 'its operation ID',
+          cell: (error: IGatewayErrorEntry) => error.opid ?? '',
+        },
+        {
+          name: 'detail_kind',
+          means: 'the kind of its detail',
+          cell: detailKindOf,
+        },
+        {
+          name: 'dateTime',
+          means: 'when it happened',
+          cell: (error: IGatewayErrorEntry) => error.dateTime ?? '',
+        },
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (error: IGatewayErrorEntry) => error.type ?? '',
+        },
+        {
+          name: 'shortText',
+          means: 'its short text',
+          cell: (error: IGatewayErrorEntry) => error.shortText ?? '',
+        },
+        {
+          name: 'username',
+          means: 'the user it happened to',
+          cell: (error: IGatewayErrorEntry) => error.username ?? '',
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** The heads the listing opens with. */
+export const GATEWAY_ERRORS_HEADS = [headShape('count', 'how many there are')];
+
 export const TOOL_DEFINITION = {
   name: 'RuntimeGetGatewayErrorLog',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] [runtime] Lists the SAP Gateway error log (/IWFND/ERROR_LOG), or reads one error's detail. The list answers each error's opid and detail_kind (what its detail is read by), dateTime, type, shortText and username: by default as TSV rows; with detail medium or full every field (id, kind, transactionId, package, applicationComponent, userId, client, requestKind, detailUri). With opid and detail_kind, the error's detail under error: the list's fields of the error, then serviceInfo, errorContext, sourceCode and callStack. With detail raw the document as ADT sent it: the Atom feed for the list, the HTML for a detail.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Lists the errors of the SAP Gateway error log, the one /IWFND/ERROR_LOG shows, or reads the detail of one error.',
+    ),
+    returns: returnsOf({
+      heads: GATEWAY_ERRORS_HEADS,
+      shapes: [shapesOf(GATEWAY_ERRORS_LISTS)],
+    }),
+    inline: true,
+  }),
   inputSchema: z.object({
     opid: z
       .string()
@@ -157,34 +218,7 @@ function terseErrors(errors: readonly IGatewayErrorEntry[]): Written<string> {
   return writeListing({
     heads: [{ head: 'count', value: String(errors.length) }],
     reading: { errors },
-    lists: {
-      errors: rows('errors', {
-        columns: [
-          {
-            name: 'opid',
-            cell: (error: IGatewayErrorEntry) => error.opid ?? '',
-          },
-          { name: 'detail_kind', cell: detailKindOf },
-          {
-            name: 'dateTime',
-            cell: (error: IGatewayErrorEntry) => error.dateTime ?? '',
-          },
-          {
-            name: 'type',
-            cell: (error: IGatewayErrorEntry) => error.type ?? '',
-          },
-          {
-            name: 'shortText',
-            cell: (error: IGatewayErrorEntry) => error.shortText ?? '',
-          },
-          {
-            name: 'username',
-            cell: (error: IGatewayErrorEntry) => error.username ?? '',
-          },
-        ],
-        header: 'always',
-      }),
-    },
+    lists: GATEWAY_ERRORS_LISTS,
   });
 }
 

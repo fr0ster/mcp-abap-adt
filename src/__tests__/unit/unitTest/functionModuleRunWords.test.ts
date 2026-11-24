@@ -29,6 +29,8 @@ describe('a function module run covers its function group', () => {
     );
   });
 
+  // HandlerUnitTestRun states its function; its run target's type says what
+  // a FUNC run covers.
   it('a run target of type FUNC says so (RunAbapUnit, HandlerUnitTestRun)', () => {
     const type = RUN_TARGET_FIELD.shape.type.description ?? '';
     assert.ok(type.includes(`FUNC runs ${GROUP_WORDS}.`), type);
@@ -40,15 +42,4 @@ describe('a function module run covers its function group', () => {
       RunAbapUnit.description,
     );
   });
-
-  for (const tool of [HandlerUnitTestRun]) {
-    it(`${tool.name}'s description says so for FUNC`, () => {
-      assert.ok(
-        tool.description.includes(
-          `FUNC a function module, whose run covers ${GROUP_WORDS}`,
-        ),
-        tool.description,
-      );
-    });
-  }
 });

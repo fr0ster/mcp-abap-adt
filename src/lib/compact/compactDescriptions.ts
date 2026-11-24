@@ -45,6 +45,7 @@ import { CLASS_RUN, PROGRAM_RUN } from '../description/runs';
 import { TRANSPORT_CREATED } from '../description/sessions';
 import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import { COMPACT_MAIN_PROGRAMS } from './compactSchemas';
+import type { HandlerGetSources } from './handlerGetSources';
 import { either, leftOf, when } from './memberTexts';
 
 /** Each member as the description names it, with the arguments it takes. */
@@ -153,19 +154,7 @@ export function readToken(member: ReadMember): string {
   return READ_TOKENS[member];
 }
 
-/**
- * The full tools HandlerGet's parts do the work of, by their descriptions:
- * each such part states the function of its tool in that tool's parts.
- */
-export interface HandlerGetSources {
-  readonly contents: string;
-  readonly urls: string;
-  readonly main_programs: string;
-  readonly draft: string;
-  readonly object_structure: string;
-  readonly node_structure: string;
-  readonly virtual_folders: string;
-}
+export type { HandlerGetSources } from './handlerGetSources';
 
 /** The parts HandlerGet reads whatever the members, by their function. */
 const ACTIVATION_PARTS = [

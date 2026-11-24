@@ -61,7 +61,7 @@ import { TOOL_DEFINITION as GetCdsUnitTestResult } from '../../handlers/unit_tes
 import { TOOL_DEFINITION as GetCdsUnitTestStatus } from '../../handlers/unit_test/high/handleGetCdsUnitTestStatus.js';
 import { TOOL_DEFINITION as GetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult.js';
 import { TOOL_DEFINITION as GetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus.js';
-import type { HandlerGetSources } from '../compact/compactDescriptions.js';
+import type { HandlerGetSources } from '../compact/handlerGetSources.js';
 
 export const READ_DEFINITIONS = {
   GetBehaviorDefinition,

@@ -174,7 +174,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getabapgitstaging-read-only-abapgit"></a>
 #### GetAbapGitStaging (Read-Only / Abapgit)
-**Description:** [read-only] Gets the abapGit staging of a linked repository: what changed, to choose what a push commits. The author SAP proposes. The committer SAP proposes. For each changed file left unstaged, each staged file and each ignored file: its object's type, its object's name, its object's package, its file name, its state in the system and its state in the remote. An object with several files is named once for each of its files.
+**Description:** [read-only] Gets the abapGit staging of a linked repository: what changed, to choose what a push commits. The author and the committer SAP proposes. For each changed file left unstaged, each staged file and each ignored file: its object's type, its object's name, its object's package, its file name, its state in the system and its state in the remote. An object with several files is named once for each of its files.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitStaging.ts`
 
@@ -657,7 +657,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getincludeslist-read-only-include"></a>
 #### GetIncludesList (Read-Only / Include)
-**Description:** [read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists every include of an ABAP program or include, with the includes each one includes, down to the last. The object's type and name. The includes SAP could not read are named. The object itself, its root and for each include it includes: its name and whether it includes itself again or was met before elsewhere. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
 

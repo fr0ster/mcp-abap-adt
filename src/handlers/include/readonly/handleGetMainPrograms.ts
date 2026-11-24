@@ -42,8 +42,7 @@ export const MAIN_PROGRAMS_LISTS: RowSchemas<{ programs: MainProgram[] }> = {
       columns: [
         {
           name: 'type',
-          means:
-            'its type, PROG/P for a program or FUGR/F for a function group',
+          means: 'whether it is a program or a function group',
           cell: (program: MainProgram) => program.type,
         },
         {

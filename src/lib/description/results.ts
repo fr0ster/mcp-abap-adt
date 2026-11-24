@@ -6,7 +6,12 @@
  */
 
 import type { startedActivationAnswer } from '../../handlers/common/low/handleActivateObject';
+import type {
+  activationResultsAnswer,
+  activationStatusAnswer,
+} from '../../handlers/common/readonly/handleGetActivationRun';
 import type { StatusAnswer } from '../abapGit/formats';
+import type { ActivationMessage } from '../strategies/activationRun';
 import type {
   PublicationAnswer,
   TerseActivationAnswer,
@@ -116,6 +121,37 @@ export const ACTIVATION_STARTED = resultShape<
   ReturnType<typeof startedActivationAnswer>
 >({
   run_id: 'the id of the started run, by which its status and results are read',
+});
+
+/** What a read of an activation run's status answers. */
+export const ACTIVATION_RUN_STATUS = resultShape<
+  ReturnType<typeof activationStatusAnswer>
+>({
+  run_id: "the run's id",
+  part: 'the part read',
+  status: "the run's status, finished, error, failed or its progress",
+  document: 'its status as SAP gave it',
+});
+
+/** What a read of an activation run's results answers. */
+export const ACTIVATION_RUN_RESULTS = resultShape<
+  ReturnType<typeof activationResultsAnswer>
+>({
+  run_id: "the run's id",
+  part: 'the part read',
+  activated: "whether SAP activated it, by the results' verdict",
+  nothing_to_activate: 'whether it was already active',
+  messages: listOf<ActivationMessage>('for each message of the run', {
+    type: 'its severity',
+    text: 'its text',
+    objectName: 'the object it is about',
+    uri: 'the address of that object',
+    object: 'the object and its part as SAP describes them',
+    source_uri: 'the source it names',
+    position: 'its position there',
+    code: "SAP's message code",
+  }),
+  document: 'its results as SAP gave them',
 });
 
 /** What a check run answers. */

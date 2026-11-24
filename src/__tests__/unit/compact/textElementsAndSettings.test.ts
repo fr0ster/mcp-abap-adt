@@ -44,7 +44,10 @@ import {
   TOOL_DEFINITION as HandlerGet,
   handleHandlerGet,
 } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
-import { updateToken } from '../../../lib/compact/compactDescriptions';
+import {
+  readToken,
+  updateToken,
+} from '../../../lib/compact/compactDescriptions';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { readOnlyToolNames } from '../../../lib/toolSet';
@@ -424,13 +427,16 @@ describe('HandlerLock and HandlerUnlock: the sub-resources', () => {
 });
 
 describe('the compact descriptions of the sub-resources', () => {
-  it('HandlerGet names source as the part of each, with its requests', () => {
+  it('HandlerGet names each sub-resource it reads, with its arguments', () => {
     const words = HandlerGet.variants.onprem.description;
-    assert.match(
-      words,
-      /PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS source \(symbols, selections and headings, one request each\)/,
-    );
-    assert.match(words, /TABLE_SETTINGS source \(the technical settings/);
+    for (const member of [
+      'TABLE_SETTINGS',
+      'PROGRAM_TEXT_ELEMENTS',
+      'FUNCTION_GROUP_TEXT_ELEMENTS',
+      'CLASS_TEXT_ELEMENTS',
+    ] as const) {
+      assert.ok(words.includes(readToken(member)), member);
+    }
   });
 
   it('HandlerUpdate names the settings and the text parts it writes, with their arguments', () => {

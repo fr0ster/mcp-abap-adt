@@ -6,6 +6,7 @@
  * it maps to in that tool's assembled parts. Read tools only: this module is
  * part of the read barrel.
  */
+
 import { TOOL_DEFINITION as GetATCFindings } from '../../handlers/atc/high/handleGetATCFindings.js';
 import { TOOL_DEFINITION as GetATCResult } from '../../handlers/atc/high/handleGetATCResult.js';
 import { TOOL_DEFINITION as ListATCResults } from '../../handlers/atc/high/handleListATCResults.js';
@@ -60,6 +61,7 @@ import { TOOL_DEFINITION as GetCdsUnitTestResult } from '../../handlers/unit_tes
 import { TOOL_DEFINITION as GetCdsUnitTestStatus } from '../../handlers/unit_test/high/handleGetCdsUnitTestStatus.js';
 import { TOOL_DEFINITION as GetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult.js';
 import { TOOL_DEFINITION as GetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus.js';
+import type { HandlerGetSources } from '../compact/compactDescriptions.js';
 
 export const READ_DEFINITIONS = {
   GetBehaviorDefinition,
@@ -117,3 +119,14 @@ export const READ_DEFINITIONS = {
   ListServiceBindingTypes,
   ValidateServiceBinding,
 } as const;
+
+/** The full tools HandlerGet's parts do the work of: what those parts state. */
+export const HANDLER_GET_SOURCES = {
+  contents: GetPackageContents.description,
+  urls: GetServiceBindingPreviewUrl.description,
+  main_programs: GetMainPrograms.description,
+  draft: GetObjectDraft.description,
+  object_structure: GetObjectStructure.description,
+  node_structure: GetNodeStructureLow.description,
+  virtual_folders: GetVirtualFoldersLow.description,
+} as const satisfies HandlerGetSources;

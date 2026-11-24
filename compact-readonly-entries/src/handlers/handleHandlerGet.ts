@@ -4,11 +4,12 @@ import {
   byVariant,
   COMPACT_MAIN_PROGRAMS,
   COMPACT_READ,
-  compactGetDescription,
+  compactGetParts,
   compactGetSchemaWithNamesFor,
   HANDLER_GET_DRAFT_TYPES,
   subResourceRefusal,
   supported,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { ToolArgs, ToolResultLike } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -20,6 +21,7 @@ import {
   withInCallSchema,
 } from '@mcp-abap-adt/lib/handlers';
 import {
+  HANDLER_GET_SOURCES,
   handleGetActivationResults,
   handleGetActivationStatus,
   handleGetNodeStructureOnce,
@@ -69,7 +71,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerGet',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactGetDescription(variant),
+    description: toolDescription(compactGetParts(variant, HANDLER_GET_SOURCES)),
     inputSchema: schemaOn(variant),
     members: COMPACT_READ[variant],
   })),

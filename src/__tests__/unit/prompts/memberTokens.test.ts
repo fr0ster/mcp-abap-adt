@@ -35,6 +35,7 @@ import {
   unlockToken,
   updateToken,
 } from '../../../lib/compact/compactDescriptions';
+import { HANDLER_GET_SOURCES } from '../../../lib/handlers/readDefinitions';
 
 /** One tool: its description on a variant and each of its members' tokens there. */
 type ToolTokens = {
@@ -51,7 +52,7 @@ const TOOLS: readonly ToolTokens[] = [
   },
   {
     tool: 'HandlerGet',
-    description: (v) => compactGetDescription(v),
+    description: (v) => compactGetDescription(v, HANDLER_GET_SOURCES),
     tokens: (v) => COMPACT_READ[v].map(readToken),
   },
   {

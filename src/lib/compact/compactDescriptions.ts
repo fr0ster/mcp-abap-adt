@@ -5,7 +5,6 @@
  * and a member the variant does not serve is not named.
  */
 import {
-  type ACTIVATION_CODES,
   COMPACT_ACTIVATE,
   COMPACT_CHECK,
   COMPACT_CREATE,
@@ -14,23 +13,27 @@ import {
   COMPACT_LOCK,
   COMPACT_PROFILE,
   COMPACT_READ,
-  COMPACT_SINGLE_ACTIVATION,
   COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
   type ProjectionVariant,
 } from '../adtProjections';
-import { parentedCodesOf } from '../adtTypeCode';
 import {
   type DescriptionParts,
+  longRunning,
   membersTaken,
   purpose,
   resultReturns,
+  sourceReader,
   toolDescription,
   underLock,
+  valueFrom,
+  valueParts,
 } from '../description/index';
 import {
   ACTIVATED,
+  ACTIVATION_RUN_RESULTS,
+  ACTIVATION_RUN_STATUS,
   ACTIVATION_STARTED,
   CHECKED,
   DELETED,
@@ -45,16 +48,9 @@ import {
 } from '../description/results';
 import { CLASS_RUN, PROGRAM_RUN } from '../description/runs';
 import { TRANSPORT_CREATED } from '../description/sessions';
-import { draftPartWords, HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
-import { withLongToolAdvice } from '../longTools';
-import {
-  either,
-  exampleCodes,
-  type Left,
-  leftOf,
-  listed,
-  when,
-} from './memberTexts';
+import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
+import { COMPACT_MAIN_PROGRAMS } from './compactSchemas';
+import { either, leftOf, when } from './memberTexts';
 
 /** Each member as the description names it, with the arguments it takes. */
 type Tokens<M extends string> = { readonly [K in M]: string };
@@ -170,70 +166,91 @@ export function readToken(member: ReadMember): string {
   return READ_TOKENS[member];
 }
 
-/** The parts each kind of type has, the kinds whose members are all removed left out. */
-const PARTS_PER_TYPE: ReadonlyArray<readonly [readonly ReadMember[], string]> =
-  [
-    [['PACKAGE'], 'metadata, contents'],
-    [['DOMAIN', 'DATA_ELEMENT', 'FUNCTION_GROUP', 'TABLE_TYPE'], 'metadata'],
-    [
-      [
-        'LOCAL_TEST_CLASS',
-        'LOCAL_TYPES',
-        'LOCAL_DEFINITIONS',
-        'LOCAL_MACROS',
-        'UNIT_TEST',
-        'CDS_UNIT_TEST',
+/**
+ * The full tools HandlerGet's parts do the work of, by their descriptions:
+ * each such part states the function of its tool in that tool's parts.
+ */
+export interface HandlerGetSources {
+  readonly contents: string;
+  readonly urls: string;
+  readonly main_programs: string;
+  readonly draft: string;
+  readonly object_structure: string;
+  readonly node_structure: string;
+  readonly virtual_folders: string;
+}
+
+/** The parts HandlerGet reads whatever the members, by their function. */
+const ACTIVATION_PARTS = [
+  valueParts('activation_status', {
+    purpose: purpose('Reads the status of an activation run by its id.'),
+    returns: resultReturns(ACTIVATION_RUN_STATUS),
+  }),
+  valueParts('activation_results', {
+    purpose: purpose(
+      "Reads the results of an activation run by its id: SAP's verdict and the messages the run produced.",
+    ),
+    returns: resultReturns(ACTIVATION_RUN_RESULTS),
+  }),
+] as const;
+
+/**
+ * HandlerGet's parts on `variant`, naming `members` (default: all the
+ * variant's): each part by its function, a part whose members are all
+ * removed left out.
+ */
+export function compactGetParts(
+  variant: ProjectionVariant,
+  sources: HandlerGetSources,
+  members: readonly ReadMember[] = COMPACT_READ[variant],
+): DescriptionParts {
+  const left = leftOf(COMPACT_READ[variant], members);
+  const mainPrograms = left.of<ReadMember>(COMPACT_MAIN_PROGRAMS[variant]);
+  const drafts = left.of(HANDLER_GET_DRAFT_TYPES[variant]);
+  return {
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads one part of the ABAP repository object of the type object_type names, of the repository by ADT address, or of an activation run by its id.',
+    ),
+    returns: [],
+    values: {
+      of: 'part',
+      each: [
+        valueParts('source', sourceReader({ object: 'the object' })),
+        valueParts('metadata', {
+          purpose: purpose(
+            'Reads the metadata of the object at the version asked, as its type keeps it.',
+          ),
+          returns: [],
+        }),
+        ...(left.has('SERVICE_BINDING')
+          ? [valueFrom('urls', sources.urls)]
+          : []),
+        ...(left.has('PACKAGE')
+          ? [valueFrom('contents', sources.contents)]
+          : []),
+        ...(mainPrograms.length > 0
+          ? [valueFrom('main_programs', sources.main_programs)]
+          : []),
+        ...(drafts.length > 0 ? [valueFrom('draft', sources.draft)] : []),
+        valueFrom('object_structure', sources.object_structure),
+        valueFrom('node_structure', sources.node_structure),
+        valueFrom('virtual_folders', sources.virtual_folders),
+        ...ACTIVATION_PARTS,
       ],
-      'source',
-    ],
-    [['TRANSPORT'], 'source, metadata'],
-    [['SERVICE_BINDING'], 'source, metadata, urls'],
-    [['TABLE_SETTINGS'], 'source (the technical settings, in one request)'],
-    [['CLASS_TEXT_ELEMENTS'], 'source (the text symbols, in one request)'],
-    [
-      ['PROGRAM_TEXT_ELEMENTS', 'FUNCTION_GROUP_TEXT_ELEMENTS'],
-      'source (symbols, selections and headings, one request each)',
-    ],
-  ];
-
-function partsPerType(left: Left): string {
-  return PARTS_PER_TYPE.map(
-    ([types, parts]) => [left.of(types), parts] as const,
-  )
-    .filter(([types]) => types.length > 0)
-    .map(([types, parts]) => `${types.join(', ')} ${parts}; `)
-    .join('');
-}
-
-/** The sentence on `part: 'draft'`, for the draft types left. */
-function draftPart(variant: ProjectionVariant, left: Left): string {
-  const types = left.of(HANDLER_GET_DRAFT_TYPES[variant]);
-  if (types.length === 0) return '';
-  const timeless = left.of<ReadMember>([
-    'METADATA_EXTENSION',
-    'SERVICE_DEFINITION',
-  ]);
-  return ` draft (${listed(types)}) reads the active, inactive and working versions of each part of the object together (${draftPartWords(variant, types)}) and answers { object_type, object_name, has_draft, parts }: per part draft states whose unactivated change it holds — own (the caller's), other (another user's), undetermined (its three ETags in another pattern), and the active state when its versions are equal — with changed_at (the change's last write, UTC) and age_seconds by the server's clock for own and other${when(timeless.length > 0, ` (null for ${listed(timeless)}, whose ETag carries a constant time)`)}, and the three ETags (active, inactive, workspace); has_draft is true when any part holds a change of a user's.`;
-}
-
-/** The sentence on reading a unit-test run's result, for the run types left. */
-function unitTestRuns(left: Left): string {
-  const runs = left.of<ReadMember>(['UNIT_TEST', 'CDS_UNIT_TEST']);
-  if (runs.length === 0) return '';
-  const [read, answer] =
-    runs.length === 1 ? ['reads', 'answers'] : ['read', 'answer'];
-  return ` ${listed(runs)} ${read} the run's result in one request and ${answer} { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime.`;
+    },
+    members: membersTaken('object_type required', members.map(readToken)),
+    notes: [longRunning],
+  };
 }
 
 /** HandlerGet's description on `variant`, naming `members` (default: all the variant's). */
 export function compactGetDescription(
   variant: ProjectionVariant,
+  sources: HandlerGetSources,
   members: readonly ReadMember[] = COMPACT_READ[variant],
 ): string {
-  const left = leftOf(COMPACT_READ[variant], members);
-  return withLongToolAdvice(
-    `[read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls${when(left.has('SERVICE_BINDING'), ' (SERVICE_BINDING)')} the service URL, its $metadata and the browser preview, contents${when(left.has('PACKAGE'), ' (PACKAGE)')} the objects the package holds, its walk read level by level in ADT batch envelopes${when(left.has('PACKAGE'), '; package_names lists several packages, read together, one entry per package in the order given')}. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: ${partsPerType(left)}every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, activated, messages, document }: activated is SAP's verdict as the results state it: true where they say activationExecuted="true" and every message is below error severity, false where they say activationExecuted="false" (a run SAP cancelled, or one whose message list is empty) or carry an error-severity message, null where they leave activationExecuted out; beside the messages the run produced and its results document as SAP answered it. ${when(members.length > 0, `Otherwise object_type required: ${named(members, readToken)}.`)}${when(left.has('TRANSPORT'), " TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position. TRANSPORT with part metadata reads the request or task itself, kind saying which: a request's header and its tasks with their object counts; a task's header, its parent request and its objects with their positions.")}${unitTestRuns(left)}${draftPart(variant, left)}`,
-  );
+  return toolDescription(compactGetParts(variant, sources, members));
 }
 
 type UpdateMember = (typeof COMPACT_UPDATE.onprem)[number];
@@ -592,7 +609,6 @@ export function compactDeletionCheckDescription(
 }
 
 type ActivateMember = (typeof COMPACT_ACTIVATE.onprem)[number];
-type ActivationCode = (typeof ACTIVATION_CODES.onprem)[number];
 
 /**
  * A HandlerActivate member as the description's single form names it: the type

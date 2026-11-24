@@ -41,6 +41,12 @@ import {
   createOnPremAdtClient,
   variantOf,
 } from '../../../lib/clients';
+import {
+  purpose,
+  resultReturns,
+  results,
+  toolDescription,
+} from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   connectionHoldingPackageLock,
@@ -55,8 +61,13 @@ import { unlockSubResource } from './subResourceLocks';
 export const TOOL_DEFINITION = {
   name: 'UnlockObjectLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Unlock an ABAP object after modification, with the lock_handle the LockObject operation answered (the lock stays in the instance’s own session until then).',
+  description: toolDescription({
+    tag: 'low-level',
+    purpose: purpose(
+      'Releases the lock an ABAP object holds under the lock handle given.',
+    ),
+    returns: resultReturns(results.WRITTEN),
+  }),
   inputSchema: z.object({
     object_name: z
       .string()

@@ -3,16 +3,17 @@
  * of every tool definition is a `toolDescription(…)` call, never a string
  * literal, a template or a concatenation — except for a tool still listed in
  * `NOT_YET_ASSEMBLED`, which is refused once it is assembled, so the list
- * only shrinks. A kind factory of `kinds.ts` (`createTool`, `checkTool`, …)
- * assembles through `toolDescription` and counts as its call. Read from the
- * source with the TypeScript parser.
+ * only shrinks. One rule: the description is a call of `toolDescription`
+ * itself (its parts made by any helper: `toolDescription(runParts(…))`), or
+ * of a factory exported from `src/lib/description/` whose every `return` is
+ * such a call (`createTool`, `checkTool`, …); anything else is written whole.
+ * Read from the source with the TypeScript parser.
  */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import ts from 'typescript';
-import * as kinds from '../../../lib/description/kinds';
 import { globSync } from '../../helpers/platform';
 import {
   NOT_YET_ASSEMBLED,
@@ -26,11 +27,87 @@ const DEFINING = [
   ...globSync('compact-*/src/handlers/**/*.ts'),
 ].filter((file) => !file.includes('__tests__'));
 
-/** The calls that assemble a description: the builder, and each kind factory. */
-const ASSEMBLING: ReadonlySet<string> = new Set([
-  'toolDescription',
-  ...Object.keys(kinds),
-]);
+/** The builder every assembled description is made by. */
+const BUILDER = 'toolDescription';
+
+/** Every `return` expression of a function's own body (not of a function nested in it). */
+function returnsOf(body: ts.Node): (ts.Expression | undefined)[] {
+  const found: (ts.Expression | undefined)[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionLike(node)) return;
+    if (ts.isReturnStatement(node)) found.push(node.expression);
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(body, visit);
+  return found;
+}
+
+/**
+ * The factories of the given sources that assemble a description: every
+ * exported function whose every `return` is a call of the builder or of
+ * another such function of these sources (a private helper included, as
+ * `kinds.ts`'s `kind`), found to a fixed point.
+ */
+function factoriesOf(sources: readonly ts.SourceFile[]): Set<string> {
+  const functions = sources.flatMap((source) =>
+    source.statements.flatMap((statement) =>
+      ts.isFunctionDeclaration(statement) &&
+      statement.name !== undefined &&
+      statement.body !== undefined
+        ? [
+            {
+              name: statement.name.text,
+              exported:
+                ts
+                  .getModifiers(statement)
+                  ?.some(
+                    (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+                  ) === true,
+              returns: returnsOf(statement.body),
+              source,
+            },
+          ]
+        : [],
+    ),
+  );
+  const assembling = new Set<string>([BUILDER]);
+  for (let grown = true; grown; ) {
+    grown = false;
+    for (const each of functions) {
+      if (assembling.has(each.name) || each.returns.length === 0) continue;
+      const all = each.returns.every(
+        (expression) =>
+          expression !== undefined &&
+          ts.isCallExpression(expression) &&
+          ts.isIdentifier(expression.expression) &&
+          assembling.has(expression.expression.text),
+      );
+      if (all) {
+        assembling.add(each.name);
+        grown = true;
+      }
+    }
+  }
+  return new Set(
+    [
+      BUILDER,
+      ...functions.filter((each) => each.exported).map((each) => each.name),
+    ].filter((name) => assembling.has(name)),
+  );
+}
+
+/** The files of the builder and its factories. */
+const DESCRIPTION_SOURCES = globSync('src/lib/description/*.ts').map((file) =>
+  ts.createSourceFile(
+    file,
+    readFileSync(file, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+  ),
+);
+
+/** The calls that assemble a description: the builder, and each factory that returns its call. */
+const ASSEMBLING: ReadonlySet<string> = factoriesOf(DESCRIPTION_SOURCES);
 
 /** One tool definition found: its name, and how its description is made. */
 interface Defined {
@@ -153,7 +230,8 @@ function definitionsOfSource(file: string, source: ts.SourceFile): Defined[] {
             name: nameProperty.initializer.text,
             assembled:
               ts.isCallExpression(description) &&
-              ASSEMBLING.has(description.expression.getText(source)),
+              ts.isIdentifier(description.expression) &&
+              ASSEMBLING.has(description.expression.text),
             made: description.getText(source).slice(0, 60),
           });
         }
@@ -227,15 +305,64 @@ describe('every tool description is assembled, or its tool still listed as not y
     );
   });
 
-  it('reads a kind factory call as assembled, and any other call as written whole', () => {
-    const file = 'kind.ts';
+  it('finds the factories that return a toolDescription call: exported, through a private helper, and only those', () => {
     const source = ts.createSourceFile(
-      file,
-      "export const A = { name: 'ToolA', description: createTool(parts) };\nexport const B = { name: 'ToolB', description: wordsOf(parts) };",
+      'factories.ts',
+      [
+        'function kind(p) { return toolDescription(p); }',
+        'export function createTool(t) { return kind(t); }',
+        'export function direct(t) { return toolDescription(t); }',
+        'export function runParts(t) { return { purpose: t }; }',
+        'export function mixed(t) { if (t) return toolDescription(t); return words(t); }',
+        'export function wrapped(t) { const f = () => words(t); return toolDescription(t); }',
+      ].join('\n'),
       ts.ScriptTarget.Latest,
       true,
     );
-    assert.ok(ASSEMBLING.has('createTool') && ASSEMBLING.has('checkTool'));
+    assert.deepStrictEqual([...factoriesOf([source])].sort(), [
+      'createTool',
+      'direct',
+      'toolDescription',
+      'wrapped',
+    ]);
+  });
+
+  it('finds the shipped factories: each kind factory, and no parts maker', () => {
+    for (const name of [
+      'toolDescription',
+      'createTool',
+      'updateTool',
+      'deleteTool',
+      'checkTool',
+      'activateTool',
+      'validateTool',
+    ]) {
+      assert.ok(ASSEMBLING.has(name), name);
+    }
+    for (const name of [
+      'runParts',
+      'sourceReader',
+      'partsOfDescription',
+      'purpose',
+    ]) {
+      assert.ok(!ASSEMBLING.has(name), name);
+    }
+  });
+
+  it('reads a factory call and a toolDescription call over made parts as assembled, and any other call as written whole', () => {
+    const file = 'kind.ts';
+    const source = ts.createSourceFile(
+      file,
+      [
+        "export const A = { name: 'ToolA', description: createTool(parts) };",
+        "export const B = { name: 'ToolB', description: wordsOf(parts) };",
+        "export const C = { name: 'ToolC', description: toolDescription(runParts(tool)) };",
+        "export const D = { name: 'ToolD', description: runParts(tool) };",
+        "export const E = { name: 'ToolE', description: kinds.createTool(parts) };",
+      ].join('\n'),
+      ts.ScriptTarget.Latest,
+      true,
+    );
     assert.deepStrictEqual(
       definitionsOfSource(file, source).map((each) => [
         each.name,
@@ -244,6 +371,9 @@ describe('every tool description is assembled, or its tool still listed as not y
       [
         ['ToolA', true],
         ['ToolB', false],
+        ['ToolC', true],
+        ['ToolD', false],
+        ['ToolE', false],
       ],
     );
   });

@@ -318,7 +318,13 @@ async function correctPhaseParts(
  */
 export interface PhaseOutcome<R> {
   results: PhaseResult<R>[];
-  envelope: { failed: false } | { failed: true; error: unknown };
+  /**
+   * `outer`: the envelope request's own status, when it had one — a `404`
+   * there is the envelope's failure, not each part's "not found".
+   */
+  envelope:
+    | { failed: false }
+    | { failed: true; error: unknown; outer: number | undefined };
 }
 
 export async function runPhase<I, R>(
@@ -416,7 +422,7 @@ export async function runPhaseOutcome<I, R>(
     await Promise.all(settled);
     return {
       results: items.map(() => ({ ok: false, error: refused })),
-      envelope: { failed: true, error: refused },
+      envelope: { failed: true, error: refused, outer: undefined },
     };
   }
   const outer = watch.outer();
@@ -441,7 +447,7 @@ export async function runPhaseOutcome<I, R>(
   const results = await Promise.all(settled);
   return {
     results,
-    envelope: failed ? { failed: true, error } : { failed: false },
+    envelope: failed ? { failed: true, error, outer } : { failed: false },
   };
 }
 

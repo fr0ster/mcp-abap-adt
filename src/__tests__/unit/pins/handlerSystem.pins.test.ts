@@ -3,8 +3,9 @@
  * call of its full tool's entry, so its requests are that tool's.
  *
  * - `search_source` over an exact package name without its subpackages, on
- *   the ADT stand-in (a listed long tool reads on a session of its own): one
- *   batch envelope asking the package's node structure, answered with the
+ *   the ADT stand-in (a listed long tool reads on a session of its own): the
+ *   package's node structure as its own request (one read, never an
+ *   envelope), answered with the
  *   corpus's empty package;
  * - the other actions on `recordingConnection` with real adt-clients code,
  *   SAP's answers the corpus documents (in their envelope where the read is
@@ -25,12 +26,14 @@ import { envelopeResponse } from '../../helpers/batchEnvelope';
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
 
 /** The node structure of an empty package, in a batch envelope. */
-const EMPTY_PACKAGE = envelopeResponse([
-  {
-    status: 200,
-    body: corpusBody('read-empty-package-contents--01-nodestructure'),
-  },
-]);
+/**
+ * The node structure of an empty package, as its own request: one package's
+ * walk is one read per level, never an envelope.
+ */
+const EMPTY_PACKAGE_ALONE = {
+  status: 200,
+  data: corpusBody('read-empty-package-contents--01-nodestructure'),
+};
 
 /** A corpus document as SAP answered it. */
 const document = (name: string) => ({
@@ -89,18 +92,19 @@ describe('onprem', () => {
         include_subpackages: false,
         query: 'FUNCTION',
       },
-      answers: [undefined, EMPTY_PACKAGE],
+      answers: [undefined, EMPTY_PACKAGE_ALONE],
       expected: [
         {
           method: 'POST',
-          url: '/sap/bc/adt/communication/batch',
+          url: '/sap/bc/adt/repository/nodestructure?parent_type=DEVC%2FK&parent_name=ZPIN_PKG&parent_tech_name=ZPIN_PKG&withShortDescriptions=false',
           headers: {
-            accept: 'multipart/mixed',
+            accept:
+              'application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml',
             'content-type':
-              'multipart/mixed; boundary=batch_51854c50-758c-497d-afaf-181ae0d3a4ca',
+              'application/vnd.sap.as+xml; charset=UTF-8; dataname=null',
             'sap-adt-saplb': 'fetch',
             'sap-adt-connection-id': 'ec1e23e9-9820-4055-ac8b-209478db6143',
-            'sap-adt-request-id': '4a89fb30c3244204a703c8e6027bd09a',
+            'sap-adt-request-id': '51854c50758c497dafaf181ae0d3a4ca',
             'x-sap-adt-profiling': 'server-time',
             authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
             'x-csrf-token': 'csrf-placeholder',
@@ -108,12 +112,12 @@ describe('onprem', () => {
             cookie:
               'SAP_SESSIONID_X01_100=session-1; sap-usercontext=sap-client=100',
             'user-agent': 'axios/1.20.0',
-            'content-length': '750',
+            'content-length': '181',
             'accept-encoding': 'gzip, compress, deflate, br',
             host: PIN_STAND_HOST,
             connection: 'keep-alive',
           },
-          body: '--batch_51854c50-758c-497d-afaf-181ae0d3a4ca\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nPOST /sap/bc/adt/repository/nodestructure?parent_type=DEVC%2FK&parent_name=ZPIN_PKG&parent_tech_name=ZPIN_PKG&withShortDescriptions=false HTTP/1.1\r\nAccept: application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml\r\nContent-Type: application/vnd.sap.as+xml; charset=UTF-8; dataname=null\r\nContent-Length: 181\r\n\r\n<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TV_NODEKEY>000000</TV_NODEKEY></DATA></asx:values></asx:abap>\r\n\r\n--batch_51854c50-758c-497d-afaf-181ae0d3a4ca--\r\n',
+          body: '<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TV_NODEKEY>000000</TV_NODEKEY></DATA></asx:values></asx:abap>',
         },
       ],
     },
@@ -265,19 +269,20 @@ describe('cloud', () => {
         include_subpackages: false,
         query: 'FUNCTION',
       },
-      answers: [undefined, undefined, EMPTY_PACKAGE],
+      answers: [undefined, undefined, EMPTY_PACKAGE_ALONE],
       expected: [
         {
           method: 'POST',
-          url: '/sap/bc/adt/communication/batch',
+          url: '/sap/bc/adt/repository/nodestructure?parent_type=DEVC%2FK&parent_name=ZPIN_PKG&parent_tech_name=ZPIN_PKG&withShortDescriptions=false',
           headers: {
-            accept: 'multipart/mixed',
+            accept:
+              'application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml',
             'content-type':
-              'multipart/mixed; boundary=batch_ae2357e3-03cd-4685-a7f7-ce0041ee85dc',
+              'application/vnd.sap.as+xml; charset=UTF-8; dataname=null',
             'sap-adt-saplb': 'fetch',
             'x-sap-security-session': 'use',
             'sap-adt-connection-id': '0276fab1-dae1-48e1-ada6-849e4ee3b065',
-            'sap-adt-request-id': 'a9104076e0534732a83280be1f98c5c8',
+            'sap-adt-request-id': 'ae2357e303cd4685a7f7ce0041ee85dc',
             'x-sap-adt-profiling': 'server-time',
             authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
             'x-csrf-token': 'csrf-placeholder',
@@ -285,12 +290,12 @@ describe('cloud', () => {
             cookie:
               'SAP_SESSIONID_X01_100=session-1; sap-usercontext=sap-client=100',
             'user-agent': 'axios/1.20.0',
-            'content-length': '750',
+            'content-length': '181',
             'accept-encoding': 'gzip, compress, deflate, br',
             host: PIN_STAND_HOST,
             connection: 'keep-alive',
           },
-          body: '--batch_ae2357e3-03cd-4685-a7f7-ce0041ee85dc\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nPOST /sap/bc/adt/repository/nodestructure?parent_type=DEVC%2FK&parent_name=ZPIN_PKG&parent_tech_name=ZPIN_PKG&withShortDescriptions=false HTTP/1.1\r\nAccept: application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml\r\nContent-Type: application/vnd.sap.as+xml; charset=UTF-8; dataname=null\r\nContent-Length: 181\r\n\r\n<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TV_NODEKEY>000000</TV_NODEKEY></DATA></asx:values></asx:abap>\r\n\r\n--batch_ae2357e3-03cd-4685-a7f7-ce0041ee85dc--\r\n',
+          body: '<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TV_NODEKEY>000000</TV_NODEKEY></DATA></asx:values></asx:abap>',
         },
       ],
     },

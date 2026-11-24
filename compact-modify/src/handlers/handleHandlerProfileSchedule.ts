@@ -1,6 +1,7 @@
 import {
   compactOf,
   compactProfileScheduleSchema,
+  purpose,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -12,8 +13,15 @@ import {
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileSchedule',
   available_in: ['onprem', 'cloud'] as const,
+  // Its action is the schedule: the purpose says so; the rest is the full
+  // tool's.
   description: compactOf(
     WRITE_DEFINITIONS.RuntimeCreateProfilerTraceParameters.description,
+    {
+      purpose: purpose(
+        'Schedules an ABAP profiler trace for a later profiled run of a class or a report, with the parameters given.',
+      ),
+    },
   ),
   inputSchema: compactProfileScheduleSchema,
 } as const;

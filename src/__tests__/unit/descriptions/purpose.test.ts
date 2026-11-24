@@ -298,6 +298,7 @@ const VERBS: Readonly<Record<string, readonly string[]>> = {
   End: ['Ends'],
   Begin: ['Starts', 'Begins'],
   Describe: ['Describes'],
+  Schedule: ['Schedules'],
 };
 
 /** The compact tools whose action is not their last action word. */
@@ -317,7 +318,6 @@ const NO_ACTION: readonly string[] = [
   'HandlerDebugSession',
   'HandlerDumpView',
   'DebugBatchAnswers',
-  'HandlerProfileSchedule',
   'HandlerProfileView',
   'HandlerSession',
   'HandlerSystem',

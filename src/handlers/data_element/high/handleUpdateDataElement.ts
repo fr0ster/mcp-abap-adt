@@ -69,9 +69,9 @@ export const TOOL_DEFINITION = {
   name: 'UpdateDataElement',
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
-    object: 'the properties of an existing ABAP data element',
+    object:
+      'the type, labels, search help and SET/GET parameter of an existing ABAP data element',
     how: ', replacing them whole and activating it when asked',
-    transported: true,
   }),
   inputSchema: z.object({
     data_element_name: z.string().describe('Data element name to update'),

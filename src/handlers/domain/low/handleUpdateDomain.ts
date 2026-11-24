@@ -65,7 +65,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     tag: 'low-level',
-    object: 'the properties of an existing ABAP domain',
+    object:
+      'the data type, length, decimals, conversion exit, value table and fixed values of an existing ABAP domain',
     how: ', under a lock the caller holds',
   }),
   inputSchema: z.object({

@@ -72,6 +72,11 @@ describe('the purpose rules', () => {
     assert.ok(
       purposeFaults('Reads a class').includes('does not end with a full stop'),
     );
+    assert.ok(
+      purposeFaults('Reads a class.\tWrites it too.').includes(
+        'holds more than one sentence',
+      ),
+    );
   });
 
   for (const marker of FORM_MARKERS) {

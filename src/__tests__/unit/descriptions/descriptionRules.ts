@@ -56,6 +56,7 @@ export const FORM_MARKERS: readonly string[] = [
   'medium',
   'full',
   'raw',
+  'read by',
 ];
 
 /**
@@ -114,12 +115,20 @@ export function purposeFaults(text: string): string[] {
     faults.push('holds a line break');
   }
   if (text.includes('..')) faults.push('holds ".."');
-  for (const end of ['. ', '? ', '! ', '?', '!']) {
-    if (body.includes(end)) {
-      faults.push('holds more than one sentence');
-      break;
-    }
-  }
+  const characters = [...body];
+  const second = characters.some((character, i) => {
+    if (character === '?' || character === '!') return true;
+    if (character !== '.') return false;
+    // A full stop followed by any white space, then more text: a second
+    // sentence (a tab or a line break as well as a space).
+    const next = characters[i + 1];
+    return (
+      next !== undefined &&
+      next.trim() === '' &&
+      body.slice(i + 1).trim() !== ''
+    );
+  });
+  if (second) faults.push('holds more than one sentence');
   for (const marker of markersIn(text)) faults.push(`says "${marker}"`);
   return faults;
 }

@@ -9,6 +9,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { memberTokens } from '@mcp-abap-adt/lib/compact-shared';
 import { defineTool } from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetObjectStructure,
@@ -91,7 +92,11 @@ describe('HandlerGet with object_type TRANSPORT', () => {
   it('routes to the full set’s ReadTransportObjects, and the matrix says get', () => {
     assert.notEqual(compactReadRouterMap.TRANSPORT.get, undefined);
     assert.notEqual(CompactGet.inputSchema.shape.transport_number, undefined);
-    assert.ok(CompactGet.description.includes('TRANSPORT(transport_number*)'));
+    assert.ok(
+      memberTokens('HandlerGet', 'onprem').includes(
+        'TRANSPORT(transport_number*)',
+      ),
+    );
     assert.deepStrictEqual(listedJson(FullRead.inputSchema).required, [
       'transport_number',
     ]);

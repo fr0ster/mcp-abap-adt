@@ -45,6 +45,7 @@ import {
   handleHandlerGet,
 } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import {
+  memberTokens,
   readToken,
   updateToken,
 } from '../../../lib/compact/compactDescriptions';
@@ -427,8 +428,8 @@ describe('HandlerLock and HandlerUnlock: the sub-resources', () => {
 });
 
 describe('the compact descriptions of the sub-resources', () => {
-  it('HandlerGet names each sub-resource it reads, with its arguments', () => {
-    const words = HandlerGet.variants.onprem.description;
+  it("HandlerGet's member table names each sub-resource it reads, with its arguments", () => {
+    const words = memberTokens('HandlerGet', 'onprem');
     for (const member of [
       'TABLE_SETTINGS',
       'PROGRAM_TEXT_ELEMENTS',
@@ -439,8 +440,8 @@ describe('the compact descriptions of the sub-resources', () => {
     }
   });
 
-  it('HandlerUpdate names the settings and the text parts it writes, with their arguments', () => {
-    const words = HandlerUpdate.variants.onprem.description;
+  it("HandlerUpdate's member table names the settings and the text parts it writes, with their arguments", () => {
+    const words = memberTokens('HandlerUpdate', 'onprem');
     for (const member of [
       'TABLE_SETTINGS',
       'PROGRAM_TEXT_ELEMENTS',

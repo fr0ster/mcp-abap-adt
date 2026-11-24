@@ -73,11 +73,13 @@ const isCompact = (kind: ToolSetKind) =>
 const PURPOSE_WORDS =
   "Records the calls of the tools that allow it and sends them to SAP together, then reads each call's answer by its number.";
 const BEGIN_WORDS =
-  'starts recording the calls of the tools that allow it, each under the next number, to send them together: that recording is on and the state handle: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).';
+  'starts recording the calls of the tools that allow it, each under the next number, to send them together.';
 const END_WORDS =
-  "sends the recorded calls to SAP together, with the credentials in force, and splits SAP's answer by call: how many calls were recorded, how many were sent and how many parts SAP's answer held.";
+  "sends the recorded calls to SAP together, with the credentials in force, and splits SAP's answer by call.";
 const ANSWERS_WORDS =
-  "reads the answer of each recorded call of the last sending, by its number: for each number asked: the number, whether it is an error, that the number is unanswered and why; for each block of the answer of a number: its kind, its text, its annotations and its metadata; for each part of SAP's answer a number kept: its status, its status text, its headers and its body.";
+  'reads the answer of each recorded call of the last sending, by its number.';
+const HANDLE_WORDS =
+  'Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).';
 const RECORDABLE_TAIL =
   'recordable: in batch mode a call is recorded under the next number, and its answer comes back under that number after the batch ends.';
 const ELIGIBLE_WORDS = `Recordable: ${RECORDABLE_TAIL.slice('recordable: '.length)}`;
@@ -311,7 +313,7 @@ describe('the batch tools on the surface', () => {
     const byName = new Map(tools.map((t) => [t.name, t.description]));
     assert.equal(
       byName.get('HandlerBatch'),
-      `[read-only] ${PURPOSE_WORDS} action begin: ${BEGIN_WORDS} action end: ${END_WORDS} action answers: ${ANSWERS_WORDS}`,
+      `[read-only] ${PURPOSE_WORDS} action begin: ${BEGIN_WORDS} action end: ${END_WORDS} action answers: ${ANSWERS_WORDS} ${HANDLE_WORDS}`,
     );
   });
 

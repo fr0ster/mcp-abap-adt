@@ -144,8 +144,7 @@ describe('description and name against function, through the local Ollama', () =
         `${assembled.length} assembled tools: a ranking needs ${MEANING_FEWEST}`,
       );
       const functionTexts = assembled.map(
-        ({ parts }) =>
-          `${model.document}${[parts.purpose.text, ...parts.returns.map((fact) => fact.text)].join(' ')}`,
+        ({ parts }) => `${model.document}${parts.purpose.text}`,
       );
       const vectors = (texts: readonly string[]) =>
         embed(model.model, texts, [], model.cpu === true);

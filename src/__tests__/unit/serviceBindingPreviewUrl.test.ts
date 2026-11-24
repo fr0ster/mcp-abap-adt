@@ -757,13 +757,5 @@ describe('GetServiceBindingPreviewUrl', () => {
       assert.equal(payload.origin, undefined);
       assert.ok(!(payload.note ?? '').includes(NO_ORIGIN_NOTE));
     });
-
-    it("the description states whether the system's HTTP origin is known", () => {
-      assert.ok(
-        TOOL_DEFINITION.description.includes(
-          "whether the system's HTTP origin is known",
-        ),
-      );
-    });
   });
 });

@@ -203,13 +203,10 @@ describe('compact unit-test results are read once', () => {
     }
   });
 
-  it("the description states the run's id and its result", () => {
+  it('the description states the read of the result by its id', () => {
     for (const tool of [RESULT_TOOL, CDS_RESULT_TOOL]) {
-      assert.ok(
-        tool.description.includes(
-          "The run's id and the run's result as SAP gave it.",
-        ),
-      );
+      assert.ok(tool.description.includes('Reads the result of'));
+      assert.ok(tool.description.includes('by its id'));
     }
   });
 });

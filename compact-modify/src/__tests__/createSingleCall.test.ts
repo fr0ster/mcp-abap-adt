@@ -24,7 +24,10 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { format, isDeepStrictEqual } from 'node:util';
-import { compactCreateSchema } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactCreateSchema,
+  memberTokens,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   handleCreateBehaviorDefinition,
@@ -1026,7 +1029,7 @@ describe('the HandlerCreate schema and description', () => {
 
   it('advertises per type only what that type’s create sends', () => {
     // Only the per-type list: from `object_type required:` to its end.
-    const description: string = TOOL_DEFINITION.description;
+    const description: string = memberTokens('HandlerCreate', 'onprem');
     const start = description.indexOf('object_type required:');
     assert.ok(start >= 0);
     const tail = description.slice(start);

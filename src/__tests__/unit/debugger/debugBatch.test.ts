@@ -923,7 +923,6 @@ describe("DebugBatchAnswers, the full set's reader of the debugger batch", () =>
     )?.values?.each.find((value) => value.value === 'answers');
     assert.ok(full !== undefined && answers !== undefined);
     assert.equal(answers.purpose, full.purpose);
-    assert.deepStrictEqual(answers.returns, full.returns);
   });
 });
 

@@ -200,13 +200,8 @@ describe('HandlerDumpList reads one page', () => {
   });
 
   it('the parameters say the next page starts at the boundary second, inclusive', () => {
-    // The description states the function and the facts; the paging rule
-    // and the bound of top are the parameters'.
-    assert.ok(
-      TOOL_DEFINITION.description.includes(
-        'where the next read starts when more remain',
-      ),
-    );
+    // The description states the function; the paging rule and the bound
+    // of top are the parameters'.
     const schema = listedJson(TOOL_DEFINITION.inputSchema);
     assert.ok(jsonAt(schema, 'top').description?.includes('100'));
     assert.ok(

@@ -11,6 +11,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { format, isDeepStrictEqual } from 'node:util';
+import { memberTokens } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
 import { moduleMetadataDocument } from '../../../src/__tests__/helpers/functionModuleMetadata';
@@ -275,7 +276,9 @@ describe('HandlerDeletionCheck is the one deletion check', () => {
     for (const type of ['INCLUDE', 'TABLE_TYPE']) {
       assert.ok(named.some((e) => isDeepStrictEqual(e, type)));
     }
-    assert.ok(cloud.description.includes('INCLUDE'));
+    assert.ok(
+      memberTokens('HandlerDeletionCheck', 'cloud').includes('INCLUDE'),
+    );
   });
 });
 

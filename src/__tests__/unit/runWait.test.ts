@@ -548,15 +548,10 @@ describe('the schema', () => {
     assertNoProperty(properties, 'max_status_polls');
   });
 
-  it('GetUnitTestResult says what it answers for a run SAP answers unfinished', () => {
+  it('GetUnitTestResult says it waits while the run goes on', () => {
     assert.ok(
       GetUnitTestResult_Tool.description.includes(
         'waiting while the run goes on',
-      ),
-    );
-    assert.ok(
-      GetUnitTestResult_Tool.description.includes(
-        "SAP's status of a run yet to start",
       ),
     );
   });

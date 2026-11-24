@@ -11,8 +11,8 @@
  * collection the table gives the value's API (its address, in the URL, the
  * parameters or the body).
  *
- * The compact tools' arguments are read from their own descriptions on that
- * variant (`MEMBER(arg*, …)`): what the description promises is what is sent.
+ * The compact tools' arguments are read from their member tables on that
+ * variant (`memberTokens`, `MEMBER(arg*, …)`): what the table promises is what is sent.
  */
 
 import assert from 'node:assert/strict';
@@ -102,6 +102,10 @@ import {
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
 } from '../../../lib/adtProjections';
+import {
+  isObjectTypeTool,
+  memberTokens,
+} from '../../../lib/compact/compactDescriptions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
@@ -341,15 +345,15 @@ function walk<M extends string>(spec: {
   };
 }
 
-/** The description a compact tool states on `variant`. */
+/** The members a compact tool takes on `variant`, with their arguments. */
 const stated = (
-  definition: {
-    readonly variants: {
-      readonly [V in ProjectionVariant]: { readonly description: string };
-    };
-  },
+  definition: { readonly name: string },
   variant: ProjectionVariant,
-) => definition.variants[variant].description;
+) => {
+  const tool = definition.name;
+  if (!isObjectTypeTool(tool)) throw new Error(`${tool} takes no object_type`);
+  return memberTokens(tool, variant);
+};
 
 const versionContent = (kind: string, variant: ProjectionVariant) => {
   const route = Object.entries(VERSIONED_ROUTES).find(

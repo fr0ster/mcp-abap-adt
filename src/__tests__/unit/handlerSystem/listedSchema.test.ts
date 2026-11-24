@@ -18,7 +18,6 @@ import {
   COMPACT_SYSTEM_TAKES,
   SYSTEM_ACTION_TOOLS,
   SYSTEM_ACTIONS,
-  type SystemAction,
 } from '../../../lib/compact';
 import { partsOfDescription } from '../../../lib/description';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
@@ -169,7 +168,6 @@ describe('the description', () => {
         )?.values?.each.find((each) => each.value === action);
         assert.ok(full !== undefined && value !== undefined, action);
         assert.equal(value.purpose, full.purpose);
-        assert.deepStrictEqual(value.returns, full.returns);
       }
     });
   }

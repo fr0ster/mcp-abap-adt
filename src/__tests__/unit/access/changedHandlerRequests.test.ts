@@ -22,6 +22,10 @@ import {
   compactDataEntries,
   compactReadOnlyEntries,
 } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  isObjectTypeTool,
+  memberTokens,
+} from '../../../lib/compact/compactDescriptions';
 import type {
   HandlerContext,
   HandlerEntry,
@@ -225,9 +229,9 @@ function argsFor(
   given: Readonly<Record<string, unknown>> = {},
 ): Record<string, unknown> {
   const declared = propertiesOf(definition);
-  const description =
-    definition.variants?.[variant].description ?? definition.description;
-  const named = tokenArguments(description, member);
+  const named = isObjectTypeTool(tool)
+    ? tokenArguments(memberTokens(tool, variant), member)
+    : [];
   const wanted = [
     ...(named.length > 0 ? named : ['object_name']),
     ...(BESIDE[tool] ?? []),

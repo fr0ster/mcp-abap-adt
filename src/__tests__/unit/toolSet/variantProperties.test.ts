@@ -34,6 +34,10 @@ import {
 } from '../../../lib/adtProjections';
 import type { ServerVariant } from '../../../lib/clients';
 import {
+  isObjectTypeTool,
+  memberTokens,
+} from '../../../lib/compact/compactDescriptions';
+import {
   COMPACT_ACTIVATE_TAKES,
   COMPACT_CHECK_TAKES,
   COMPACT_CREATE_TAKES,
@@ -232,8 +236,12 @@ describe('a compact tool offers on each variant the properties its offered membe
           // Every property the tool takes on any variant, so a description
           // naming one its variant does not offer is caught too.
           const properties = takenOn(declared.takes, declared.members.onprem);
+          // The members' table names each member's arguments (a
+          // description names no parameter).
           for (const [member, argument] of namedArguments(
-            tool.description ?? '',
+            isObjectTypeTool(tool.name)
+              ? memberTokens(tool.name, variant)
+              : (tool.description ?? ''),
             offered,
             properties,
           )) {

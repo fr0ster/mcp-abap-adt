@@ -1,7 +1,6 @@
 /**
  * The rules a tool's description is held to (plan step 10.4): its purpose
- * is one sentence of at most `PURPOSE_LIMIT` characters, and neither it nor
- * any generated fact says a word of the answer's form or of how the tool
+ * is one sentence of at most `PURPOSE_LIMIT` characters, and it never says a word of the answer's form or of how the tool
  * works (`FORM_MARKERS`) — the `detail` parameter's shared text alone
  * describes form. Adding a marker is a reviewed change of this file.
  */
@@ -131,11 +130,6 @@ export function purposeFaults(text: string): string[] {
   if (second) faults.push('holds more than one sentence');
   for (const marker of markersIn(text)) faults.push(`says "${marker}"`);
   return faults;
-}
-
-/** What breaks the fact rules in `text`: a marker of form. */
-export function factFaults(text: string): string[] {
-  return markersIn(text).map((marker) => `says "${marker}"`);
 }
 
 /** What breaks the rules in a note: a marker of form, but its named exception. */

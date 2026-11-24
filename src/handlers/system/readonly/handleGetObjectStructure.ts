@@ -1,8 +1,11 @@
 import * as z from 'zod';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 import {
+  about,
   bullets,
   listAnswerAt,
   type RowSchemas,
+  shapesOf,
   type Written,
   writeListing,
 } from '../../../lib/detail';
@@ -32,8 +35,13 @@ import {
 export const TOOL_DEFINITION = {
   name: 'GetObjectStructure',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Returns the ADT structure of the repository object named by objecttype and objectname as a compact JSON tree.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the structure of an ABAP repository object, such as a CDS view: its parts and their parts, down to the last level.',
+    ),
+    returns: returnsOf({ shapes: [shapesOf(objectStructureLists(false))] }),
+  }),
   inputSchema: z.object({
     objecttype: z.string().describe('ADT object type (e.g. DDLS/DF)'),
     objectname: z.string().describe('ADT object name (e.g. /CBY/ACQ_DDL)'),
@@ -229,6 +237,28 @@ function bulletSchemas(
 }
 
 /**
+ * The lists an object structure's listing writes: what its description
+ * states — each node by its type and its name or description.
+ */
+export function objectStructureLists(
+  withOwner: boolean,
+): RowSchemas<{ tree: ObjectStructureTreeNode[] }> {
+  return {
+    tree: about(
+      'each part of the object, such as an element, an association or an annotation, is named by its type and its name or description, at its depth',
+      bullets(
+        'tree',
+        (node: ObjectStructureTreeNode) => labelOf(node, withOwner),
+        {
+          synthetic: (node: ObjectStructureTreeNode) => node.synthetic === true,
+          lists: bulletSchemas(withOwner),
+        },
+      ),
+    ),
+  };
+}
+
+/**
  * {@link treeText}, written by the listing writer: every node of the
  * document a bullet, depth first; the object asked, which SAP did not
  * send, the root and no item.
@@ -251,16 +281,7 @@ function completeTreeText(
   return writeListing({
     heads: [],
     reading: { tree: buildNestedTree(nodes, root) },
-    lists: {
-      tree: bullets(
-        'tree',
-        (node: ObjectStructureTreeNode) => labelOf(node, withOwner),
-        {
-          synthetic: (node: ObjectStructureTreeNode) => node.synthetic === true,
-          lists: bulletSchemas(withOwner),
-        },
-      ),
-    },
+    lists: objectStructureLists(withOwner),
     title: 'tree:',
     end: '',
   });

@@ -87,6 +87,15 @@ import {
   TOOL_DEFINITION as INACTIVE_OBJECTS,
 } from '../../../handlers/system/readonly/handleGetInactiveObjects';
 import {
+  TOOL_DEFINITION as OUTLINE,
+  OUTLINE_HEADS,
+  outlineLists,
+} from '../../../handlers/system/readonly/handleGetObjectOutline';
+import {
+  TOOL_DEFINITION as OBJECT_STRUCTURE,
+  objectStructureLists,
+} from '../../../handlers/system/readonly/handleGetObjectStructure';
+import {
   TOOL_DEFINITION as TRANSACTION,
   TRANSACTION_HEADS,
   TRANSACTION_LISTS,
@@ -224,6 +233,8 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   RuntimeListProfilerTraceFiles: TRACE_FILES.description,
   GetATCFindings: ATC_FINDINGS.description,
   GetATCResult: ATC_RESULT.description,
+  GetObjectOutline: OUTLINE.description,
+  GetObjectStructure: OBJECT_STRUCTURE.description,
 };
 
 /** An ATC tool's tie: one finding, under the heads the tool writes. */
@@ -354,6 +365,91 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  GetObjectOutline: () => {
+    // A class with a method in its own include and one in a local include.
+    const at = (source: string, line: number) => ({
+      rel: 'definitionIdentifier',
+      source,
+      start: { line, column: 0 },
+    });
+    const reading = {
+      tree: [
+        {
+          name: 'ZCL_A',
+          type: 'CLAS/OC',
+          links: [at('/sap/bc/adt/oo/classes/zcl_a/source/main', 1)],
+          children: [
+            {
+              name: 'RUN',
+              type: 'CLAS/OM',
+              visibility: 'public',
+              links: [at('/sap/bc/adt/oo/classes/zcl_a/source/main', 3)],
+              children: [],
+            },
+            {
+              name: 'LCL',
+              type: 'CLAS/OCL',
+              links: [
+                at('/sap/bc/adt/oo/classes/zcl_a/includes/implementations', 1),
+              ],
+              children: [],
+            },
+          ],
+        },
+      ],
+    };
+    const source = '/sap/bc/adt/oo/classes/zcl_a/source/main';
+    const heads = [
+      { head: 'object', value: 'CLAS/OC ZCL_A' },
+      { head: 'source', value: source },
+    ];
+    return writtenTie(
+      'GetObjectOutline',
+      [outlineLists(undefined)],
+      OUTLINE_HEADS,
+      [
+        {
+          reading,
+          lines: writtenLines({ heads, reading, lists: outlineLists(source) }),
+        },
+      ],
+    );
+  },
+  GetObjectStructure: () => {
+    const reading = {
+      tree: [
+        {
+          objecttype: 'DDLS/DF',
+          objectname: 'ZI_A',
+          isfolder: false,
+          synthetic: true as const,
+          children: [
+            {
+              objecttype: 'DDLS/DFE',
+              objectname: 'FIELD',
+              isfolder: false,
+              children: [],
+            },
+          ],
+        },
+      ],
+    };
+    return writtenTie(
+      'GetObjectStructure',
+      [objectStructureLists(false)],
+      [],
+      [
+        {
+          reading,
+          lines: writtenLines({
+            heads: [],
+            reading,
+            lists: objectStructureLists(false),
+          }),
+        },
+      ],
+    );
+  },
   GetATCFindings: () =>
     atcTie('GetATCFindings', ATC_FINDINGS_HEADS, [
       { head: 'worklist', value: 'W1' },

@@ -27,11 +27,14 @@ import type { ServerOutlineCode } from '../../../lib/adtClientContract';
 import type { ProjectionVariant } from '../../../lib/adtProjections';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 import {
   type AnswerTable,
+  about,
   answerAt,
   type Column,
   entries,
+  headShape,
   type JsonSchemas,
   type ListAnswerTable,
   listAnswerAt,
@@ -39,6 +42,7 @@ import {
   omitted,
   type RowSchemas,
   rows,
+  shapesOf,
   values,
   writeJson,
   writeListing,
@@ -64,9 +68,6 @@ export const OUTLINE_TYPES = {
 /** A kind the tool takes on some variant. */
 export type OutlineType = (typeof OUTLINE_TYPES)['onprem'][number];
 
-const DESCRIPTION =
-  "[read-only] Lists the components of the ABAP object named by object_type and object_name — types, attributes, methods, events, local classes, forms, includes or modules — with their kind, visibility and level, and the source positions SAP's object structure states for each: the include each link points into and, for a class or an interface, its start and end line and column (lines from 1, columns from 0, the end exclusive), the lines a ranged source read (start_line, end_line) answers. Returns the components as a tree.";
-
 /** GetObjectOutline's input on `variant`. */
 function outlineSchema(variant: ProjectionVariant) {
   return z.object({
@@ -81,11 +82,26 @@ function outlineSchema(variant: ProjectionVariant) {
   });
 }
 
+/** The heads an outline's listing opens with. */
+export const OUTLINE_HEADS = [
+  headShape('object', "the object's type and name"),
+  headShape('source', 'the include its components are defined in'),
+];
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectOutline',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: DESCRIPTION,
+    description: toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Lists the components of an ABAP class, interface, program or function group, with where each one is defined in its source.',
+      ),
+      returns: returnsOf({
+        heads: OUTLINE_HEADS,
+        shapes: [shapesOf(outlineLists(undefined))],
+      }),
+    }),
     inputSchema: outlineSchema(variant),
   })),
 } as const;
@@ -252,11 +268,16 @@ function outlineSchemas(source: string | undefined): {
   readonly below: RowSchemas<AnsweredComponent>;
 } {
   const columns: Column<AnsweredComponent>[] = [
-    { name: 'name', cell: (component) => component.name },
-    { name: 'type', cell: (component) => component.type },
-    { name: 'visibility', cell: (component) => component.visibility ?? '' },
+    { name: 'name', means: 'its name', cell: (component) => component.name },
+    { name: 'type', means: 'its kind', cell: (component) => component.type },
+    {
+      name: 'visibility',
+      means: 'its visibility',
+      cell: (component) => component.visibility ?? '',
+    },
     {
       name: 'line',
+      means: 'where its definition starts',
       cell: (component) => {
         const start = definitionOf(component)?.start;
         return start === undefined ? '' : String(start.line);
@@ -264,6 +285,7 @@ function outlineSchemas(source: string | undefined): {
     },
     {
       name: 'source',
+      means: 'the include it is defined in, where that differs',
       cell: (component) => {
         const definition = definitionOf(component);
         return definition === undefined || definition.source === source
@@ -288,6 +310,19 @@ function outlineSchemas(source: string | undefined): {
     }),
   };
   return { columns, below };
+}
+
+/** The lists an outline's listing writes: what its description states. */
+export function outlineLists(
+  source: string | undefined,
+): RowSchemas<{ tree: AnsweredComponent[] }> {
+  const { columns, below } = outlineSchemas(source);
+  return {
+    tree: about(
+      'for each component, such as a type, attribute, method, event, local class, form or module, at its depth',
+      rows('tree', { columns, header: 'always', tree: true, lists: below }),
+    ),
+  };
 }
 
 /**
@@ -316,21 +351,13 @@ function outlineAnswers(
       const root = outline === undefined ? undefined : components(outline);
       if (root === undefined) return writeWhole({ document });
       const source = definitionOf(root)?.source;
-      const { columns, below } = outlineSchemas(source);
       return writeListing({
         heads: [
           { head: 'object', value: `${objectType} ${objectName}` },
           ...(source === undefined ? [] : [{ head: 'source', value: source }]),
         ],
         reading: { tree: [root] },
-        lists: {
-          tree: rows('tree', {
-            columns,
-            header: 'always',
-            tree: true,
-            lists: below,
-          }),
-        },
+        lists: outlineLists(source),
       });
     },
     // Every component with its links (the reading's own tree, every

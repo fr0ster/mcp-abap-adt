@@ -27,7 +27,7 @@ import type { ServerOutlineCode } from '../../../lib/adtClientContract';
 import type { ProjectionVariant } from '../../../lib/adtProjections';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   type AnswerTable,
   about,
@@ -42,7 +42,6 @@ import {
   omitted,
   type RowSchemas,
   rows,
-  shapesOf,
   values,
   writeJson,
   writeListing,
@@ -97,10 +96,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Lists the components of an ABAP class, interface, program or function group, with where each one is defined in its source.',
       ),
-      returns: returnsOf({
-        heads: OUTLINE_HEADS,
-        shapes: [shapesOf(outlineLists(undefined))],
-      }),
     }),
     inputSchema: outlineSchema(variant),
   })),

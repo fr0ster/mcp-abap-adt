@@ -8,7 +8,6 @@ import {
   terseSnapshotList,
 } from '../../../lib/debugger/memoryReadings';
 import { purpose, toolDescription } from '../../../lib/description';
-import { SNAPSHOTS } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { carryingFailure } from '../../../lib/strategies/step';
@@ -23,7 +22,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Lists the memory snapshots the system holds, of one user when asked.',
       ),
-      result: SNAPSHOTS,
     }),
   ),
   inputSchema: z.object({

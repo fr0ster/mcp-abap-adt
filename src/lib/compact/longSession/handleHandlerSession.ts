@@ -41,7 +41,6 @@ export function handlerSessionParts(
     purpose: purpose(
       `${verb.charAt(0).toUpperCase()}${verb.slice(1)} a long session on this server, which keeps its server instance and SAP connection between calls.`,
     ),
-    returns: [],
     values: {
       of: 'action',
       each: actions.map((action) => ACTION_VALUES[action]),

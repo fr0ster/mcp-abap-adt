@@ -53,7 +53,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Writes new source code into an existing include of an ABAP function group, activating it when asked.',
     ),
-    returns: [],
   }),
   inputSchema: z.object({
     function_group_name: z

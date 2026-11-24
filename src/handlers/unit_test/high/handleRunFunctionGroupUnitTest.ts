@@ -16,12 +16,7 @@ import { unitTestRun } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
-import {
-  runnerOf,
-  runnerWaitOf,
-  scopeOf,
-  type UnitTestScopeArgs,
-} from '../shared/runner';
+import { runnerOf, runnerWaitOf, scopeOf } from '../shared/runner';
 import { projectSync, runTestsSync } from '../shared/runSync';
 import { projectRun, runAndWait } from '../shared/runTests';
 
@@ -29,7 +24,7 @@ export const TOOL_DEFINITION = {
   name: 'RunFunctionGroupUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description: toolDescription(
-    unitTestRun('every ABAP Unit test of a function group', 'sync'),
+    unitTestRun('every ABAP Unit test of a function group'),
   ),
   inputSchema: z.object({
     function_group_name: z.string().describe('Function group whose tests run.'),

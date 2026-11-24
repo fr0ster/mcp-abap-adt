@@ -21,28 +21,14 @@ import {
 import {
   type DescriptionParts,
   longRunning,
-  membersTaken,
   purpose,
-  resultReturns,
   sourceReader,
+  stateHandleAnswered,
   toolDescription,
   underLock,
   valueFrom,
   valueParts,
 } from '../description/index';
-import {
-  ACTIVATION_RUN_RESULTS,
-  ACTIVATION_RUN_STATUS,
-  DELETED,
-  DELETION_CHECKED,
-  HELD_LOCK,
-  PUBLISHED,
-  UNLOCKED,
-  WRITTEN,
-  WRITTEN_UNDER_LOCK,
-} from '../description/results';
-import { CLASS_RUN, PROGRAM_RUN } from '../description/runs';
-import { TRANSPORT_CREATED } from '../description/sessions';
 import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import { COMPACT_MAIN_PROGRAMS } from './compactSchemas';
 import type { HandlerGetSources } from './handlerGetSources';
@@ -95,11 +81,6 @@ export function compactCreateParts(
     purpose: purpose(
       `Creates the ABAP repository object of the type object_type names, inactive${when(transport, ', or a transport')}.`,
     ),
-    returns: [
-      ...resultReturns(WRITTEN),
-      ...(transport ? resultReturns(TRANSPORT_CREATED, 'for TRANSPORT:') : []),
-    ],
-    members: membersTaken('object_type required', members.map(createToken)),
   };
 }
 
@@ -160,13 +141,11 @@ export type { HandlerGetSources } from './handlerGetSources';
 const ACTIVATION_PARTS = [
   valueParts('activation_status', {
     purpose: purpose('Reads the status of an activation run by its id.'),
-    returns: resultReturns(ACTIVATION_RUN_STATUS),
   }),
   valueParts('activation_results', {
     purpose: purpose(
       "Reads the results of an activation run by its id: SAP's verdict and the messages the run produced.",
     ),
-    returns: resultReturns(ACTIVATION_RUN_RESULTS),
   }),
 ] as const;
 
@@ -188,7 +167,6 @@ export function compactGetParts(
     purpose: purpose(
       'Reads one part of the ABAP repository object of the type object_type names, of the repository by ADT address, or of an activation run by its id.',
     ),
-    returns: [],
     values: {
       of: 'part',
       each: [
@@ -197,7 +175,6 @@ export function compactGetParts(
           purpose: purpose(
             'Reads the metadata of the object at the version asked, as its type keeps it.',
           ),
-          returns: [],
         }),
         ...(left.has('SERVICE_BINDING')
           ? [valueFrom('urls', sources.urls)]
@@ -215,7 +192,6 @@ export function compactGetParts(
         ...ACTIVATION_PARTS,
       ],
     },
-    members: membersTaken('object_type required', members.map(readToken)),
     notes: [longRunning],
   };
 }
@@ -285,19 +261,12 @@ export function updateToken(member: UpdateMember): string {
 /** HandlerUpdate's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactUpdateParts(
   variant: ProjectionVariant,
-  members: readonly UpdateMember[] = COMPACT_UPDATE[variant],
+  _members: readonly UpdateMember[] = COMPACT_UPDATE[variant],
 ): DescriptionParts {
   return {
     purpose: purpose(
       'Writes the whole content of the ABAP repository object of the type object_type names, under the lock its lock handle names.',
     ),
-    returns: [
-      ...resultReturns(WRITTEN_UNDER_LOCK),
-      ...(members.includes('SERVICE_BINDING')
-        ? resultReturns(PUBLISHED, 'for SERVICE_BINDING:')
-        : []),
-    ],
-    members: membersTaken('object_type required', members.map(updateToken)),
     notes: [underLock],
   };
 }
@@ -367,8 +336,6 @@ export function compactDeleteParts(
     purpose: purpose(
       `Deletes the ABAP repository object of the type object_type names${when(includes.length > 0, ", or empties a class include under the class's lock")}.`,
     ),
-    returns: resultReturns(DELETED),
-    members: membersTaken('object_type required', members.map(deleteToken)),
     notes: [underLock],
   };
 }
@@ -404,14 +371,13 @@ export function lockToken(member: LockMember): string {
 /** HandlerLock's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactLockParts(
   variant: ProjectionVariant,
-  members: readonly LockMember[] = COMPACT_LOCK[variant],
+  _members: readonly LockMember[] = COMPACT_LOCK[variant],
 ): DescriptionParts {
   return {
     purpose: purpose(
       'Locks the ABAP repository object of the type object_type names on the server instance that then holds the lock for its write, delete and unlock.',
     ),
-    returns: resultReturns(HELD_LOCK),
-    members: membersTaken('object_type required', members.map(lockToken)),
+    notes: [stateHandleAnswered],
   };
 }
 
@@ -433,14 +399,12 @@ export function unlockToken(member: UnlockMember): string {
 /** HandlerUnlock's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactUnlockParts(
   variant: ProjectionVariant,
-  members: readonly UnlockMember[] = COMPACT_UNLOCK[variant],
+  _members: readonly UnlockMember[] = COMPACT_UNLOCK[variant],
 ): DescriptionParts {
   return {
     purpose: purpose(
       'Releases the lock this server instance holds on the ABAP repository object of the type object_type names, under its lock handle.',
     ),
-    returns: resultReturns(UNLOCKED),
-    members: membersTaken('object_type required', members.map(unlockToken)),
     notes: [underLock],
   };
 }
@@ -455,8 +419,8 @@ export function compactUnlockDescription(
 
 type ValidateMember = (typeof COMPACT_VALIDATE.onprem)[number];
 
-/** A HandlerValidate member with the arguments it takes, as the description names it. */
-function validateToken(member: ValidateMember): string {
+/** A HandlerValidate member with the arguments it takes. */
+export function validateToken(member: ValidateMember): string {
   return objectNamed<ValidateMember>(
     member,
     {
@@ -483,15 +447,13 @@ function validateToken(member: ValidateMember): string {
 /** HandlerValidate's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactValidateParts(
   variant: ProjectionVariant,
-  members: readonly ValidateMember[] = COMPACT_VALIDATE[variant],
+  _members: readonly ValidateMember[] = COMPACT_VALIDATE[variant],
 ): DescriptionParts {
   return {
     tag: 'read-only',
     purpose: purpose(
       'Validates the name of a new ABAP repository object of the type object_type names, before it is created.',
     ),
-    returns: [],
-    members: membersTaken('object_type required', members.map(validateToken)),
   };
 }
 
@@ -529,8 +491,6 @@ export function compactCheckRunParts(
     purpose: purpose(
       `Checks the syntax of the ABAP repository object of the type object_type names${when(unsaved.length > 0, ', as stored or as the source given')}.`,
     ),
-    returns: [],
-    members: membersTaken('object_type required', members.map(checkToken)),
   };
 }
 
@@ -544,8 +504,8 @@ export function compactCheckRunDescription(
 
 type DeletionCheckMember = (typeof COMPACT_DELETION_CHECK.onprem)[number];
 
-/** A HandlerDeletionCheck member as the description names it. */
-function deletionCheckToken(member: DeletionCheckMember): string {
+/** A HandlerDeletionCheck member with what names it. */
+export function deletionCheckToken(member: DeletionCheckMember): string {
   return member === 'CDS_UNIT_TEST'
     ? 'CDS_UNIT_TEST (its test class)'
     : member === 'FUNCTION_MODULE'
@@ -556,17 +516,12 @@ function deletionCheckToken(member: DeletionCheckMember): string {
 /** HandlerDeletionCheck's parts on `variant`, naming `given` (default: all the variant's). */
 export function compactDeletionCheckParts(
   variant: ProjectionVariant,
-  given: readonly DeletionCheckMember[] = COMPACT_DELETION_CHECK[variant],
+  _given: readonly DeletionCheckMember[] = COMPACT_DELETION_CHECK[variant],
 ): DescriptionParts {
   return {
     tag: 'read-only',
     purpose: purpose(
       'Asks SAP whether the ABAP repository object of the type object_type names can be deleted.',
-    ),
-    returns: resultReturns(DELETION_CHECKED),
-    members: membersTaken(
-      'object_type and object_name required',
-      given.map(deletionCheckToken),
     ),
   };
 }
@@ -595,14 +550,12 @@ export function activateToken(member: ActivateMember): string {
 /** HandlerActivate's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactActivateParts(
   variant: ProjectionVariant,
-  members: readonly ActivateMember[] = COMPACT_ACTIVATE[variant],
+  _members: readonly ActivateMember[] = COMPACT_ACTIVATE[variant],
 ): DescriptionParts {
   return {
     purpose: purpose(
       'Activates the ABAP repository object named, by its type or its ADT type, or the objects listed, at once or by an activation run it starts.',
     ),
-    returns: [],
-    members: membersTaken('object_type', members.map(activateToken)),
   };
 }
 
@@ -621,12 +574,10 @@ const PROFILE_RUNS = {
     purpose: purpose(
       'Runs an ABAP class implementing if_oo_adt_classrun and gives its console output.',
     ),
-    returns: resultReturns(CLASS_RUN),
   },
   PROGRAM: {
     value: 'PROGRAM',
     purpose: purpose('Runs an ABAP report and gives its output.'),
-    returns: resultReturns(PROGRAM_RUN),
   },
 } as const;
 
@@ -641,7 +592,6 @@ export function compactProfileRunParts(
     purpose: purpose(
       `Runs ${either(members.map((member) => (member === 'CLASS' ? 'an ABAP class' : 'an ABAP report')))}, under a scheduled profiler trace when its profiler id is given.`,
     ),
-    returns: [],
     values: {
       of: 'target_type',
       each: members.map((member) => PROFILE_RUNS[member]),
@@ -657,4 +607,50 @@ export function compactProfileRunDescription(
   ],
 ): string {
   return toolDescription(compactProfileRunParts(variant, members));
+}
+
+/** The compact tools whose `object_type` picks the object. */
+export const OBJECT_TYPE_TOOLS = [
+  'HandlerCreate',
+  'HandlerGet',
+  'HandlerUpdate',
+  'HandlerDelete',
+  'HandlerLock',
+  'HandlerUnlock',
+  'HandlerValidate',
+  'HandlerCheckRun',
+  'HandlerDeletionCheck',
+  'HandlerActivate',
+] as const;
+export type ObjectTypeTool = (typeof OBJECT_TYPE_TOOLS)[number];
+
+/** Whether `name` is a compact tool whose `object_type` picks the object. */
+export function isObjectTypeTool(name: string): name is ObjectTypeTool {
+  return OBJECT_TYPE_TOOLS.some((tool) => tool === name);
+}
+
+/**
+ * The members `tool` takes on `variant`, each with the arguments it needs:
+ * `object_type required: A(a*), B(b*).` — the member table the schema
+ * serves and the prompts quote; a description names no parameter (owner),
+ * so this is the one place the members are written as text.
+ */
+export function memberTokens(
+  tool: ObjectTypeTool,
+  variant: ProjectionVariant,
+): string {
+  const tokens: Record<ObjectTypeTool, () => readonly string[]> = {
+    HandlerCreate: () => COMPACT_CREATE[variant].map(createToken),
+    HandlerGet: () => COMPACT_READ[variant].map(readToken),
+    HandlerUpdate: () => COMPACT_UPDATE[variant].map(updateToken),
+    HandlerDelete: () => COMPACT_DELETE[variant].map(deleteToken),
+    HandlerLock: () => COMPACT_LOCK[variant].map(lockToken),
+    HandlerUnlock: () => COMPACT_UNLOCK[variant].map(unlockToken),
+    HandlerValidate: () => COMPACT_VALIDATE[variant].map(validateToken),
+    HandlerCheckRun: () => COMPACT_CHECK[variant].map(checkToken),
+    HandlerDeletionCheck: () =>
+      COMPACT_DELETION_CHECK[variant].map(deletionCheckToken),
+    HandlerActivate: () => COMPACT_ACTIVATE[variant].map(activateToken),
+  };
+  return `object_type required: ${tokens[tool]().join(', ')}.`;
 }

@@ -7,7 +7,6 @@ import {
   STATE_HANDLE_PROPERTY,
 } from '../../../lib/debugger/schemas';
 import { purpose, toolDescription } from '../../../lib/description';
-import { DEBUG_STATE } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
@@ -21,7 +20,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Waits for the next stop or end of an ABAP debug session, up to the seconds asked, and tells its state.',
       ),
-      result: DEBUG_STATE,
     }),
   ),
   inputSchema: z.object({

@@ -408,7 +408,6 @@ export function handlerAbapGitGetParts(
     purpose: purpose(
       `Reads abapGit repositories: ${listed(actions.map((action) => GET_PHRASES[action]))}.`,
     ),
-    returns: [],
     values: {
       of: 'action',
       each: actions.map((action) =>
@@ -426,7 +425,6 @@ export function handlerAbapGitParts(
     purpose: purpose(
       `Changes abapGit repositories and their remotes: ${listed(actions.map((action) => WRITE_PHRASES[action]))}.`,
     ),
-    returns: [],
     values: {
       of: 'action',
       each: actions.map((action) =>

@@ -12,10 +12,7 @@
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
-import {
-  UNIT_TEST_RESULT_ONCE,
-  unitTestRead,
-} from '../../../lib/description/runs';
+import { unitTestRead } from '../../../lib/description/runs';
 import { type AnswerTable, answerAt } from '../../../lib/detail';
 import type { DetailLevel } from '../../../lib/detail/levels';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -67,12 +64,8 @@ export function resultOnceAnswer<T>(runId: string, value: T) {
 
 /** A unit-test run's result read once, by its id: what the compact reads state. */
 export const RESULT_ONCE_PARTS = {
-  abap: unitTestRead(
-    'the result',
-    'an ABAP Unit test run',
-    UNIT_TEST_RESULT_ONCE,
-  ),
-  cds: unitTestRead('the result', 'a CDS unit test run', UNIT_TEST_RESULT_ONCE),
+  abap: unitTestRead('the result', 'an ABAP Unit test run'),
+  cds: unitTestRead('the result', 'a CDS unit test run'),
 } as const;
 
 /**

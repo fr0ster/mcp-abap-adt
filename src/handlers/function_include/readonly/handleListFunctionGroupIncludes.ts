@@ -22,8 +22,8 @@ import * as z from 'zod';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
-import { listAnswerAt, shapesOf, wireAnswer } from '../../../lib/detail';
+import { purpose, toolDescription } from '../../../lib/description';
+import { listAnswerAt, wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   ASSEMBLED_DETAIL_SHAPE,
@@ -33,8 +33,6 @@ import {
 import {
   fetchFunctionGroupChildren,
   functionGroupListAnswers,
-  GROUP_CHILD_HEADS,
-  groupChildLists,
 } from '../../../lib/strategies/functionGroupChildren';
 import { nodeStructureOn } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -50,10 +48,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Lists the includes of an ABAP function group, its TOP include among them, at its active version.',
     ),
-    returns: returnsOf({
-      heads: GROUP_CHILD_HEADS,
-      shapes: [shapesOf(groupChildLists('includes'))],
-    }),
   }),
   inputSchema: z.object({
     function_group_name: z.string().describe('Function group name.'),

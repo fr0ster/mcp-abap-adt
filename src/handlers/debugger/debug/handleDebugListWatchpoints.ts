@@ -4,11 +4,7 @@ import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { readXmlDocument } from '../../../lib/debugger/memoryReadings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
-import {
-  purpose,
-  toolDescription,
-  untypedReturns,
-} from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -18,7 +14,6 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose('Shows the watchpoints of the stopped ABAP debuggee.'),
-    returns: untypedReturns(),
   }),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),
 } as const;

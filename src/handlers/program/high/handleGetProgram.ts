@@ -10,20 +10,12 @@ import {
 } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  READ_PART_FIELD,
-  type ReadPart,
-  readPartOf,
-} from '../../../lib/handlers/readPart';
-import {
-  READ_VERSION_FIELD,
-  type ReadVersion,
-} from '../../../lib/handlers/readVersion';
+import { READ_PART_FIELD, readPartOf } from '../../../lib/handlers/readPart';
+import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
 import {
   answerSourceRead,
   rangeFields,
   SOURCE_RANGE_SHAPE,
-  type SourceRangeArgs,
   sourceRangeOf,
 } from '../../../lib/handlers/sourceRange';
 import { readProgramMetadata } from '../../../lib/strategies/metadataReads';
@@ -40,7 +32,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         "Reads the source of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, at the version asked, or its metadata.",
       ),
-      range: 'with-count',
       metadata: true,
     }),
   ),

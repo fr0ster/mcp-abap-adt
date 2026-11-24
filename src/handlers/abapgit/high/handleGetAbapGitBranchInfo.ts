@@ -21,13 +21,10 @@ import {
 } from '../../../lib/abapGit/client';
 import {
   ABAPGIT_DETAIL_SHAPE,
-  ACCESS_MODE_HEADS,
   BRANCH_INFO_ANSWERS,
-  BRANCH_INFO_MEDIUM,
-  BRANCH_INFO_TERSE,
 } from '../../../lib/abapGit/formats';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
-import { answerAt, listAnswerAt, shapesOf } from '../../../lib/detail';
+import { purpose, toolDescription } from '../../../lib/description';
+import { listAnswerAt } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
@@ -38,10 +35,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Gets the abapGit branch information of a remote repository for the package it would be linked to.',
     ),
-    returns: returnsOf({
-      heads: ACCESS_MODE_HEADS,
-      shapes: [shapesOf(BRANCH_INFO_TERSE)],
-    }),
   }),
   inputSchema: z.object({
     url: URL_FIELD,

@@ -26,7 +26,6 @@ import type { KindToolDefinition } from '../../../lib/abapGit/kindTool';
 import { BACKGROUND_FIELD } from '../../../lib/backgroundRuns/tools';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { ABAPGIT_STATUS } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 const FIELDS = {
@@ -44,7 +43,6 @@ const ONPREM_PARTS = runParts({
   purpose: purpose(
     "Commits the objects and files chosen from an abapGit repository's staging, with its comment, author and committer, and pushes the commit to its remote branch.",
   ),
-  result: ABAPGIT_STATUS,
 });
 
 export const TOOL_DEFINITION: KindToolDefinition<
@@ -64,7 +62,6 @@ export const TOOL_DEFINITION: KindToolDefinition<
         purpose: purpose(
           "Commits the objects and files chosen from an abapGit repository's staging and pushes the commit to its remote branch, as an SAP job.",
         ),
-        result: ABAPGIT_STATUS,
       }),
     ),
     inputSchema: CLOUD_SCHEMA,

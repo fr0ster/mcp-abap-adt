@@ -2,7 +2,6 @@ import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugBatchEnd.ts
 import { endDebugBatch } from '../../../lib/batch/tools';
 import { purpose, toolDescription } from '../../../lib/description';
-import { RECORDED_SENT } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../interfaces';
 
@@ -15,7 +14,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         "Sends the recorded debugger calls together on the session they were recorded on, and splits SAP's answer by call.",
       ),
-      result: RECORDED_SENT,
     }),
   ),
   inputSchema: z.object({}),

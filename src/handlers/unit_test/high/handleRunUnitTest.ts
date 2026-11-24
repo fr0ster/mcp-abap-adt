@@ -18,12 +18,7 @@ import { unitTestRun } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
-import {
-  runnerOf,
-  runnerWaitOf,
-  scopeOf,
-  type UnitTestScopeArgs,
-} from '../shared/runner';
+import { runnerOf, runnerWaitOf, scopeOf } from '../shared/runner';
 import { projectSync, runTestsSync } from '../shared/runSync';
 import { projectRun, runAndWait } from '../shared/runTests';
 
@@ -31,7 +26,7 @@ export const TOOL_DEFINITION = {
   name: 'RunUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description: toolDescription(
-    unitTestRun('the ABAP Unit tests of an ABAP class', 'sync'),
+    unitTestRun('the ABAP Unit tests of an ABAP class'),
   ),
   inputSchema: z.object({
     class_name: z.string().describe('Class whose tests run.'),

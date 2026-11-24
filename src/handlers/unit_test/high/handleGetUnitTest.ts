@@ -2,10 +2,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { toolDescription } from '../../../lib/description';
-import {
-  UNIT_TEST_STATUS_AND_RESULT,
-  unitTestRead,
-} from '../../../lib/description/runs';
+import { unitTestRead } from '../../../lib/description/runs';
 import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -21,12 +18,7 @@ export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description: toolDescription(
-    unitTestRead(
-      'the status and result',
-      'an ABAP Unit test run',
-      UNIT_TEST_STATUS_AND_RESULT,
-      'waits',
-    ),
+    unitTestRead('the status and result', 'an ABAP Unit test run', 'waits'),
   ),
   inputSchema: z.object({
     run_id: z.string().describe('Run identifier returned by RunUnitTest.'),

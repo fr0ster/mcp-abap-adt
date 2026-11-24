@@ -2,7 +2,6 @@ import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugBatchAnswers.ts
 import { answersOf } from '../../../lib/batch/tools';
 import { purpose, toolDescription } from '../../../lib/description';
-import { RECORDED_OUTCOMES } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../interfaces';
 
@@ -15,7 +14,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Reads the outcome of each recorded debugger call of the last sending, by its number.',
       ),
-      result: RECORDED_OUTCOMES,
     }),
   ),
   inputSchema: z.object({

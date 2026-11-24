@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ReadTransportActionLog — what has happened to a transport request.
@@ -23,7 +23,6 @@ import {
   omitting,
   type RowSchemas,
   rows,
-  shapesOf,
   values,
   writeJson,
   writeListing,
@@ -113,12 +112,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the action log of a transport or task: every event of its life, its objects added and taken out among them.',
     ),
-    returns: returnsOf({
-      heads: ACTION_LOG_HEADS,
-      of: 'the',
-      shapes: [shapesOf(ACTION_LOG_LISTS)],
-    }),
-    inline: true,
   }),
   inputSchema: z.object({
     transport_number: z

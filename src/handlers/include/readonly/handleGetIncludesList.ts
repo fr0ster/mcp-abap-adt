@@ -42,7 +42,6 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import {
@@ -62,12 +61,10 @@ import {
   listAnswerAt,
   marks,
   member,
-  nest,
   node,
   partsOf,
   type RowSchemas,
   rows,
-  shapesOf,
   type TextResult,
   values,
   type Written,
@@ -79,10 +76,7 @@ import {
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AnswerObject, JsonValue } from '../../../lib/json';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { linesOf } from '../../../lib/plainText';
 import { includeNameOf } from '../../../lib/strategies/abapIncludeStatement';
 import {
@@ -199,10 +193,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Lists every include of an ABAP program or include, with the includes each one includes, down to the last.',
       ),
-      returns: returnsOf({
-        heads: INCLUDES_HEADS,
-        shapes: [shapesOf(INCLUDES_LISTS)],
-      }),
       notes: [longRunning],
     }),
     inputSchema: includesListSchema(variant),
@@ -1134,11 +1124,6 @@ async function includeTrees(
     trees.push(await treeFromAnswers(context, parent, answers, shown));
   }
   return trees;
-}
-
-/** A failed answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): JsonValue {
-  return answerPayload(result);
 }
 
 /** Whether an answer is a credential failure: it ends a call for several objects. */

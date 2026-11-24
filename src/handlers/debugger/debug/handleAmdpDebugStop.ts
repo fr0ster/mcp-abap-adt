@@ -18,7 +18,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Ends the AMDP part of a debug session, releasing a suspended debuggee first.',
     ),
-    returns: [],
   }),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),
 } as const;

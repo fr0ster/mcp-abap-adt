@@ -12,15 +12,13 @@ import * as z from 'zod';
  */
 import { asksNumbers } from '../../batch/batchTools';
 import { answersOf, beginBatch, endBatch } from '../../batch/tools';
-import { RECORDED_OUTCOMES, RECORDED_SENT } from '../../description/debugger';
 import {
   type DescriptionParts,
   purpose,
-  resultReturns,
+  stateHandleAnswered,
   toolDescription,
   valueParts,
 } from '../../description/index';
-import { CALLS_RECORDING } from '../../description/sessions';
 import type { HandlerContext, ToolArgs } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
 import { textsOf } from '../memberTexts';
@@ -35,19 +33,16 @@ const ACTION_VALUES = {
     purpose: purpose(
       'Starts recording the calls of the tools that allow it, each under the next number, to send them together.',
     ),
-    returns: resultReturns(CALLS_RECORDING),
   }),
   end: valueParts('end', {
     purpose: purpose(
       "Sends the recorded calls to SAP together, with the credentials in force, and splits SAP's answer by call.",
     ),
-    returns: resultReturns(RECORDED_SENT),
   }),
   answers: valueParts('answers', {
     purpose: purpose(
       'Reads the answer of each recorded call of the last sending, by its number.',
     ),
-    returns: resultReturns(RECORDED_OUTCOMES),
   }),
 } as const;
 
@@ -60,11 +55,11 @@ export function handlerBatchParts(
     purpose: purpose(
       "Records the calls of the tools that allow it and sends them to SAP together, then reads each call's answer by its number.",
     ),
-    returns: [],
     values: {
       of: 'action',
       each: actions.map((action) => ACTION_VALUES[action]),
     },
+    ...(actions.includes('begin') ? { notes: [stateHandleAnswered] } : {}),
   };
 }
 

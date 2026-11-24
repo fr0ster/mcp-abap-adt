@@ -19,7 +19,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Selects the stack frame of a stopped debuggee whose variables are then shown, execution going on from the same point.',
     ),
-    returns: [],
   }),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,

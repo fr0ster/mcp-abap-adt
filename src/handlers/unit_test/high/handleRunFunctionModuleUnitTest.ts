@@ -19,12 +19,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { inCheckedGroup } from '../../../lib/strategies/functionModuleGroup';
 import { return_error } from '../../../lib/utils';
-import {
-  runnerOf,
-  runnerWaitOf,
-  scopeOf,
-  type UnitTestScopeArgs,
-} from '../shared/runner';
+import { runnerOf, runnerWaitOf, scopeOf } from '../shared/runner';
 import { projectSync, runTestsSync } from '../shared/runSync';
 import { projectRun, runAndWait } from '../shared/runTests';
 
@@ -34,7 +29,6 @@ export const TOOL_DEFINITION = {
   description: toolDescription(
     unitTestRun(
       'the ABAP Unit tests of the function group holding a function module',
-      'sync',
     ),
   ),
   inputSchema: z.object({

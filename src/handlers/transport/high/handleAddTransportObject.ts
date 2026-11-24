@@ -25,7 +25,6 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { TRANSPORT_ADDITION } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
@@ -40,7 +39,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         "Adds an existing ABAP object to a transport task, so it travels with the task's transport.",
       ),
-      result: TRANSPORT_ADDITION,
     }),
   ),
   inputSchema: z.object({

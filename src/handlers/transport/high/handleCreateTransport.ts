@@ -39,7 +39,6 @@ import {
 import { createAdtClient } from '../../../lib/clients';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { TRANSPORT_CREATED } from '../../../lib/description/sessions';
 import {
   type DetailTable,
   type LevelReading,
@@ -101,7 +100,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked.',
       ),
-      result: TRANSPORT_CREATED,
     }),
   ),
   inputSchema: createArguments('CreateTransport', {

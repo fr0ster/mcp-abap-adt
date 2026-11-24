@@ -15,7 +15,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads an ABAP message class: its messages with their numbers and texts, and its master language.',
     ),
-    returns: [],
   }),
   inputSchema: z.object({
     message_class_name: z.string().describe('Message class name.'),

@@ -6,11 +6,7 @@ import { createAdtClient } from '../../../lib/clients';
 import { sourceReader, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  READ_PART_FIELD,
-  type ReadPart,
-  readPartOf,
-} from '../../../lib/handlers/readPart';
+import { READ_PART_FIELD, readPartOf } from '../../../lib/handlers/readPart';
 import {
   READ_VERSION_FIELD_UNDEFAULTED,
   type ReadVersion,
@@ -20,7 +16,6 @@ import {
   rangeFields,
   SOURCE_RANGE_SHAPE,
   type SourceCut,
-  type SourceRangeArgs,
   sourceRangeOf,
 } from '../../../lib/handlers/sourceRange';
 import { readIncludeMetadata } from '../../../lib/strategies/metadataReads';
@@ -34,8 +29,6 @@ export const TOOL_DEFINITION = {
   description: toolDescription(
     sourceReader({
       object: 'an ABAP include',
-      answers: 'source',
-      range: 'lines',
       metadata: true,
     }),
   ),

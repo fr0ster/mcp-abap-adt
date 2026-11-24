@@ -19,11 +19,9 @@ import {
 import {
   ABAPGIT_DETAIL_SHAPE,
   RUN_LOG_ANSWERS,
-  RUN_LOG_MEDIUM,
-  RUN_LOG_TERSE,
 } from '../../../lib/abapGit/formats';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
-import { answerAt, listAnswerAt, shapesOf } from '../../../lib/detail';
+import { purpose, toolDescription } from '../../../lib/description';
+import { listAnswerAt } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
@@ -35,10 +33,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Gets the error log of the last abapGit pull or push of a repository, object by object.',
     ),
-    returns: returnsOf({
-      heads: [],
-      shapes: [shapesOf(RUN_LOG_TERSE)],
-    }),
   }),
   inputSchema: z.object({
     repository_key: REPOSITORY_KEY_FIELD,

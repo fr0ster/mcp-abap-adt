@@ -37,7 +37,7 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   about,
   asJsonResult,
@@ -46,19 +46,15 @@ import {
   type DetailLevel,
   entries,
   type Head,
-  headShape,
   type JsonSchemas,
   type ListAnswerTable,
   type Listing,
   listAnswerAt,
   marks,
-  type Nested,
-  nest,
   partsOf,
   type RowSchemas,
   rows,
   sections,
-  shapesOf,
   type TextResult,
   values,
   type Written,
@@ -869,14 +865,6 @@ const ENHANCEMENTS_LISTS: RowSchemas<EnhancementsTerse> = {
   nested: within<NestedEnhancements, 'nested'>('nested', nestedSchemas),
 };
 
-/** The heads an enhancements listing writes, each object's and the total. */
-const ENHANCEMENTS_HEADS = [
-  headShape('object', 'its type and name'),
-  headShape('context', 'the main program of an include'),
-  headShape('count', 'how many enhancements it has'),
-  headShape('total', 'the total found across its includes'),
-];
-
 export const TOOL_DEFINITION = {
   name: 'GetEnhancements',
   available_in: ['onprem', 'cloud'] as const,
@@ -885,11 +873,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Lists the enhancement implementations of ABAP programs, includes, function groups or classes at their active version, and of their includes when asked.',
     ),
-    returns: returnsOf({
-      heads: ENHANCEMENTS_HEADS,
-      of: 'for each object read:',
-      shapes: [shapesOf(ENHANCEMENTS_LISTS)],
-    }),
   }),
   inputSchema: z.object({
     object_name: z
@@ -1974,11 +1957,6 @@ const ONE_REQUEST_HOSTS: readonly HostSpelling[] = [
   HOST_SPELLINGS.group,
   HOST_SPELLINGS.program,
 ];
-
-/** An answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): JsonValue {
-  return answerPayload(result);
-}
 
 /** Whether an answer is a credential failure: it ends a call for several objects. */
 function endsList(result: McpResult): boolean {

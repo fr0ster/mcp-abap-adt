@@ -41,12 +41,7 @@ import {
   createOnPremAdtClient,
   variantOf,
 } from '../../../lib/clients';
-import {
-  purpose,
-  resultReturns,
-  results,
-  toolDescription,
-} from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   connectionHoldingPackageLock,
@@ -66,7 +61,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Releases the lock an ABAP object holds under the lock handle given.',
     ),
-    returns: resultReturns(results.WRITTEN),
   }),
   inputSchema: z.object({
     object_name: z

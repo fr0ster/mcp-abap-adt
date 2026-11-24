@@ -20,7 +20,6 @@ import {
 import { statusAnswer } from '../../../lib/abapGit/formats';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { ABAPGIT_STATUS } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
@@ -31,7 +30,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Switches an abapGit repository to a branch, creating the branch in the remote first when asked.',
       ),
-      result: ABAPGIT_STATUS,
     }),
   ),
   inputSchema: z.object({

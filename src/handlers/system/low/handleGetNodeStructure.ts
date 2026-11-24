@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { membersOf, purpose, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import { succeeded } from '../../../lib/strategies/stepResponse';
 /**
@@ -92,27 +92,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads one level of the repository browser of a package, class, program or other repository object, at its root or the node asked.',
     ),
-    returns: membersOf<LevelAnswer>({
-      nouns: {
-        objects: {
-          each: 'object',
-          nouns: {
-            name: 'name',
-            type: 'type',
-            description: 'description',
-            techName: 'technical name',
-            uri: 'ADT URI',
-          },
-        },
-        childNodes: {
-          each: 'child node',
-          nouns: { type: 'type', nodeId: 'node ID' },
-        },
-        notLoaded: { clause: 'whether SAP could load the level' },
-        blank: { clause: 'what an empty package level means' },
-      },
-    }),
-    inline: true,
   }),
   inputSchema: z.object({
     parent_type: requiredText('parent_type is required').describe(

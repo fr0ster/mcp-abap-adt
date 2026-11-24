@@ -4,7 +4,7 @@ import { XMLParser } from 'fast-xml-parser';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { purpose, toolDescription } from '../../../lib/description';
-import { DUMP, runParts } from '../../../lib/description/runs';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { JsonValue } from '../../../lib/json';
 import { afterLast, digitsAfter } from '../../../lib/plainText';
@@ -15,8 +15,6 @@ import {
   child,
   childAt,
   isList,
-  type XmlList,
-  type XmlNode,
   type XmlRead,
 } from '../../../lib/xml/tree';
 import { parseRuntimePayloadToJson } from './runtimePayloadParser';
@@ -30,7 +28,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Reads an ABAP runtime dump by its id, with a summary of where and why its program terminated.',
       ),
-      result: DUMP,
     }),
   ),
   inputSchema: z.object({

@@ -3,7 +3,6 @@ import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import {
@@ -16,12 +15,9 @@ import {
   type Listing,
   listAnswerAt,
   listWrittenAt,
-  nest,
-  parts,
   partsOf,
   type RowSchemas,
   rows,
-  shapesOf,
   type Written,
   wireAnswer,
   writeJson,
@@ -211,12 +207,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Lists every object inside an ABAP program, function group, class, package or other composite object, down to its nested includes and subcomponents.',
       ),
-      returns: returnsOf({
-        heads: OBJECTS_LIST_HEADS,
-        of: OBJECTS_LIST_OF,
-        shapes: [shapesOf(OBJECTS_LIST_LISTS)],
-      }),
-      inline: true,
       notes: [longRunning],
     }),
     schemaOn,

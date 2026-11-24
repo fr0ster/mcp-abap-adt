@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { purpose, sapData, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * GetVirtualFolders Handler - Low-level handler for virtual folders
@@ -36,7 +36,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the virtual folders that group ABAP repository objects by package, group, type and other facets, for a name pattern.',
     ),
-    returns: [sapData],
   }),
   inputSchema: z.object({
     object_search_pattern: z

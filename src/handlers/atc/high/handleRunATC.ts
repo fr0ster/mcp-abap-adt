@@ -18,7 +18,7 @@ import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { variantOf } from '../../../lib/clients';
 import { purpose, toolDescription } from '../../../lib/description';
-import { ATC_RUN, runParts } from '../../../lib/description/runs';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 import { succeededWith } from '../../../lib/strategies/sequence';
@@ -40,7 +40,7 @@ type Covers<All, Listed extends All> = [Exclude<All, Listed>] extends [never]
 /** Compiles only for `true`. */
 type Holds<T extends true> = T;
 /** Fails to compile when the client names a class include kind the list leaves out. */
-type EveryClassIncludeKindListed = Holds<
+export type EveryClassIncludeKindListed = Holds<
   Covers<AtcClassIncludeKind, (typeof CLASS_INCLUDE_KINDS)[number]>
 >;
 
@@ -72,7 +72,6 @@ export const TOOL_DEFINITION = {
         purpose: purpose(
           'Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist.',
         ),
-        result: ATC_RUN,
       }),
     ),
     inputSchema: runAtcSchema(variant),

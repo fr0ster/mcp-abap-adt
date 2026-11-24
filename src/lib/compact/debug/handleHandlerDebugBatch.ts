@@ -15,6 +15,7 @@ import { answersOf, beginDebugBatch, endDebugBatch } from '../../batch/tools';
 import {
   type DescriptionParts,
   purpose,
+  stateHandleAnswered,
   toolDescription,
   valueFrom,
 } from '../../description/index';
@@ -43,11 +44,11 @@ export function handlerDebugBatchParts(
     purpose: purpose(
       "Records the debugger calls at the stopped ABAP debuggee or the AMDP break and sends them together, then reads each call's outcome by its number.",
     ),
-    returns: [],
     values: {
       of: 'action',
       each: actions.map((action) => ACTION_VALUES[action]),
     },
+    ...(actions.includes('begin') ? { notes: [stateHandleAnswered] } : {}),
   };
 }
 

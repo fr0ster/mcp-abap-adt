@@ -22,7 +22,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Unlinks an abapGit repository by its key, keeping its objects in the system and its remote as it is.',
     ),
-    returns: [],
   }),
   inputSchema: z.object({ repository_key: REPOSITORY_KEY_FIELD }),
 } as const;

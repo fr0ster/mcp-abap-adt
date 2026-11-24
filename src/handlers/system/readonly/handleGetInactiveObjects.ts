@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * GetInactiveObjects Handler - Retrieve list of inactive ABAP objects
@@ -16,7 +16,6 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   about,
   answered,
-  type DetailTable,
   entries,
   fullLevel,
   headShape,
@@ -25,7 +24,6 @@ import {
   rawLevel,
   readingAt,
   rows,
-  shapesOf,
   type Written,
   writeJson,
   writeListing,
@@ -115,11 +113,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Lists the inactive ABAP objects of the system: classes, tables, CDS views and other objects changed and awaiting activation.',
     ),
-    returns: returnsOf({
-      heads: INACTIVE_HEADS,
-      shapes: [shapesOf(INACTIVE_LISTS)],
-    }),
-    inline: true,
   }),
   inputSchema: z.object({ ...DETAIL_SHAPE }),
 } as const;

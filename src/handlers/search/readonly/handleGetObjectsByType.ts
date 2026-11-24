@@ -8,7 +8,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   about,
   type Column,
@@ -16,7 +16,6 @@ import {
   marks,
   type RowSchemas,
   rows,
-  shapesOf,
   writeListing,
 } from '../../../lib/detail';
 import {
@@ -177,12 +176,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Lists the objects of one type, such as classes, tables, programs or interfaces, in an ABAP package or other composite object.',
     ),
-    returns: returnsOf({
-      heads: OBJECTS_BY_TYPE_HEADS,
-      of: 'the',
-      shapes: Object.values(OBJECTS_BY_TYPE_LISTS).map(shapesOf),
-    }),
-    inline: true,
   }),
   inputSchema: z.object({
     parent_name: z.string().describe('[read-only] Parent object name'),

@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 
 /**
  * GetObjectVersions Handler - read-only version history of an ABAP object.
@@ -25,18 +25,13 @@ import {
   listAnswerAt,
   type RowSchemas,
   rows,
-  shapesOf,
   writeJson,
   writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
 import { asError } from '../../../lib/thrownValue';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
 import { readVersions, resolveVersionedObject } from './resolveVersionedObject';
 
@@ -91,10 +86,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Lists the version history of an ABAP class, program, interface, function module, table, structure, CDS view or other versioned object.',
       ),
-      returns: returnsOf({
-        heads: VERSIONS_HEADS,
-        shapes: [shapesOf(VERSIONS_LISTS)],
-      }),
     }),
     inputSchema: objectVersionsSchema(variant),
   })),

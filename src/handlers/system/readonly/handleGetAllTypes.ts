@@ -11,11 +11,10 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   about,
   answered,
-  type DetailTable,
   fullLevel,
   headShape,
   type ListDetailTable,
@@ -23,7 +22,6 @@ import {
   rawLevel,
   readingAt,
   rows,
-  shapesOf,
   writeListing,
   writeWhole,
   written,
@@ -67,11 +65,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Lists the repository object types the ABAP system knows, by their type codes.',
     ),
-    returns: returnsOf({
-      heads: TYPES_HEADS,
-      shapes: [shapesOf(TYPES_LISTS)],
-    }),
-    inline: true,
   }),
   inputSchema: z.object({
     validate_type: z

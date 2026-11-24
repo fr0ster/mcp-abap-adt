@@ -5,21 +5,18 @@ import { answer } from '../../../lib/answer';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import {
   headShape,
   type ListAnswerTable,
   listAnswerAt,
-  shapesOf,
   writeWhole,
 } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
-  FINDINGS_LISTS,
   findingsText,
   PRIORITY_HEAD,
   parseAtcWorklist,
@@ -61,10 +58,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background.',
     ),
-    returns: returnsOf({
-      heads: ATC_FINDINGS_HEADS,
-      shapes: [shapesOf(FINDINGS_LISTS)],
-    }),
     notes: [longRunning],
   }),
   inputSchema: z.object({

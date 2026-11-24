@@ -9,7 +9,6 @@ import {
   STATE_HANDLE_PROPERTY,
 } from '../../../lib/debugger/schemas';
 import { purpose, toolDescription } from '../../../lib/description';
-import { BREAKPOINTS_SET } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
@@ -23,7 +22,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Adds breakpoints to an ABAP debug session: at a source position, optionally conditional, on an exception class, an ABAP statement or a message.',
       ),
-      result: BREAKPOINTS_SET,
     }),
   ),
   inputSchema: z.object({

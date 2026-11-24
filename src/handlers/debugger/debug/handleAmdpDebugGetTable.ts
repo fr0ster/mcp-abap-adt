@@ -5,11 +5,7 @@ import {
 } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
-import {
-  purpose,
-  toolDescription,
-  untypedReturns,
-} from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -21,7 +17,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the records of a table variable at the AMDP stop, up to 100, through a SELECT over it when one is set.',
     ),
-    returns: untypedReturns(),
   }),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,

@@ -6,11 +6,9 @@ import {
   STATE_HANDLE_PROPERTY,
   terseOnceStep,
 } from '../../debugger/index';
-import { HELD_DEBUG, STACK_POSITION } from '../../description/debugOnce';
 import {
   type DescriptionParts,
   purpose,
-  resultReturns,
   toolDescription,
   valueParts,
 } from '../../description/index';
@@ -35,16 +33,9 @@ const AMDP_OPERATIONS = ['stepOver', 'stepContinue'] as const;
 export const STEP_OPERATIONS = [...ABAP_OPERATIONS] as const;
 type StepOperation = (typeof STEP_OPERATIONS)[number];
 
-/** An operation by its function, and what it answers where its reading is typed. */
-function operation(
-  value: StepOperation,
-  text: string,
-  shape?: Parameters<typeof resultReturns>[0],
-) {
-  return valueParts(value, {
-    purpose: purpose(text),
-    returns: shape === undefined ? [] : resultReturns(shape),
-  });
+/** An operation by its function. */
+function operation(value: StepOperation, text: string) {
+  return valueParts(value, { purpose: purpose(text) });
 }
 
 /** Each operation by its function. */
@@ -76,7 +67,6 @@ const STEP_VALUES = {
   setStackPosition: operation(
     'setStackPosition',
     'Selects the stack frame of the ABAP debuggee whose variables are read.',
-    STACK_POSITION,
   ),
 } as const;
 
@@ -89,7 +79,6 @@ export function handlerDebugStepParts(
     purpose: purpose(
       'Moves the stopped ABAP or AMDP debuggee by one step, one SAP call per operation.',
     ),
-    returns: resultReturns(HELD_DEBUG),
     values: {
       of: 'operation',
       each: operations.map((op) => STEP_VALUES[op]),

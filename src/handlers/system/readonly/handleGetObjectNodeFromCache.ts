@@ -8,7 +8,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads one repository object the last objects listing named, by its type, name and technical name, with the content at its URI in the active version.',
     ),
-    returns: [],
   }),
   inputSchema: z.object({
     object_type: z.string().describe('[read-only] Object type'),

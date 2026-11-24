@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import type { McpResult } from '../../answer';
+import type { DebugExtra } from '../../debugger/access';
 import {
   type DebuggerInstance,
   type DebugView,
@@ -7,7 +8,6 @@ import {
   type OnceIdentity,
   requireDebugger,
 } from '../../debugger/index';
-import type { HeldDebug } from '../../description/debugOnce';
 import type { HandlerContext } from '../../handlers/index';
 import type { DetailArgs } from '../../strategies/detail';
 
@@ -112,7 +112,7 @@ export function identityOf(args: {
 }
 
 /** The handle while the state holds something, and the ABAP identity once fixed. */
-function heldExtra(context: HandlerContext): HeldDebug {
+function heldExtra(context: HandlerContext): DebugExtra {
   if (!context.state?.holdsState()) return {};
   const identity = context.debugger?.().abap.currentIdentity();
   return {

@@ -4,11 +4,9 @@ import {
   breakpointsFromArgs,
   readXmlDocument,
 } from '../../debugger/index';
-import { BREAKPOINT_DELETED, HELD_DEBUG } from '../../description/debugOnce';
 import {
   type DescriptionParts,
   purpose,
-  resultReturns,
   toolDescription,
   valueParts,
 } from '../../description/index';
@@ -40,16 +38,9 @@ const AMDP_OPERATIONS = ['syncBreakpoints'] as const;
 export const BREAKPOINT_OPERATIONS = [...ABAP_OPERATIONS] as const;
 type BreakpointOperation = (typeof BREAKPOINT_OPERATIONS)[number];
 
-/** An operation by its function, and what it answers where its reading is typed. */
-function operation(
-  value: BreakpointOperation,
-  text: string,
-  shape?: Parameters<typeof resultReturns>[0],
-) {
-  return valueParts(value, {
-    purpose: purpose(text),
-    returns: shape === undefined ? [] : resultReturns(shape),
-  });
+/** An operation by its function. */
+function operation(value: BreakpointOperation, text: string) {
+  return valueParts(value, { purpose: purpose(text) });
 }
 
 /** Each operation by its function. */
@@ -65,7 +56,6 @@ const BREAKPOINT_VALUES = {
   deleteBreakpoint: operation(
     'deleteBreakpoint',
     'Deletes one ABAP breakpoint by its id.',
-    BREAKPOINT_DELETED,
   ),
   createWatchpoint: operation(
     'createWatchpoint',
@@ -90,7 +80,6 @@ export function handlerDebugBreakpointsParts(
     purpose: purpose(
       'Sets, rewrites and deletes the ABAP and AMDP debugger breakpoints, and the watchpoints of the attached ABAP debuggee.',
     ),
-    returns: resultReturns(HELD_DEBUG),
     values: {
       of: 'operation',
       each: operations.map((op) => BREAKPOINT_VALUES[op]),

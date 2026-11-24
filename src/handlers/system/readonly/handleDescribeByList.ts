@@ -3,7 +3,6 @@ import * as z from 'zod';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
@@ -35,7 +34,6 @@ import {
   type ListAnswerTable,
   listAnswerAt,
   type RowSchemas,
-  shapesOf,
   wireAnswer,
   writeJsonList,
   writeListing,
@@ -249,7 +247,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Describes several ABAP repository objects named in one call, each by its name and, when known, its type.',
     ),
-    returns: returnsOf({ shapes: [shapesOf(DESCRIBED_LISTS)] }),
     notes: [longRunning],
   }),
   inputSchema: z.object({

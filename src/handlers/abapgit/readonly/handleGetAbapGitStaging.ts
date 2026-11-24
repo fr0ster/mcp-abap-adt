@@ -16,13 +16,9 @@ import {
 import {
   ABAPGIT_DETAIL_SHAPE,
   STAGING_ANSWERS,
-  STAGING_HEADS,
-  STAGING_HEADS_BY,
-  STAGING_MEDIUM,
-  STAGING_TERSE,
 } from '../../../lib/abapGit/formats';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
-import { answerAt, listAnswerAt, shapesOf } from '../../../lib/detail';
+import { purpose, toolDescription } from '../../../lib/description';
+import { listAnswerAt } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
@@ -33,11 +29,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Gets the abapGit staging of a linked repository: what changed, to choose what a push commits.',
     ),
-    returns: returnsOf({
-      heads: STAGING_HEADS,
-      by: STAGING_HEADS_BY,
-      shapes: [shapesOf(STAGING_TERSE)],
-    }),
   }),
   inputSchema: z.object({
     repository_key: REPOSITORY_KEY_FIELD,

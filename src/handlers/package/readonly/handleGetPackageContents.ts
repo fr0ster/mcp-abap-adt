@@ -13,7 +13,6 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import {
@@ -26,7 +25,6 @@ import {
   listAnswerAt,
   rows,
   sections,
-  shapesOf,
   type Written,
   wireAnswer,
   writeJsonList,
@@ -126,9 +124,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Lists the objects of one or more ABAP packages, with the objects of their subpackages when asked.',
     ),
-    returns: returnsOf({
-      shapes: Object.values(CONTENTS_LISTS).map(shapesOf),
-    }),
     notes: [longRunning],
   }),
   inputSchema: withInCallSchema(
@@ -191,8 +186,6 @@ function onlyPart(read: ContentsRead): ContentsPart {
   const [part] = partsOf(read);
   return part ?? { name: read.packageNames[0] ?? '' };
 }
-
-const TOOL = 'GetPackageContents';
 
 /**
  * One package's objects as TSV: the type, the name, the technical name

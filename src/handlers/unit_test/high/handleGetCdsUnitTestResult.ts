@@ -2,7 +2,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { toolDescription } from '../../../lib/description';
-import { UNIT_TEST_RESULT, unitTestRead } from '../../../lib/description/runs';
+import { unitTestRead } from '../../../lib/description/runs';
 import { wireAnswer } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -19,12 +19,7 @@ export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description: toolDescription(
-    unitTestRead(
-      'the result',
-      'a CDS unit test run',
-      UNIT_TEST_RESULT,
-      'waits',
-    ),
+    unitTestRead('the result', 'a CDS unit test run', 'waits'),
   ),
   inputSchema: z.object({
     run_id: requiredText('run_id is required').describe(

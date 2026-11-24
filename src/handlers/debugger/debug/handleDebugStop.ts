@@ -8,7 +8,6 @@ import {
 import { debugAnswer, stoppedSession } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
 import { purpose, toolDescription } from '../../../lib/description';
-import { STOPPED } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
@@ -22,7 +21,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes its connections.',
       ),
-      result: STOPPED,
     }),
   ),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),

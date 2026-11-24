@@ -21,13 +21,12 @@
  */
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import type { compactProfileScheduleSchema } from '../../../lib/compact/compactSchemas';
 import { purpose, toolDescription } from '../../../lib/description';
-import { runParts, TRACE_SCHEDULED } from '../../../lib/description/runs';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { profilerTraceParameters } from '../../../lib/profilerTraceParameters';
 import { ourClassExecutor } from '../../../lib/strategies/resultSets';
@@ -43,7 +42,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Schedules an ABAP profiler trace with its parameters, for a later profiled run of a class or a report.',
       ),
-      result: TRACE_SCHEDULED,
     }),
   ),
   inputSchema: z.object({

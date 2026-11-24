@@ -9,11 +9,7 @@ import * as z from 'zod';
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type {
-  IAdtError,
-  IAdtResponse,
-  IAdtVersionable,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { createTwoFilesPatch } from 'diff';
 import {
   type ProjectionVariant,
@@ -24,7 +20,6 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   type DescriptionParts,
-  membersOf,
   purpose,
   toolDescription,
 } from '../../../lib/description';
@@ -145,14 +140,6 @@ export function versionDiffParts(object: string): DescriptionParts {
     purpose: purpose(
       `Compares two versions of ${object}, taken from its version history.`,
     ),
-    returns: membersOf<VersionDiffResult>({
-      nouns: {
-        diff: { clause: 'the changes between their sources' },
-        identical: { clause: 'whether they are identical' },
-        notes: { clause: 'which source came back empty' },
-      },
-    }),
-    inline: true,
   };
 }
 

@@ -44,7 +44,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { purpose, toolDescription } from '../../../lib/description';
-import { CLASS_RUN, runParts } from '../../../lib/description/runs';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { profilerTraceParameters } from '../../../lib/profilerTraceParameters';
 import { newTraceAfter } from '../../../lib/strategies/newTrace';
@@ -65,7 +65,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Runs an ABAP class implementing if_oo_adt_classrun and gives its console output, under the ABAP profiler when asked.',
       ),
-      result: CLASS_RUN,
     }),
   ),
   inputSchema: z.object({

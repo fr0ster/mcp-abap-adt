@@ -4,11 +4,7 @@ import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { readXmlDocument } from '../../../lib/debugger/memoryReadings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
-import {
-  purpose,
-  toolDescription,
-  untypedReturns,
-} from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -20,7 +16,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Watches a variable of the stopped ABAP debuggee, stopping it when the variable changes, under a condition when one is set.',
     ),
-    returns: untypedReturns(),
   }),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,

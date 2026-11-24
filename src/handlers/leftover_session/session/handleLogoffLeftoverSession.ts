@@ -1,7 +1,6 @@
 import * as z from 'zod';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { LEFTOVER_LOGGED_OFF } from '../../../lib/description/sessions';
 import { answerLeftoverLogoff } from '../../../lib/leftoverSessions/answers';
 import type { HandlerContext } from '../../interfaces';
 
@@ -12,7 +11,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Logs off a leftover SAP session by its handle, releasing every lock it holds and deleting its record.',
       ),
-      result: LEFTOVER_LOGGED_OFF,
     }),
   ),
   inputSchema: z.object({

@@ -4,7 +4,6 @@ import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
 import { purpose, toolDescription } from '../../../lib/description';
-import { DELETED } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
@@ -18,7 +17,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Removes a watchpoint of the stopped ABAP debuggee by its id.',
       ),
-      result: DELETED,
     }),
   ),
   inputSchema: z.object({

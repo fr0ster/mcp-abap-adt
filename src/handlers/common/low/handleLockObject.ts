@@ -39,12 +39,7 @@ import {
   createOnPremAdtClient,
   variantOf,
 } from '../../../lib/clients';
-import {
-  purpose,
-  resultReturns,
-  resultShape,
-  toolDescription,
-} from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionForPackageLock } from '../../../lib/packageSessions';
 import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
@@ -61,11 +56,6 @@ export interface LockAnswer {
   readonly lock_handle: string;
 }
 
-/** What a lock answers, by its noun. */
-const LOCKED = resultShape<LockAnswer>({
-  lock_handle: 'the lock handle the update and the unlock take',
-});
-
 export const TOOL_DEFINITION = {
   name: 'LockObjectLow',
   available_in: ['onprem', 'cloud'] as const,
@@ -74,7 +64,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       "Locks an ABAP object for modification in this instance's session, until it is unlocked or the instance ends.",
     ),
-    returns: resultReturns(LOCKED),
   }),
   inputSchema: z.object({
     object_name: z

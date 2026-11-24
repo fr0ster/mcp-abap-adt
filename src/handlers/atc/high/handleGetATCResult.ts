@@ -5,21 +5,18 @@ import { answer } from '../../../lib/answer';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import {
   headShape,
   type ListAnswerTable,
   listAnswerAt,
-  shapesOf,
   writeWhole,
 } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
-  FINDINGS_LISTS,
   findingsText,
   PRIORITY_HEAD,
 } from '../../../lib/strategies/atcFindings';
@@ -57,10 +54,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads a stored ATC result by its display ID: its findings and the counts per priority.',
     ),
-    returns: returnsOf({
-      heads: ATC_RESULT_HEADS,
-      shapes: [shapesOf(FINDINGS_LISTS)],
-    }),
     notes: [longRunning],
   }),
   inputSchema: z.object({

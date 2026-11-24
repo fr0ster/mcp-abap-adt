@@ -10,22 +10,18 @@ import { adtClientOf, type ServerAdtClient } from '../../../lib/clients';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import {
   about,
   answered,
   type Column,
-  type DetailTable,
   fullLevel,
   type ListDetailTable,
   type RowSchemas,
   rawLevel,
   readingAt,
   rows,
-  shapesOf,
-  structuredValue,
   type Written,
   whole,
   writeListing,
@@ -132,7 +128,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Finds ABAP repository objects by name or name pattern, of any type or of one: classes, programs, tables, interfaces and every other kind.',
       ),
-      returns: returnsOf({ shapes: [shapesOf(SEARCH_HITS_LISTS)] }),
       notes: [longRunning],
     }),
     schemaOn,

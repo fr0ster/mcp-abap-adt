@@ -57,7 +57,6 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import {
@@ -72,12 +71,10 @@ import {
   type ListAnswerTable,
   type Listing,
   listAnswerAt,
-  nest,
   omitting,
   partsOf,
   type RowSchemas,
   rows,
-  shapesOf,
   type TextResult,
   values,
   type Written,
@@ -262,10 +259,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Finds where an ABAP class, function module, table or other repository object is used: every object that uses, calls or references it.',
       ),
-      returns: returnsOf({
-        heads: WHERE_USED_HEADS,
-        shapes: [shapesOf(WHERE_USED_LISTS)],
-      }),
       notes: [longRunning],
     }),
     inputSchema: whereUsedSchema(variant, variant),
@@ -927,11 +920,6 @@ const WHERE_USED_CONTEXT = { tool: 'GetWhereUsed', detail: 'terse' } as const;
  * `Written`, never by splicing the single answers' texts.
  */
 const readsOf = new WeakMap<WhereUsedArgs, WhereUsedRead>();
-
-/** An answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): JsonValue {
-  return answerPayload(result);
-}
 
 /** Whether an answer is a credential failure: it ends a call for several objects. */
 function endsList(result: McpResult): boolean {

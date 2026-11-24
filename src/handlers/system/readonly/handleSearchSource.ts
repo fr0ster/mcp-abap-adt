@@ -4,7 +4,6 @@ import { isRfcConnection } from '../../../lib/connectionKind';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import {
@@ -20,7 +19,6 @@ import {
   marks,
   type RowSchemas,
   rows,
-  shapesOf,
   type Written,
   wireAnswer,
   writeListing,
@@ -34,7 +32,6 @@ import {
 } from '../../../lib/search-source/answerLevel';
 import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 import {
-  type OrchestratorInput,
   type OrchestratorResult,
   runSearchSourceWithContext,
 } from '../../../lib/search-source/orchestrator';
@@ -162,10 +159,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Searches the ABAP source code of one or more packages for a text: programs, includes, function groups, classes, interfaces and CDS sources.',
     ),
-    returns: returnsOf({
-      heads: SEARCH_SOURCE_HEADS,
-      shapes: Object.values(SEARCH_SOURCE_LISTS).map(shapesOf),
-    }),
     notes: [longRunning],
   }),
   inputSchema: z.object({

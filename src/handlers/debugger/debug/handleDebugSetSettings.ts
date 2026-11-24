@@ -9,7 +9,6 @@ import {
   settingsFromArgs,
 } from '../../../lib/debugger/schemas';
 import { purpose, toolDescription } from '../../../lib/description';
-import { SETTINGS } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
@@ -23,7 +22,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Changes the debugger settings of an ABAP debug session at its current stop, applied again after each later attach.',
       ),
-      result: SETTINGS,
     }),
   ),
   inputSchema: z.object({

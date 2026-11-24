@@ -23,7 +23,6 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { TRANSPORT_SORTED } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
@@ -38,7 +37,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Sorts the objects of a transport task and merges its duplicates.',
       ),
-      result: TRANSPORT_SORTED,
     }),
   ),
   inputSchema: z.object({

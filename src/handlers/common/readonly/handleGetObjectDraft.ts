@@ -9,37 +9,13 @@ import type { ProjectionVariant } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer, answerCaught } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
-import { membersOf, purpose, toolDescription } from '../../../lib/description';
-import { type DraftPartState, draftOf } from '../../../lib/draft/draftOf';
+import { purpose, toolDescription } from '../../../lib/description';
+import { draftOf } from '../../../lib/draft/draftOf';
 import { DRAFT_TYPES, draftRuleOf } from '../../../lib/draft/draftTypes';
 import { readDraftEtags } from '../../../lib/draft/readDraftEtags';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
-
-/** One part of the object, as the tool answers it. */
-type DraftPartAnswer = { readonly part: string } & DraftPartState;
-
-/** What the tool gives back: whether the object holds a change, then each part's state. */
-const DRAFT_RETURNS = [
-  ...membersOf<{ readonly has_draft: boolean }>({
-    of: 'whether',
-    nouns: {
-      has_draft: 'the object holds an unactivated change of any user',
-    },
-  }),
-  ...membersOf<DraftPartAnswer>({
-    of: 'for each part, its main source or metadata or a class include:',
-    nouns: {
-      part: 'its name',
-      draft:
-        "its state (active, the caller's change, another user's change or undetermined)",
-      changed_at: 'when that change was last written',
-      age_seconds: 'how many seconds ago',
-      etags: 'the ETags of its active, inactive and working versions',
-    },
-  }),
-];
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectDraft',
@@ -50,7 +26,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Tells whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose.',
       ),
-      returns: DRAFT_RETURNS,
     }),
     inputSchema: objectDraftSchema(variant),
   })),

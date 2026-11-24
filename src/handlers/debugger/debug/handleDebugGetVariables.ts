@@ -11,7 +11,6 @@ import {
 } from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
 import { purpose, toolDescription } from '../../../lib/description';
-import { VARIABLES_OR_MEMBERS } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
@@ -25,7 +24,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Reads variables of the stopped ABAP debuggee by name, or the members of parent variables.',
       ),
-      result: VARIABLES_OR_MEMBERS,
     }),
   ),
   inputSchema: z.object({

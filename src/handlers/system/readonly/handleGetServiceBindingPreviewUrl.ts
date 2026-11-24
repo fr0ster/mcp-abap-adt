@@ -49,7 +49,7 @@ import {
   requestThrownEntry,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { membersOf, purpose, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { withoutTrailing } from '../../../lib/plainText';
@@ -195,36 +195,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Builds the Fiori preview URL of a published OData service binding, with its service and $metadata URLs.',
     ),
-    returns: membersOf<PreviewUrlAnswer>({
-      nouns: {
-        success: null,
-        service_binding_name: null,
-        published: { clause: 'whether it is published' },
-        live: "service's live state",
-        protocol: 'OData protocol',
-        service: 'service',
-        service_definition: 'service definition',
-        version: 'service version',
-        entity_sets: 'entity sets',
-        binding_category: 'binding category',
-        client: 'client',
-        language: 'logon language',
-        associations: 'associations',
-        origin: { clause: "whether the system's HTTP origin is known" },
-        service_url: 'service URL',
-        service_url_source: 'service URL source',
-        metadata_url: '$metadata URL',
-        annotation_url: 'annotation URL',
-        preview_url: 'preview URL',
-        preview_descriptor: 'preview descriptor',
-        missing: { clause: 'what the preview URL still needs' },
-        note: 'notes',
-        system_information_failure: {
-          clause: "the failure of reading the system's client and language",
-        },
-      },
-    }),
-    inline: true,
   }),
   inputSchema: z.object({
     service_binding_name: requiredText(

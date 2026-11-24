@@ -1,8 +1,11 @@
 import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugBatchBegin.ts
 import { beginDebugBatch } from '../../../lib/batch/tools';
-import { purpose, toolDescription } from '../../../lib/description';
-import { RECORDING } from '../../../lib/description/debugger';
+import {
+  purpose,
+  stateHandleAnswered,
+  toolDescription,
+} from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../interfaces';
 
@@ -15,7 +18,7 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Starts recording the debugger calls at the stopped ABAP debuggee or at the AMDP break, each under the next number, to send them together.',
       ),
-      result: RECORDING,
+      notes: [stateHandleAnswered],
     }),
   ),
   inputSchema: z.object({}),

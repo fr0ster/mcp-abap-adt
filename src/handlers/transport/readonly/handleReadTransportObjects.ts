@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import {
   DETAIL_SHAPE,
@@ -39,7 +39,6 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   about,
   answered,
-  type DetailTable,
   entries,
   fullLevel,
   headShape,
@@ -49,7 +48,6 @@ import {
   rawLevel,
   readingAt,
   rows,
-  shapesOf,
   type Written,
   writeJson,
   writeListing,
@@ -121,12 +119,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Lists the objects a transport or one of its tasks holds, each with the position a removal names.',
     ),
-    returns: returnsOf({
-      heads: TRANSPORT_OBJECTS_HEADS,
-      of: 'the',
-      shapes: [shapesOf(TRANSPORT_OBJECTS_LISTS)],
-    }),
-    inline: true,
   }),
   inputSchema: z.object({
     transport_number: requiredText('transport_number is required').describe(
@@ -150,18 +142,6 @@ export interface ReadTransportEntry {
   task?: string;
   description?: string;
   lock_status?: string;
-}
-
-/** One entry, as this tool reads it. */
-interface Entry {
-  name: string;
-  type: string;
-  pgmid?: string | undefined;
-  description?: string | undefined;
-  position?: string | undefined;
-  lockStatus?: string | undefined;
-  /** The task the entry is on, when a request was read. */
-  task?: string | undefined;
 }
 
 /**

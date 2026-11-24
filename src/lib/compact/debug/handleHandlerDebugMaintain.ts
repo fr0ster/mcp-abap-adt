@@ -9,11 +9,9 @@ import {
   terseMemorySizes,
   terseVariables,
 } from '../../debugger/index';
-import { HELD_DEBUG } from '../../description/debugOnce';
 import {
   type DescriptionParts,
   purpose,
-  resultReturns,
   toolDescription,
   valueParts,
 } from '../../description/index';
@@ -40,16 +38,9 @@ export const MAINTAIN_OPERATIONS = [
 ] as const;
 type MaintainOperation = (typeof MAINTAIN_OPERATIONS)[number];
 
-/** An operation by its function, and what it answers where its reading is typed. */
-function operation(
-  value: MaintainOperation,
-  text: string,
-  shape?: Parameters<typeof resultReturns>[0],
-) {
-  return valueParts(value, {
-    purpose: purpose(text),
-    returns: shape === undefined ? [] : resultReturns(shape),
-  });
+/** An operation by its function. */
+function operation(value: MaintainOperation, text: string) {
+  return valueParts(value, { purpose: purpose(text) });
 }
 
 /** Each operation by its function. */
@@ -93,7 +84,6 @@ export function handlerDebugMaintainParts(
     purpose: purpose(
       'Reads and changes the stopped ABAP or AMDP debuggee: its stack, its variables, its memory and its table variables.',
     ),
-    returns: resultReturns(HELD_DEBUG),
     values: {
       of: 'operation',
       each: operations.map((op) => MAINTAIN_VALUES[op]),

@@ -11,7 +11,6 @@ import {
 } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
 import { purpose, toolDescription } from '../../../lib/description';
-import { DEBUG_STATE } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
@@ -25,7 +24,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Steps the stopped ABAP debuggee into a call, over it, out of it or on to the next stop, or leaves it running by detaching or freeing the debugger.',
       ),
-      result: DEBUG_STATE,
     }),
   ),
   inputSchema: z.object({

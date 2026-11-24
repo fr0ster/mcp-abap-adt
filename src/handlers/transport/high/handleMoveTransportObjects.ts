@@ -22,7 +22,6 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { TRANSPORT_MOVE } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
@@ -61,7 +60,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Moves objects from one transport task to another, each at its position in the task it leaves.',
       ),
-      result: TRANSPORT_MOVE,
     }),
   ),
   inputSchema: z.object({
@@ -80,13 +78,6 @@ export const TOOL_DEFINITION = {
     ...DETAIL_SHAPE,
   }),
 } as const;
-
-interface MoveTransportObjectEntry {
-  object_name: string;
-  object_type: string;
-  position: string;
-  pgmid?: string;
-}
 
 type MoveTransportObjectsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 

@@ -21,7 +21,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads one view of an ABAP profiler trace, its hit list, its statements or its database accesses, as recorded or summarised.',
     ),
-    returns: [],
     values: {
       of: 'mode',
       each: [

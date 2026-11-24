@@ -6,7 +6,7 @@ import {
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { purpose, toolDescription } from '../../../lib/description';
-import { ATC_RUN_STATUS, runParts } from '../../../lib/description/runs';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -39,7 +39,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Reads the status of an ATC run by its id, and whether it has ended.',
       ),
-      result: ATC_RUN_STATUS,
     }),
   ),
   inputSchema: z.object({

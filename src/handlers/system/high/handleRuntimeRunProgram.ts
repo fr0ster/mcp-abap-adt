@@ -33,7 +33,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremExecutor } from '../../../lib/clients';
 import { purpose, toolDescription } from '../../../lib/description';
-import { PROGRAM_RUN, runParts } from '../../../lib/description/runs';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { profilerTraceParameters } from '../../../lib/profilerTraceParameters';
 import { ourProgramExecutor } from '../../../lib/strategies/resultSets';
@@ -49,7 +49,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Runs an ABAP report and gives its output, under the ABAP profiler when asked.',
       ),
-      result: PROGRAM_RUN,
     }),
   ),
   inputSchema: z.object({

@@ -7,7 +7,7 @@ import {
   purpose,
   toolDescription,
 } from '../../../lib/description';
-import { ATC_RESULTS, runParts } from '../../../lib/description/runs';
+import { runParts } from '../../../lib/description/runs';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
@@ -35,7 +35,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days.',
       ),
-      result: ATC_RESULTS,
       notes: [longRunning],
     }),
   ),

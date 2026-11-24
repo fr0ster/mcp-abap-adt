@@ -51,7 +51,6 @@ import {
 import { createAdtClient } from '../../../lib/clients';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { TASK_CREATED } from '../../../lib/description/sessions';
 import {
   type DetailTable,
   type LevelReading,
@@ -89,7 +88,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Creates a task of the type asked under an existing transport, owned by the SAP user named.',
       ),
-      result: TASK_CREATED,
     }),
   ),
   inputSchema: createArguments('CreateTransportTask', {

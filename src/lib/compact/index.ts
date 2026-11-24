@@ -26,17 +26,11 @@ export {
   assembledParts,
   compactOf,
   longRunning,
-  membersTaken,
   purpose,
   toolDescription,
-  untypedReturns,
   valueFrom,
   valueParts,
 } from '../description/index.js';
-export type {
-  HeldLockAnswer,
-  NotUnlockedAnswer,
-} from '../description/results.js';
 export { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes.js';
 export type { ReadVersion } from '../handlers/readVersion.js';
 export { isJsonObject, type JsonValue, jsonAt } from '../json.js';
@@ -134,6 +128,7 @@ export { handlerDebugBreakpointsDefinition } from './debug/handleHandlerDebugBre
 export { handlerDebugMaintainDefinition } from './debug/handleHandlerDebugMaintain.js';
 export { handlerDebugSessionDefinition } from './debug/handleHandlerDebugSession.js';
 export { handlerDebugStepDefinition } from './debug/handleHandlerDebugStep.js';
+export type { HeldLockAnswer, NotUnlockedAnswer } from './lockAnswers.js';
 export { handlerSessionDefinition } from './longSession/handleHandlerSession.js';
 export {
   either,

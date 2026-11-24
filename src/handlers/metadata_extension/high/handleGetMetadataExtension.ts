@@ -6,20 +6,12 @@ import { createAdtClient } from '../../../lib/clients';
 import { sourceReader, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  READ_PART_FIELD,
-  type ReadPart,
-  readPartOf,
-} from '../../../lib/handlers/readPart';
-import {
-  READ_VERSION_FIELD,
-  type ReadVersion,
-} from '../../../lib/handlers/readVersion';
+import { READ_PART_FIELD, readPartOf } from '../../../lib/handlers/readPart';
+import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
 import {
   answerSourceRead,
   rangeFields,
   SOURCE_RANGE_SHAPE,
-  type SourceRangeArgs,
   sourceRangeOf,
 } from '../../../lib/handlers/sourceRange';
 import { readMetadataExtensionMetadata } from '../../../lib/strategies/metadataReads';
@@ -33,7 +25,6 @@ export const TOOL_DEFINITION = {
   description: toolDescription(
     sourceReader({
       object: 'a CDS metadata extension',
-      range: 'with-count',
       metadata: true,
     }),
   ),

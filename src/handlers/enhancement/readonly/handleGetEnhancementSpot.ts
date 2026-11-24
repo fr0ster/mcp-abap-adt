@@ -1,11 +1,7 @@
 import * as z from 'zod';
 import { failureEntry, isCredentialPayload } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import {
-  membersOf,
-  readerParts,
-  toolDescription,
-} from '../../../lib/description';
+import { readerParts, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { readEnhancementSpotMetadata } from '../../../lib/strategies/metadataReads';
 import {
@@ -26,34 +22,6 @@ export const TOOL_DEFINITION = {
     readerParts({
       object: 'an enhancement spot',
       at: 'at its active version',
-      facts: membersOf<EnhancementSpotMetadata>({
-        nouns: {
-          name: 'name',
-          description: 'description',
-          type: 'type',
-          // Declared, and read from no spot's document: nothing to state.
-          status: null,
-          package: 'package',
-          interface: 'interface',
-          badi_definitions: {
-            each: 'BAdI definition',
-            nouns: {
-              name: 'name',
-              shorttext: 'short text',
-              interface: 'interface',
-            },
-          },
-          links: {
-            each: 'related link',
-            nouns: {
-              href: 'address',
-              rel: 'relation',
-              type: 'media type',
-              title: 'title',
-            },
-          },
-        },
-      }),
     }),
   ),
   inputSchema: z.object({

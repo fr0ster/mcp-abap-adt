@@ -1,7 +1,6 @@
 import * as z from 'zod';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { SESSION_CLOSED } from '../../../lib/description/sessions';
 import { closeLongSession } from '../../../lib/longSession/tools';
 import type { HandlerContext } from '../../interfaces';
 
@@ -13,7 +12,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Closes the long session a state handle names, logging off its SAP sessions and so releasing their locks.',
       ),
-      result: SESSION_CLOSED,
     }),
   ),
   inputSchema: z.object({}),

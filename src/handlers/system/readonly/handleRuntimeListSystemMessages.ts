@@ -6,11 +6,10 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   about,
   answered,
-  type DetailTable,
   formatted,
   headShape,
   type ListDetailTable,
@@ -18,7 +17,6 @@ import {
   rawLevel,
   readingAt,
   rows,
-  shapesOf,
   whole,
   writeListing,
   written,
@@ -76,11 +74,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Lists the system messages of the SAP system, the ones SM02 shows, optionally by one author.',
     ),
-    returns: returnsOf({
-      heads: SYSTEM_MESSAGES_HEADS,
-      shapes: [shapesOf(SYSTEM_MESSAGES_LISTS)],
-    }),
-    inline: true,
   }),
   inputSchema: z.object({
     user: z.string().optional().describe('Filter by author username.'),

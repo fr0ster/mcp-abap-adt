@@ -15,7 +15,6 @@ import {
   startOptionsFromArgs,
 } from '../../../lib/debugger/schemas';
 import { purpose, toolDescription } from '../../../lib/description';
-import { DEBUG_STARTED } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
@@ -29,7 +28,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Opens an ABAP debug session taking its user over from another debugger: arms breakpoints, listens for a debuggee and attaches the first one caught.',
       ),
-      result: DEBUG_STARTED,
     }),
   ),
   inputSchema: z.object({

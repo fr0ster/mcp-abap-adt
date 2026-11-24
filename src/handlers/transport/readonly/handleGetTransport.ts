@@ -42,19 +42,12 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { answer, answerCaught } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import {
-  purpose,
-  type ReturnsFact,
-  returnsOf,
-  toolDescription,
-} from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   about,
   entries,
   formatted,
   fullLevel,
-  headShape,
-  jsonShapesOf,
   type ListDetailTable,
   rawLevel,
   readingAt,
@@ -109,39 +102,6 @@ const TASK_LISTS = {
   ),
 };
 
-/**
- * What GetTransport gives back, by the kind of number read: a request's
- * facts and tasks, or a task's facts, its parent request's and its objects.
- */
-const TRANSPORT_RETURNS: readonly ReturnsFact[] = [
-  ...returnsOf({
-    of: 'for a transport:',
-    heads: [
-      headShape(
-        'transport',
-        'its number, description, type, status, owner and target system',
-      ),
-      headShape('task_count', 'how many tasks it has'),
-    ],
-    shapes: [jsonShapesOf(REQUEST_LISTS)],
-  }),
-  ...returnsOf({
-    of: 'for a task:',
-    heads: [
-      headShape(
-        'task',
-        'its number, its transport, description, type, status and owner',
-      ),
-      headShape(
-        'parent_request',
-        "its transport's number, type, status and target system",
-      ),
-      headShape('object_count', 'how many objects it holds'),
-    ],
-    shapes: [jsonShapesOf(TASK_LISTS)],
-  }),
-];
-
 export const TOOL_DEFINITION = {
   name: 'GetTransport',
   available_in: ['onprem', 'cloud'] as const,
@@ -150,7 +110,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads an ABAP transport or one of its tasks by its number, and says which of the two it is.',
     ),
-    returns: TRANSPORT_RETURNS,
   }),
   inputSchema: z.object({
     transport_number: z.string().describe('Transport request or task number'),

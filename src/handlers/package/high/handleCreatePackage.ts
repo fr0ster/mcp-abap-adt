@@ -49,7 +49,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Creates a new ABAP package under a super package, with its type, software component, transport layer and description.',
     ),
-    returns: [],
   }),
   inputSchema: createArguments('CreatePackage', {
     package_name: z.string().describe('Package name.'),

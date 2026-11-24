@@ -5,15 +5,11 @@ import { createAdtClient } from '../../../lib/clients';
 import { sourceReader, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  READ_VERSION_FIELD,
-  type ReadVersion,
-} from '../../../lib/handlers/readVersion';
+import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
 import {
   answerSourceRead,
   rangeFields,
   SOURCE_RANGE_SHAPE,
-  type SourceRangeArgs,
   sourceRangeOf,
 } from '../../../lib/handlers/sourceRange';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -25,7 +21,6 @@ export const TOOL_DEFINITION = {
   description: toolDescription(
     sourceReader({
       object: 'the local macros include of an ABAP class',
-      range: 'with-count',
     }),
   ),
   inputSchema: z.object({

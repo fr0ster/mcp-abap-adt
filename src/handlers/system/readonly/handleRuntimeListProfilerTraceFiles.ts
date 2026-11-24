@@ -6,11 +6,10 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   about,
   answered,
-  type DetailTable,
   entries,
   formatted,
   headShape,
@@ -19,7 +18,6 @@ import {
   rawLevel,
   readingAt,
   rows,
-  shapesOf,
   writeJson,
   writeListing,
   written,
@@ -78,11 +76,6 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose('Lists the ABAP profiler traces recorded in the system.'),
-    returns: returnsOf({
-      heads: TRACE_FILES_HEADS,
-      shapes: [shapesOf(TRACE_FILES_LISTS)],
-    }),
-    inline: true,
   }),
   inputSchema: z.object({ ...DETAIL_SHAPE }),
 } as const;

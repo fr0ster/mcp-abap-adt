@@ -16,13 +16,11 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import {
   about,
   answered,
-  type DetailTable,
   entries,
   fullLevel,
   headShape,
@@ -32,7 +30,6 @@ import {
   rawLevel,
   readingAt,
   rows,
-  shapesOf,
   writeJson,
   writeListing,
   written,
@@ -223,11 +220,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       "Lists a user's transports, workbench, customizing and transport-of-copies alike, that the user owns or holds a task in.",
     ),
-    returns: returnsOf({
-      heads: TRANSPORTS_HEADS,
-      shapes: [shapesOf(TRANSPORTS_LISTS)],
-    }),
-    inline: true,
     notes: [longRunning],
   }),
   inputSchema: z.object({

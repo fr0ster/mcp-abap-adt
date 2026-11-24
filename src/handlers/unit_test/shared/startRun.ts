@@ -30,11 +30,11 @@ import type * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { compactUnitTestRunSchema } from '../../../lib/compact/compactSchemas';
 import { purpose } from '../../../lib/description/purpose';
-import { runParts, UNIT_TEST_STARTED } from '../../../lib/description/runs';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import { runnerOf, scopeOf, type UnitTestRunner } from './runner';
+import { runnerOf, scopeOf } from './runner';
 import { projectSync, runTestsSync } from './runSync';
 import { type RunTargetArgs, runFlagsOf, runTargetOf } from './runTarget';
 
@@ -56,7 +56,6 @@ export const START_RUN_PARTS = runParts({
   purpose: purpose(
     "Runs the ABAP Unit tests of chosen test classes, of a repository object or of a package, giving the run's id at once or the finished result of the test classes.",
   ),
-  result: UNIT_TEST_STARTED,
 });
 
 export async function handleStartUnitTestRun(

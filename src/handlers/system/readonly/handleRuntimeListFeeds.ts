@@ -37,7 +37,6 @@ import {
   type DescriptionParts,
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import {
@@ -52,12 +51,9 @@ import {
   type ListAnswerTable,
   type Listing,
   listAnswerAt,
-  nest,
-  parts,
   partsOf,
   type RowSchemas,
   rows,
-  shapesOf,
   type TextResult,
   values,
   type Written,
@@ -528,18 +524,6 @@ export const FEED_PAGE_PARTS: DescriptionParts = {
   purpose: purpose(
     'Reads one page of the short dumps, system messages or SAP Gateway errors of an ABAP system, newest first, by user, object and time.',
   ),
-  returns: returnsOf({
-    heads: FEED_HEADS,
-    of: 'for the feed read:',
-    shapes: [
-      shapesOf({
-        heads: FEED_SCHEMAS.heads,
-        dumps: FEED_SCHEMAS.dumps,
-        system_messages: FEED_SCHEMAS.system_messages,
-        gateway_errors: FEED_SCHEMAS.gateway_errors,
-      }),
-    ],
-  }),
   notes: [longRunning],
 };
 
@@ -551,11 +535,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the runtime feeds of an ABAP system: its short dumps, system messages or SAP Gateway errors by user and time, or the feeds there are and their variants.',
     ),
-    returns: returnsOf({
-      heads: FEED_HEADS,
-      of: 'for the feed read:',
-      shapes: [shapesOf(FEED_SCHEMAS)],
-    }),
     notes: [longRunning],
   }),
   inputSchema: withInCallSchema(
@@ -1083,11 +1062,6 @@ async function feedsInRounds(
     answers.push(result.value);
   }
   return { answers };
-}
-
-/** An answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): JsonValue {
-  return answerPayload(result);
 }
 
 /** Whether an answer is a credential failure: it ends a call for several feeds. */

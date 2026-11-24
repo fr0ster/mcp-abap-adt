@@ -24,7 +24,6 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import {
@@ -41,13 +40,11 @@ import {
   type Listing,
   listAnswerAt,
   marks,
-  nest,
   node,
   partsOf,
   type RowSchemas,
   rows,
   sections,
-  shapesOf,
   type TextResult,
   values,
   type Written,
@@ -425,11 +422,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the structures embedded in one or more ABAP structures, through their includes and appends, down to the last, at the version asked.',
     ),
-    returns: returnsOf({
-      heads: STRUCTURES_HEADS,
-      of: 'the',
-      shapes: [shapesOf(STRUCTURES_LISTS)],
-    }),
     notes: [longRunning],
   }),
   inputSchema: withInCallSchema(
@@ -1268,11 +1260,6 @@ async function structureTrees(
     );
   }
   return trees;
-}
-
-/** An answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): JsonValue {
-  return answerPayload(result);
 }
 
 /** Whether an answer is a credential failure: it ends a call for several structures. */

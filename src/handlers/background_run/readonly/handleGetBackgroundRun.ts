@@ -2,7 +2,6 @@ import * as z from 'zod';
 import { answerBackgroundGet } from '../../../lib/backgroundRuns/answers';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { BACKGROUND_RUN } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
@@ -13,7 +12,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         "Reads one of the caller's background runs by its run handle, with the answer of a run that has ended.",
       ),
-      result: BACKGROUND_RUN,
     }),
   ),
   inputSchema: z.object({

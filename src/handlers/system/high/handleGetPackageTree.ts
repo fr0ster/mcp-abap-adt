@@ -2,7 +2,6 @@ import * as z from 'zod';
 import {
   longRunning,
   purpose,
-  returnsOf,
   toolDescription,
 } from '../../../lib/description';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
@@ -37,11 +36,9 @@ import {
   type Listing,
   listAnswerAt,
   listWrittenAt,
-  nest,
   partsOf,
   type RowSchemas,
   rows,
-  shapesOf,
   type Written,
   wireAnswer,
   writeJsonList,
@@ -159,9 +156,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level.',
     ),
-    returns: returnsOf({
-      shapes: Object.values(PACKAGE_TREE_LISTS).map(shapesOf),
-    }),
     notes: [longRunning],
   }),
   inputSchema: withInCallSchema(

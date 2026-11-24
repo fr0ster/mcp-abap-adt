@@ -27,7 +27,6 @@ import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   longRunning,
-  membersOf,
   purpose,
   toolDescription,
 } from '../../../lib/description';
@@ -174,27 +173,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Reads the repository browser of a package, class, program, function group or other repository object, with descriptions and packages when asked.',
       ),
-      returns: [
-        ...membersOf<TreeNode>({
-          each: 'object',
-          nouns: {
-            OBJECT_TYPE: 'type',
-            OBJECT_NAME: 'name',
-            OBJECT_DESCRIPTION: 'description',
-            OBJECT_PACKAGE: 'package',
-            CHILDREN: 'objects it holds, down to the depth asked',
-          },
-        }),
-        ...membersOf<FailedTree>({
-          each: 'object whose read failed',
-          nouns: {
-            OBJECT_TYPE: 'type',
-            OBJECT_NAME: 'name',
-            error: 'failure',
-          },
-        }),
-      ],
-      inline: true,
       notes: [longRunning],
     }),
     schemaOn,

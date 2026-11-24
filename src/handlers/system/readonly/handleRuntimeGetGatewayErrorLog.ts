@@ -7,7 +7,7 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   about,
   answered,
@@ -19,7 +19,6 @@ import {
   rawLevel,
   readingAt,
   rows,
-  shapesOf,
   type Written,
   writeListing,
   writeWhole,
@@ -89,11 +88,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Lists the errors of the SAP Gateway error log, the one /IWFND/ERROR_LOG shows, or reads the detail of one error.',
     ),
-    returns: returnsOf({
-      heads: GATEWAY_ERRORS_HEADS,
-      shapes: [shapesOf(GATEWAY_ERRORS_LISTS)],
-    }),
-    inline: true,
   }),
   inputSchema: z.object({
     opid: z

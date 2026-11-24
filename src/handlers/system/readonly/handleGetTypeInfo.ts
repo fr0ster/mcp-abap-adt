@@ -40,14 +40,7 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { parseXml } from '../../../lib/xml/node';
-import {
-  child,
-  childAt,
-  listOf,
-  type XmlList,
-  type XmlNode,
-  type XmlRead,
-} from '../../../lib/xml/tree';
+import { child, childAt, listOf, type XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetTypeInfo',
@@ -57,7 +50,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the DDIC definition of a type name: each data element, domain, structure or table type of that name, its inactive version where one exists.',
     ),
-    returns: [],
   }),
   inputSchema: z.object({
     type_name: z.string().describe('Name of the ABAP type'),

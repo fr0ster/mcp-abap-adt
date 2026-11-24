@@ -4,11 +4,10 @@ import { XMLParser } from 'fast-xml-parser';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   about,
   answered,
-  type DetailTable,
   entries,
   formatted,
   headShape,
@@ -17,7 +16,6 @@ import {
   rawLevel,
   readingAt,
   rows,
-  shapesOf,
   writeJson,
   writeListing,
   written,
@@ -67,10 +65,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Finds the main programs of an ABAP include: each program that includes it, or the function group it belongs to.',
     ),
-    returns: returnsOf({
-      heads: MAIN_PROGRAMS_HEADS,
-      shapes: [shapesOf(MAIN_PROGRAMS_LISTS)],
-    }),
   }),
   inputSchema: z.object({
     include_name: requiredText('Include name is required').describe(

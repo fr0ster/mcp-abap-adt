@@ -38,7 +38,6 @@ import type { McpResult } from '../../../lib/answer';
 import { BACKGROUND_FIELD } from '../../../lib/backgroundRuns/tools';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { ABAPGIT_OBJECTS } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 const FIELDS = {
@@ -56,7 +55,6 @@ const ONPREM_PARTS = runParts({
   purpose: purpose(
     'Pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport.',
   ),
-  result: ABAPGIT_OBJECTS,
 });
 
 export const TOOL_DEFINITION: KindToolDefinition<
@@ -86,7 +84,6 @@ export const TOOL_DEFINITION: KindToolDefinition<
         purpose: purpose(
           'Pulls an abapGit repository from the branch it is linked on as an SAP job, recorded in a transport, its imported objects left inactive.',
         ),
-        result: ABAPGIT_OBJECTS,
       }),
     ),
     inputSchema: CLOUD_SCHEMA,

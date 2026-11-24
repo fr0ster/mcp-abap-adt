@@ -7,15 +7,13 @@ import {
   longRunning,
   purpose,
   toolDescription,
-  untypedReturns,
 } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import type { AnswerDetail } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import type { XmlList, XmlNode, XmlRead } from '../../../lib/xml/tree';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 /**
  * The answer's shape, shared with `GetTableContents`, which reads the same
@@ -49,7 +47,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Runs an ABAP SQL SELECT over database tables and CDS views and reads the data it selects, up to the number of records asked.',
     ),
-    returns: untypedReturns(),
     notes: [longRunning],
   }),
   inputSchema: z.object({

@@ -1,20 +1,18 @@
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   about,
   entries,
   type Head,
   headShape,
   type JsonSchemas,
-  jsonShapesOf,
   type ListAnswerTable,
   listAnswerAt,
   member,
   type RowSchemas,
   rows,
-  shapesOf,
   writeJson,
   writeListing,
 } from '../../../lib/detail';
@@ -114,12 +112,6 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose('Reads an ABAP package at the version asked.'),
-    returns: returnsOf({
-      of: 'its',
-      heads: PACKAGE_HEADS,
-      shapes: [shapesOf(PACKAGE_TERSE)],
-    }),
-    inline: true,
   }),
   inputSchema: z.object({
     package_name: requiredText('package_name is required').describe(

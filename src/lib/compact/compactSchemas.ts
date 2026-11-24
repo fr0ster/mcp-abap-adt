@@ -33,7 +33,6 @@ import {
   longRunning,
   purpose,
   toolDescription,
-  untypedReturns,
   valueFrom,
 } from '../description/index';
 import { DETAIL_LEVELS } from '../detail/levels';
@@ -2643,7 +2642,6 @@ export function handlerSystemParts(
     purpose: purpose(
       `Reads across the ABAP system: ${listed(actions.map((action) => SYSTEM_PHRASES[action]))}.`,
     ),
-    returns: [],
     values: {
       of: 'action',
       each: actions.map((action) =>
@@ -2768,7 +2766,6 @@ export function handlerGetDataWithSqlDefinition() {
       purpose: purpose(
         'Reads the data of an ABAP database table or CDS view, or the data an ABAP SQL SELECT selects, up to the number of records asked.',
       ),
-      returns: untypedReturns(),
       notes: [longRunning],
     }),
     inputSchema: compactGetDataSchema,
@@ -2783,7 +2780,6 @@ export function handlerGetDataWithoutSqlDefinition() {
       purpose: purpose(
         'Reads the data of an ABAP database table or CDS view, up to the number of records asked.',
       ),
-      returns: untypedReturns(),
       notes: [longRunning],
     }),
     inputSchema: withInCallSchema(

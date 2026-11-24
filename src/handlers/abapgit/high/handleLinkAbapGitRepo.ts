@@ -27,7 +27,6 @@ import type { KindToolDefinition } from '../../../lib/abapGit/kindTool';
 import { BACKGROUND_FIELD } from '../../../lib/backgroundRuns/tools';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { ABAPGIT_OBJECTS } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 const FIELDS = {
@@ -50,7 +49,6 @@ const ONPREM_PARTS = runParts({
   purpose: purpose(
     "Links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport.",
   ),
-  result: ABAPGIT_OBJECTS,
 });
 
 export const TOOL_DEFINITION: KindToolDefinition<
@@ -70,7 +68,6 @@ export const TOOL_DEFINITION: KindToolDefinition<
         purpose: purpose(
           'Links an ABAP package to a remote abapGit repository on a branch, mapping its folders to subpackages as asked.',
         ),
-        result: ABAPGIT_OBJECTS,
       }),
     ),
     inputSchema: CLOUD_SCHEMA,

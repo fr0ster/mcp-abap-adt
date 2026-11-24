@@ -12,7 +12,6 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'debug',
     purpose: purpose('Cancels the execution of the stopped AMDP debuggee.'),
-    returns: [],
   }),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),
 } as const;

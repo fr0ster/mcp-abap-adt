@@ -2,14 +2,10 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { purpose, sapData, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourServiceBindingReads } from '../../../lib/strategies/resultSets';
-import {
-  parseServiceBindingPayload,
-  type ServiceBindingResponseFormat,
-} from './serviceBindingPayloadUtils';
+import { parseServiceBindingPayload } from './serviceBindingPayloadUtils';
 
 export const TOOL_DEFINITION = {
   name: 'ListServiceBindingTypes',
@@ -19,7 +15,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Lists the service binding types the system offers, such as OData V2 and OData V4, in the format asked.',
     ),
-    returns: [sapData],
   }),
   inputSchema: z.object({
     response_format: z

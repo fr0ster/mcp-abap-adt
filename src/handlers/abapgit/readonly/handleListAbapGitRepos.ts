@@ -15,11 +15,9 @@ import {
   ABAPGIT_DETAIL_SHAPE,
   filteredRepos,
   REPOS_ANSWERS,
-  REPOS_MEDIUM,
-  REPOS_TERSE,
 } from '../../../lib/abapGit/formats';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
-import { answerAt, listAnswerAt, shapesOf } from '../../../lib/detail';
+import { purpose, toolDescription } from '../../../lib/description';
+import { listAnswerAt } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
@@ -30,10 +28,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Lists the abapGit repositories linked in the system, or the one with a key or of one package.',
     ),
-    returns: returnsOf({
-      heads: [],
-      shapes: [shapesOf(REPOS_TERSE)],
-    }),
   }),
   inputSchema: z.object({
     package_name: z

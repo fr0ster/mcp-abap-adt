@@ -4,7 +4,6 @@ import { requireDebugger } from '../../../lib/debugger/access';
 import { debugStateAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
 import { purpose, toolDescription } from '../../../lib/description';
-import { DEBUG_STATE } from '../../../lib/description/debugger';
 import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
@@ -18,7 +17,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Ends the stopped ABAP debuggee and its program where it stands.',
       ),
-      result: DEBUG_STATE,
     }),
   ),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),

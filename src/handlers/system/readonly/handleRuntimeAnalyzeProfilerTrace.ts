@@ -18,13 +18,10 @@ import {
   purpose,
   toolDescription,
 } from '../../../lib/description';
-import { runParts, TRACE_SUMMARY } from '../../../lib/description/runs';
+import { runParts } from '../../../lib/description/runs';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 
 export const TOOL_DEFINITION = {
@@ -36,7 +33,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         'Summarises one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time.',
       ),
-      result: TRACE_SUMMARY,
       notes: [longRunning],
     }),
   ),

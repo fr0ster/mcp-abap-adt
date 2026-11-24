@@ -2,7 +2,6 @@ import * as z from 'zod';
 import { answerBackgroundDiscard } from '../../../lib/backgroundRuns/answers';
 import { purpose, toolDescription } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
-import { BACKGROUND_RUN_ENDED } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
@@ -13,7 +12,6 @@ export const TOOL_DEFINITION = {
       purpose: purpose(
         "Ends a background run by its run handle: a running read is cancelled and its session logged off, an ended run's answer deleted.",
       ),
-      result: BACKGROUND_RUN_ENDED,
     }),
   ),
   inputSchema: z.object({

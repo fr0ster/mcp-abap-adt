@@ -2,14 +2,13 @@ import { analyseObjectProperties } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   about,
   headShape,
   listAnswerAt,
   type RowSchemas,
   rows,
-  shapesOf,
   values,
   writeJson,
   writeListing,
@@ -77,12 +76,6 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose('Reads the properties of an ABAP transaction code.'),
-    returns: returnsOf({
-      heads: TRANSACTION_HEADS,
-      of: "the transaction's",
-      shapes: [shapesOf(TRANSACTION_LISTS)],
-    }),
-    inline: true,
   }),
   inputSchema: z.object({
     transaction_name: z.string().describe('Name of the ABAP transaction'),

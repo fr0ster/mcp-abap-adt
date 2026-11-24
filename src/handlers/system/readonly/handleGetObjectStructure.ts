@@ -1,11 +1,10 @@
 import * as z from 'zod';
-import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
   about,
   bullets,
   listAnswerAt,
   type RowSchemas,
-  shapesOf,
   type Written,
   writeListing,
 } from '../../../lib/detail';
@@ -40,7 +39,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the structure of an ABAP repository object, such as a CDS view: its parts and their parts, down to the last level.',
     ),
-    returns: returnsOf({ shapes: [shapesOf(objectStructureLists(false))] }),
   }),
   inputSchema: z.object({
     objecttype: z.string().describe('ADT object type (e.g. DDLS/DF)'),

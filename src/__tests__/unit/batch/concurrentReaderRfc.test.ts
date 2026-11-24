@@ -1,0 +1,70 @@
+/**
+ * The package walks' single-request reader (`concurrentReader`, used by
+ * `GetPackageContents` and `GetPackageTree` when they read descriptions)
+ * keeps `NODE_READ_CONCURRENCY` requests in flight over HTTP and one over
+ * RFC — the rule SearchSource follows (`readsInFlight`): an RFC connection
+ * is one ABAP session, and reads sent to it in parallel were lost without
+ * an error (measured on premise, 2026-09-26).
+ */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { HandlerContext } from '../../../handlers/interfaces';
+import {
+  concurrentReader,
+  NODE_READ_CONCURRENCY,
+} from '../../../lib/strategies/packageWalk';
+import { withinTurns } from '../../helpers/withinTurns';
+
+/** A connection of `kind`: only its configuration is read. */
+function connectionOf(kind: 'rfc' | 'http'): IAbapConnection {
+  return {
+    getConfig: () => ({ connectionType: kind }),
+  } as unknown as IAbapConnection;
+}
+
+/** The most reads in flight at once while `items` are read on `kind`. */
+async function mostInFlight(kind: 'rfc' | 'http', items: number) {
+  const context = {
+    connection: connectionOf(kind),
+    logger: undefined,
+  } as unknown as HandlerContext;
+  let inFlight = 0;
+  let most = 0;
+  const read = concurrentReader(context, async (item: number) => {
+    inFlight += 1;
+    most = Math.max(most, inFlight);
+    // Every read waits a few turns, so the next ones start beside it.
+    for (let turn = 0; turn < 3; turn++) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    inFlight -= 1;
+    return item * 2;
+  });
+  const results = await withinTurns(
+    read(Array.from({ length: items }, (_, i) => i)),
+    2000,
+  );
+  return { most, results };
+}
+
+describe('concurrentReader: reads in flight by connection kind', () => {
+  it(`over HTTP: ${NODE_READ_CONCURRENCY} at once`, async () => {
+    const { most, results } = await mostInFlight('http', 20);
+    assert.equal(most, NODE_READ_CONCURRENCY);
+    assert.deepStrictEqual(
+      results.map((r) => (r.ok ? r.value : undefined)),
+      Array.from({ length: 20 }, (_, i) => i * 2),
+    );
+  });
+
+  it('over RFC: one at a time, every item read, in order', async () => {
+    const { most, results } = await mostInFlight('rfc', 20);
+    assert.equal(most, 1);
+    assert.deepStrictEqual(
+      results.map((r) => (r.ok ? r.value : undefined)),
+      Array.from({ length: 20 }, (_, i) => i * 2),
+    );
+  });
+});

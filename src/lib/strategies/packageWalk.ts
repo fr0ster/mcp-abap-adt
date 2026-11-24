@@ -33,6 +33,7 @@ import {
   runPhase,
 } from '../batch/phases';
 import { createAdtClient } from '../clients';
+import { readsInFlight } from '../connectionKind';
 import { bodyTextOf } from '../wireValue';
 import { parseXml, type XmlNode } from '../xml/node';
 import {
@@ -145,7 +146,8 @@ export const NODE_READ_CONCURRENCY = 8;
 
 /**
  * One level's reads as requests sent alone, `NODE_READ_CONCURRENCY` at a
- * time, on the call's connection: `read(item, connection)` for every item;
+ * time over HTTP and one at a time over RFC (`readsInFlight`), on the
+ * call's connection: `read(item, connection)` for every item;
  * each item's settlement, in item order. Every answer is its own request's
  * (`ownAnswers`), so a node structure's `DESCRIPTION` is the object's own —
  * which an envelope part's is not (measured on an on-premise system: inside
@@ -181,7 +183,13 @@ export function concurrentReader<I, R>(
         }
       }
     };
-    const pumps = Math.max(1, Math.min(NODE_READ_CONCURRENCY, items.length));
+    const pumps = Math.max(
+      1,
+      Math.min(
+        readsInFlight(context.connection, NODE_READ_CONCURRENCY),
+        items.length,
+      ),
+    );
     await Promise.all(Array.from({ length: pumps }, pump));
     if (ended !== undefined) throw ended.error;
     return stopped ? out.slice(0, next) : out;

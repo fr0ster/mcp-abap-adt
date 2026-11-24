@@ -33,6 +33,11 @@ import {
   packageHeads,
 } from '../../../handlers/package/high/handleGetPackage';
 import {
+  TOOL_DEFINITION as SEARCH_SOURCE,
+  SEARCH_SOURCE_HEADS,
+  SEARCH_SOURCE_LISTS,
+} from '../../../handlers/system/readonly/handleSearchSource';
+import {
   ACCESS_MODE_HEADS,
   BRANCH_INFO_MEDIUM,
   BRANCH_INFO_TERSE,
@@ -102,6 +107,7 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   ListFunctionModules: LIST_FUNCTION_MODULES.description,
   ListFunctionGroupIncludes: LIST_GROUP_INCLUDES.description,
   GetMainPrograms: GET_MAIN_PROGRAMS.description,
+  SearchSource: SEARCH_SOURCE.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -180,6 +186,44 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  SearchSource: () => {
+    const parts = partsOfDescription(descriptionOf('SearchSource'));
+    assert.ok(parts !== undefined);
+    const hit = {
+      devclass: 'ZPKG',
+      object_type: 'CLAS' as const,
+      object_name: 'ZCL_A',
+      include: 'ZCL_A',
+    };
+    const scan = {
+      scanned: { objects: 2, sources: 3, objects_with_hits: 1 },
+      truncated: { by_object_cap: true, by_max_hits: true },
+      not_loaded: [{ package: 'ZPKG', type: 'PROG/P' }],
+      incomplete: [{ package: 'ZPKG', type: 'CLAS/OC', uri: '/sap/bc/x' }],
+    };
+    const heads = [
+      { head: 'scanned', value: 'objects 2 sources 3 objects_with_hits 1' },
+      { head: 'truncated', value: 'by_object_cap' },
+      { head: 'truncated', value: 'by_max_hits' },
+    ];
+    // A scan at each answer level: lines, snippets, objects.
+    const samples = [
+      { level: 'lines', results: [{ ...hit, line: 3 }] },
+      { level: 'snippets', results: [{ ...hit, line: 3, snippet: 'x' }] },
+      { level: 'objects', results: [{ ...hit, hits: 2 }] },
+    ].map(({ level, results }) => {
+      const lists =
+        SEARCH_SOURCE_LISTS[level as keyof typeof SEARCH_SOURCE_LISTS];
+      const reading = { ...scan, results };
+      return { reading, lines: writtenLines({ heads, reading, lists }) };
+    });
+    return {
+      terse: Object.values(SEARCH_SOURCE_LISTS).flatMap(shapesOf),
+      heads: SEARCH_SOURCE_HEADS,
+      returns: parts.returns,
+      samples,
+    };
+  },
   GetMainPrograms: () => {
     const parts = partsOfDescription(descriptionOf('GetMainPrograms'));
     assert.ok(parts !== undefined);

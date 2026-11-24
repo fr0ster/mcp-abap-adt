@@ -916,40 +916,26 @@ describe('SearchSource: the description is functional', () => {
     });
   }
 
-  it('names what it reads, its version, its masks, what it skips and its counters', () => {
+  it('names what it searches; its masks are told by the packages parameter', () => {
+    // Plan step 10: the description states the function and what comes
+    // back; how a parameter is read is the parameter's own text.
     for (const text of [
-      'programs, program includes',
-      'function groups (function modules and includes)',
-      'classes (main source and the four local includes)',
+      'programs',
+      'includes',
+      'function groups',
+      'classes',
       'interfaces',
-      'CDS data definitions',
-      'behavior definitions',
-      'metadata extensions',
-      'service definitions',
-      '`version`',
-      '`*` (zero or more characters) and `?` (one character) are the wildcards',
-      '`+`, `_`, `%` and `#` are characters of the name',
-      'every package it matches',
-      'every target is read in one run, unless `max_hits` is reached',
-      '`answer`',
-      '`objects`',
-      '`lines`',
-      '`lines` with the line only (the default at detail terse)',
-      '`max_hits`',
-      '`truncated.by_max_hits`',
-      'the sources of the last batch read, those read past the stop included',
-      'skipped',
-      '`scanned.objects`',
-      '`scanned.sources` the sources read (each once)',
-      '`scanned.objects_with_hits`',
-      'only when given',
-      '`PROG` a program, `PROG/I` a program include',
-      'a hit in a function module is `FUGR/FF`',
-      'a hit in an include addressed under its function group is `FUGR/I`',
-      'each with `function_group_name`',
-      'each module and each include of a function group is an object of its own',
+      'CDS sources',
     ]) {
-      assert.ok(description.includes(text));
+      assert.ok(description.includes(text), text);
+    }
+    const packages = TOOL_DEFINITION.inputSchema.shape.packages.description;
+    for (const text of [
+      '`*` stands for zero or more characters',
+      '`?` for one character',
+      '`+`, `_`, `%` and `#` are characters of the name',
+    ]) {
+      assert.ok(packages?.includes(text), text);
     }
   });
 

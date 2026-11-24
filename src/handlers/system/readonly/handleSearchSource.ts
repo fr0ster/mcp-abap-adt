@@ -2,25 +2,32 @@ import * as z from 'zod';
 import type { McpResult } from '../../../lib/answer';
 import { isRfcConnection } from '../../../lib/connectionKind';
 import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
   type AnswerTable,
+  about,
   answerAt,
   type Column,
   type DetailLevel,
+  headShape,
   jsonText,
   type ListAnswerTable,
   listAnswerAt,
   marks,
+  type RowSchemas,
   rows,
+  shapesOf,
   type Written,
   wireAnswer,
   writeListing,
   writeWhole,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
   ANSWER_LEVELS,
   type AnswerLevel,
@@ -46,12 +53,121 @@ import {
 } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
 
+/** One hit of a scan. */
+type Hit = OrchestratorResult['results'][number];
+
+/** The answer level a scan was read at, by its first hit's shape (`lines` when none). */
+function answerLevelOf(first: Hit | undefined): AnswerLevel {
+  if (first === undefined) return 'lines';
+  if ('snippet' in first) return 'snippets';
+  return 'line' in first ? 'lines' : 'objects';
+}
+
+const includeCell: Column<Hit> = {
+  name: 'include',
+  means: 'its include',
+  cell: includeColumn,
+};
+const lineCell: Column<Hit> = {
+  name: 'line',
+  means: 'its position in the source',
+  cell: (hit) => ('line' in hit ? String(hit.line) : ''),
+};
+
+/** The lists of one scan, by its answer level: what its description states. */
+function searchSourceLists(
+  noun: string,
+  columns: Column<Hit>[],
+): RowSchemas<OrchestratorResult> {
+  return {
+    not_loaded: about(
+      'the package parts SAP left unloaded are named, each by its package and type',
+      marks('not_loaded', 'not loaded by SAP', (node: NotLoadedNode) => [
+        node.package,
+        node.type,
+      ]),
+    ),
+    // A target SAP listed without a name: never scanned, named by what
+    // tells it apart.
+    incomplete: about(
+      'the nameless objects SAP lists, left unsearched, are named by what tells them apart',
+      marks('incomplete', 'incomplete', incompleteWords),
+    ),
+    results: about(
+      noun,
+      rows('results', {
+        columns,
+        header: 'always',
+        groups: [
+          {
+            label: 'object',
+            of: (hit: Hit) =>
+              `${hit.devclass} ${hit.object_type} ${hit.object_name}`,
+            mode: 'gathered',
+          },
+        ],
+      }),
+    ),
+  };
+}
+
+/** Each match's object, as the group above its matches names it. */
+const MATCH_NOUN =
+  'for each match, under its object named by package, type and name';
+
+/**
+ * The lists of a scan at each answer level: `include\tline`,
+ * `include\tline\tsnippet`, or `include\thits`.
+ */
+export const SEARCH_SOURCE_LISTS: Readonly<
+  Record<AnswerLevel, RowSchemas<OrchestratorResult>>
+> = {
+  lines: searchSourceLists(MATCH_NOUN, [includeCell, lineCell]),
+  snippets: searchSourceLists(MATCH_NOUN, [
+    includeCell,
+    lineCell,
+    {
+      name: 'snippet',
+      means: 'the source code that matched, when snippets are asked',
+      cell: (hit) => ('snippet' in hit ? hit.snippet : ''),
+    },
+  ]),
+  objects: searchSourceLists(
+    'with objects asked, for each object it matched in, named by package, type and name',
+    [
+      includeCell,
+      {
+        name: 'hits',
+        means: 'how many matches it has',
+        cell: (hit) => ('hits' in hit ? String(hit.hits) : ''),
+      },
+    ],
+  ),
+};
+
+/** The heads every scan's listing opens with. */
+export const SEARCH_SOURCE_HEADS = [
+  headShape(
+    'scanned',
+    'how many objects and sources were searched, and how many objects matched',
+  ),
+  headShape('truncated', 'which limit stopped the search, when one did'),
+];
+
 export const TOOL_DEFINITION = {
   name: 'SearchSource',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Search ABAP source text inside one or more packages: programs, program includes, function groups (function modules and includes), classes (main source and the four local includes), interfaces, CDS data definitions, behavior definitions, metadata extensions and service definitions. Each source is read at the call\'s `version` (default active). `packages` takes exact package names and masks (Z*, /NS/Z?); in a mask `*` (zero or more characters) and `?` (one character) are the wildcards, and `+`, `_`, `%` and `#` are characters of the name; a mask is resolved by the repository quick search to every package it matches. `object_types` and `object_filter` select the scan targets of the resolved packages (`PROG` selects programs and program includes, `FUGR` function groups with their modules and includes); every target is read in one run, unless `max_hits` is reached. A line matches when it contains `query` (and `query2`, when given), case-insensitively, and a line containing an `exclude` entry is dropped; `exclude_comments` skips col-1 `*` and full-line `"` comment lines. `max_hits_per_object` limits the hits of each object only when given; each module and each include of a function group is an object of its own, and a program include is one object however many function groups list it (its hits answered and counted once, from the first listing in the scan order). `max_hits` limits the hits of the whole answer, counted in the scan order after `max_hits_per_object`: reached, the scan stops reading, and `truncated.by_max_hits` is true when anything was left. `answer` sets what each hit is answered as: `lines` with the line only (the default at detail terse), `snippets` with line and snippet (the default at medium and full), `objects` one entry per object and include with its number of hits. The answer lists each hit (`results`: package, object type, object name, include, line, snippet). The `object_type` of a hit names its kind of source: `PROG` a program, `PROG/I` a program include (`object_name` the include name), `CLAS` a class with `include` the class name for its main source or `definitions`, `implementations`, `macros`, `testclasses` for its local includes, `INTF`, `DDLS`, `BDEF`, `DDLX` and `SRVD` the object source; a hit in a function module is `FUGR/FF` (`object_name` the module) and a hit in an include addressed under its function group is `FUGR/I` (`object_name` the include), each with `function_group_name`, the group, in place of `include`; an include a function group lists among the program includes is `PROG/I`; `scanned.objects` counts the objects read, `scanned.sources` the sources read (each once) and `scanned.objects_with_hits` the objects with a hit; `truncated.by_object_cap` is true when an object had more hits than `max_hits_per_object`. At a stop the counters report what was done until it; where the reads go in batches, `scanned.sources` counts the sources of the last batch read, those read past the stop included. A source, an object or a package SAP refuses is skipped, and a type node or subpackage SAP refuses is skipped with everything under it; a read that fails before SAP answers ends the call as an error. Sources are read in ADT batch envelopes where the system offers them, each source once per call.',
-  ),
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Searches the ABAP source code of one or more packages for a text: programs, includes, function groups, classes, interfaces and CDS sources.',
+    ),
+    returns: returnsOf({
+      heads: SEARCH_SOURCE_HEADS,
+      shapes: Object.values(SEARCH_SOURCE_LISTS).map(shapesOf),
+    }),
+    notes: [longRunning],
+  }),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
     query: z
@@ -186,60 +302,8 @@ export function searchSourceRows(result: OrchestratorResult): Written<string> {
         : []),
     ],
     reading: result,
-    lists: {
-      not_loaded: marks(
-        'not_loaded',
-        'not loaded by SAP',
-        (node: NotLoadedNode) => [node.package, node.type],
-      ),
-      // A target SAP listed without a name: never scanned, named by what
-      // tells it apart.
-      incomplete: marks('incomplete', 'incomplete', incompleteWords),
-      results: rows('results', {
-        columns: hitColumns(result.results[0]),
-        header: 'always',
-        groups: [
-          {
-            label: 'object',
-            of: (hit: Hit) =>
-              `${hit.devclass} ${hit.object_type} ${hit.object_name}`,
-            mode: 'gathered',
-          },
-        ],
-      }),
-    },
+    lists: SEARCH_SOURCE_LISTS[answerLevelOf(result.results[0])],
   });
-}
-
-/** One hit of a scan. */
-type Hit = OrchestratorResult['results'][number];
-
-/**
- * The columns of the hits, by the scan's answer level (its first hit's
- * shape): `include\tline`, `include\tline\tsnippet`, or `include\thits`.
- */
-function hitColumns(first: Hit | undefined): Column<Hit>[] {
-  const include: Column<Hit> = { name: 'include', cell: includeColumn };
-  const line: Column<Hit> = {
-    name: 'line',
-    cell: (hit) => ('line' in hit ? String(hit.line) : ''),
-  };
-  if (first === undefined || 'line' in first) {
-    return first !== undefined && 'snippet' in first
-      ? [
-          include,
-          line,
-          {
-            name: 'snippet',
-            cell: (hit) => ('snippet' in hit ? hit.snippet : ''),
-          },
-        ]
-      : [include, line];
-  }
-  return [
-    include,
-    { name: 'hits', cell: (hit) => ('hits' in hit ? String(hit.hits) : '') },
-  ];
 }
 
 /** A target SAP listed without a name: the words of its line. */

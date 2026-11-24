@@ -66,6 +66,12 @@
       "find the main program of include ZMY_INC",
       "які програми включають інклуд ZMY_INC?",
       "знайди головну програму інклуда ZMY_INC"
+    ],
+    "SearchSource": [
+      "find where the text AUTHORITY-CHECK appears in the code of package ZMY_PKG",
+      "search the source code of package ZMY_PKG for SELECT FROM mara",
+      "знайди в коді пакета ZMY_PKG текст AUTHORITY-CHECK",
+      "де у вихідному коді пакета ZMY_PKG викликається BAPI_TRANSACTION_COMMIT?"
     ]
   },
   "siblings": {},
@@ -88,6 +94,10 @@
     "ListFunctionGroupIncludes: покажи інклуди групи функцій ZMY_FG",
     "ListFunctionGroupIncludes: які інклуди має група функцій ZMY_FG?",
     "GetMainPrograms: which programs include ZMY_INC?",
-    "GetMainPrograms: які програми включають інклуд ZMY_INC?"
+    "GetMainPrograms: які програми включають інклуд ZMY_INC?",
+    "SearchSource: find where the text AUTHORITY-CHECK appears in the code of package ZMY_PKG",
+    "SearchSource: search the source code of package ZMY_PKG for SELECT FROM mara",
+    "SearchSource: знайди в коді пакета ZMY_PKG текст AUTHORITY-CHECK",
+    "SearchSource: де у вихідному коді пакета ZMY_PKG викликається BAPI_TRANSACTION_COMMIT?"
   ]
 }

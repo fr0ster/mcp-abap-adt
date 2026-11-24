@@ -4,6 +4,14 @@ import {
   breakpointsFromArgs,
   readXmlDocument,
 } from '../../debugger/index';
+import { BREAKPOINT_DELETED, HELD_DEBUG } from '../../description/debugOnce';
+import {
+  type DescriptionParts,
+  purpose,
+  resultReturns,
+  toolDescription,
+  valueParts,
+} from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
 import { DETAIL_SHAPE } from '../../strategies/detail';
@@ -32,35 +40,62 @@ const AMDP_OPERATIONS = ['syncBreakpoints'] as const;
 export const BREAKPOINT_OPERATIONS = [...ABAP_OPERATIONS] as const;
 type BreakpointOperation = (typeof BREAKPOINT_OPERATIONS)[number];
 
-const WATCHPOINTS: readonly BreakpointOperation[] = [
-  'createWatchpoint',
-  'listWatchpoints',
-  'deleteWatchpoint',
-];
+/** An operation by its function, and what it answers where its reading is typed. */
+function operation(
+  value: BreakpointOperation,
+  text: string,
+  shape?: Parameters<typeof resultReturns>[0],
+) {
+  return valueParts(value, {
+    purpose: purpose(text),
+    returns: shape === undefined ? [] : resultReturns(shape),
+  });
+}
 
-/** The abap clauses of the description, for the operations left. */
-function abapClauses(left: readonly BreakpointOperation[]): string[] {
-  const watch = WATCHPOINTS.filter((op) => left.includes(op));
-  return [
-    ...(left.includes('setBreakpoints')
-      ? [
-          'setBreakpoints sets the breakpoint set of this debugging identity to breakpoints and answers each row SAP placed or refused',
-        ]
-      : []),
-    ...(left.includes('syncBreakpoints')
-      ? [
-          'syncBreakpoints rewrites the full set (sync_scope full) or the part of the objects in sync_objects (sync_scope partial)',
-        ]
-      : []),
-    ...(left.includes('deleteBreakpoint')
-      ? ['deleteBreakpoint deletes breakpoint_id']
-      : []),
-    ...(watch.length > 0
-      ? [
-          `${listed(watch)} ${watch.length === 1 ? 'works' : 'work'} on the attached debuggee`,
-        ]
-      : []),
-  ];
+/** Each operation by its function. */
+const BREAKPOINT_VALUES = {
+  setBreakpoints: operation(
+    'setBreakpoints',
+    'Sets the ABAP breakpoint set of this debugging identity, shared by every IDE of the SAP user.',
+  ),
+  syncBreakpoints: operation(
+    'syncBreakpoints',
+    'Rewrites the ABAP breakpoints of the objects named or the whole set, or the breakpoints of the running AMDP session.',
+  ),
+  deleteBreakpoint: operation(
+    'deleteBreakpoint',
+    'Deletes one ABAP breakpoint by its id.',
+    BREAKPOINT_DELETED,
+  ),
+  createWatchpoint: operation(
+    'createWatchpoint',
+    'Watches a variable of the attached ABAP debuggee.',
+  ),
+  listWatchpoints: operation(
+    'listWatchpoints',
+    'Shows the watchpoints of the attached ABAP debuggee.',
+  ),
+  deleteWatchpoint: operation(
+    'deleteWatchpoint',
+    'Removes a watchpoint of the attached ABAP debuggee.',
+  ),
+} as const;
+
+/** `HandlerDebugBreakpoints`' parts with `operations`: each by its function. */
+export function handlerDebugBreakpointsParts(
+  operations: readonly BreakpointOperation[],
+): DescriptionParts {
+  return {
+    tag: 'debug',
+    purpose: purpose(
+      'Sets, rewrites and deletes the ABAP and AMDP debugger breakpoints, and the watchpoints of the attached ABAP debuggee.',
+    ),
+    returns: resultReturns(HELD_DEBUG),
+    values: {
+      of: 'operation',
+      each: operations.map((op) => BREAKPOINT_VALUES[op]),
+    },
+  };
 }
 
 /**
@@ -72,7 +107,6 @@ export function handlerDebugBreakpointsDefinition(
   operations: readonly BreakpointOperation[],
 ) {
   const has = (op: BreakpointOperation) => operations.includes(op);
-  const abap = abapClauses(operations);
   const amdp = AMDP_OPERATIONS.filter((op) => operations.includes(op));
   const writes = operations.filter(
     (op) => op === 'setBreakpoints' || op === 'syncBreakpoints',
@@ -82,7 +116,7 @@ export function handlerDebugBreakpointsDefinition(
     ...(amdp.length > 0 ? [`amdp ${either(amdp)}`] : []),
   ];
   return {
-    description: `Debugger breakpoints and watchpoints: each call sends one SAP request, the operation's, and answers what SAP answered. kind abap: ${abap.join('; ')}. In user mode the breakpoints catch every request of the request user; the set is one per SAP user and request user, shared by every IDE of that user, and each change rewrites it as a whole.${amdp.length > 0 ? ' kind amdp: syncBreakpoints rewrites the breakpoints of the running AMDP session and answers the request id; SAP confirms them in a SYNC_BREAKPOINTS event.' : ''} The answer carries state_handle, and for abap the identity in force.`,
+    description: toolDescription(handlerDebugBreakpointsParts(operations)),
     inputSchema: z.object({
       ...(writes.length > 0
         ? openingStateHandleProperty(`abap ${listed(writes)}`)
@@ -166,8 +200,9 @@ const DELETE_WATCHPOINT_PROPERTIES = {
 export const TOOL_DEFINITION = {
   name: 'HandlerDebugBreakpoints',
   available_in: ['onprem', 'cloud'] as const,
-  description: handlerDebugBreakpointsDefinition(BREAKPOINT_OPERATIONS)
-    .description,
+  description: toolDescription(
+    handlerDebugBreakpointsParts(BREAKPOINT_OPERATIONS),
+  ),
   inputSchema: z.object({
     ...openingStateHandleProperty('abap setBreakpoints and syncBreakpoints'),
     ...KIND_PROPERTY,

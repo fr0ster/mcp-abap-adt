@@ -6,10 +6,18 @@ import {
   STATE_HANDLE_PROPERTY,
   terseOnceStep,
 } from '../../debugger/index';
+import { HELD_DEBUG, STACK_POSITION } from '../../description/debugOnce';
+import {
+  type DescriptionParts,
+  purpose,
+  resultReturns,
+  toolDescription,
+  valueParts,
+} from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
 import { DETAIL_SHAPE } from '../../strategies/detail';
-import { either, listed } from '../memberTexts';
+import { either } from '../memberTexts';
 import { KIND_PROPERTY, needed, onceAnswer, refuseOperation } from './shared';
 
 const ABAP_OPERATIONS = [
@@ -27,50 +35,66 @@ const AMDP_OPERATIONS = ['stepOver', 'stepContinue'] as const;
 export const STEP_OPERATIONS = [...ABAP_OPERATIONS] as const;
 type StepOperation = (typeof STEP_OPERATIONS)[number];
 
-/** The abap part of the description, for the operations left. */
-function abapWords(left: readonly StepOperation[]): string {
-  const steps = left.filter(
-    (op) =>
-      op === 'stepInto' ||
-      op === 'stepOver' ||
-      op === 'stepReturn' ||
-      op === 'stepContinue',
-  );
-  const toLine = left.includes('stepRunToLine');
-  const jump = left.includes('stepJumpToLine');
-  const clauses = [
-    ...(steps.length > 0
-      ? [
-          `${listed(steps)} ${steps.length === 1 ? 'steps' : 'step'} from where it stands`,
-        ]
-      : []),
-    ...(toLine && jump
-      ? [
-          'stepRunToLine runs to the line object_type, object_name and line name, stepJumpToLine moves there and skips what lies between',
-        ]
-      : toLine
-        ? [
-            'stepRunToLine runs to the line object_type, object_name and line name',
-          ]
-        : jump
-          ? [
-              'stepJumpToLine moves to the line object_type, object_name and line name and skips what lies between',
-            ]
-          : []),
-  ];
-  const sentences = [
-    ...(clauses.length > 0
-      ? [
-          `${clauses.join('; ')}; a step answers SAP's step result, or ended when SAP reports the program's end, and the stopped position is read from the stack.`,
-        ]
-      : []),
-    ...(left.includes('setStackPosition')
-      ? ['setStackPosition makes frame position the one variables are read in.']
-      : []),
-  ];
-  return sentences.length === 0
-    ? ''
-    : ` kind abap, on the attached debuggee: ${sentences.join(' ')}`;
+/** An operation by its function, and what it answers where its reading is typed. */
+function operation(
+  value: StepOperation,
+  text: string,
+  shape?: Parameters<typeof resultReturns>[0],
+) {
+  return valueParts(value, {
+    purpose: purpose(text),
+    returns: shape === undefined ? [] : resultReturns(shape),
+  });
+}
+
+/** Each operation by its function. */
+const STEP_VALUES = {
+  stepInto: operation(
+    'stepInto',
+    'Steps the ABAP debuggee into the call where it stands.',
+  ),
+  stepOver: operation(
+    'stepOver',
+    'Steps the ABAP or AMDP debuggee over the statement where it stands.',
+  ),
+  stepReturn: operation(
+    'stepReturn',
+    'Steps the ABAP debuggee out of the current call.',
+  ),
+  stepContinue: operation(
+    'stepContinue',
+    'Lets the ABAP or AMDP debuggee run on to its next stop.',
+  ),
+  stepRunToLine: operation(
+    'stepRunToLine',
+    'Runs the ABAP debuggee to the source position named.',
+  ),
+  stepJumpToLine: operation(
+    'stepJumpToLine',
+    'Moves the ABAP debuggee to the source position named, skipping what lies between.',
+  ),
+  setStackPosition: operation(
+    'setStackPosition',
+    'Selects the stack frame of the ABAP debuggee whose variables are read.',
+    STACK_POSITION,
+  ),
+} as const;
+
+/** `HandlerDebugStep`'s parts with `operations`: each by its function. */
+export function handlerDebugStepParts(
+  operations: readonly StepOperation[],
+): DescriptionParts {
+  return {
+    tag: 'debug',
+    purpose: purpose(
+      'Moves the stopped ABAP or AMDP debuggee by one step, one SAP call per operation.',
+    ),
+    returns: resultReturns(HELD_DEBUG),
+    values: {
+      of: 'operation',
+      each: operations.map((op) => STEP_VALUES[op]),
+    },
+  };
 }
 
 /**
@@ -90,7 +114,7 @@ export function handlerDebugStepDefinition(
     ...(amdp.length > 0 ? [`amdp ${either(amdp)}`] : []),
   ];
   return {
-    description: `Moves the stopped debuggee: each call sends one SAP request, the operation's.${abapWords(operations)}${amdp.length > 0 ? ` kind amdp: ${listed(amdp)} ${amdp.length === 1 ? 'moves' : 'move'} debuggee_id and ${amdp.length === 1 ? 'answers' : 'answer'} the request id; the next stop arrives as a break event.` : ''}`,
+    description: toolDescription(handlerDebugStepParts(operations)),
     inputSchema: z.object({
       ...STATE_HANDLE_PROPERTY,
       ...KIND_PROPERTY,
@@ -125,7 +149,7 @@ export function handlerDebugStepDefinition(
 export const TOOL_DEFINITION = {
   name: 'HandlerDebugStep',
   available_in: ['onprem', 'cloud'] as const,
-  description: handlerDebugStepDefinition(STEP_OPERATIONS).description,
+  description: toolDescription(handlerDebugStepParts(STEP_OPERATIONS)),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     ...KIND_PROPERTY,

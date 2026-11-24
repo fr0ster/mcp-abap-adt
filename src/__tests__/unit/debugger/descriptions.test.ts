@@ -123,11 +123,11 @@ describe('the debugger descriptions', () => {
         .toolDefinition.description as string;
     assert.match(
       description('HandlerDebugBreakpoints'),
-      /In user mode the breakpoints catch every request of the request user/,
+      /the ABAP breakpoint set of this debugging identity/,
     );
     assert.match(
       description('HandlerDebugSession'),
-      /kind amdp: start opens an AMDP session for the connected SAP user/,
+      /operation start: opens an AMDP debug session for the connected SAP user/,
     );
   });
 

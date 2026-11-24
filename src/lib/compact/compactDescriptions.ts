@@ -55,14 +55,6 @@ import { either, leftOf, when } from './memberTexts';
 /** Each member as the description names it, with the arguments it takes. */
 type Tokens<M extends string> = { readonly [K in M]: string };
 
-/** The members, each as `token` names it, joined by commas. */
-function named<M extends string>(
-  members: readonly M[],
-  token: (member: M) => string,
-): string {
-  return members.map(token).join(', ');
-}
-
 type CreateMember = (typeof COMPACT_CREATE.onprem)[number];
 
 const CREATE_TOKENS: Tokens<CreateMember> = {

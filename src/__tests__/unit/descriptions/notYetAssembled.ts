@@ -5,19 +5,14 @@
  * and the list is gone once the last group lands. A tool listed here is
  * refused once it is assembled, so the list only shrinks.
  */
-export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
-  'HandlerDebugBreakpoints',
-  'HandlerDebugMaintain',
-  'HandlerDebugSession',
-  'HandlerDebugStep',
-]);
+export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([]);
 
 /**
  * How many tools `NOT_YET_ASSEMBLED` may list at most: the list only
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 4;
+export const NOT_YET_ASSEMBLED_MOST = 0;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

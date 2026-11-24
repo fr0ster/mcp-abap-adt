@@ -10,11 +10,15 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { handleGetObjectsList } from '../../handlers/search/readonly/handleGetObjectsList';
+import {
+  handleGetObjectsList,
+  OBJECTS_LIST_LISTS,
+} from '../../handlers/search/readonly/handleGetObjectsList';
 import {
   createBatchAvailability,
   NO_BATCH_ENDPOINT_STATUS,
 } from '../../lib/batch/availability';
+import { writeListing } from '../../lib/detail';
 import { declareSystemKind } from '../../lib/systemKind';
 import { recordingConnection } from '../helpers/recordingConnection';
 
@@ -227,6 +231,79 @@ describe('GetObjectsList detail', () => {
       );
     });
   }
+
+  // Codex re-review: an object kept with its 404 (METADATA_ERROR) is shown at
+  // terse too — SAP's error on a line of its own after the rows, never a
+  // row as if nothing failed. The terse pass reads metadata only for an
+  // object SAP listed without a type, which the node-structure reading no
+  // longer yields (an empty OBJECT_TYPE is a node SAP could not load), so
+  // the terse writer is held to such a list directly.
+  it('terse: an object SAP answered 404 for is written with its error', () => {
+    const error = {
+      error: 'client_threw',
+      status: 404,
+      message: 'Request failed with status code 404',
+      step: 'read object metadata',
+    };
+    const gone = {
+      OBJECT_TYPE: '',
+      OBJECT_NAME: 'ZGONE',
+      OBJECT_URI: '/sap/bc/adt/x/zgone',
+      METADATA_ERROR: error,
+    };
+    const text = writeListing({
+      heads: [],
+      reading: {
+        parent_name: 'ZFG',
+        parent_type: 'FUGR/F',
+        objects: [{ OBJECT_TYPE: 'FUGR/FF', OBJECT_NAME: 'Z_FM' }, gone],
+        refused: [gone],
+      },
+      lists: OBJECTS_LIST_LISTS,
+    }).answer;
+    const marked = text
+      .split('\n')
+      .filter((line) => line.startsWith('# metadata_error\t'));
+    assert.equal(marked.length, 1, text);
+    const [, type, name, uri, written] = (marked[0] ?? '').split('\t');
+    assert.deepStrictEqual(
+      [type, name, uri],
+      ['', 'ZGONE', '/sap/bc/adt/x/zgone'],
+      text,
+    );
+    assert.deepStrictEqual(JSON.parse(String(written)), error, text);
+  });
+
+  it('medium: the objects SAP answered 404 for are named apart, none no member', async () => {
+    const connection = recordingConnection([
+      { data: LEVEL },
+      {
+        status: 404,
+        data: '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><message lang="EN">Resource FUGR Z_FM does not exist.</message></exc:exception>',
+      },
+      {
+        data: '<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="Top"/>',
+      },
+    ]);
+    declareSystemKind(connection, 'onprem');
+    const batchAvailability = createBatchAvailability();
+    batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+    const result = await handleGetObjectsList(
+      { connection, logger: undefined, batchAvailability },
+      {
+        parent_name: 'ZFG',
+        parent_tech_name: 'ZFG',
+        parent_type: 'FUGR/F',
+        detail: 'medium',
+      },
+    );
+    const answer = JSON.parse(result.content[0]?.text ?? '');
+    assert.deepStrictEqual(
+      answer.refused.map((o: { name: string }) => o.name),
+      ['Z_FM'],
+    );
+    assert.equal('refused' in JSON.parse(await objectsList('medium')), false);
+  });
 
   // Codex round 8: a nameless row is addressed by its URI, never by an
   // address built from an empty name.

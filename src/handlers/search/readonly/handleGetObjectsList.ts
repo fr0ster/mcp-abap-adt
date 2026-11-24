@@ -15,6 +15,7 @@ import {
   type Listing,
   listAnswerAt,
   listWrittenAt,
+  marks,
   partsOf,
   type RowSchemas,
   rows,
@@ -186,6 +187,17 @@ export const OBJECTS_LIST_LISTS: RowSchemas<ParentList> = {
       ],
       header: 'always',
     }),
+  ),
+  // An object SAP answered 404 for, its row above: SAP's error on a line of
+  // its own, so a row left without its type never hides why.
+  refused: about(
+    'for each object whose metadata read SAP answered it does not exist, its error',
+    marks('refused', 'metadata_error', (o: FlatObject) => [
+      o.OBJECT_TYPE,
+      o.OBJECT_NAME,
+      o.OBJECT_URI ?? '',
+      JSON.stringify(o.METADATA_ERROR ?? {}),
+    ]),
   ),
 };
 
@@ -558,6 +570,20 @@ interface ParentList {
   parent_tech_name?: string | undefined;
   parent_type: string | undefined;
   objects: FlatObject[];
+  /** The objects whose metadata read SAP answered 404 (`METADATA_ERROR`), each also among `objects`. */
+  refused: FlatObject[];
+}
+
+/** A parent's list of `objects`: the ones SAP answered 404 for named beside them. */
+function parentListOf(
+  parent: Pick<ParentList, 'parent_name' | 'parent_tech_name' | 'parent_type'>,
+  objects: FlatObject[],
+): ParentList {
+  return {
+    ...parent,
+    objects,
+    refused: objects.filter((o) => o.METADATA_ERROR !== undefined),
+  };
 }
 
 /**
@@ -623,7 +649,12 @@ function objectsListAnswers(): ListAnswerTable<ParentList, string | object> {
           total_objects: list.objects.length,
         },
         list,
-        { objects: entries('objects', mediumObject) },
+        {
+          objects: entries('objects', mediumObject),
+          // The objects SAP answered 404 for, also among the objects with
+          // their metadata_error: named apart, as at terse; none, no member.
+          refused: entries('refused', mediumObject, { omitEmpty: true }),
+        },
       ),
     // The whole parse, as it is.
     full,
@@ -942,7 +973,7 @@ async function answeredGetObjectsList(
             parent_type: listed[i]?.parent_type,
           };
           return walk.ok
-            ? { list: { ...asked, objects: walk.getResult().value } }
+            ? { list: parentListOf(asked, walk.getResult().value) }
             : { ...asked, error: failureOfWalk(walk) };
         });
         // Through the list table, like every other answer.
@@ -1016,7 +1047,9 @@ async function answeredGetObjectsList(
       };
       // The cache keeps the full answer, whatever the level answered.
       objectsListCache.setCache(result);
-      return shown({ parent_name, parent_tech_name, parent_type, objects });
+      return shown(
+        parentListOf({ parent_name, parent_tech_name, parent_type }, objects),
+      );
     },
   );
 }

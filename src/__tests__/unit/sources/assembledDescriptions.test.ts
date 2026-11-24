@@ -31,21 +31,52 @@ interface Defined {
   readonly made: string;
 }
 
-/** The text of a property's name: a plain identifier, a string, or a computed literal (`['description']`). */
+/**
+ * The text of a property's name: a plain identifier, a string, a computed
+ * literal (`['description']`) or a computed constant of its file holding
+ * one (`[DESCRIPTION]`, `const DESCRIPTION = 'description'`).
+ */
 function propertyName(
   property: ts.ObjectLiteralElementLike,
 ): string | undefined {
   const name = property.name;
   if (name === undefined) return undefined;
   if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text;
+  if (!ts.isComputedPropertyName(name)) return undefined;
+  const expression = name.expression;
   if (
-    ts.isComputedPropertyName(name) &&
-    (ts.isStringLiteral(name.expression) ||
-      ts.isNoSubstitutionTemplateLiteral(name.expression))
+    ts.isStringLiteral(expression) ||
+    ts.isNoSubstitutionTemplateLiteral(expression)
   ) {
-    return name.expression.text;
+    return expression.text;
   }
-  return undefined;
+  return ts.isIdentifier(expression)
+    ? constantText(expression.getSourceFile(), expression.text)
+    : undefined;
+}
+
+/** The string a `const` of the file holds, by its name; none for another. */
+function constantText(source: ts.SourceFile, name: string): string | undefined {
+  let found: string | undefined;
+  const visit = (node: ts.Node): void => {
+    if (found !== undefined) return;
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === name &&
+      node.initializer !== undefined &&
+      (ts.isStringLiteral(node.initializer) ||
+        ts.isNoSubstitutionTemplateLiteral(node.initializer)) &&
+      ts.isVariableDeclarationList(node.parent) &&
+      (node.parent.flags & ts.NodeFlags.Const) !== 0
+    ) {
+      found = node.initializer.text;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
 }
 
 /** Every `description` property inside `node`, however deep (a variant's own). */
@@ -146,6 +177,23 @@ describe('every tool description is assembled, or its tool still listed as not y
         each.assembled,
       ]),
       [['ToolX', false]],
+    );
+  });
+
+  it('reads a computed constant key as the description', () => {
+    const file = 'constant.ts';
+    const source = ts.createSourceFile(
+      file,
+      "const DESCRIPTION = 'description';\nexport const T = { name: 'ToolY', [DESCRIPTION]: 'Written whole.' };",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    assert.deepStrictEqual(
+      definitionsOfSource(file, source).map((each) => [
+        each.name,
+        each.assembled,
+      ]),
+      [['ToolY', false]],
     );
   });
 

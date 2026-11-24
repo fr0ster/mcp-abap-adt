@@ -30,6 +30,7 @@ import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
 import {
   type DescriptionParts,
   longRunning,
+  pairsPurpose,
   purpose,
   toolDescription,
 } from '../description/index';
@@ -2598,35 +2599,16 @@ function actionTargetRule(variant: ProjectionVariant | undefined) {
 }
 
 /** What each read gives, in the purpose's words. */
-const SYSTEM_PHRASES: Readonly<
-  Record<
-    SystemAction,
-    { readonly verb: 'finds' | 'reads'; readonly words: string }
-  >
-> = {
-  search_source: { verb: 'finds', words: 'source code text' },
-  search_object: { verb: 'finds', words: 'objects by name' },
-  where_used: { verb: 'finds', words: 'where objects are used' },
-  package_tree: { verb: 'finds', words: 'package contents' },
-  transports: { verb: 'reads', words: 'transport orders' },
-  atc_findings: { verb: 'reads', words: 'ATC findings' },
-  atc_results: { verb: 'reads', words: 'ATC results' },
-  atc_result: { verb: 'reads', words: 'one ATC result' },
+const SYSTEM_PAIRS: Readonly<Record<SystemAction, string>> = {
+  search_source: 'searches the source code of packages for text',
+  search_object: 'finds repository objects by name',
+  where_used: 'finds where a repository object is used',
+  package_tree: 'reads a package with its subpackages and their objects',
+  transports: "reads a user's transports",
+  atc_findings: "reads an ATC run's findings",
+  atc_results: 'reads the stored ATC results',
+  atc_result: 'reads one stored ATC result with its findings',
 };
-
-/** `Finds a, b and c, and reads d and e.`, for the actions given. */
-function systemPurposeText(actions: readonly SystemAction[]): string {
-  const of = (verb: 'finds' | 'reads') =>
-    actions
-      .map((action) => SYSTEM_PHRASES[action])
-      .filter((phrase) => phrase.verb === verb)
-      .map((phrase) => phrase.words);
-  const clauses = [
-    ...(of('finds').length > 0 ? [`finds ${listed(of('finds'))}`] : []),
-    ...(of('reads').length > 0 ? [`reads ${listed(of('reads'))}`] : []),
-  ].join(', and ');
-  return `${clauses.charAt(0).toUpperCase()}${clauses.slice(1)}.`;
-}
 
 /**
  * `HandlerSystem`'s parts with `actions`: what its actions find and read,
@@ -2637,7 +2619,7 @@ export function handlerSystemParts(
 ): DescriptionParts {
   return {
     tag: 'read-only',
-    purpose: purpose(systemPurposeText(actions)),
+    purpose: pairsPurpose(actions.map((action) => SYSTEM_PAIRS[action])),
     notes: [longRunning],
   };
 }

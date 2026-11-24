@@ -26,10 +26,9 @@ export {
   assembledParts,
   compactOf,
   longRunning,
+  pairsPurpose,
   purpose,
   toolDescription,
-  valueFrom,
-  valueParts,
 } from '../description/index.js';
 export { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes.js';
 export type { ReadVersion } from '../handlers/readVersion.js';

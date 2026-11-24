@@ -1,7 +1,4 @@
-import type {
-  CompactObjectType,
-  HeldLockAnswer,
-} from '@mcp-abap-adt/lib/compact-shared';
+import type { HeldLockAnswer } from '@mcp-abap-adt/lib/compact-shared';
 import {
   acceptedOf,
   byVariant,

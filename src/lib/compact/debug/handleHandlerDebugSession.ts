@@ -6,9 +6,8 @@ import {
 } from '../../debugger/index';
 import {
   type DescriptionParts,
-  purpose,
+  pairsPurpose,
   toolDescription,
-  valueParts,
 } from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
@@ -52,60 +51,23 @@ export const SESSION_OPERATIONS = [
 ] as const;
 type SessionOperation = (typeof SESSION_OPERATIONS)[number];
 
-/** An operation by its function. */
-function operation(value: SessionOperation, text: string) {
-  return valueParts(value, { purpose: purpose(text) });
-}
-
-/** Each operation by its function. */
-const SESSION_VALUES = {
-  checkListener: operation(
-    'checkListener',
-    'Checks whether another debugger holds the ABAP debugging of this identity.',
-  ),
-  listen: operation(
-    'listen',
-    'Listens for an ABAP debuggee for the seconds asked and gives the one caught.',
-  ),
-  stopListener: operation(
-    'stopListener',
-    "Stops the ABAP listener and deletes the identity's breakpoints.",
-  ),
-  attach: operation(
-    'attach',
-    'Attaches the caught ABAP debuggee, so it can be stepped and read.',
-  ),
-  detachDebugger: operation(
-    'detachDebugger',
-    'Detaches the debugger from the ABAP debuggee, which runs on.',
-  ),
-  terminateDebuggee: operation(
-    'terminateDebuggee',
-    'Ends the ABAP debuggee where it stands.',
-  ),
-  terminateDebugger: operation('terminateDebugger', 'Frees the ABAP debugger.'),
-  setDebuggerSettings: operation(
-    'setDebuggerSettings',
-    'Sets the debugger settings given at the attached ABAP debuggee.',
-  ),
-  start: operation(
-    'start',
-    'Opens an AMDP debug session for the connected SAP user.',
-  ),
-  getEvents: operation(
-    'getEvents',
-    'Reads the events of the AMDP debug session: its breaks, its breakpoint confirmations and its close.',
-  ),
-  stop: operation('stop', 'Ends the AMDP debug session.'),
-  deleteDebuggee: operation(
-    'deleteDebuggee',
-    'Cancels the execution of an AMDP debuggee.',
-  ),
-  end: operation(
-    'end',
-    "Logs off every connection of the debug state and ends it, the user's breakpoints staying set.",
-  ),
-} as const;
+/** Each operation as an action and object pair (owner). */
+const PAIRS: { readonly [K in SessionOperation]: string } = {
+  checkListener:
+    "checks whether another debugger holds this identity's debugging",
+  listen: 'listens for an ABAP debuggee',
+  stopListener: 'stops the ABAP listener',
+  attach: 'attaches an ABAP debuggee',
+  detachDebugger: 'detaches the debugger from the debuggee',
+  terminateDebuggee: 'terminates the ABAP debuggee',
+  terminateDebugger: 'terminates the debugger',
+  setDebuggerSettings: 'sets the debugger settings',
+  start: 'starts an AMDP debug session',
+  getEvents: "gets the AMDP session's events",
+  stop: 'stops the AMDP debug session',
+  deleteDebuggee: 'deletes an AMDP debuggee',
+  end: 'ends the debug state',
+};
 
 /** `HandlerDebugSession`'s parts with `operations`: each by its function. */
 export function handlerDebugSessionParts(
@@ -113,13 +75,7 @@ export function handlerDebugSessionParts(
 ): DescriptionParts {
   return {
     tag: 'debug',
-    purpose: purpose(
-      'Listens for, attaches and ends ABAP debuggees, and opens and ends AMDP debug sessions, one SAP call per operation.',
-    ),
-    values: {
-      of: 'operation',
-      each: operations.map((op) => SESSION_VALUES[op]),
-    },
+    purpose: pairsPurpose(operations.map((op) => PAIRS[op])),
   };
 }
 

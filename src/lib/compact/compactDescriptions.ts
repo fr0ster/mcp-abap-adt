@@ -20,15 +20,14 @@ import {
 import {
   type DescriptionParts,
   longRunning,
-  purpose,
+  pairsPurpose,
   stateHandleAnswered,
   toolDescription,
-  typesPurpose,
   underLock,
-  valueParts,
+  withArticle,
 } from '../description/index';
 import type { CompactObjectType } from './compactObjectTypes';
-import { either, leftOf, when } from './memberTexts';
+import { leftOf } from './memberTexts';
 
 /** Each member as the description names it, with the arguments it takes. */
 type Tokens<M extends string> = { readonly [K in M]: string };
@@ -46,12 +45,12 @@ const TYPE_WORDS: { readonly [K in CompactObjectType]: string } = {
   SERVICE_DEFINITION: 'service definition',
   SERVICE_BINDING: 'service binding',
   CLASS: 'class',
-  UNIT_TEST: 'class unit test',
-  CDS_UNIT_TEST: 'CDS unit test',
-  LOCAL_TEST_CLASS: 'local test class',
-  LOCAL_TYPES: 'class local types',
-  LOCAL_DEFINITIONS: 'class local definitions',
-  LOCAL_MACROS: 'class local macros',
+  UNIT_TEST: "class's unit tests",
+  CDS_UNIT_TEST: "CDS view's unit tests",
+  LOCAL_TEST_CLASS: "class's local test classes",
+  LOCAL_TYPES: "class's local types",
+  LOCAL_DEFINITIONS: "class's local definitions",
+  LOCAL_MACROS: "class's local macros",
   PROGRAM: 'program',
   INCLUDE: 'include',
   INTERFACE: 'interface',
@@ -62,11 +61,19 @@ const TYPE_WORDS: { readonly [K in CompactObjectType]: string } = {
   METADATA_EXTENSION: 'metadata extension',
   RUNTIME_PROFILE: 'profiler trace',
   RUNTIME_DUMP: 'short dump',
-  PROGRAM_TEXT_ELEMENTS: 'program text elements',
-  FUNCTION_GROUP_TEXT_ELEMENTS: 'function group text elements',
-  CLASS_TEXT_ELEMENTS: 'class text elements',
-  TABLE_SETTINGS: 'table technical settings',
+  PROGRAM_TEXT_ELEMENTS: "program's text elements",
+  FUNCTION_GROUP_TEXT_ELEMENTS: "function group's text elements",
+  CLASS_TEXT_ELEMENTS: "class's text elements",
+  TABLE_SETTINGS: "table's technical settings",
 };
+
+/** One pair per object type: `verb` and the type in words, with its article. */
+function pairsOf(
+  verb: string,
+  members: readonly CompactObjectType[],
+): string[] {
+  return typeWords(members).map((type) => `${verb} ${withArticle(type)}`);
+}
 
 /** The object types `members` names, in words, each once. */
 function typeWords(members: readonly CompactObjectType[]): string[] {
@@ -112,13 +119,8 @@ export function compactCreateParts(
   variant: ProjectionVariant,
   members: readonly CreateMember[] = COMPACT_CREATE[variant],
 ): DescriptionParts {
-  const transport = members.includes('TRANSPORT');
   return {
-    purpose: typesPurpose(
-      'Creates an ABAP ',
-      typeWords(members),
-      ', inactive where it is activated.',
-    ),
+    purpose: pairsPurpose(pairsOf('creates', members)),
   };
 }
 
@@ -173,22 +175,72 @@ export function readToken(member: ReadMember): string {
   return READ_TOKENS[member];
 }
 
-/**
- * HandlerGet's parts on `variant`, naming `members` (default: all the
- * variant's): each part by its function, a part whose members are all
- * removed left out.
- */
+/** The members whose word names a part of an object: read as it is, not by its source. */
+const PART_WORDS: readonly ReadMember[] = [
+  'LOCAL_TEST_CLASS',
+  'LOCAL_TYPES',
+  'LOCAL_DEFINITIONS',
+  'LOCAL_MACROS',
+  'TABLE_SETTINGS',
+  'PROGRAM_TEXT_ELEMENTS',
+  'FUNCTION_GROUP_TEXT_ELEMENTS',
+  'CLASS_TEXT_ELEMENTS',
+];
+
+/** The members whose one part is their metadata. */
+const METADATA_ONLY: readonly ReadMember[] = [
+  'DOMAIN',
+  'DATA_ELEMENT',
+  'FUNCTION_GROUP',
+  'TABLE_TYPE',
+];
+
+/** What HandlerGet reads of `member`, one pair per part it offers. */
+function readPairs(member: ReadMember): string[] {
+  const word = TYPE_WORDS[member];
+  const of = (part: string) => `reads ${withArticle(word)}'s ${part}`;
+  switch (member) {
+    case 'PACKAGE':
+      return [of('metadata'), of('contents')];
+    case 'TRANSPORT':
+      return [of('objects'), of('header')];
+    case 'SERVICE_BINDING':
+      return [of('source'), of('metadata'), of('URLs')];
+    case 'UNIT_TEST':
+      return ["reads an ABAP Unit run's result"];
+    case 'CDS_UNIT_TEST':
+      return ["reads a CDS unit test run's result"];
+    default:
+      if (PART_WORDS.includes(member)) return [`reads ${withArticle(word)}`];
+      if (METADATA_ONLY.includes(member)) return [of('metadata')];
+      return [of('source'), of('metadata')];
+  }
+}
+
+/** The members left on `variant`. */
+function left(variant: ProjectionVariant, members: readonly ReadMember[]) {
+  return leftOf(COMPACT_READ[variant], members);
+}
+
+/** HandlerGet's parts on `variant`: one pair per object type and part it reads. */
 export function compactGetParts(
   variant: ProjectionVariant,
   members: readonly ReadMember[] = COMPACT_READ[variant],
 ): DescriptionParts {
   return {
     tag: 'read-only',
-    purpose: typesPurpose(
-      'Reads the source code, metadata, contents, structure or unactivated change of an ABAP ',
-      typeWords(members),
-      ', or the status and results of an activation run.',
-    ),
+    purpose: pairsPurpose([
+      ...members.flatMap(readPairs),
+      ...(variant === 'onprem' && left(variant, members).has('INCLUDE')
+        ? ["reads an include's main programs"]
+        : []),
+      "reads a repository object's unactivated change",
+      "reads a repository object's structure",
+      'reads a repository browser node',
+      'reads virtual folders',
+      "reads an activation run's status",
+      "reads an activation run's results",
+    ]),
     notes: [longRunning],
   };
 }
@@ -260,11 +312,7 @@ export function compactUpdateParts(
   members: readonly UpdateMember[] = COMPACT_UPDATE[variant],
 ): DescriptionParts {
   return {
-    purpose: typesPurpose(
-      'Updates an ABAP ',
-      typeWords(members),
-      ', under its lock.',
-    ),
+    purpose: pairsPurpose(pairsOf('updates', members)),
     notes: [underLock],
   };
 }
@@ -323,20 +371,8 @@ export function compactDeleteParts(
   variant: ProjectionVariant,
   members: readonly DeleteMember[] = COMPACT_DELETE[variant],
 ): DescriptionParts {
-  const includes = leftOf(COMPACT_DELETE[variant], members).of<DeleteMember>([
-    'LOCAL_TEST_CLASS',
-    'LOCAL_TYPES',
-    'LOCAL_DEFINITIONS',
-    'LOCAL_MACROS',
-    'UNIT_TEST',
-  ]);
   return {
-    purpose: typesPurpose(
-      'Deletes an ABAP ',
-      typeWords(members),
-      when(includes.length > 0, ", a class include under the class's lock") +
-        '.',
-    ),
+    purpose: pairsPurpose(pairsOf('deletes', members)),
     notes: [underLock],
   };
 }
@@ -369,32 +405,16 @@ export function lockToken(member: LockMember): string {
   );
 }
 
-/** HandlerLock's two actions, each by its function. */
-const LOCK_ACTIONS = [
-  valueParts('lock', {
-    purpose: purpose(
-      'Locks the object for its update and delete on the server instance that then holds the lock.',
-    ),
-  }),
-  valueParts('unlock', {
-    purpose: purpose(
-      'Unlocks the object, releasing the lock this server instance holds.',
-    ),
-  }),
-] as const;
-
 /** HandlerLock's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactLockParts(
   variant: ProjectionVariant,
   members: readonly LockMember[] = COMPACT_LOCK[variant],
 ): DescriptionParts {
   return {
-    purpose: typesPurpose(
-      'Locks or unlocks an ABAP ',
-      typeWords(members),
+    purpose: pairsPurpose(
+      pairsOf('locks or unlocks', members),
       ' for editing.',
     ),
-    values: { of: 'action', each: LOCK_ACTIONS },
     notes: [stateHandleAnswered, underLock],
   };
 }
@@ -441,10 +461,8 @@ export function compactValidateParts(
 ): DescriptionParts {
   return {
     tag: 'read-only',
-    purpose: typesPurpose(
-      'Validates the name of a new ABAP ',
-      typeWords(members),
-      ', before it is created.',
+    purpose: pairsPurpose(
+      typeWords(members).map((type) => `validates the name of a new ${type}`),
     ),
   };
 }
@@ -473,18 +491,9 @@ export function compactCheckRunParts(
   variant: ProjectionVariant,
   members: readonly CheckMember[] = COMPACT_CHECK[variant],
 ): DescriptionParts {
-  const unsaved = leftOf(COMPACT_CHECK[variant], members).of<CheckMember>([
-    'CLASS',
-    'STRUCTURE',
-    'DDL',
-  ]);
   return {
     tag: 'read-only',
-    purpose: typesPurpose(
-      'Checks the syntax of an ABAP ',
-      typeWords(members),
-      `${when(unsaved.length > 0, ', as stored or as the source given')}.`,
-    ),
+    purpose: pairsPurpose(pairsOf('checks the syntax of', members)),
   };
 }
 
@@ -514,10 +523,10 @@ export function compactDeletionCheckParts(
 ): DescriptionParts {
   return {
     tag: 'read-only',
-    purpose: typesPurpose(
-      'Checks whether SAP lets an ABAP ',
-      typeWords(given),
-      ' be deleted.',
+    purpose: pairsPurpose(
+      typeWords(given).map(
+        (type) => `checks whether ${withArticle(type)} can be deleted`,
+      ),
     ),
   };
 }
@@ -549,11 +558,11 @@ export function compactActivateParts(
   members: readonly ActivateMember[] = COMPACT_ACTIVATE[variant],
 ): DescriptionParts {
   return {
-    purpose: typesPurpose(
-      'Activates an ABAP ',
-      typeWords(members),
-      ', another object by its ADT type, or several objects together by an activation run.',
-    ),
+    purpose: pairsPurpose([
+      ...pairsOf('activates', members),
+      'activates another object by its ADT type',
+      'activates several objects together',
+    ]),
   };
 }
 
@@ -565,20 +574,6 @@ export function compactActivateDescription(
   return toolDescription(compactActivateParts(variant, members));
 }
 
-/** What each HandlerProfileRun member runs, by its function: the full run tool's result. */
-const PROFILE_RUNS = {
-  CLASS: {
-    value: 'CLASS',
-    purpose: purpose(
-      'Runs an ABAP class implementing if_oo_adt_classrun and gives its console output.',
-    ),
-  },
-  PROGRAM: {
-    value: 'PROGRAM',
-    purpose: purpose('Runs an ABAP report and gives its output.'),
-  },
-} as const;
-
 /** HandlerProfileRun's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactProfileRunParts(
   variant: ProjectionVariant,
@@ -587,13 +582,11 @@ export function compactProfileRunParts(
   ],
 ): DescriptionParts {
   return {
-    purpose: purpose(
-      `Runs ${either(members.map((member) => (member === 'CLASS' ? 'an ABAP class' : 'an ABAP report')))}, under a scheduled profiler trace when its profiler id is given.`,
+    purpose: pairsPurpose(
+      members.map((member) =>
+        member === 'CLASS' ? 'runs an ABAP class' : 'runs an ABAP report',
+      ),
     ),
-    values: {
-      of: 'target_type',
-      each: members.map((member) => PROFILE_RUNS[member]),
-    },
   };
 }
 

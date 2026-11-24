@@ -19,7 +19,6 @@ import type * as z from 'zod';
  * knobs) rather than exposed here for the first time.
  */
 
-import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
   acceptedOf,
   byVariant,

@@ -7,17 +7,13 @@ import * as z from 'zod';
  * another action, the call is refused before anything runs.
  */
 
-import { TOOL_DEFINITION as DebugBatchAnswers_Tool } from '../../../handlers/debugger/debug/handleDebugBatchAnswers';
-import { TOOL_DEFINITION as DebugBatchBegin_Tool } from '../../../handlers/debugger/debug/handleDebugBatchBegin';
-import { TOOL_DEFINITION as DebugBatchEnd_Tool } from '../../../handlers/debugger/debug/handleDebugBatchEnd';
 import { asksNumbers } from '../../batch/batchTools';
 import { answersOf, beginDebugBatch, endDebugBatch } from '../../batch/tools';
 import {
   type DescriptionParts,
-  purpose,
+  pairsPurpose,
   stateHandleAnswered,
   toolDescription,
-  valueFrom,
 } from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
@@ -28,12 +24,12 @@ import { textsOf } from '../memberTexts';
 export const DEBUG_BATCH_ACTIONS = ['begin', 'end', 'answers'] as const;
 type DebugBatchAction = (typeof DEBUG_BATCH_ACTIONS)[number];
 
-/** Each action by its function: the full set's tool of the same meaning. */
-const ACTION_VALUES = {
-  begin: valueFrom('begin', DebugBatchBegin_Tool.description),
-  end: valueFrom('end', DebugBatchEnd_Tool.description),
-  answers: valueFrom('answers', DebugBatchAnswers_Tool.description),
-} as const;
+/** Each action as an action and object pair (owner). */
+const PAIRS: { readonly [K in DebugBatchAction]: string } = {
+  begin: 'begins recording the debugger calls at a stopped debuggee',
+  end: 'ends the recording and sends the recorded debugger calls together',
+  answers: "reads each recorded debugger call's outcome by its number",
+};
 
 /** `HandlerDebugBatch`'s parts with `actions`: each action by its function. */
 export function handlerDebugBatchParts(
@@ -41,13 +37,7 @@ export function handlerDebugBatchParts(
 ): DescriptionParts {
   return {
     tag: 'debug',
-    purpose: purpose(
-      "Records the debugger calls at the stopped ABAP debuggee or the AMDP break and sends them together, then reads each call's outcome by its number.",
-    ),
-    values: {
-      of: 'action',
-      each: actions.map((action) => ACTION_VALUES[action]),
-    },
+    purpose: pairsPurpose(actions.map((action) => PAIRS[action])),
     ...(actions.includes('begin') ? { notes: [stateHandleAnswered] } : {}),
   };
 }

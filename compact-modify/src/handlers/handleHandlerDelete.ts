@@ -1,4 +1,3 @@
-import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
   byVariant,
   COMPACT_DELETE,

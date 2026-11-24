@@ -11,9 +11,8 @@ import {
 } from '../../debugger/index';
 import {
   type DescriptionParts,
-  purpose,
+  pairsPurpose,
   toolDescription,
-  valueParts,
 } from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
@@ -38,42 +37,16 @@ export const MAINTAIN_OPERATIONS = [
 ] as const;
 type MaintainOperation = (typeof MAINTAIN_OPERATIONS)[number];
 
-/** An operation by its function. */
-function operation(value: MaintainOperation, text: string) {
-  return valueParts(value, { purpose: purpose(text) });
-}
-
-/** Each operation by its function. */
-const MAINTAIN_VALUES = {
-  getStack: operation(
-    'getStack',
-    'Reads the call stack of the ABAP debuggee, the stopped position on top.',
-  ),
-  getVariables: operation(
-    'getVariables',
-    'Reads variables of the ABAP debuggee by name, a component or a table record by its path.',
-  ),
-  getChildVariables: operation(
-    'getChildVariables',
-    'Reads the members of variables of the ABAP debuggee, or its scopes.',
-  ),
-  getMemorySizes: operation(
-    'getMemorySizes',
-    'Reads how much memory the ABAP debuggee uses.',
-  ),
-  createMemorySnapshot: operation(
-    'createMemorySnapshot',
-    'Writes a memory snapshot of the ABAP debuggee.',
-  ),
-  setVariableValue: operation(
-    'setVariableValue',
-    'Sets the value of a variable of the ABAP debuggee.',
-  ),
-  getDataPreview: operation(
-    'getDataPreview',
-    'Reads the records of a table variable at an AMDP break.',
-  ),
-} as const;
+/** Each operation as an action and object pair (owner). */
+const PAIRS: { readonly [K in MaintainOperation]: string } = {
+  getStack: "gets the debuggee's call stack",
+  getVariables: 'gets variables by name',
+  getChildVariables: "gets a variable's members",
+  getMemorySizes: "gets the debuggee's memory sizes",
+  createMemorySnapshot: 'creates a memory snapshot',
+  setVariableValue: "sets a variable's value",
+  getDataPreview: "gets an AMDP table variable's records",
+};
 
 /** `HandlerDebugMaintain`'s parts with `operations`: each by its function. */
 export function handlerDebugMaintainParts(
@@ -81,13 +54,7 @@ export function handlerDebugMaintainParts(
 ): DescriptionParts {
   return {
     tag: 'debug',
-    purpose: purpose(
-      'Reads and changes the stopped ABAP or AMDP debuggee: its stack, its variables, its memory and its table variables.',
-    ),
-    values: {
-      of: 'operation',
-      each: operations.map((op) => MAINTAIN_VALUES[op]),
-    },
+    purpose: pairsPurpose(operations.map((op) => PAIRS[op])),
   };
 }
 

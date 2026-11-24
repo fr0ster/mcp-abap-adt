@@ -6,9 +6,8 @@ import {
 } from '../../debugger/index';
 import {
   type DescriptionParts,
-  purpose,
+  pairsPurpose,
   toolDescription,
-  valueParts,
 } from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
@@ -38,38 +37,15 @@ const AMDP_OPERATIONS = ['syncBreakpoints'] as const;
 export const BREAKPOINT_OPERATIONS = [...ABAP_OPERATIONS] as const;
 type BreakpointOperation = (typeof BREAKPOINT_OPERATIONS)[number];
 
-/** An operation by its function. */
-function operation(value: BreakpointOperation, text: string) {
-  return valueParts(value, { purpose: purpose(text) });
-}
-
-/** Each operation by its function. */
-const BREAKPOINT_VALUES = {
-  setBreakpoints: operation(
-    'setBreakpoints',
-    'Sets the ABAP breakpoint set of this debugging identity, shared by every IDE of the SAP user.',
-  ),
-  syncBreakpoints: operation(
-    'syncBreakpoints',
-    'Rewrites the ABAP breakpoints of the objects named or the whole set, or the breakpoints of the running AMDP session.',
-  ),
-  deleteBreakpoint: operation(
-    'deleteBreakpoint',
-    'Deletes one ABAP breakpoint by its id.',
-  ),
-  createWatchpoint: operation(
-    'createWatchpoint',
-    'Watches a variable of the attached ABAP debuggee.',
-  ),
-  listWatchpoints: operation(
-    'listWatchpoints',
-    'Shows the watchpoints of the attached ABAP debuggee.',
-  ),
-  deleteWatchpoint: operation(
-    'deleteWatchpoint',
-    'Removes a watchpoint of the attached ABAP debuggee.',
-  ),
-} as const;
+/** Each operation as an action and object pair (owner). */
+const PAIRS: { readonly [K in BreakpointOperation]: string } = {
+  setBreakpoints: 'sets the ABAP breakpoints of this debugging identity',
+  syncBreakpoints: 'syncs the ABAP or AMDP breakpoints',
+  deleteBreakpoint: 'deletes an ABAP breakpoint',
+  createWatchpoint: 'creates a watchpoint on a variable',
+  listWatchpoints: 'lists the watchpoints',
+  deleteWatchpoint: 'deletes a watchpoint',
+};
 
 /** `HandlerDebugBreakpoints`' parts with `operations`: each by its function. */
 export function handlerDebugBreakpointsParts(
@@ -77,13 +53,7 @@ export function handlerDebugBreakpointsParts(
 ): DescriptionParts {
   return {
     tag: 'debug',
-    purpose: purpose(
-      'Sets, rewrites and deletes the ABAP and AMDP debugger breakpoints, and the watchpoints of the attached ABAP debuggee.',
-    ),
-    values: {
-      of: 'operation',
-      each: operations.map((op) => BREAKPOINT_VALUES[op]),
-    },
+    purpose: pairsPurpose(operations.map((op) => PAIRS[op])),
   };
 }
 

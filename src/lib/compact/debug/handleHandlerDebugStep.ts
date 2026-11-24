@@ -8,9 +8,8 @@ import {
 } from '../../debugger/index';
 import {
   type DescriptionParts,
-  purpose,
+  pairsPurpose,
   toolDescription,
-  valueParts,
 } from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
@@ -33,42 +32,16 @@ const AMDP_OPERATIONS = ['stepOver', 'stepContinue'] as const;
 export const STEP_OPERATIONS = [...ABAP_OPERATIONS] as const;
 type StepOperation = (typeof STEP_OPERATIONS)[number];
 
-/** An operation by its function. */
-function operation(value: StepOperation, text: string) {
-  return valueParts(value, { purpose: purpose(text) });
-}
-
-/** Each operation by its function. */
-const STEP_VALUES = {
-  stepInto: operation(
-    'stepInto',
-    'Steps the ABAP debuggee into the call where it stands.',
-  ),
-  stepOver: operation(
-    'stepOver',
-    'Steps the ABAP or AMDP debuggee over the statement where it stands.',
-  ),
-  stepReturn: operation(
-    'stepReturn',
-    'Steps the ABAP debuggee out of the current call.',
-  ),
-  stepContinue: operation(
-    'stepContinue',
-    'Lets the ABAP or AMDP debuggee run on to its next stop.',
-  ),
-  stepRunToLine: operation(
-    'stepRunToLine',
-    'Runs the ABAP debuggee to the source position named.',
-  ),
-  stepJumpToLine: operation(
-    'stepJumpToLine',
-    'Moves the ABAP debuggee to the source position named, skipping what lies between.',
-  ),
-  setStackPosition: operation(
-    'setStackPosition',
-    'Selects the stack frame of the ABAP debuggee whose variables are read.',
-  ),
-} as const;
+/** Each operation as an action and object pair (owner). */
+const PAIRS: { readonly [K in StepOperation]: string } = {
+  stepInto: 'steps into the call where the debuggee stands',
+  stepOver: 'steps over a statement',
+  stepReturn: 'steps out of the current call',
+  stepContinue: 'continues to the next stop',
+  stepRunToLine: 'runs to a source position',
+  stepJumpToLine: 'jumps to a source position',
+  setStackPosition: 'sets the stack frame whose variables are read',
+};
 
 /** `HandlerDebugStep`'s parts with `operations`: each by its function. */
 export function handlerDebugStepParts(
@@ -76,13 +49,7 @@ export function handlerDebugStepParts(
 ): DescriptionParts {
   return {
     tag: 'debug',
-    purpose: purpose(
-      'Steps the stopped ABAP or AMDP debuggee, one SAP call per operation.',
-    ),
-    values: {
-      of: 'operation',
-      each: operations.map((op) => STEP_VALUES[op]),
-    },
+    purpose: pairsPurpose(operations.map((op) => PAIRS[op])),
   };
 }
 

@@ -3,7 +3,6 @@ import {
   byVariant,
   COMPACT_ACTIVATE,
   COMPACT_ACTIVATE_ROUTES,
-  type CompactObjectType,
   compactActivateParts,
   compactActivateSchemaWithNamesFor,
   subResourceRefusal,

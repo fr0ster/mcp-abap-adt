@@ -14,10 +14,9 @@ import { asksNumbers } from '../../batch/batchTools';
 import { answersOf, beginBatch, endBatch } from '../../batch/tools';
 import {
   type DescriptionParts,
-  purpose,
+  pairsPurpose,
   stateHandleAnswered,
   toolDescription,
-  valueParts,
 } from '../../description/index';
 import type { HandlerContext, ToolArgs } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
@@ -27,24 +26,12 @@ import { textsOf } from '../memberTexts';
 export const BATCH_ACTIONS = ['begin', 'end', 'answers'] as const;
 type BatchAction = (typeof BATCH_ACTIONS)[number];
 
-/** Each action by its function, and what it answers. */
-const ACTION_VALUES = {
-  begin: valueParts('begin', {
-    purpose: purpose(
-      'Starts recording the calls of the tools that allow it, each under the next number, to send them together.',
-    ),
-  }),
-  end: valueParts('end', {
-    purpose: purpose(
-      "Sends the recorded calls to SAP together, with the credentials in force, and splits SAP's answer by call.",
-    ),
-  }),
-  answers: valueParts('answers', {
-    purpose: purpose(
-      'Reads the answer of each recorded call of the last sending, by its number.',
-    ),
-  }),
-} as const;
+/** Each action as an action and object pair (owner). */
+const PAIRS: { readonly [K in BatchAction]: string } = {
+  begin: 'begins recording the calls of the tools that allow it',
+  end: 'ends the recording and sends the recorded calls to SAP together',
+  answers: "reads each recorded call's answer by its number",
+};
 
 /** `HandlerBatch`'s parts with `actions`: each action by its function. */
 export function handlerBatchParts(
@@ -52,13 +39,7 @@ export function handlerBatchParts(
 ): DescriptionParts {
   return {
     tag: 'read-only',
-    purpose: purpose(
-      "Records the calls of the tools that allow it and sends them to SAP together, then reads each call's answer by its number.",
-    ),
-    values: {
-      of: 'action',
-      each: actions.map((action) => ACTION_VALUES[action]),
-    },
+    purpose: pairsPurpose(actions.map((action) => PAIRS[action])),
     ...(actions.includes('begin') ? { notes: [stateHandleAnswered] } : {}),
   };
 }

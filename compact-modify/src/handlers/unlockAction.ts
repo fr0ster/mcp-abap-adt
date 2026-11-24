@@ -1,7 +1,4 @@
-import type {
-  CompactObjectType,
-  NotUnlockedAnswer,
-} from '@mcp-abap-adt/lib/compact-shared';
+import type { NotUnlockedAnswer } from '@mcp-abap-adt/lib/compact-shared';
 /**
  * `HandlerLock` with `action: 'unlock'`: the release of a lock this server
  * instance holds, under its lock handle — one UNLOCK request, or none where

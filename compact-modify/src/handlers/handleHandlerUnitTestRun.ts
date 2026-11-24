@@ -6,7 +6,6 @@ import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   handleStartUnitTestRun,
   START_RUN_PARTS,
-  type UnitTestRunner,
 } from '@mcp-abap-adt/lib/handlers/write';
 import type * as z from 'zod';
 

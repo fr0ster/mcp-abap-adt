@@ -13,19 +13,6 @@
  */
 
 import * as z from 'zod';
-import { TOOL_DEFINITION as GetAbapGitBranchInfo } from '../../../handlers/abapgit/high/handleGetAbapGitBranchInfo';
-import { TOOL_DEFINITION as LinkAbapGitRepo } from '../../../handlers/abapgit/high/handleLinkAbapGitRepo';
-import { TOOL_DEFINITION as PullAbapGitRepo } from '../../../handlers/abapgit/high/handlePullAbapGitRepo';
-import { TOOL_DEFINITION as PushAbapGitRepo } from '../../../handlers/abapgit/high/handlePushAbapGitRepo';
-import { TOOL_DEFINITION as SwitchAbapGitBranch } from '../../../handlers/abapgit/high/handleSwitchAbapGitBranch';
-import { TOOL_DEFINITION as UnlinkAbapGitRepo } from '../../../handlers/abapgit/high/handleUnlinkAbapGitRepo';
-import { TOOL_DEFINITION as CheckAbapGitExternalRepo } from '../../../handlers/abapgit/readonly/handleCheckAbapGitExternalRepo';
-import { TOOL_DEFINITION as CheckAbapGitRepo } from '../../../handlers/abapgit/readonly/handleCheckAbapGitRepo';
-import { TOOL_DEFINITION as GetAbapGitErrorLog } from '../../../handlers/abapgit/readonly/handleGetAbapGitErrorLog';
-import { TOOL_DEFINITION as GetAbapGitFile } from '../../../handlers/abapgit/readonly/handleGetAbapGitFile';
-import { TOOL_DEFINITION as GetAbapGitModifiedObjects } from '../../../handlers/abapgit/readonly/handleGetAbapGitModifiedObjects';
-import { TOOL_DEFINITION as GetAbapGitStaging } from '../../../handlers/abapgit/readonly/handleGetAbapGitStaging';
-import { TOOL_DEFINITION as ListAbapGitRepos } from '../../../handlers/abapgit/readonly/handleListAbapGitRepos';
 import {
   APP_LOG_KEY_FIELD,
   AUTHOR_FIELD,
@@ -48,12 +35,10 @@ import type { ProjectionVariant } from '../../adtProjections';
 import { COMPACT_BACKGROUND_FIELD } from '../../backgroundRuns/tools';
 import {
   type DescriptionParts,
-  purpose,
+  pairsPurpose,
   toolDescription,
-  valueFrom,
 } from '../../description/index';
 import { listedValues } from '../../handlers/listedValues';
-import { listed } from '../memberTexts';
 
 /** `HandlerAbapGitGet`'s actions, each a full read. */
 export const ABAPGIT_GET_ACTIONS = [
@@ -359,44 +344,25 @@ function writeTakes(variant: ProjectionVariant): {
   };
 }
 
-/** Each action's full tool, by its description: what the action states. */
-const ACTION_DESCRIPTIONS: Readonly<
-  Record<AbapGitGetAction | AbapGitWriteAction, string>
-> = {
-  repos: ListAbapGitRepos.description,
-  external_repo: CheckAbapGitExternalRepo.description,
-  modified_objects: GetAbapGitModifiedObjects.description,
-  staging: GetAbapGitStaging.description,
-  checks: CheckAbapGitRepo.description,
-  file: GetAbapGitFile.description,
-  error_log: GetAbapGitErrorLog.description,
-  link: LinkAbapGitRepo.description,
-  unlink: UnlinkAbapGitRepo.description,
-  pull: PullAbapGitRepo.description,
-  push: PushAbapGitRepo.description,
-  switch_branch: SwitchAbapGitBranch.description,
-  branch_info: GetAbapGitBranchInfo.description,
+/** Each read as an action and object pair (owner). */
+const GET_PAIRS: Readonly<Record<AbapGitGetAction, string>> = {
+  repos: 'reads the linked abapGit repositories',
+  external_repo: 'checks a remote repository',
+  modified_objects: 'reads what a pull would change',
+  staging: "reads a repository's staging",
+  checks: "checks a repository's connection to its remote",
+  file: 'reads a repository file',
+  error_log: "reads a run's error log",
 };
 
-/** What each read gives, in the purpose's words. */
-const GET_PHRASES: Readonly<Record<AbapGitGetAction, string>> = {
-  repos: 'the linked ones',
-  external_repo: 'a remote',
-  modified_objects: "a pull's changes",
-  staging: 'the staged objects',
-  checks: 'the connection to a remote',
-  file: 'a file',
-  error_log: "a run's error log",
-};
-
-/** What each write does, in the purpose's words. */
-const WRITE_PHRASES: Readonly<Record<AbapGitWriteAction, string>> = {
-  link: 'links a package to a remote',
-  unlink: 'unlinks a package',
-  pull: 'pulls',
-  push: 'pushes',
-  switch_branch: 'switches the branch',
-  branch_info: 'reads a remote branch',
+/** Each write as an action and object pair (owner). */
+const WRITE_PAIRS: Readonly<Record<AbapGitWriteAction, string>> = {
+  link: 'links a package to a remote repository',
+  unlink: 'unlinks a repository from its package',
+  pull: 'pulls a repository',
+  push: 'pushes a commit to a remote branch',
+  switch_branch: "switches a repository's branch",
+  branch_info: "reads a remote branch's information",
 };
 
 /** `HandlerAbapGitGet`'s parts on `actions`: each read by its full tool's parts. */
@@ -405,15 +371,7 @@ export function handlerAbapGitGetParts(
 ): DescriptionParts {
   return {
     tag: 'read-only',
-    purpose: purpose(
-      `Reads abapGit repositories: ${listed(actions.map((action) => GET_PHRASES[action]))}.`,
-    ),
-    values: {
-      of: 'action',
-      each: actions.map((action) =>
-        valueFrom(action, ACTION_DESCRIPTIONS[action]),
-      ),
-    },
+    purpose: pairsPurpose(actions.map((action) => GET_PAIRS[action])),
   };
 }
 
@@ -422,15 +380,7 @@ export function handlerAbapGitParts(
   actions: readonly AbapGitWriteAction[],
 ): DescriptionParts {
   return {
-    purpose: purpose(
-      `Changes abapGit repositories and their remotes: ${listed(actions.map((action) => WRITE_PHRASES[action]))}.`,
-    ),
-    values: {
-      of: 'action',
-      each: actions.map((action) =>
-        valueFrom(action, ACTION_DESCRIPTIONS[action]),
-      ),
-    },
+    purpose: pairsPurpose(actions.map((action) => WRITE_PAIRS[action])),
   };
 }
 

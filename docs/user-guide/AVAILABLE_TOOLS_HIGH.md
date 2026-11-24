@@ -247,7 +247,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getabapgitbranchinfo-high-level-abapgit"></a>
 #### GetAbapGitBranchInfo (High-Level / Abapgit)
-**Description:** Reads one branch of the remote repository at url for the package it would be linked to: to answer it, SAP links the repository to package_name, reads the repository's settings and removes the link again. Answers facts only: the access mode and the branch with its name, type, whether it is the head, its commit hash and its folder logic.
+**Description:** Reads one branch of a remote git repository for the package it would be linked to, SAP linking and unlinking it to find out. Whether the remote repository is public or private. For the branch: its name, how its folders map to packages, its type, whether it is the head and its commit.
 
 **Source:** `src/handlers/abapgit/high/handleGetAbapGitBranchInfo.ts`
 
@@ -2274,7 +2274,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Per `detail`: terse a TSV summary (its facts as `# field value` lines, one row per sub-package); medium and full the details under `metadata`, with `part: "metadata"`; raw the document as SAP sent it.
+**Description:** [read-only] Reads an ABAP package: its settings and its subpackages, at the version asked. The package's name. Its description. Its type. Its super package. Its software component. Its application component. Its transport layer. Its ABAP language version. Who is responsible for it. For each subpackage: its name and its description. The package's settings.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 

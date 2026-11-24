@@ -26,6 +26,7 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import type { McpResult } from '../answer';
 import { ServerRefusal } from '../auth/serverRefusal';
 import { STATE_UNAVAILABLE_WORDS } from '../state/InstanceState';
+import type { SessionHolding } from '../state/longSession';
 
 /**
  * The sentences of open, shared by `SessionOpen` and `HandlerSession`'s
@@ -57,7 +58,7 @@ export async function openLongSession(
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ state_handle: state.handle }),
+        text: JSON.stringify(openedSession(state.handle)),
       },
     ],
   };
@@ -92,8 +93,18 @@ export async function closeLongSession(
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ closed: true, held }),
+        text: JSON.stringify(closedSession(held)),
       },
     ],
   };
+}
+
+/** What an open answers: the state handle every call of the session carries. */
+export function openedSession(stateHandle: string) {
+  return { state_handle: stateHandle };
+}
+
+/** What a close answers: the session closed, and what the instance held. */
+export function closedSession(held: SessionHolding) {
+  return { closed: true, held };
 }

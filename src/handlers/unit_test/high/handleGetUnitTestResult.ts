@@ -1,6 +1,8 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { toolDescription } from '../../../lib/description';
+import { UNIT_TEST_RESULT, unitTestRead } from '../../../lib/description/runs';
 import { type AnswerTable, answerAt, wireAnswer } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -12,7 +14,7 @@ import {
 import {
   type RunOutcome,
   readGivenRun,
-  unfinishedRun,
+  runOutcomeAnswer,
 } from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
@@ -20,8 +22,14 @@ import { testRunner } from '../shared/runTests';
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
+  description: toolDescription(
+    unitTestRead(
+      'the result',
+      'an ABAP Unit test run',
+      UNIT_TEST_RESULT,
+      'waits',
+    ),
+  ),
   inputSchema: z.object({
     run_id: requiredText('run_id is required').describe(
       'Run id a unit test run answered.',
@@ -104,14 +112,7 @@ function resultAnswers<T>(
   runId: string,
 ): AnswerTable<RunOutcome<{ value: T }>, object> {
   const parsed = (outcome: RunOutcome<{ value: T }>) =>
-    !outcome.finished
-      ? unfinishedRun(runId, outcome.runStatus)
-      : {
-          success: true,
-          run_id: runId,
-          finished: true,
-          run_result: outcome.result.value,
-        };
+    runOutcomeAnswer(runId, outcome);
   return { terse: parsed, medium: parsed, full: parsed, raw: parsed };
 }
 

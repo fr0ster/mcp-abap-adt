@@ -7,14 +7,24 @@ import {
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { terseVariables } from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { VARIABLES } from '../../../lib/description/debugger';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugSetVariable',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.',
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Sets the value of a variable of the stopped ABAP debuggee.',
+      ),
+      result: VARIABLES,
+    }),
+  ),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     name: z.string().describe('Variable to set; a path reaches a component.'),

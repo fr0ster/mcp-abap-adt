@@ -1,13 +1,21 @@
 import * as z from 'zod';
-import {
-  OPEN_SESSION_WORDS,
-  openLongSession,
-} from '../../../lib/longSession/tools';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
+import { SESSION_OPENED } from '../../../lib/description/sessions';
+import { openLongSession } from '../../../lib/longSession/tools';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'SessionOpen',
-  description: `[read-only] ${OPEN_SESSION_WORDS}`,
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Opens a long session on this server, keeping its server instance and SAP connection for every call that carries its state handle.',
+      ),
+      result: SESSION_OPENED,
+    }),
+  ),
   inputSchema: z.object({}),
 } as const;
 

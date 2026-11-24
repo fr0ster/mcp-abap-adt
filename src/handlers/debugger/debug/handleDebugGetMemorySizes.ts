@@ -8,14 +8,22 @@ import {
   terseMemorySizes,
 } from '../../../lib/debugger/memoryReadings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { MEMORY_SIZES } from '../../../lib/description/debugger';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugGetMemorySizes',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] [debug] Memory the stopped debuggee uses. Needs a stopped debuggee.',
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose('Reads how much memory the stopped ABAP debuggee uses.'),
+      result: MEMORY_SIZES,
+    }),
+  ),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),
 } as const;
 

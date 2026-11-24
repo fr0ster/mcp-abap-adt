@@ -917,7 +917,7 @@ describe("DebugBatchAnswers, the full set's reader of the debugger batch", () =>
 
   it("means what HandlerDebugBatch's answers action means, in the same words", () => {
     const words = DebugBatchAnswers_Tool.description.replace(
-      '[read-only] [debug] ',
+      '[read-only] ',
       '',
     );
     assert.ok(

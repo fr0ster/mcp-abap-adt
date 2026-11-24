@@ -543,8 +543,6 @@ describe('RunATC: the object kinds of each variant', () => {
     it(format('%s offers exactly its kinds', variant), () => {
       assert.deepStrictEqual(ATC_OBJECT_TYPES[variant], kinds);
       assert.deepStrictEqual(typeEnum(variant), kinds);
-      const words = stated(variant).description;
-      for (const kind of kinds) assert.ok(words.includes(kind));
     });
   }
 

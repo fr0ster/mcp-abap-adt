@@ -7,18 +7,28 @@ import {
 import { debugAnswer } from '../../../lib/debugger/answer';
 import {
   AMDP_BREAKPOINTS_PROPERTY,
-  AMDP_CATCH_SENTENCE,
   amdpBreakpointsFromArgs,
   RUN_PROPERTY,
   runFromArgs,
 } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { AMDP_STARTED } from '../../../lib/description/debugger';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugStart',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. ${AMDP_CATCH_SENTENCE}`,
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Opens an AMDP debug session of the connected SAP user with breakpoints in SQLScript methods, starting a background run once they are confirmed.',
+      ),
+      result: AMDP_STARTED,
+    }),
+  ),
   inputSchema: z.object({
     stop_existing: z
       .boolean()

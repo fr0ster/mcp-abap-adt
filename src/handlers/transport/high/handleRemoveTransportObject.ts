@@ -32,6 +32,9 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
+import { TRANSPORT_REMOVAL } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
@@ -41,8 +44,14 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'RemoveTransportObject',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Removes the entry of the object named by object_name and object_type from the transport task named by transport_number, at position.',
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        "Removes a named object from a transport task, at its position among the task's objects.",
+      ),
+      result: TRANSPORT_REMOVAL,
+    }),
+  ),
   inputSchema: z.object({
     transport_number: z
       .string()
@@ -94,15 +103,7 @@ export async function handleRemoveTransportObject(
   // field would skip the re-read that is the only thing establishing the
   // outcome. The field a caller finds instead is `accepted`, and next to it
   // the reading that settles the question.
-  const terseRemoval = () => ({
-    accepted: true,
-    removed: 'unknown',
-    transport_number: args.transport_number,
-    object: `${args.pgmid ?? 'R3TR'} ${args.object_type} ${args.object_name}`,
-    position: args.position,
-    confirm_with:
-      'ReadTransportActionLog, or ReadTransportObjects on the same task — this answer only says the request was understood, never that an entry went away.',
-  });
+  const terseRemoval = () => transportRemoval(args);
 
   return answer(
     { tool: 'RemoveTransportObject', detail },
@@ -123,4 +124,23 @@ export async function handleRemoveTransportObject(
       ),
     project(detail, terseRemoval),
   );
+}
+
+/** What a removal answers: SAP took it, the task, the object and its position, and where to confirm it. */
+export function transportRemoval(args: {
+  readonly transport_number: string;
+  readonly object_name: string;
+  readonly object_type: string;
+  readonly position: string;
+  readonly pgmid?: string | undefined;
+}) {
+  return {
+    accepted: true,
+    removed: 'unknown',
+    transport_number: args.transport_number,
+    object: `${args.pgmid ?? 'R3TR'} ${args.object_type} ${args.object_name}`,
+    position: args.position,
+    confirm_with:
+      'ReadTransportActionLog, or ReadTransportObjects on the same task — this answer only says the request was understood, never that an entry went away.',
+  };
 }

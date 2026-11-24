@@ -25,6 +25,9 @@ import {
 import { objectsAnswer } from '../../../lib/abapGit/formats';
 import type { KindToolDefinition } from '../../../lib/abapGit/kindTool';
 import { BACKGROUND_FIELD } from '../../../lib/backgroundRuns/tools';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
+import { ABAPGIT_OBJECTS } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 const FIELDS = {
@@ -43,23 +46,33 @@ const CLOUD_SCHEMA = z.object({ ...FIELDS, folder_logic: FOLDER_LOGIC_FIELD });
  */
 type LinkArgs = z.output<typeof CLOUD_SCHEMA>;
 
-const ONPREM_DESCRIPTION =
-  "Links package_name to the remote repository at url on branch, and imports every object of the branch into the package and its subpackages, overwriting objects of the system and objects held by other packages, recorded in transport_request. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.";
+const ONPREM_PARTS = runParts({
+  purpose: purpose(
+    "Links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport.",
+  ),
+  result: ABAPGIT_OBJECTS,
+});
 
 export const TOOL_DEFINITION: KindToolDefinition<
   typeof ONPREM_SCHEMA,
   typeof CLOUD_SCHEMA
 > = {
   name: 'LinkAbapGitRepo',
-  description: ONPREM_DESCRIPTION,
+  description: toolDescription(ONPREM_PARTS),
   inputSchema: ONPREM_SCHEMA,
   onprem: {
-    description: ONPREM_DESCRIPTION,
+    description: toolDescription(ONPREM_PARTS),
     inputSchema: ONPREM_SCHEMA,
   },
   cloud: {
-    description:
-      "Links package_name to the remote repository at url on branch, and links only: a pull imports the objects. folder_logic says how folders map to subpackages. Answers facts only: SAP's status, done, and the objects SAP lists.",
+    description: toolDescription(
+      runParts({
+        purpose: purpose(
+          'Links an ABAP package to a remote abapGit repository on a branch, mapping its folders to subpackages as asked.',
+        ),
+        result: ABAPGIT_OBJECTS,
+      }),
+    ),
     inputSchema: CLOUD_SCHEMA,
   },
 };

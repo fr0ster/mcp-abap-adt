@@ -1,6 +1,11 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { toolDescription } from '../../../lib/description';
+import {
+  UNIT_TEST_STATUS_AND_RESULT,
+  unitTestRead,
+} from '../../../lib/description/runs';
 import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -9,14 +14,20 @@ import {
   levelOf,
 } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
-import { readGivenRun, unfinishedRun } from '../shared/pollRun';
+import { readGivenRun, runOutcomeWithStatus } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
+  description: toolDescription(
+    unitTestRead(
+      'the status and result',
+      'an ABAP Unit test run',
+      UNIT_TEST_STATUS_AND_RESULT,
+      'waits',
+    ),
+  ),
   inputSchema: z.object({
     run_id: z.string().describe('Run identifier returned by RunUnitTest.'),
     ...ASSEMBLED_DETAIL_SHAPE,
@@ -79,15 +90,6 @@ async function answeredGetUnitTest(
     // fixture in the corpus proves a further reduction of a test-run result
     // is safe. `raw` never reaches here — the status and result documents
     // are answered as SAP sent them (`wireAnswer`, above).
-    (outcome) =>
-      !outcome.finished
-        ? unfinishedRun(run_id, outcome.runStatus)
-        : {
-            success: true,
-            run_id,
-            finished: true,
-            run_status: outcome.status.value,
-            run_result: outcome.result.value,
-          },
+    (outcome) => runOutcomeWithStatus(run_id, outcome),
   );
 }

@@ -6,16 +6,26 @@ import {
   BREAKPOINT_ITEM,
   BREAKPOINTS_WORDS,
   breakpointsFromArgs,
-  SHARED_SET_SENTENCE,
   STATE_HANDLE_PROPERTY,
 } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { BREAKPOINTS_SET } from '../../../lib/description/debugger';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugSetBreakpoints',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[debug] Adds breakpoints to a debug session — a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition — and answers the whole set placed, this call's refusals each with its breakpoint and reason, earlier breakpoints that dropped out of the set, and any answer row left unpaired with a breakpoint. ${SHARED_SET_SENTENCE}`,
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Adds breakpoints to an ABAP debug session: at a source position, optionally conditional, on an exception class, an ABAP statement or a message.',
+      ),
+      result: BREAKPOINTS_SET,
+    }),
+  ),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     breakpoints: z.array(BREAKPOINT_ITEM).min(1).describe(BREAKPOINTS_WORDS),

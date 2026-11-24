@@ -3,16 +3,26 @@ import {
   debugBatchRecorder,
   requireDebugger,
 } from '../../../lib/debugger/access';
-import { debugAnswer } from '../../../lib/debugger/answer';
+import { amdpStepped, debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { AMDP_STEPPED } from '../../../lib/description/debugger';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugStep',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.',
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Steps the stopped AMDP debuggee over a statement or on to the next stop.',
+      ),
+      result: AMDP_STEPPED,
+    }),
+  ),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     action: z
@@ -38,6 +48,6 @@ export async function handleAmdpDebugStep(
         ? amdp.recordStep(recorder, args.action)
         : amdp.step(args.action);
     },
-    (v) => ({ state: v }),
+    amdpStepped,
   );
 }

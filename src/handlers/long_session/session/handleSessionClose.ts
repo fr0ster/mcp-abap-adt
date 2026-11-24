@@ -1,13 +1,21 @@
 import * as z from 'zod';
-import {
-  CLOSE_SESSION_WORDS,
-  closeLongSession,
-} from '../../../lib/longSession/tools';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
+import { SESSION_CLOSED } from '../../../lib/description/sessions';
+import { closeLongSession } from '../../../lib/longSession/tools';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'SessionClose',
-  description: `[read-only] ${CLOSE_SESSION_WORDS}`,
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Closes the long session a state handle names, logging off its SAP sessions and so releasing their locks.',
+      ),
+      result: SESSION_CLOSED,
+    }),
+  ),
   inputSchema: z.object({}),
 } as const;
 

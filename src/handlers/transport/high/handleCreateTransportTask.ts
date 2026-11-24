@@ -49,6 +49,9 @@ import {
   type McpResult,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
+import { TASK_CREATED } from '../../../lib/description/sessions';
 import {
   type DetailTable,
   type LevelReading,
@@ -81,8 +84,14 @@ interface TypedTask {
 export const TOOL_DEFINITION = {
   name: 'CreateTransportTask',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Creates a task under the existing transport request named by transport_number, owned by the user named by target_user, of the type task_type. The task is itself a request resource — it reads, writes and releases like one — and is what adding and removing an object entry address, since a request's objects live on its tasks. `target_user` is required: it names the task's owner, and an empty owner is refused with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses an added object on premise with SCTS_ADT_MSG 009 / TK127.",
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        'Creates a task of the type asked under an existing transport, owned by the SAP user named.',
+      ),
+      result: TASK_CREATED,
+    }),
+  ),
   inputSchema: createArguments('CreateTransportTask', {
     transport_number: z
       .string()
@@ -228,17 +237,8 @@ async function answeredCreateTransportTask(
   // document as it came.
   // Terse what the next call needs: the task's number and type, and why it
   // is untyped when it is; medium the task as created (the former terse).
-  const terseNumbers = (number: string, settled: TypedTask) => {
-    const answered = terseTask(number, settled);
-    return {
-      task_number: answered.task_number,
-      task_type: answered.task_type,
-      ...(answered.task_type_error === undefined
-        ? {}
-        : { task_type_error: answered.task_type_error }),
-      ...(answered.note === undefined ? {} : { note: answered.note }),
-    };
-  };
+  const terseNumbers = (number: string, settled: TypedTask) =>
+    createdTaskNumbers(terseTask(number, settled));
   const taskReadings: DetailTable<CreatedTask<TaskAnswer>> = {
     terse: createdTaskAt(
       (number) => (settled) => terseNumbers(number, settled),
@@ -326,4 +326,21 @@ async function answeredCreateTransportTask(
     // reading of the create; it does not reshape one reading.
     (reading) => reading.value.answer(typed),
   );
+}
+
+/** What a created task answers at terse: its number and type, and why it is untyped when it is. */
+export function createdTaskNumbers(answered: {
+  readonly task_number: string | null;
+  readonly task_type: TaskType;
+  readonly task_type_error?: FailureEntry | undefined;
+  readonly note?: string | undefined;
+}) {
+  return {
+    task_number: answered.task_number,
+    task_type: answered.task_type,
+    ...(answered.task_type_error === undefined
+      ? {}
+      : { task_type_error: answered.task_type_error }),
+    ...(answered.note === undefined ? {} : { note: answered.note }),
+  };
 }

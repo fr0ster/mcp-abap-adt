@@ -10,21 +10,28 @@ import {
   breakpointsFromArgs,
   RUN_PROPERTY,
   runFromArgs,
-  SHARED_SET_SENTENCE,
   START_BREAKPOINTS_PROPERTY,
-  START_NEEDS_BREAKPOINTS_SENTENCE,
   START_PROPERTIES,
   startOptionsFromArgs,
-  TAKE_OVER_SENTENCE,
-  USER_MODE_SENTENCE,
 } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { DEBUG_STARTED } from '../../../lib/description/debugger';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugTakeOverListener',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. ${TAKE_OVER_SENTENCE} ${START_NEEDS_BREAKPOINTS_SENTENCE} Takes whose requests are caught, the debugging mode and the debugger settings. ${USER_MODE_SENTENCE} ${SHARED_SET_SENTENCE}`,
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Opens an ABAP debug session taking its user over from another debugger: arms breakpoints, listens for a debuggee and attaches the first one caught.',
+      ),
+      result: DEBUG_STARTED,
+    }),
+  ),
   inputSchema: z.object({
     ...START_BREAKPOINTS_PROPERTY,
     ...START_PROPERTIES,

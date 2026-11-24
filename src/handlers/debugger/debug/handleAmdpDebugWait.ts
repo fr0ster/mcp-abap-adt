@@ -1,19 +1,28 @@
 import * as z from 'zod';
 import { requireDebugger } from '../../../lib/debugger/access';
-import { terseAmdpEvent } from '../../../lib/debugger/amdpReadings';
-import { debugAnswer } from '../../../lib/debugger/answer';
+import { debugAnswer, terseAmdpState } from '../../../lib/debugger/answer';
 import {
   HOLD_SECONDS_PROPERTY,
   STATE_HANDLE_PROPERTY,
 } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { AMDP_STATE } from '../../../lib/description/debugger';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugWait',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] [debug] AMDP events of a debug session after waiting up to hold_seconds.',
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Waits for the AMDP events of a debug session, up to the seconds asked.',
+      ),
+      result: AMDP_STATE,
+    }),
+  ),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     ...HOLD_SECONDS_PROPERTY,
@@ -38,9 +47,6 @@ export async function handleAmdpDebugWait(
             : JSON.stringify(s),
       };
     },
-    (s) =>
-      s.state === 'event'
-        ? { state: 'event', events: s.events.map(terseAmdpEvent) }
-        : s,
+    terseAmdpState,
   );
 }

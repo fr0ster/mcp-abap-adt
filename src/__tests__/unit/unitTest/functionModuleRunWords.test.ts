@@ -18,7 +18,7 @@ describe('a function module run covers its function group', () => {
   it('RunFunctionModuleUnitTest says so for its default runner', () => {
     assert.ok(
       RunFunctionModuleUnitTest.description.includes(
-        `Runs ${GROUP_WORDS}: the function module named by function_module_name`,
+        'Runs the ABAP Unit tests of the function group holding a function module',
       ),
       RunFunctionModuleUnitTest.description,
     );
@@ -34,7 +34,14 @@ describe('a function module run covers its function group', () => {
     assert.ok(type.includes(`FUNC runs ${GROUP_WORDS}.`), type);
   });
 
-  for (const tool of [RunAbapUnit, HandlerUnitTestRun]) {
+  it("RunAbapUnit's description says so for a function module", () => {
+    assert.ok(
+      RunAbapUnit.description.includes("function module's group"),
+      RunAbapUnit.description,
+    );
+  });
+
+  for (const tool of [HandlerUnitTestRun]) {
     it(`${tool.name}'s description says so for FUNC`, () => {
       assert.ok(
         tool.description.includes(

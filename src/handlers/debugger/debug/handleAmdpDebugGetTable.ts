@@ -5,14 +5,24 @@ import {
 } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import {
+  purpose,
+  toolDescription,
+  untypedReturns,
+} from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugGetTable',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] [debug] Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the records of a table variable at the AMDP stop, up to 100, through a SELECT over it when one is set.',
+    ),
+    returns: untypedReturns(),
+  }),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     variable: z.string().describe('The table variable to read.'),

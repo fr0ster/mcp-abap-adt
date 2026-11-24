@@ -3,17 +3,27 @@ import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import {
   AMDP_BREAKPOINTS_PROPERTY,
-  AMDP_CATCH_SENTENCE,
   amdpBreakpointsFromArgs,
   STATE_HANDLE_PROPERTY,
 } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { AMDP_BREAKPOINTS } from '../../../lib/description/debugger';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugSetBreakpoints',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[debug] Sets the AMDP breakpoints of a debug session to the set given, as confirmed by the system. ${AMDP_CATCH_SENTENCE}`,
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Sets the AMDP breakpoints of a debug session to the set asked, as the system confirms them.',
+      ),
+      result: AMDP_BREAKPOINTS,
+    }),
+  ),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     ...AMDP_BREAKPOINTS_PROPERTY,

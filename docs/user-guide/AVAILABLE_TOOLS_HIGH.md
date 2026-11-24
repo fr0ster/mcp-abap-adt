@@ -261,7 +261,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="linkabapgitrepo-high-level-abapgit"></a>
 #### LinkAbapGitRepo (High-Level / Abapgit)
-**Description:** Links package_name to the remote repository at url on branch, and imports every object of the branch into the package and its subpackages, overwriting objects of the system and objects held by other packages, recorded in transport_request. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.
+**Description:** Links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
 
 **Source:** `src/handlers/abapgit/high/handleLinkAbapGitRepo.ts`
 
@@ -272,7 +272,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `transport_request` (string, optional) - The transport request that records the objects written.
 - `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
 
-**On ABAP Cloud (`cloud`):** Links package_name to the remote repository at url on branch, and links only: a pull imports the objects. folder_logic says how folders map to subpackages. Answers facts only: SAP's status, done, and the objects SAP lists.
+**On ABAP Cloud (`cloud`):** Links an ABAP package to a remote abapGit repository on a branch, mapping its folders to subpackages as asked. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
 
 **Parameters (`cloud`):**
 - `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
@@ -285,7 +285,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="pullabapgitrepo-high-level-abapgit"></a>
 #### PullAbapGitRepo (High-Level / Abapgit)
-**Description:** Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: every object changed in the remote is imported, objects changed in the system are overwritten, and objects held by other packages are written too. Ends on SAP's answer, or with background true runs on an ABAP session of its own. When SAP's request or its response is lost mid-import (an SSE or stdio close logs the connection off), the outcome is unknown to this server and what SAP does then is unverified (unread in SAP's code, unmeasured): the repository's staging read shows the current differences, whichever writes made them. Answers facts only: SAP's status, done, and the objects SAP lists.
+**Description:** Pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
 
 **Source:** `src/handlers/abapgit/high/handlePullAbapGitRepo.ts`
 
@@ -294,7 +294,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 - `transport_request` (string, optional) - The transport request that records the objects written.
 
-**On ABAP Cloud (`cloud`):** Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: the job takes every object the modified-objects read lists and brings it to its remote version, a package warning with action 5 (delete and re-create) excepted: SAP leaves it out; given overwrite, SAP selects by name against the list as it stands when its job runs: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state. SAP accepts it as its own job, which runs to its end whatever happens to the client or its connection after the call; the objects it imports are inactive, and the repository list shows its run state. Answers facts only: SAP's status and accepted.
+**On ABAP Cloud (`cloud`):** Pulls an abapGit repository from the branch it is linked on as an SAP job, recorded in a transport, its imported objects left inactive. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
 
 **Parameters (`cloud`):**
 - `overwrite` (array, optional) - The objects listed by GetAbapGitModifiedObjects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused, within one list or across both: SAP matches by name within each list, so a collision inside one list could take an object not named. SAP selects by name when its job runs, against the list as it stands then: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state; SAP leaves a package warning with action 5 (delete and re-create) out of every pull. Without it the job takes every other listed object.
@@ -305,7 +305,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="pushabapgitrepo-high-level-abapgit"></a>
 #### PushAbapGitRepo (High-Level / Abapgit)
-**Description:** Commits the objects and files chosen from the staging with comment, author and committer, and pushes the commit to the remote branch of the repository repository_key. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status and done.
+**Description:** Commits the objects and files chosen from an abapGit repository's staging, with its comment, author and committer, and pushes the commit to its remote branch. SAP's status and whether SAP made the change or accepted it as its own job.
 
 **Source:** `src/handlers/abapgit/high/handlePushAbapGitRepo.ts`
 
@@ -317,7 +317,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `objects` (array, required) - The objects and files to commit, each as GetAbapGitStaging with detail "medium" answers it.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 
-**On ABAP Cloud (`cloud`):** Commits the objects and files chosen from the staging with comment, author and committer, and pushes the commit to the remote branch of the repository repository_key. SAP accepts it as its own job, which runs to its end; the repository list shows its run state. Answers facts only: SAP's status and accepted.
+**On ABAP Cloud (`cloud`):** Commits the objects and files chosen from an abapGit repository's staging and pushes the commit to its remote branch, as an SAP job. SAP's status and whether SAP made the change or accepted it as its own job.
 
 **Parameters (`cloud`):**
 - `author` (object, required) - The commit author: name and email (GetAbapGitStaging answers the proposal of this system).
@@ -330,7 +330,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="switchabapgitbranch-high-level-abapgit"></a>
 #### SwitchAbapGitBranch (High-Level / Abapgit)
-**Description:** Switches the repository repository_key to branch; with create true, creates branch in the remote first when the remote lacks it; with create false and a branch the remote lacks, the repository stays on its branch and SAP answers success. Answers facts only: SAP's status.
+**Description:** Switches an abapGit repository to a branch, creating the branch in the remote first when asked. SAP's status and whether SAP made the change or accepted it as its own job.
 
 **Source:** `src/handlers/abapgit/high/handleSwitchAbapGitBranch.ts`
 
@@ -383,7 +383,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getatcrunstatus-high-level-atc"></a>
 #### GetATCRunStatus (High-Level / Atc)
-**Description:** [read-only] Answers whether the ATC run named by run_id has ended (a run started with wait=false answers its run_id). Answers the status the server reports and whether it is finished — finished means ended, whatever the checks found. The run's findings are read by its worklist_id.
+**Description:** [read-only] Reads the status of an ATC run by its id, and whether it has ended. The run's id, SAP's status of the run, whether the run has ended, the worklist holding its findings and the id of its result.
 
 **Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
 
@@ -394,7 +394,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="listatcresults-high-level-atc"></a>
 #### ListATCResults (High-Level / Atc)
-**Description:** [read-only] Lists the ATC results the system holds, newest first. Answers each result with its display_id, title, check_variant, run_series, created_at, the finding counts per priority and the failure count. created_by names whose results (a user name, or * for every user); central_only=true lists central results only; age_min and age_max bound the age in days, and when both are absent the system applies an age window of its own. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. How many results the system holds. For each result, newest first: its display id, its title, its check variant, its run series, when it was created, its finding counts per priority and its failure count. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleListATCResults.ts`
 
@@ -409,19 +409,11 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, program, program_include, function_include (with function_group, the include's function group), class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
+**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist. The check variant it ran, the worklist holding its findings, whether the call waited for the checks to end, the finding counts of a run waited for and the id of a started run to read its status by. For each object checked: its name, its type, the function group of a function include and the include of a class include.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
 **Parameters:**
-- `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
-- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
-- `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
-- `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
-
-**On ABAP Cloud (`cloud`):** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, function_include (with function_group, the include's function group), class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
-
-**Parameters (`cloud`):**
 - `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
 - `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
 - `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
@@ -2731,7 +2723,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimecreateprofilertraceparameters-high-level-system"></a>
 #### RuntimeCreateProfilerTraceParameters (High-Level / System)
-**Description:** [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
+**Description:** Schedules an ABAP profiler trace with its parameters, for a later profiled run of a class or a report. The profiler id a profiled run names.
 
 **Source:** `src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts`
 
@@ -2755,7 +2747,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimerunclass-high-level-system"></a>
 #### RuntimeRunClass (High-Level / System)
-**Description:** [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.
+**Description:** Runs an ABAP class implementing if_oo_adt_classrun and gives its console output, under the ABAP profiler when asked. The class that ran, its console output and the profiler and trace ids of a profiled run.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunClass.ts`
 
@@ -2785,7 +2777,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimerunprogram-high-level-system"></a>
 #### RuntimeRunProgram (High-Level / System)
-**Description:** [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).
+**Description:** Runs an ABAP report and gives its output, under the ABAP profiler when asked. The report that ran, its output and the profiler id of a profiled run.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunProgram.ts`
 
@@ -3097,7 +3089,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="addtransportobject-high-level-transport"></a>
 #### AddTransportObject (High-Level / Transport)
-**Description:** Adds the existing object named by object_name and object_type to the transport task named by transport_number, so it travels with the task's request.
+**Description:** Adds an existing ABAP object to a transport task, so it travels with the task's transport. Whether SAP took the change, that SAP's answer leaves the attachment unconfirmed, the transport task, the object named and where the change is confirmed.
 
 **Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
 
@@ -3114,7 +3106,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtransport-high-level-transport"></a>
 #### CreateTransport (High-Level / Transport)
-**Description:** Creates a transport request and gives the task SAP creates with it the type task_type (default S, Development/Correction). Response: JSON with transport_number and task_number (and task_type_error or a note when the task is left untyped); with detail medium, the request as created too.
+**Description:** Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked. The number of the transport created, the number of its task, SAP's refusal of the task type and what is left to do when the task stays untyped.
 
 **Source:** `src/handlers/transport/high/handleCreateTransport.ts`
 
@@ -3132,7 +3124,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtransporttask-high-level-transport"></a>
 #### CreateTransportTask (High-Level / Transport)
-**Description:** Creates a task under the existing transport request named by transport_number, owned by the user named by target_user, of the type task_type. The task is itself a request resource — it reads, writes and releases like one — and is what adding and removing an object entry address, since a request's objects live on its tasks. `target_user` is required: it names the task's owner, and an empty owner is refused with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses an added object on premise with SCTS_ADT_MSG 009 / TK127.
+**Description:** Creates a task of the type asked under an existing transport, owned by the SAP user named. The number of the task created, its type, SAP's refusal of the task type and what is left to do when the task stays untyped.
 
 **Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
 
@@ -3148,7 +3140,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="movetransportobjects-high-level-transport"></a>
 #### MoveTransportObjects (High-Level / Transport)
-**Description:** Moves the object entries named by objects from the transport task named by transport_number to the task named by target_number. Each entry is named by its position in the source task's object list.
+**Description:** Moves objects from one transport task to another, each at its position in the task it leaves. Whether SAP took the change, the task they leave, the task they move to and where the change is confirmed. For each object sent: the object named and its position in the task it leaves.
 
 **Source:** `src/handlers/transport/high/handleMoveTransportObjects.ts`
 
@@ -3164,7 +3156,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="removetransportobject-high-level-transport"></a>
 #### RemoveTransportObject (High-Level / Transport)
-**Description:** Removes the entry of the object named by object_name and object_type from the transport task named by transport_number, at position.
+**Description:** Removes a named object from a transport task, at its position among the task's objects. Whether SAP took the change, that SAP's answer leaves the removal unconfirmed, the transport task, the object named, its position in the task and where the change is confirmed.
 
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
 
@@ -3182,7 +3174,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="sortandcompresstransporttask-high-level-transport"></a>
 #### SortAndCompressTransportTask (High-Level / Transport)
-**Description:** Sorts the object list of the transport task named by transport_number and merges its duplicate entries. A task holding the same entry twice refuses removing an entry until this has run.
+**Description:** Sorts the objects of a transport task and merges its duplicates. Whether SAP took the change, the transport task and where the change is confirmed.
 
 **Source:** `src/handlers/transport/high/handleSortAndCompressTransportTask.ts`
 
@@ -3291,7 +3283,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.
+**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on. The run's id, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -3307,7 +3299,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runabapunit-high-level-unit-test"></a>
 #### RunAbapUnit (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the run target named by target. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, whose run covers the ABAP Unit tests of the module's whole function group, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.
+**Description:** Runs the ABAP Unit tests of a class, report, function group, function module's group, CDS view, package, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
 
@@ -3325,7 +3317,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runcdsunittest-high-level-unit-test"></a>
 #### RunCdsUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the CDS view test class named by class_name. The run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.
+**Description:** Runs the ABAP Unit tests of a CDS view test class, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
 
@@ -3338,7 +3330,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Runs every ABAP Unit test of the function group named by function_group_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out.
+**Description:** Runs every ABAP Unit test of a function group, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
@@ -3355,7 +3347,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the module's whole function group: the function module named by function_module_name is run, and SAP runs the tests of the function group holding it. runner async (default), addressed by function_module_name alone: the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group, called with wait left out.
+**Description:** Runs the ABAP Unit tests of the function group holding a function module, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
@@ -3373,7 +3365,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the report named by program_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** Runs the ABAP Unit tests of an ABAP report, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
@@ -3390,7 +3382,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the ABAP class named by class_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out.
+**Description:** Runs the ABAP Unit tests of an ABAP class, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 

@@ -6,14 +6,20 @@ import {
 } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugStop',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that failed to undo is reported and kept with the answers.',
+  description: toolDescription({
+    tag: 'debug',
+    purpose: purpose(
+      'Ends the AMDP part of a debug session, releasing a suspended debuggee first.',
+    ),
+    returns: [],
+  }),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),
 } as const;
 

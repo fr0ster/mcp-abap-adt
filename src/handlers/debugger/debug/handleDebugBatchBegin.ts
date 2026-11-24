@@ -1,13 +1,23 @@
 import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugBatchBegin.ts
 import { beginDebugBatch } from '../../../lib/batch/tools';
+import { purpose, toolDescription } from '../../../lib/description';
+import { RECORDING } from '../../../lib/description/debugger';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugBatchBegin',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] [debug] Starts the debugger batch on the stopped ABAP debuggee, else at the AMDP break. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable at the ABAP debuggee, and of step over, continue or the data preview of a table variable at the AMDP break, is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).',
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Starts recording the debugger calls at the stopped ABAP debuggee or at the AMDP break, each under the next number, to send them together.',
+      ),
+      result: RECORDING,
+    }),
+  ),
   inputSchema: z.object({}),
 } as const;
 

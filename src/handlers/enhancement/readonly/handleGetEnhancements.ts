@@ -1804,13 +1804,6 @@ async function enhancementsInPhases(
   );
 }
 
-/** The hosts whose call is one request: the elements, read directly. */
-const ONE_REQUEST_HOSTS: readonly HostSpelling[] = [
-  HOST_SPELLINGS.class,
-  HOST_SPELLINGS.group,
-  HOST_SPELLINGS.program,
-];
-
 /** An answer's payload: its JSON, else its text. */
 function payloadOfAnswer(result: McpResult): JsonValue {
   return jsonOrText(result.content[0]?.text ?? '');
@@ -1852,33 +1845,10 @@ export async function handleGetEnhancements(
 ) {
   const listed = args?.objects;
   try {
-    if (listed === undefined) {
-      const objectName = args.object_name;
-      if (!objectName) return await enhancementsOf(context, args);
-      const options = enhancementOptionsOf(args);
-      const kind = String(args.object_type ?? '')
-        .trim()
-        .toUpperCase();
-      // The elements of an object named by its type: one request.
-      if (
-        !options.includeNested &&
-        ONE_REQUEST_HOSTS.some((host) => spelledAs(kind, host))
-      ) {
-        return await enhancementsOf(context, args);
-      }
-      return await withSequentialFallback<McpResult>(
-        context,
-        async () =>
-          (
-            await enhancementsInPhases(
-              context,
-              [{ name: objectName, type: args.object_type }],
-              options,
-            )
-          )[0],
-        () => enhancementsOf(context, args),
-      );
-    }
+    // One object — its probes, its enhancements, its includes — is read
+    // in single requests, never in a batch envelope: a batch is for reads
+    // of several objects.
+    if (listed === undefined) return await enhancementsOf(context, args);
     if (
       args.object_name !== undefined ||
       args.object_type !== undefined ||
@@ -1898,6 +1868,21 @@ export async function handleGetEnhancements(
       return { ...rest, ...o };
     };
     const options = enhancementOptionsOf(args);
+    const oneByOne = async () => {
+      // One object after another, each as the single call reads it; a
+      // credential failure ends the call, and nothing after it is read.
+      const results: McpResult[] = [];
+      for (const o of objects) {
+        const result = await enhancementsOf(context, single(o));
+        if (endsList(result)) return result;
+        results.push(result);
+      }
+      return listAnswer(objects, results);
+    };
+    // A list naming one object reads it as the single call does.
+    if (objects.filter((o) => Boolean(o.object_name)).length < 2) {
+      return await oneByOne();
+    }
     return await withSequentialFallback<McpResult>(
       context,
       async () => {
@@ -1918,17 +1903,7 @@ export async function handleGetEnhancements(
         }
         return listAnswer(objects, results);
       },
-      async () => {
-        // One object after another, each as the single call reads it; a
-        // credential failure ends the call, and nothing after it is read.
-        const results: McpResult[] = [];
-        for (const o of objects) {
-          const result = await enhancementsOf(context, single(o));
-          if (endsList(result)) return result;
-          results.push(result);
-        }
-        return listAnswer(objects, results);
-      },
+      oneByOne,
     );
   } catch (error) {
     return return_error(error);

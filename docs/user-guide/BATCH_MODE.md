@@ -310,7 +310,10 @@ object stay single requests: a tool that reads one object, or probes one name fo
   goes in one envelope (before: up to three, one probe per object each), and each object's kind
   is decided over those answers as the sequential version decides it: a `404` means not that kind,
   and a probe the decision does not reach (the program probe of a class) is in nobody's answer.
-  One object's probes still go one per envelope.
+  One object — `object_name`, or `objects` naming one — sends no envelope at all: its probes, its
+  enhancements and, with `include_nested`, its includes go as single requests, in the order and with
+  the answer of the sequential version (before, they went in envelopes, one part each for the
+  probes).
 - **At most 300 reads per envelope** (`READS_PER_ENVELOPE`, `src/lib/batch/phases.ts`), as for
   `SearchSource`'s source reads: more independent reads go in consecutive envelopes, each judged
   as it answers. The same bound splits every phase of `GetEnhancements`. SAP's own limit is not

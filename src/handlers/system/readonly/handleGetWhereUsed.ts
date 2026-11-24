@@ -55,12 +55,20 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
   asJsonResult,
   asTextResult,
   byListing,
   type DetailLevel,
   entries,
   type Head,
+  headShape,
   type ListAnswerTable,
   type Listing,
   listAnswerAt,
@@ -69,6 +77,7 @@ import {
   partsOf,
   type RowSchemas,
   rows,
+  shapesOf,
   type TextResult,
   values,
   type Written,
@@ -85,7 +94,6 @@ import {
 } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { type JsonValue, jsonFields } from '../../../lib/json';
-import { withLongToolAdvice } from '../../../lib/longTools';
 import {
   ASSEMBLED_DETAIL_SHAPE,
   detailOf,
@@ -184,13 +192,82 @@ export function whereUsedTargetOf(
   return { object_name: name, object_type: code };
 }
 
+/** A reference SAP listed without a name: its URI, what tells it apart; `''` for a named one. */
+function namelessUri(reference: { name: string; uri?: string | undefined }) {
+  return reference.name === '' ? (reference.uri ?? '') : '';
+}
+
+/** The lists a WhereUsedListResult listing writes: what its description states. */
+export const WHERE_USED_LISTS: RowSchemas<WhereUsedListResult> = {
+  references: about(
+    'for each object that uses it, under its package',
+    rows('references', {
+      columns: [
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (reference: WhereUsedReference) => reference.type,
+        },
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (reference: WhereUsedReference) => reference.name,
+        },
+        {
+          name: 'uri',
+          means: 'its URI when SAP lists it nameless',
+          cell: namelessUri,
+        },
+        {
+          name: 'usage',
+          means: 'how it uses the object, where SAP tells it',
+          cell: (reference: WhereUsedReference) =>
+            reference.usage_information === COMMON_USAGE
+              ? ''
+              : (reference.usage_information ?? ''),
+        },
+      ],
+      header: 'always',
+      groups: [
+        {
+          label: 'package',
+          of: (reference: WhereUsedReference) => reference.package_name ?? '',
+          mode: 'gathered',
+        },
+      ],
+      // The terse shape (approved): usages only — the package and
+      // container nodes of SAP's tree carry no usage, and leave.
+      omit: omitting(
+        (reference: WhereUsedReference) =>
+          reference.usage_information === undefined ? 'node' : 'usage',
+        {
+          node: 'the packages and containers SAP groups the usages under are left out',
+        },
+      ),
+    }),
+  ),
+};
+
+/** The head every where-used listing opens with. */
+export const WHERE_USED_HEADS = [
+  headShape('total', 'how many references SAP counts'),
+];
+
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: withLongToolAdvice(
-      '[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }).',
-    ),
+    description: toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Finds where an ABAP class, function module, table or other repository object is used: every object that uses, calls or references it.',
+      ),
+      returns: returnsOf({
+        heads: WHERE_USED_HEADS,
+        shapes: [shapesOf(WHERE_USED_LISTS)],
+      }),
+      notes: [longRunning],
+    }),
     inputSchema: whereUsedSchema(variant, variant),
   })),
   // No variant stated: its type list unread (the call reads it).
@@ -390,45 +467,6 @@ function fullWhereUsed(result: WhereUsedListResult, args: WhereUsedArgs) {
   };
 }
 
-/** The lists a WhereUsedListResult listing writes: what its description states. */
-const WHERE_USED_LISTS: RowSchemas<WhereUsedListResult> = {
-  references: rows('references', {
-    columns: [
-      {
-        name: 'type',
-        cell: (reference: WhereUsedReference) => reference.type,
-      },
-      {
-        name: 'name',
-        cell: (reference: WhereUsedReference) => reference.name,
-      },
-      { name: 'uri', cell: namelessUri },
-      {
-        name: 'usage',
-        cell: (reference: WhereUsedReference) =>
-          reference.usage_information === COMMON_USAGE
-            ? ''
-            : (reference.usage_information ?? ''),
-      },
-    ],
-    header: 'always',
-    groups: [
-      {
-        label: 'package',
-        of: (reference: WhereUsedReference) => reference.package_name ?? '',
-        mode: 'gathered',
-      },
-    ],
-    // The terse shape (approved): usages only — the package and
-    // container nodes of SAP's tree carry no usage, and leave.
-    omit: omitting(
-      (reference: WhereUsedReference) =>
-        reference.usage_information === undefined ? 'node' : 'usage',
-      { node: 'a package or container node of the tree: no usage' },
-    ),
-  }),
-};
-
 /**
  * The usages as TSV, grouped by package (terse). A reference is a usage when
  * SAP gave it `usageInformation`; the package and container nodes of its
@@ -443,11 +481,6 @@ function whereUsedListing(
     reading: result,
     lists: WHERE_USED_LISTS,
   };
-}
-
-/** A reference SAP listed without a name: its URI, what tells it apart; `''` for a named one. */
-function namelessUri(reference: { name: string; uri?: string | undefined }) {
-  return reference.name === '' ? (reference.uri ?? '') : '';
 }
 
 /**

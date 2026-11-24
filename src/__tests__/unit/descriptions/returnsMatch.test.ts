@@ -41,6 +41,11 @@ import {
   DESCRIBED_LISTS,
 } from '../../../handlers/system/readonly/handleDescribeByList';
 import {
+  TOOL_DEFINITION as WHERE_USED,
+  WHERE_USED_HEADS,
+  WHERE_USED_LISTS,
+} from '../../../handlers/system/readonly/handleGetWhereUsed';
+import {
   TOOL_DEFINITION as SEARCH_SOURCE,
   SEARCH_SOURCE_HEADS,
   SEARCH_SOURCE_LISTS,
@@ -118,6 +123,7 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   SearchSource: SEARCH_SOURCE.description,
   SearchObject: SEARCH_OBJECT.description,
   DescribeByList: DESCRIBE_BY_LIST.description,
+  GetWhereUsed: WHERE_USED.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -251,6 +257,45 @@ const TIED: Readonly<Record<string, () => ReturnsTie>> = {
         {
           reading,
           lines: writtenLines({ heads: [], reading, lists: DESCRIBED_LISTS }),
+        },
+      ],
+    };
+  },
+  GetWhereUsed: () => {
+    const parts = partsOfDescription(descriptionOf('GetWhereUsed'));
+    assert.ok(parts !== undefined);
+    // A package node, a usage, and a usage SAP listed without a name.
+    const reading = {
+      totalReferences: 3,
+      references: [
+        { name: 'ZPKG', type: 'DEVC/K' },
+        {
+          name: 'ZCL_USER',
+          type: 'CLAS/OC',
+          package_name: 'ZPKG',
+          usage_information: 'gradeDirect,includeProductive',
+        },
+        {
+          name: '',
+          type: 'PROG/P',
+          uri: '/sap/bc/adt/x',
+          package_name: 'ZPKG',
+          usage_information: 'gradeIndirect',
+        },
+      ],
+    };
+    return {
+      terse: shapesOf(WHERE_USED_LISTS),
+      heads: WHERE_USED_HEADS,
+      returns: parts.returns,
+      samples: [
+        {
+          reading,
+          lines: writtenLines({
+            heads: [{ head: 'total', value: '3' }],
+            reading,
+            lists: WHERE_USED_LISTS,
+          }),
         },
       ],
     };

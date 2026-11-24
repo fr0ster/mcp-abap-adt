@@ -85,6 +85,12 @@
       "describe these objects: ZCL_A, ZIF_B, ZMY_TABLE",
       "що це за об'єкти ZCL_A, ZMY_TABLE і ZMY_PROG і в яких вони пакетах?",
       "опиши об'єкти ZCL_A, ZIF_B, ZMY_TABLE"
+    ],
+    "GetWhereUsed": [
+      "where is class ZCL_MY_CLASS used?",
+      "which objects call function module Z_MY_FM?",
+      "де використовується клас ZCL_MY_CLASS?",
+      "хто викликає функціональний модуль Z_MY_FM?"
     ]
   },
   "siblings": {},
@@ -120,6 +126,10 @@
     "DescribeByList: what are ZCL_A, ZMY_TABLE and ZMY_PROG, and which package is each in?",
     "DescribeByList: describe these objects: ZCL_A, ZIF_B, ZMY_TABLE",
     "DescribeByList: що це за об'єкти ZCL_A, ZMY_TABLE і ZMY_PROG і в яких вони пакетах?",
-    "DescribeByList: опиши об'єкти ZCL_A, ZIF_B, ZMY_TABLE"
+    "DescribeByList: опиши об'єкти ZCL_A, ZIF_B, ZMY_TABLE",
+    "GetWhereUsed: where is class ZCL_MY_CLASS used?",
+    "GetWhereUsed: which objects call function module Z_MY_FM?",
+    "GetWhereUsed: де використовується клас ZCL_MY_CLASS?",
+    "GetWhereUsed: хто викликає функціональний модуль Z_MY_FM?"
   ]
 }

@@ -1,6 +1,6 @@
 /**
  * The descriptions of the source readers (plan step 10.6, group 3): what is
- * read, at the version asked — the function alone (owner: a description is
+ * read — the function alone (owner: a description is
  * purely functional).
  */
 
@@ -19,25 +19,31 @@ export interface SourceReader {
   readonly notes?: readonly Note[] | undefined;
 }
 
-/** A source reader's description parts: "Reads the source of <object> at the version asked". */
+/** A source reader's description parts: "Reads the current source code of <object>". */
 export function sourceReader(reader: SourceReader): DescriptionParts {
   return {
     tag: 'read-only',
     purpose:
       reader.purpose ??
       purpose(
-        `Reads the source of ${reader.object} at the version asked${reader.metadata === true ? ', or its metadata' : ''}.`,
+        `Reads the current source code of ${reader.object}${reader.metadata === true ? ', or its metadata' : ''}.`,
       ),
     notes: reader.notes,
   };
 }
 
-/** A version source reader: "Reads the source of one version of <object>, from its version history". */
+/** A version source reader: "Reads an older version of <object>'s source from its version history". */
 export function versionSourceReader(object: string): DescriptionParts {
+  // One named object takes the possessive; a list, or `a CDS view (DDL
+  // source)`, takes `the source of`.
+  const source =
+    object.endsWith(')') || object.includes(',')
+      ? `the source of ${object}`
+      : `${object}'s source`;
   return {
     tag: 'read-only',
     purpose: purpose(
-      `Reads the source of one version of ${object}, from its version history.`,
+      `Reads an older version of ${source} from its version history.`,
     ),
   };
 }
@@ -46,6 +52,6 @@ export function versionSourceReader(object: string): DescriptionParts {
 export function versionHistoryReader(object: string): DescriptionParts {
   return {
     tag: 'read-only',
-    purpose: purpose(`Lists the version history of ${object}.`),
+    purpose: purpose(`Reads the version history of ${object}.`),
   };
 }

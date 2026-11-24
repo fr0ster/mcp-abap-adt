@@ -30,7 +30,7 @@ export const TOOL_DEFINITION = {
     sourceReader({
       object: 'an ABAP program',
       purpose: purpose(
-        "Reads the source of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, at the version asked, or its metadata.",
+        "Reads the current source code of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, or its metadata.",
       ),
       metadata: true,
     }),

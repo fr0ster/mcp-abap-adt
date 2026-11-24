@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
     sourceReader({
       object: 'an ABAP function module',
       purpose: purpose(
-        'Reads the source of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, at the version asked, or its metadata.',
+        'Reads the current source code of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.',
       ),
       metadata: true,
     }),

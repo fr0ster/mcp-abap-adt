@@ -5,24 +5,49 @@ import * as z from 'zod';
  * `close`, as its `SessionClose`.
  * Works on no connection of the instance.
  */
+import { TOOL_DEFINITION as SessionClose } from '../../../handlers/long_session/session/handleSessionClose';
+import { TOOL_DEFINITION as SessionOpen } from '../../../handlers/long_session/session/handleSessionOpen';
+import {
+  type DescriptionParts,
+  purpose,
+  toolDescription,
+  valueFrom,
+} from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
-import {
-  CLOSE_SESSION_WORDS,
-  closeLongSession,
-  OPEN_SESSION_WORDS,
-  openLongSession,
-} from '../../longSession/tools';
+import { closeLongSession, openLongSession } from '../../longSession/tools';
 import { textsOf } from '../memberTexts';
 
 /** `HandlerSession`'s actions. */
 export const SESSION_ACTIONS = ['open', 'close'] as const;
 type SessionAction = (typeof SESSION_ACTIONS)[number];
 
-const ACTION_SENTENCES: ReadonlyArray<readonly [SessionAction, string]> = [
-  ['open', `action 'open': ${OPEN_SESSION_WORDS}`],
-  ['close', `action 'close': ${CLOSE_SESSION_WORDS}`],
-];
+/** What each action does: the full set's tool of its meaning. */
+const ACTION_VALUES = {
+  open: valueFrom('open', SessionOpen.description),
+  close: valueFrom('close', SessionClose.description),
+} as const;
+
+/** `HandlerSession`'s parts with `actions`: each action by its function. */
+export function handlerSessionParts(
+  actions: readonly SessionAction[],
+): DescriptionParts {
+  const verbs = actions.map((action) =>
+    action === 'open' ? 'opens' : 'closes',
+  );
+  const verb = verbs.join(' or ');
+  return {
+    tag: 'read-only',
+    purpose: purpose(
+      `${verb.charAt(0).toUpperCase()}${verb.slice(1)} a long session on this server, which keeps its server instance and SAP connection between calls.`,
+    ),
+    returns: [],
+    values: {
+      of: 'action',
+      each: actions.map((action) => ACTION_VALUES[action]),
+    },
+  };
+}
 
 const ACTION_WORDS: ReadonlyArray<readonly [SessionAction, string]> = [
   ['open', 'open: open a long session and answer its state_handle.'],
@@ -32,7 +57,7 @@ const ACTION_WORDS: ReadonlyArray<readonly [SessionAction, string]> = [
 /** `HandlerSession`'s description and schema with `actions`. */
 export function handlerSessionDefinition(actions: readonly SessionAction[]) {
   return {
-    description: `[read-only] ${textsOf(actions, ACTION_SENTENCES).join(' ')}`,
+    description: toolDescription(handlerSessionParts(actions)),
     inputSchema: z.object({
       action: listedValues(actions).describe(
         textsOf(actions, ACTION_WORDS).join(' '),
@@ -43,7 +68,8 @@ export function handlerSessionDefinition(actions: readonly SessionAction[]) {
 
 export const TOOL_DEFINITION = {
   name: 'HandlerSession',
-  ...handlerSessionDefinition(SESSION_ACTIONS),
+  description: toolDescription(handlerSessionParts(SESSION_ACTIONS)),
+  inputSchema: handlerSessionDefinition(SESSION_ACTIONS).inputSchema,
 } as const;
 
 type SessionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;

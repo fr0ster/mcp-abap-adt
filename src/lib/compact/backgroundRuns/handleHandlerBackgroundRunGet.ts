@@ -1,11 +1,12 @@
 import * as z from 'zod';
+import { TOOL_DEFINITION as GetBackgroundRun } from '../../../handlers/background_run/readonly/handleGetBackgroundRun';
 import { answerBackgroundGet } from '../../backgroundRuns/answers';
+import { compactOf } from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerBackgroundRunGet',
-  description:
-    "[read-only] Reads one of your background runs by its run_handle: running; finished with what the run tool answered (the system answer as it is, an error included); or cancelled. A read run's finished or cancelled answer is answered once and then deleted, so a lost answer is read again by starting the read again; a code run's answer is kept until it is discarded.",
+  description: compactOf(GetBackgroundRun.description),
   inputSchema: z.object({
     run_handle: z
       .string()

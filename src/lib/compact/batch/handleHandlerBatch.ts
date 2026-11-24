@@ -12,6 +12,15 @@ import * as z from 'zod';
  */
 import { asksNumbers } from '../../batch/batchTools';
 import { answersOf, beginBatch, endBatch } from '../../batch/tools';
+import { RECORDED_OUTCOMES, RECORDED_SENT } from '../../description/debugger';
+import {
+  type DescriptionParts,
+  purpose,
+  resultReturns,
+  toolDescription,
+  valueParts,
+} from '../../description/index';
+import { CALLS_RECORDING } from '../../description/sessions';
 import type { HandlerContext, ToolArgs } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
 import { textsOf } from '../memberTexts';
@@ -20,21 +29,44 @@ import { textsOf } from '../memberTexts';
 export const BATCH_ACTIONS = ['begin', 'end', 'answers'] as const;
 type BatchAction = (typeof BATCH_ACTIONS)[number];
 
-/** Each action's sentence of the description: the full set's tool of its meaning. */
-const ACTION_SENTENCES: ReadonlyArray<readonly [BatchAction, string]> = [
-  [
-    'begin',
-    "action 'begin': Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).",
-  ],
-  [
-    'end',
-    "action 'end': Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.",
-  ],
-  [
-    'answers',
-    "action 'answers' (with number or numbers): Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.",
-  ],
-];
+/** Each action by its function, and what it answers. */
+const ACTION_VALUES = {
+  begin: valueParts('begin', {
+    purpose: purpose(
+      'Starts recording the calls of the tools that allow it, each under the next number, to send them together.',
+    ),
+    returns: resultReturns(CALLS_RECORDING),
+  }),
+  end: valueParts('end', {
+    purpose: purpose(
+      "Sends the recorded calls to SAP together, with the credentials in force, and splits SAP's answer by call.",
+    ),
+    returns: resultReturns(RECORDED_SENT),
+  }),
+  answers: valueParts('answers', {
+    purpose: purpose(
+      'Reads the answer of each recorded call of the last sending, by its number.',
+    ),
+    returns: resultReturns(RECORDED_OUTCOMES),
+  }),
+} as const;
+
+/** `HandlerBatch`'s parts with `actions`: each action by its function. */
+export function handlerBatchParts(
+  actions: readonly BatchAction[],
+): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: purpose(
+      "Records the calls of the tools that allow it and sends them to SAP together, then reads each call's answer by its number.",
+    ),
+    returns: [],
+    values: {
+      of: 'action',
+      each: actions.map((action) => ACTION_VALUES[action]),
+    },
+  };
+}
 
 /** Each action's words in `action`'s description. */
 const ACTION_WORDS: ReadonlyArray<readonly [BatchAction, string]> = [
@@ -70,7 +102,7 @@ const NUMBER_PROPERTIES = {
  */
 export function handlerBatchDefinition(actions: readonly BatchAction[]) {
   return {
-    description: `[read-only] ${textsOf(actions, ACTION_SENTENCES).join(' ')}`,
+    description: toolDescription(handlerBatchParts(actions)),
     inputSchema: z.object({
       action: listedValues(actions).describe(
         `${textsOf(actions, ACTION_WORDS).join('; ')}.`,
@@ -80,14 +112,9 @@ export function handlerBatchDefinition(actions: readonly BatchAction[]) {
   };
 }
 
-const ALL = handlerBatchDefinition(BATCH_ACTIONS);
-
-/** `HandlerBatch`'s description with every action. */
-export const HANDLER_BATCH_DESCRIPTION = ALL.description;
-
 export const TOOL_DEFINITION = {
   name: 'HandlerBatch',
-  description: HANDLER_BATCH_DESCRIPTION,
+  description: toolDescription(handlerBatchParts(BATCH_ACTIONS)),
   inputSchema: z.object({
     action: listedValues(BATCH_ACTIONS).describe(
       `${textsOf(BATCH_ACTIONS, ACTION_WORDS).join('; ')}.`,

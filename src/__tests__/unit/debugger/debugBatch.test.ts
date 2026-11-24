@@ -44,12 +44,13 @@ import {
   CompactDebugBatchHandlersGroup,
   CompactDebugHandlersGroup,
 } from '../../../lib/compact/debug/group';
-import { HANDLER_DEBUG_BATCH_DESCRIPTION } from '../../../lib/compact/debug/handleHandlerDebugBatch';
+import { TOOL_DEFINITION as HandlerDebugBatch_Tool } from '../../../lib/compact/debug/handleHandlerDebugBatch';
 import {
   AmdpSession,
   DebuggerInstance,
   DebugSession,
 } from '../../../lib/debugger/index';
+import { partsOfDescription } from '../../../lib/description';
 import {
   DebugBatchHandlersGroup,
   debugBatchToolEntries,
@@ -915,16 +916,14 @@ describe("DebugBatchAnswers, the full set's reader of the debugger batch", () =>
     assert.equal(schema.safeParse({ numbers: [] }).success, false);
   });
 
-  it("means what HandlerDebugBatch's answers action means, in the same words", () => {
-    const words = DebugBatchAnswers_Tool.description.replace(
-      '[read-only] ',
-      '',
-    );
-    assert.ok(
-      HANDLER_DEBUG_BATCH_DESCRIPTION.includes(
-        `action 'answers' (with number or numbers): ${words}`,
-      ),
-    );
+  it("means what HandlerDebugBatch's answers action means, in the same parts", () => {
+    const full = partsOfDescription(DebugBatchAnswers_Tool.description);
+    const answers = partsOfDescription(
+      HandlerDebugBatch_Tool.description,
+    )?.values?.each.find((value) => value.value === 'answers');
+    assert.ok(full !== undefined && answers !== undefined);
+    assert.equal(answers.purpose, full.purpose);
+    assert.deepStrictEqual(answers.returns, full.returns);
   });
 });
 

@@ -54,11 +54,14 @@ export function communicationBatch(logger?: ILogger): OpenBatch {
   return { connection, target, envelopes, recorded: [] };
 }
 
+/** What the batch's start answers: it is on, and the handle its calls carry. */
+export type BatchBegun = { batch: 'on'; state_handle?: string };
+
 /** The batch begin: a communication batch opened; answers `{ batch: 'on', state_handle }`. */
 export async function beginBatch(context: HandlerContext): Promise<McpResult> {
   const owner = ownerOf(context);
   owner.begin('communication', communicationBatch(context.logger));
-  const answer: { batch: 'on'; state_handle?: string } = { batch: 'on' };
+  const answer: BatchBegun = { batch: 'on' };
   if (context.state !== undefined) answer.state_handle = context.state.handle;
   return {
     isError: false,

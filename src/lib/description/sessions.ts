@@ -17,6 +17,7 @@ import type { ObjectsAnswerFacts, statusFacts } from '../abapGit/formats';
 import type { backgroundRunList } from '../backgroundRuns/answers';
 import type { BackgroundRunRecord } from '../backgroundRuns/contract';
 import type { BackgroundRunTools } from '../backgroundRuns/port';
+import type { BatchBegun } from '../batch/tools';
 import type { leftoverListAnswer } from '../leftoverSessions/answers';
 import type { LogoffOutcome } from '../leftoverSessions/port';
 import type { closedSession, openedSession } from '../longSession/tools';
@@ -31,6 +32,12 @@ export const SESSION_OPENED = resultShape<ReturnType<typeof openedSession>>({
 export const SESSION_CLOSED = resultShape<ReturnType<typeof closedSession>>({
   closed: 'whether the session is closed',
   held: 'the locks, recorded calls and debug session it held',
+});
+
+/** What the start of recording calls to send together answers. */
+export const CALLS_RECORDING = resultShape<BatchBegun>({
+  batch: 'that recording is on',
+  state_handle: 'the state handle every recorded call carries',
 });
 
 /** What the list of leftover sessions answers. */

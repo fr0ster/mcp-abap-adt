@@ -1,11 +1,12 @@
 import * as z from 'zod';
+import { TOOL_DEFINITION as LogoffLeftoverSession } from '../../../handlers/leftover_session/session/handleLogoffLeftoverSession';
+import { compactOf } from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { answerLeftoverLogoff } from '../../leftoverSessions/answers';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerLeftoverSessionLogoff',
-  description:
-    'Logs off a leftover SAP session (any role), releasing every lock it holds; only the logoff is sent, credential-free. Its record is deleted afterwards.',
+  description: compactOf(LogoffLeftoverSession.description),
   inputSchema: z.object({
     handle: z
       .string()

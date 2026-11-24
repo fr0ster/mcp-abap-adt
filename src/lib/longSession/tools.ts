@@ -28,13 +28,6 @@ import { ServerRefusal } from '../auth/serverRefusal';
 import { STATE_UNAVAILABLE_WORDS } from '../state/InstanceState';
 import type { SessionHolding } from '../state/longSession';
 
-/**
- * The sentences of open, shared by `SessionOpen` and `HandlerSession`'s
- * `action: 'open'`.
- */
-export const OPEN_SESSION_WORDS =
-  "Opens a long session on this server: the server instance and its SAP connection are kept for every call that carries the session's state_handle, until the session is closed or the server's idle bound passes between two calls. Answers the state_handle: send it as the state_handle argument of every call of the session (or in the x-mcp-state-handle header). Called with the state_handle of an instance that already holds state, or of an open session, answers that same state_handle and keeps what the instance holds. In batch mode it runs at once and the batch stays open.";
-
 /** Open: the long session marked open; answers `{ state_handle }`. */
 export async function openLongSession(
   context: HandlerContext,
@@ -63,13 +56,6 @@ export async function openLongSession(
     ],
   };
 }
-
-/**
- * The sentences of close, shared by `SessionClose` and `HandlerSession`'s
- * `action: 'close'`.
- */
-export const CLOSE_SESSION_WORDS =
-  'Closes the long session the state_handle names: once this answer is written the server instance is closed — every SAP session it holds is logged off, which releases the locks taken in it; an open batch and its recorded calls are dropped unsent — and the state_handle ends: a later call carrying it gets the unavailable-state answer. Answers that the session is closed and what it held: its locks, a batch, a debug session. Called with an unknown state_handle, or on a new instance, it gets the unavailable-state answer. In batch mode it runs at once and drops the batch.';
 
 /** Close: the instance's close asked; answers `{ closed, held }`. */
 export async function closeLongSession(

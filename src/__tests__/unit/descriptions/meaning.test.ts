@@ -90,9 +90,13 @@ const MEANING_FEWEST = 10;
 describe('description and name against function, through the local Ollama', () => {
   let tools: ServedTool[] = [];
   before(async () => {
+    // The union of what onprem and cloud serve: a tool on one only (the
+    // cloud's abapGit reads) is ranked too, each tool once.
     const all = [
       ...(await servedCatalog(setOf('core'))),
       ...(await servedCatalog(setOf('compact'))),
+      ...(await servedCatalog(setOf('core'), 'stdio', 'cloud')),
+      ...(await servedCatalog(setOf('compact'), 'stdio', 'cloud')),
     ];
     // A compact tool is ranked per action once group (10) of step 10.7
     // assembles its actions: until then none of its texts is assembled.
@@ -102,6 +106,8 @@ describe('description and name against function, through the local Ollama', () =
       // The tools only the HTTP transports serve (a long session, …).
       ...(await servedCatalog(setOf('core'), 'http')),
       ...(await servedCatalog(setOf('compact'), 'http')),
+      ...(await servedCatalog(setOf('core'), 'http', 'cloud')),
+      ...(await servedCatalog(setOf('compact'), 'http', 'cloud')),
     ].filter((tool) => {
       if (seen.has(tool.name)) return false;
       seen.add(tool.name);

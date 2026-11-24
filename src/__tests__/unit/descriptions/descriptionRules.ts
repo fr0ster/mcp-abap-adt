@@ -1,3 +1,5 @@
+import { typeCodesIn } from '../../../lib/description/purpose';
+
 /**
  * The rules a tool's description is held to (plan step 10.4): its purpose
  * is one sentence of at most `PURPOSE_LIMIT` characters, and it never says a word of the answer's form or of how the tool
@@ -106,10 +108,12 @@ export function purposeFaults(text: string, types?: string): string[] {
   const faults: string[] = [];
   // The object types a compact purpose names come from its schema enum:
   // counted as one word.
+  // The type codes beside the objects are generated too: not counted.
   const length =
-    types === undefined
+    (types === undefined
       ? text.length
-      : text.length - types.length + 'types'.length;
+      : text.length - types.length + 'types'.length) -
+    (types === undefined ? typeCodesIn(text).length : 0);
   if (length > PURPOSE_LIMIT) {
     faults.push(`longer than ${PURPOSE_LIMIT} characters (${length})`);
   }

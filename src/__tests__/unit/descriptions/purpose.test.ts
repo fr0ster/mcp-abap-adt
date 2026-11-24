@@ -20,6 +20,7 @@ import {
   toolDescription,
   withArticle,
 } from '../../../lib/description';
+import { withTypeCodes } from '../../../lib/description/purpose';
 import { LEVEL_SENTENCES, levelWords } from '../../../lib/strategies/detail';
 import { BINARIES } from '../../../lib/toolSet';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
@@ -44,6 +45,64 @@ function memberOf(value: unknown, key: string): unknown {
     ? Reflect.get(value, key)
     : undefined;
 }
+
+describe('the type codes beside the objects', () => {
+  it('writes the ADT object type after the first naming of each object', () => {
+    assert.equal(
+      withTypeCodes('Reads the source code of a RAP behavior definition.'),
+      'Reads the source code of a RAP behavior definition (BDEF).',
+    );
+    assert.equal(
+      withTypeCodes(
+        'Reads an ABAP class, program, function module or CDS view, or another class.',
+      ),
+      'Reads an ABAP class (CLAS), program (PROG), function module (FUGR/FF) or CDS view (DDLS), or another class.',
+    );
+    // The longest noun wins: a table type is no table, a behavior
+    // implementation class no class.
+    assert.equal(
+      withTypeCodes(
+        'Creates a table type for a behavior implementation class.',
+      ),
+      'Creates a table type (TTYP) for a behavior implementation class (BIMP).',
+    );
+    // A plural is the object too.
+    assert.equal(
+      withTypeCodes('Reads the classes of packages.'),
+      'Reads the classes (CLAS) of packages (DEVC).',
+    );
+  });
+
+  it('leaves alone what only sounds like an object', () => {
+    for (const text of [
+      'Reads the local test classes of nothing.',
+      'Updates its data class and delivery class.',
+      'Reads a value table.',
+      "Reads a repository object's structure.",
+      'Reads a profiler trace view.',
+      "Reads a class's local types.",
+      'Reads a classic thing.',
+    ]) {
+      assert.equal(withTypeCodes(text), text);
+    }
+    // An OData service binding is a service binding: `data ` only as a word.
+    assert.equal(
+      withTypeCodes('Deletes an OData service binding.'),
+      'Deletes an OData service binding (SRVB).',
+    );
+  });
+
+  it('every purpose minted carries its codes', () => {
+    assert.equal(
+      purpose('Deletes an ABAP data element.').text,
+      'Deletes an ABAP data element (DTEL).',
+    );
+    assert.equal(
+      pairsPurpose(['deletes a domain', 'deletes a package']).text,
+      'Deletes a domain (DOMA), deletes a package (DEVC).',
+    );
+  });
+});
 
 describe('the purpose rules', () => {
   it('takes one sentence of the function, in domain words', () => {
@@ -138,11 +197,11 @@ describe('the description builder', () => {
     });
     assert.equal(
       text,
-      `[read-only] Reads the objects a package holds. ${longRunning.text}`,
+      `[read-only] Reads the objects a package (DEVC) holds. ${longRunning.text}`,
     );
     assert.equal(
       toolDescription({ purpose: purpose('Reads a class.') }),
-      'Reads a class.',
+      'Reads a class (CLAS).',
     );
     // A tag written into the purpose is refused there: it comes from the flag.
     assert.ok(purposeFaults('[read-only] Reads a class.').includes('says "["'));
@@ -156,7 +215,7 @@ describe('the description builder', () => {
           ', under its lock.',
         ),
       }),
-      'Updates a class, updates an include, under its lock.',
+      'Updates a class (CLAS), updates an include (PROG/I), under its lock.',
     );
     // The pairs are generated: the length rule counts them as one word.
     const many = pairsPurpose(

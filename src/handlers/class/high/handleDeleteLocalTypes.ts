@@ -21,7 +21,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { deleteTool, purpose, results } from '../../../lib/description';
+import { deleteTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -40,7 +40,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Clears the local types of an ABAP class, activating the class when asked.',
     ),
-    result: results.WRITTEN_UNDER_LOCK,
   }),
   inputSchema: z.object({
     class_name: z.string().describe('Parent class name.'),

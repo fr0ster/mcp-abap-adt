@@ -44,7 +44,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description: updateTool({
     object: 'the source code of an existing ABAP program (report)',
-    how: ', activating it when asked, recorded in the transport given',
+    how: ', activating it when asked',
+    transported: true,
   }),
   inputSchema: z.object({
     program_name: z

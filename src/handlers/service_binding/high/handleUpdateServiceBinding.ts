@@ -98,7 +98,7 @@ import {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
-import { results, updateTool } from '../../../lib/description';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analysePublicationLockAnswer } from '../../../lib/strategies/lockAnswer';
@@ -118,7 +118,6 @@ export const TOOL_DEFINITION = {
   description: updateTool({
     object: 'the publication state of an existing OData service binding',
     how: ', publishing or unpublishing its service',
-    result: results.PUBLISHED,
   }),
   inputSchema: z.object({
     service_binding_name: z

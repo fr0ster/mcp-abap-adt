@@ -47,8 +47,10 @@ export const TOOL_DEFINITION = {
   name: 'UpdateStructure',
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
-    object: 'the DDL source of an existing ABAP structure',
-    how: ', activating it when asked, recorded in the transport given',
+    object:
+      'the DDL source of an existing ABAP structure, which defines its components',
+    how: ', activating it when asked',
+    transported: true,
   }),
   inputSchema: z.object({
     structure_name: z

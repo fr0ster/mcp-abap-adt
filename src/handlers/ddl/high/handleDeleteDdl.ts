@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: deleteTool({
     object: 'a CDS view or classic DDL view',
-    how: ', recorded in the transport given',
+    transported: true,
   }),
   inputSchema: z.object({
     ddl_name: z.string().describe('DDL source name.'),

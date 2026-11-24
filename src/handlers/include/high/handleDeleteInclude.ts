@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description: deleteTool({
     object: 'an ABAP include',
-    how: ', recorded in the transport given',
+    transported: true,
   }),
   inputSchema: z.object({
     include_name: z.string().describe('Include name.'),

@@ -6,7 +6,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  */
 
 import { answer } from '../../../lib/answer';
-import { deleteTool, purpose, results } from '../../../lib/description';
+import { deleteTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -20,7 +20,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Deletes the ABAP Unit test classes of an ABAP class, keeping the class.',
     ),
-    result: results.WRITTEN,
   }),
   inputSchema: z.object({
     class_name: z

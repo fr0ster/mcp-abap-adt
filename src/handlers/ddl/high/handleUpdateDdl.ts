@@ -44,7 +44,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     object: 'the DDL source of an existing CDS view or classic DDL view',
-    how: ', activating it when asked, recorded in the transport given',
+    how: ', activating it when asked',
+    transported: true,
   }),
   inputSchema: z.object({
     ddl_name: z.string().describe('DDL source name.'),

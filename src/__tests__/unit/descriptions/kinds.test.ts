@@ -1,16 +1,23 @@
 /**
  * Plan step 10.6: the uniform tool kinds' descriptions (`kinds.ts`) — each
- * factory's sentence pinned for two tools of different object types, and
+ * factory's sentence pinned for two tools of different object types (a
+ * create, update or delete by the served tool's own description, its
+ * purpose alone), and
  * the facts of a typed result (`resultShape`, `listOf`) generated from its
  * members' nouns, a member left out or invented refused by the compiler.
  */
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { TOOL_DEFINITION as DELETE_CLASS } from '../../../handlers/class/high/handleDeleteClass';
+import { TOOL_DEFINITION as CREATE_DATA_ELEMENT } from '../../../handlers/data_element/high/handleCreateDataElement';
+import { TOOL_DEFINITION as CREATE_DOMAIN } from '../../../handlers/domain/high/handleCreateDomain';
+import { TOOL_DEFINITION as UPDATE_DOMAIN } from '../../../handlers/domain/high/handleUpdateDomain';
+import { TOOL_DEFINITION as UPDATE_TABLE_LOW } from '../../../handlers/table/low/handleUpdateTable';
+import { TOOL_DEFINITION as DELETE_TABLE_TYPE } from '../../../handlers/table_type/high/handleDeleteTableType';
 import {
   activateTool,
   checkTool,
-  createTool,
   deleteTool,
   listOf,
   purpose,
@@ -18,109 +25,99 @@ import {
   resultShape,
   results,
   untypedReturns,
-  updateTool,
   validateTool,
 } from '../../../lib/description';
 import { factFaults, purposeFaults } from './descriptionRules';
 
-const WRITTEN = 'Whether SAP took the change.';
-const UNDER_LOCK =
-  'Whether SAP took the change and a lock left held when its release failed.';
+const MESSAGES =
+  "For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.";
 
 describe('the kind factories', () => {
-  it('create: the object, what the inputs add, whether SAP took it', () => {
+  it('create: the object and what the tool writes for it, the transport last, no facts', () => {
     assert.equal(
-      createTool({
-        object: 'an ABAP class',
-        how: 'in a package, with its description',
-      }),
-      `Creates an ABAP class in a package, with its description. ${WRITTEN}`,
+      CREATE_DATA_ELEMENT.description,
+      'Creates an ABAP data element in a package, typed by a domain, a built-in type or a reference, with its labels and search help, recorded in the transport given.',
     );
     assert.equal(
-      createTool({ object: 'an ABAP domain', how: 'in a package' }),
-      `Creates an ABAP domain in a package. ${WRITTEN}`,
+      CREATE_DOMAIN.description,
+      'Creates an ABAP domain in a package, with its data type, length, decimals, conversion exit, value table and fixed values, recorded in the transport given.',
     );
   });
 
-  it('update: whether SAP took it, and a lock left held', () => {
+  it('update: what it changes of the object, no facts', () => {
     assert.equal(
-      updateTool({
-        object: 'the source code of an ABAP interface',
-        how: ', activating it when asked',
-      }),
-      `Updates the source code of an ABAP interface, activating it when asked. ${UNDER_LOCK}`,
+      UPDATE_DOMAIN.description,
+      'Updates the data type, length, decimals, conversion exit, value table and fixed values of an existing ABAP domain, replacing them whole.',
     );
     assert.equal(
-      updateTool({ object: 'the description of an ABAP package' }),
-      `Updates the description of an ABAP package. ${UNDER_LOCK}`,
+      UPDATE_TABLE_LOW.description,
+      '[low-level] Updates the DDL source of an existing ABAP database table, which defines its key, components and delivery class, under a lock the caller holds.',
     );
   });
 
-  it("delete: SAP's deletion verdict", () => {
-    const deleted =
-      "Whether SAP deleted the object, its name and SAP's message about it.";
+  it('delete: the object, the transport last, no facts', () => {
     assert.equal(
-      deleteTool({ object: 'an ABAP class' }),
-      `Deletes an ABAP class. ${deleted}`,
+      DELETE_CLASS.description,
+      'Deletes an ABAP class, recorded in the transport given.',
     );
     assert.equal(
-      deleteTool({ object: 'an ABAP domain', tag: 'low-level' }),
-      `[low-level] Deletes an ABAP domain. ${deleted}`,
+      DELETE_TABLE_TYPE.description,
+      'Deletes an ABAP table type, recorded in the transport given.',
     );
   });
 
-  it('check: its function alone', () => {
+  it("check: the check's verdict, then each message", () => {
+    const checked = `Whether the check ran and SAP's status text. ${MESSAGES}`;
     assert.equal(
       checkTool({ object: 'an ABAP class', tag: 'read-only' }),
-      '[read-only] Checks the syntax of an ABAP class.',
+      `[read-only] Checks the syntax of an ABAP class. ${checked}`,
     );
     assert.equal(
       checkTool({ object: 'a CDS view', how: 'or of its source as given' }),
-      'Checks the syntax of a CDS view or of its source as given.',
+      `Checks the syntax of a CDS view or of its source as given. ${checked}`,
     );
   });
 
-  it('activate: its function alone', () => {
+  it("activate: the activation's verdict, then each message", () => {
+    const activated = `Whether SAP activated it, whether SAP generated it and whether it was already active. ${MESSAGES}`;
     assert.equal(
       activateTool({ object: 'an ABAP class' }),
-      'Activates an ABAP class.',
+      `Activates an ABAP class. ${activated}`,
     );
     assert.equal(
       activateTool({ object: 'an ABAP table', tag: 'low-level' }),
-      '[low-level] Activates an ABAP table.',
+      `[low-level] Activates an ABAP table. ${activated}`,
     );
   });
 
-  it('validate: its function alone', () => {
+  it("validate: the verdict and SAP's message", () => {
+    const validated =
+      "Whether the name is admissible and SAP's message about it.";
     assert.equal(
       validateTool({ object: 'the name of a new ABAP class' }),
-      'Validates the name of a new ABAP class.',
+      `Validates the name of a new ABAP class. ${validated}`,
     );
     assert.equal(
       validateTool({ object: 'the name of a new service binding' }),
-      'Validates the name of a new service binding.',
+      `Validates the name of a new service binding. ${validated}`,
     );
   });
 
-  it("a tool's own purpose replaces the kind's sentence; its facts stay the kind's", () => {
+  it("a tool's own purpose replaces the kind's sentence", () => {
     assert.equal(
       deleteTool({
         purpose: purpose('Clears the local types of an ABAP class.'),
-        result: results.WRITTEN_UNDER_LOCK,
       }),
-      `Clears the local types of an ABAP class. ${UNDER_LOCK}`,
+      'Clears the local types of an ABAP class.',
     );
   });
 
   it('every kind sentence and fact keeps the rules', () => {
     const shapes = [
       results.WRITTEN,
-      results.WRITTEN_UNDER_LOCK,
-      results.DELETED,
       results.CHECKED,
       results.ACTIVATED,
       results.VALIDATED,
-      results.PUBLISHED,
     ];
     for (const shape of shapes) {
       for (const fact of resultReturns(shape)) {

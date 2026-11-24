@@ -44,7 +44,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     object: 'the source code of an existing CDS metadata extension',
-    how: ', activating it when asked, recorded in the transport given',
+    how: ', activating it when asked',
+    transported: true,
   }),
   inputSchema: z.object({
     name: z.string().describe('Metadata Extension name'),

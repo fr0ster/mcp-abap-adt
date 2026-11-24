@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: deleteTool({
     object: 'an ABAP class',
-    how: ', recorded in the transport given',
+    transported: true,
   }),
   inputSchema: z.object({
     class_name: z.string().describe('Class name.'),

@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: deleteTool({
     object: 'a service definition',
-    how: ', recorded in the transport given',
+    transported: true,
   }),
   inputSchema: z.object({
     service_definition_name: z.string().describe('ServiceDefinition name.'),

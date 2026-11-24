@@ -37,7 +37,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'an ABAP function module',
-    how: 'in an existing function group, with its description, recorded in the transport given',
+    how: 'in an existing function group, with its description',
+    transported: true,
   }),
   inputSchema: createArguments('CreateFunctionModule', {
     function_group_name: z.string().describe('Parent function group name'),

@@ -113,8 +113,9 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description: updateTool({
-      object: 'the technical settings of an existing ABAP database table',
-      how: ', each setting given over the stored one, activating the table when asked',
+      object:
+        'the technical settings of an existing ABAP database table, its data class, size category, buffering and logging',
+      how: ', each given over the stored one',
     }),
     inputSchema: settingsSchema(variant),
   })),

@@ -23,7 +23,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
-import { results, updateTool } from '../../../lib/description';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -37,7 +37,6 @@ export const TOOL_DEFINITION = {
     tag: 'low-level',
     object: 'the source code of an existing ABAP program (report)',
     how: ', under a lock the caller holds',
-    result: results.WRITTEN,
   }),
   inputSchema: z.object({
     program_name: z

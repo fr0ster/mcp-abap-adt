@@ -35,7 +35,7 @@ import {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { results, updateTool } from '../../../lib/description';
+import { updateTool } from '../../../lib/description';
 import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -67,7 +67,6 @@ export const TOOL_DEFINITION = {
   description: updateTool({
     object: 'the definition of an existing ABAP table type',
     how: ': its description, the type it holds, its access type and primary key, activating it when asked',
-    result: results.STORED_TABLE_TYPE,
   }),
   inputSchema: z.object({
     table_type_name: z

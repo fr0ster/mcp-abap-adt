@@ -41,7 +41,7 @@ import {
   messageCarriedBy,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { results, updateTool } from '../../../lib/description';
+import { updateTool } from '../../../lib/description';
 import type {
   HandlerContext,
   ToolArgValue,
@@ -64,9 +64,9 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     tag: 'low-level',
-    object: 'the properties of an existing ABAP data element',
+    object:
+      'the type, labels, search help and SET/GET parameter of an existing ABAP data element',
     how: ', under a lock the caller holds',
-    result: results.WRITTEN,
   }),
   inputSchema: z.object({
     data_element_name: z

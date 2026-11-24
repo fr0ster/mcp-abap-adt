@@ -43,7 +43,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { createTool, results } from '../../../lib/description';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { domainChanges } from '../../../lib/strategies/documentChanges';
@@ -64,8 +64,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'an ABAP domain',
-    how: 'in a package, with its description, recorded in the transport given',
-    result: results.WRITTEN_UNDER_LOCK,
+    how: 'in a package, with its data type, length, decimals, conversion exit, value table and fixed values',
+    transported: true,
   }),
   inputSchema: createArguments('CreateDomain', {
     domain_name: z.string().describe('Domain name.'),

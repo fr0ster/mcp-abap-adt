@@ -454,7 +454,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Creates a RAP behavior definition for a root entity in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Creates a managed, unmanaged, abstract or projection RAP behavior definition for a root entity in a package, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
 
@@ -475,7 +475,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletebehaviordefinition-high-level-behavior-definition"></a>
 #### DeleteBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Deletes a RAP behavior definition, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes a RAP behavior definition, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_definition/high/handleDeleteBehaviorDefinition.ts`
 
@@ -507,7 +507,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatebehaviordefinition-high-level-behavior-definition"></a>
 #### UpdateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Updates the source code of an existing RAP behavior definition, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the source code of an existing RAP behavior definition, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`
 
@@ -527,7 +527,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Creates the RAP behavior implementation class of a behavior definition in a package, with its description, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates the RAP behavior implementation class of a behavior definition in a package, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
@@ -545,7 +545,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletebehaviorimplementation-high-level-behavior-implementation"></a>
 #### DeleteBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Deletes a RAP behavior implementation class, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes a RAP behavior implementation class, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_implementation/high/handleDeleteBehaviorImplementation.ts`
 
@@ -577,7 +577,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatebehaviorimplementation-high-level-behavior-implementation"></a>
 #### UpdateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Updates the implementations of an existing RAP behavior implementation class, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the implementations of an existing RAP behavior implementation class, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_implementation/high/handleUpdateBehaviorImplementation.ts`
 
@@ -627,7 +627,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Creates an ABAP class in a package, with its description, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates an ABAP class in a package, with its description, its superclass and its FINAL and CREATE PROTECTED settings, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -648,7 +648,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteclass-high-level-class"></a>
 #### DeleteClass (High-Level / Class)
-**Description:** Deletes an ABAP class, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP class, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleDeleteClass.ts`
 
@@ -663,7 +663,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocaldefinitions-high-level-class"></a>
 #### DeleteLocalDefinitions (High-Level / Class)
-**Description:** Clears the local definitions of an ABAP class, activating the class when asked. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Clears the local definitions of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalDefinitions.ts`
 
@@ -679,7 +679,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocalmacros-high-level-class"></a>
 #### DeleteLocalMacros (High-Level / Class)
-**Description:** Clears the local macros of an ABAP class, activating the class when asked. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Clears the local macros of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalMacros.ts`
 
@@ -695,7 +695,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocaltestclass-high-level-class"></a>
 #### DeleteLocalTestClass (High-Level / Class)
-**Description:** Clears the local test classes of an ABAP class, activating the class when asked. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Clears the local test classes of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
 
@@ -711,7 +711,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocaltypes-high-level-class"></a>
 #### DeleteLocalTypes (High-Level / Class)
-**Description:** Clears the local types of an ABAP class, activating the class when asked. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Clears the local types of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTypes.ts`
 
@@ -808,7 +808,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateclass-high-level-class"></a>
 #### UpdateClass (High-Level / Class)
-**Description:** Updates the source code of an existing ABAP class, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the source code of an existing ABAP class, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateClass.ts`
 
@@ -825,7 +825,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatelocaldefinitions-high-level-class"></a>
 #### UpdateLocalDefinitions (High-Level / Class)
-**Description:** Updates the local definitions of an existing ABAP class, activating the class when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the local definitions of an existing ABAP class, activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalDefinitions.ts`
 
@@ -842,7 +842,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatelocalmacros-high-level-class"></a>
 #### UpdateLocalMacros (High-Level / Class)
-**Description:** Updates the local macros of an existing ABAP class, activating the class when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the local macros of an existing ABAP class, activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalMacros.ts`
 
@@ -859,7 +859,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatelocaltestclass-high-level-class"></a>
 #### UpdateLocalTestClass (High-Level / Class)
-**Description:** Updates the local test classes of an existing ABAP class, activating the class when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the local test classes of an existing ABAP class, activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
@@ -876,7 +876,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatelocaltypes-high-level-class"></a>
 #### UpdateLocalTypes (High-Level / Class)
-**Description:** Updates the local types of an existing ABAP class, activating the class when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the local types of an existing ABAP class, activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTypes.ts`
 
@@ -1265,7 +1265,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createdataelement-high-level-data-element"></a>
 #### CreateDataElement (High-Level / Data Element)
-**Description:** Creates an ABAP data element in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Creates an ABAP data element in a package, typed by a domain, a built-in type or a reference, with its labels and search help, recorded in the transport given.
 
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
 
@@ -1295,7 +1295,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletedataelement-high-level-data-element"></a>
 #### DeleteDataElement (High-Level / Data Element)
-**Description:** Deletes an ABAP data element, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP data element, recorded in the transport given.
 
 **Source:** `src/handlers/data_element/high/handleDeleteDataElement.ts`
 
@@ -1324,7 +1324,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatedataelement-high-level-data-element"></a>
 #### UpdateDataElement (High-Level / Data Element)
-**Description:** Updates the properties of an existing ABAP data element, replacing them whole and activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the type, labels, search help and SET/GET parameter of an existing ABAP data element, replacing them whole and activating it when asked.
 
 **Source:** `src/handlers/data_element/high/handleUpdateDataElement.ts`
 
@@ -1386,7 +1386,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Creates a CDS view or classic DDL view in a package, with its description, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates a CDS view or classic DDL view in a package, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
@@ -1404,7 +1404,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteddl-high-level-ddl"></a>
 #### DeleteDdl (High-Level / Ddl)
-**Description:** Deletes a CDS view or classic DDL view, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes a CDS view or classic DDL view, recorded in the transport given.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
@@ -1436,7 +1436,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateddl-high-level-ddl"></a>
 #### UpdateDdl (High-Level / Ddl)
-**Description:** Updates the DDL source of an existing CDS view or classic DDL view, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the DDL source of an existing CDS view or classic DDL view, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
 
@@ -1484,7 +1484,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
-**Description:** Creates a CDS metadata extension in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Creates a CDS metadata extension in a package, with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
 
@@ -1503,7 +1503,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatemetadataextension-high-level-ddlx"></a>
 #### UpdateMetadataExtension (High-Level / Ddlx)
-**Description:** Updates the source code of an existing CDS metadata extension, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the source code of an existing CDS metadata extension, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`
 
@@ -1551,7 +1551,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createdomain-high-level-domain"></a>
 #### CreateDomain (High-Level / Domain)
-**Description:** Creates an ABAP domain in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Creates an ABAP domain in a package, with its data type, length, decimals, conversion exit, value table and fixed values, recorded in the transport given.
 
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
 
@@ -1578,7 +1578,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletedomain-high-level-domain"></a>
 #### DeleteDomain (High-Level / Domain)
-**Description:** Deletes an ABAP domain, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP domain, recorded in the transport given.
 
 **Source:** `src/handlers/domain/high/handleDeleteDomain.ts`
 
@@ -1607,7 +1607,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatedomain-high-level-domain"></a>
 #### UpdateDomain (High-Level / Domain)
-**Description:** Updates the properties of an existing ABAP domain, replacing them whole and activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the data type, length, decimals, conversion exit, value table and fixed values of an existing ABAP domain, replacing them whole.
 
 **Source:** `src/handlers/domain/high/handleUpdateDomain.ts`
 
@@ -1694,7 +1694,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
-**Description:** Creates an ABAP function group in a package, with its description, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates an ABAP function group in a package, with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionGroup.ts`
 
@@ -1713,7 +1713,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createfunctionmodule-high-level-function"></a>
 #### CreateFunctionModule (High-Level / Function)
-**Description:** Creates an ABAP function module in an existing function group, with its description, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates an ABAP function module in an existing function group, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionModule.ts`
 
@@ -1730,7 +1730,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
-**Description:** Updates the description of an existing ABAP function group, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the description of an existing ABAP function group, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 
@@ -1746,7 +1746,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatefunctionmodule-high-level-function"></a>
 #### UpdateFunctionModule (High-Level / Function)
-**Description:** Updates the source code of an existing ABAP function module, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the source code of an existing ABAP function module in its function group, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionModule.ts`
 
@@ -1767,7 +1767,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletefunctiongroup-high-level-function-group"></a>
 #### DeleteFunctionGroup (High-Level / Function Group)
-**Description:** Deletes an ABAP function group, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP function group, recorded in the transport given.
 
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
 
@@ -1799,7 +1799,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createfunctioninclude-high-level-function-include"></a>
 #### CreateFunctionInclude (High-Level / Function Include)
-**Description:** Creates an include in an existing ABAP function group, with its description, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates an include in an existing ABAP function group, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
 
@@ -1814,7 +1814,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletefunctioninclude-high-level-function-include"></a>
 #### DeleteFunctionInclude (High-Level / Function Include)
-**Description:** Deletes an include of an ABAP function group, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an include of an ABAP function group, recorded in the transport given.
 
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
@@ -1847,7 +1847,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletefunctionmodule-high-level-function-module"></a>
 #### DeleteFunctionModule (High-Level / Function Module)
-**Description:** Deletes an ABAP function module, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP function module, recorded in the transport given.
 
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
@@ -1898,7 +1898,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createinclude-high-level-include"></a>
 #### CreateInclude (High-Level / Include)
-**Description:** Creates an ABAP include in a package, with its description and the comment header SAP writes into it, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates an ABAP include in a package, with its description and the comment header SAP writes into it, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleCreateInclude.ts`
 
@@ -1916,7 +1916,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteinclude-high-level-include"></a>
 #### DeleteInclude (High-Level / Include)
-**Description:** Deletes an ABAP include, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP include, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleDeleteInclude.ts`
 
@@ -1931,7 +1931,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateinclude-high-level-include"></a>
 #### UpdateInclude (High-Level / Include)
-**Description:** Updates the source code of an existing ABAP include, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the source code of an existing ABAP include, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleUpdateInclude.ts`
 
@@ -1948,7 +1948,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateincludemetadata-high-level-include"></a>
 #### UpdateIncludeMetadata (High-Level / Include)
-**Description:** Updates the stored metadata of an existing ABAP include, replacing it whole, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the stored metadata of an existing ABAP include, replacing it whole, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleUpdateIncludeMetadata.ts`
 
@@ -1993,7 +1993,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
-**Description:** Creates an ABAP interface in a package, with its description, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates an ABAP interface in a package, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
 
@@ -2011,7 +2011,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteinterface-high-level-interface"></a>
 #### DeleteInterface (High-Level / Interface)
-**Description:** Deletes an ABAP interface, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP interface, recorded in the transport given.
 
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
 
@@ -2043,7 +2043,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateinterface-high-level-interface"></a>
 #### UpdateInterface (High-Level / Interface)
-**Description:** Updates the source code of an existing ABAP interface, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the source code of an existing ABAP interface, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
 
@@ -2063,7 +2063,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createmessageclass-high-level-message-class"></a>
 #### CreateMessageClass (High-Level / Message Class)
-**Description:** Creates an ABAP message class (T100) in a package, with its description, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates an ABAP message class (T100) in a package, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
 
@@ -2079,7 +2079,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createmessageclassmessage-high-level-message-class"></a>
 #### CreateMessageClassMessage (High-Level / Message Class)
-**Description:** Creates a message, with its number and text, in an existing ABAP message class (T100), recorded in the transport given. Whether SAP took the change.
+**Description:** Creates a message in an existing ABAP message class (T100), with its number, text and self-explanatory flag, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClassMessage.ts`
 
@@ -2095,7 +2095,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletemessageclass-high-level-message-class"></a>
 #### DeleteMessageClass (High-Level / Message Class)
-**Description:** Deletes an ABAP message class (T100) with all its messages, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP message class (T100) with all its messages, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
 
@@ -2108,7 +2108,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletemessageclassmessage-high-level-message-class"></a>
 #### DeleteMessageClassMessage (High-Level / Message Class)
-**Description:** Deletes one message, by its number, from an ABAP message class (T100), keeping the class and its other messages. Whether SAP deleted the message, the message class, the message number and a sentence saying so.
+**Description:** Deletes one message, by its number, from an ABAP message class (T100), keeping the class and its other messages.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClassMessage.ts`
 
@@ -2145,7 +2145,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatemessageclass-high-level-message-class"></a>
 #### UpdateMessageClass (High-Level / Message Class)
-**Description:** Updates the description of an existing ABAP message class (T100), recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the description of an existing ABAP message class (T100), recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClass.ts`
 
@@ -2159,7 +2159,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatemessageclassmessage-high-level-message-class"></a>
 #### UpdateMessageClassMessage (High-Level / Message Class)
-**Description:** Updates the text and flags of a message in an ABAP message class (T100), creating the message when the class lacks it, recorded in the transport given. Whether SAP took the change.
+**Description:** Updates the text and flags of a message in an ABAP message class (T100), creating the message when the class lacks it, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClassMessage.ts`
 
@@ -2178,7 +2178,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletemetadataextension-high-level-metadata-extension"></a>
 #### DeleteMetadataExtension (High-Level / Metadata Extension)
-**Description:** Deletes a CDS metadata extension, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes a CDS metadata extension, recorded in the transport given.
 
 **Source:** `src/handlers/metadata_extension/high/handleDeleteMetadataExtension.ts`
 
@@ -2250,7 +2250,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletepackage-high-level-package"></a>
 #### DeletePackage (High-Level / Package)
-**Description:** Deletes an ABAP package, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP package, recorded in the transport given.
 
 **Source:** `src/handlers/package/high/handleDeletePackage.ts`
 
@@ -2281,7 +2281,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatepackage-high-level-package"></a>
 #### UpdatePackage (High-Level / Package)
-**Description:** Updates the description of an existing ABAP package, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the description of an existing ABAP package, recorded in the transport given.
 
 **Source:** `src/handlers/package/high/handleUpdatePackage.ts`
 
@@ -2328,7 +2328,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
-**Description:** Creates an ABAP program (report) in a package, with its description, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates an executable ABAP program (report) in a package, with its description and application area, recorded in the transport given.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
@@ -2347,7 +2347,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteprogram-high-level-program"></a>
 #### DeleteProgram (High-Level / Program)
-**Description:** Deletes an ABAP program (report), recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP program (report), recorded in the transport given.
 
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
 
@@ -2379,7 +2379,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateprogram-high-level-program"></a>
 #### UpdateProgram (High-Level / Program)
-**Description:** Updates the source code of an existing ABAP program (report), activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the source code of an existing ABAP program (report), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/program/high/handleUpdateProgram.ts`
 
@@ -2413,7 +2413,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
-**Description:** Creates an OData service binding (V2 or V4, UI or Web API) for a service definition in a package, with its description, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates an OData V2 or V4 service binding, UI or Web API, for a service definition in a package, with its service name and version.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
@@ -2437,7 +2437,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteservicebinding-high-level-service-binding"></a>
 #### DeleteServiceBinding (High-Level / Service Binding)
-**Description:** Deletes an OData service binding, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an OData service binding, recorded in the transport given.
 
 **Source:** `src/handlers/service_binding/high/handleDeleteServiceBinding.ts`
 
@@ -2479,7 +2479,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateservicebinding-high-level-service-binding"></a>
 #### UpdateServiceBinding (High-Level / Service Binding)
-**Description:** Updates the publication state of an existing OData service binding, publishing or unpublishing its service. Whether SAP made the change or started it, whether it has completed or runs in the background, SAP's severity, SAP's status text, what a started change means for the service and a lock left held when its release failed.
+**Description:** Updates the publication state of an existing OData service binding, publishing or unpublishing its service.
 
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
 
@@ -2531,7 +2531,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
-**Description:** Creates a service definition exposing CDS views as an OData service in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Creates a service definition exposing CDS views as an OData service in a package, with its source code when given, activating it when asked.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
 
@@ -2551,7 +2551,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteservicedefinition-high-level-service-definition"></a>
 #### DeleteServiceDefinition (High-Level / Service Definition)
-**Description:** Deletes a service definition, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes a service definition, recorded in the transport given.
 
 **Source:** `src/handlers/service_definition/high/handleDeleteServiceDefinition.ts`
 
@@ -2583,7 +2583,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateservicedefinition-high-level-service-definition"></a>
 #### UpdateServiceDefinition (High-Level / Service Definition)
-**Description:** Updates the source code of an existing service definition, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the source code of an existing service definition, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/service_definition/high/handleUpdateServiceDefinition.ts`
 
@@ -2632,7 +2632,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createstructure-high-level-structure"></a>
 #### CreateStructure (High-Level / Structure)
-**Description:** Creates an ABAP structure in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Creates an ABAP structure in a package, with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/structure/high/handleCreateStructure.ts`
 
@@ -2653,7 +2653,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletestructure-high-level-structure"></a>
 #### DeleteStructure (High-Level / Structure)
-**Description:** Deletes an ABAP structure, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP structure, recorded in the transport given.
 
 **Source:** `src/handlers/structure/high/handleDeleteStructure.ts`
 
@@ -2685,7 +2685,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatestructure-high-level-structure"></a>
 #### UpdateStructure (High-Level / Structure)
-**Description:** Updates the DDL source of an existing ABAP structure, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the DDL source of an existing ABAP structure, which defines its components, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/structure/high/handleUpdateStructure.ts`
 
@@ -2836,7 +2836,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
-**Description:** Creates an ABAP database table in a package, with its description, recorded in the transport given. Whether SAP took the change.
+**Description:** Creates an ABAP database table by its name in a package, recorded in the transport given.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
@@ -2854,7 +2854,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletetable-high-level-table"></a>
 #### DeleteTable (High-Level / Table)
-**Description:** Deletes an ABAP database table, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP database table, recorded in the transport given.
 
 **Source:** `src/handlers/table/high/handleDeleteTable.ts`
 
@@ -2886,7 +2886,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatetable-high-level-table"></a>
 #### UpdateTable (High-Level / Table)
-**Description:** Updates the DDL source of an existing ABAP database table, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the DDL source of an existing ABAP database table, which defines its key, components and delivery class, activating it when asked.
 
 **Source:** `src/handlers/table/high/handleUpdateTable.ts`
 
@@ -2903,7 +2903,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatetablesettings-high-level-table"></a>
 #### UpdateTableSettings (High-Level / Table)
-**Description:** Updates the technical settings of an existing ABAP database table, each setting given over the stored one, activating the table when asked. Whether SAP took the change and a lock left held when its release failed.
+**Description:** Updates the technical settings of an existing ABAP database table, its data class, size category, buffering and logging, each given over the stored one.
 
 **Source:** `src/handlers/table/high/handleUpdateTableSettings.ts`
 
@@ -2921,7 +2921,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `translation` (string, optional) - Translation value; the translation flags keep their stored values.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if the table is local or already in a transport request.
 
-**On ABAP Cloud (`cloud`):** Updates the technical settings of an existing ABAP database table, each setting given over the stored one, activating the table when asked. Whether SAP took the change and a lock left held when its release failed.
+**On ABAP Cloud (`cloud`):** Updates the technical settings of an existing ABAP database table, its data class, size category, buffering and logging, each given over the stored one.
 
 **Parameters (`cloud`):**
 - `activate` (boolean, required) - true activates the table after the settings are written; false leaves them inactive.
@@ -2973,7 +2973,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtabletype-high-level-table-type"></a>
 #### CreateTableType (High-Level / Table Type)
-**Description:** Creates an ABAP table type in a package, with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given. Whether SAP took the change, a lock left held when its release failed, the version its stored definition was read at and SAP's failure when that read failed.
+**Description:** Creates an ABAP table type in a package, with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/table_type/high/handleCreateTableType.ts`
 
@@ -2999,7 +2999,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletetabletype-high-level-table-type"></a>
 #### DeleteTableType (High-Level / Table Type)
-**Description:** Deletes an ABAP table type, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes an ABAP table type, recorded in the transport given.
 
 **Source:** `src/handlers/table_type/high/handleDeleteTableType.ts`
 
@@ -3028,7 +3028,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatetabletype-high-level-table-type"></a>
 #### UpdateTableType (High-Level / Table Type)
-**Description:** Updates the definition of an existing ABAP table type : its description, the type it holds, its access type and primary key, activating it when asked. Whether SAP took the change, a lock left held when its release failed, the version its stored definition was read at and SAP's failure when that read failed.
+**Description:** Updates the definition of an existing ABAP table type: its description, the type it holds, its access type and primary key, activating it when asked.
 
 **Source:** `src/handlers/table_type/high/handleUpdateTableType.ts`
 
@@ -3056,7 +3056,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatetextelements-high-level-text-elements"></a>
 #### UpdateTextElements (High-Level / Text Elements)
-**Description:** Updates the text elements of an existing ABAP program, function group or class, each part given replacing its stored one, activating the object when asked. Whether SAP took the change and a lock left held when its release failed. For each part SAP saved: its name and what was saved.
+**Description:** Updates the text elements of an existing ABAP program, function group or class, each part given replacing its stored one, activating the object when asked.
 
 **Source:** `src/handlers/text_elements/high/handleUpdateTextElements.ts`
 
@@ -3070,7 +3070,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `symbols` (array, optional) - The text symbols: the whole list; symbols left out are deleted.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if the object is local or already in a transport request.
 
-**On ABAP Cloud (`cloud`):** Updates the text elements of an existing ABAP program, function group or class, each part given replacing its stored one, activating the object when asked. Whether SAP took the change and a lock left held when its release failed. For each part SAP saved: its name and what was saved.
+**On ABAP Cloud (`cloud`):** Updates the text elements of an existing ABAP program, function group or class, each part given replacing its stored one, activating the object when asked.
 
 **Parameters (`cloud`):**
 - `activate` (boolean, required) - true activates the object together with its text elements after the write; false leaves them inactive.
@@ -3191,7 +3191,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Creates an ABAP Unit test class for a CDS view in a package, from the test class source given, once the view supports CDS test doubles. Whether SAP took the change.
+**Description:** Creates an ABAP Unit test class for a CDS view in a package, from the test class source given, once the view supports CDS test doubles.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
@@ -3209,7 +3209,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createfunctiongroupunittest-high-level-unit-test"></a>
 #### CreateFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of an ABAP function group from the test class source given, in a test include activated with the group. Whether SAP took the change.
+**Description:** Creates the ABAP Unit test classes of an ABAP function group from the test class source given, in a test include activated with the group.
 
 **Source:** `src/handlers/unit_test/high/handleCreateFunctionGroupUnitTest.ts`
 
@@ -3223,7 +3223,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createprogramunittest-high-level-unit-test"></a>
 #### CreateProgramUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of an ABAP report from the test class source given, in a test include of the report, and activates the report. Whether SAP took the change.
+**Description:** Creates the ABAP Unit test classes of an ABAP report from the test class source given, in a test include of the report, and activates the report.
 
 **Source:** `src/handlers/unit_test/high/handleCreateProgramUnitTest.ts`
 
@@ -3237,7 +3237,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of an ABAP class from the test class source given, as its local test classes, and activates the class. Whether SAP took the change.
+**Description:** Creates the ABAP Unit test classes of an ABAP class from the test class source given, as its local test classes, and activates the class.
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
@@ -3253,7 +3253,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletecdsunittest-high-level-unit-test"></a>
 #### DeleteCdsUnitTest (High-Level / Unit Test)
-**Description:** Deletes a CDS view test class, with the ABAP Unit test classes it holds. Whether SAP deleted the object, its name and SAP's message about it.
+**Description:** Deletes a CDS view test class, with the ABAP Unit test classes it holds.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
 
@@ -3268,7 +3268,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteunittest-high-level-unit-test"></a>
 #### DeleteUnitTest (High-Level / Unit Test)
-**Description:** Deletes the ABAP Unit test classes of an ABAP class, keeping the class. Whether SAP took the change.
+**Description:** Deletes the ABAP Unit test classes of an ABAP class, keeping the class.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteUnitTest.ts`
 
@@ -3399,7 +3399,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** Updates the ABAP Unit test classes of a CDS view test class from the test class source given, activating it, recorded in the transport given. Whether SAP took the change.
+**Description:** Updates the ABAP Unit test classes of a CDS view test class from the test class source given, activating it, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
@@ -3415,7 +3415,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatefunctiongroupunittest-high-level-unit-test"></a>
 #### UpdateFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Updates the ABAP Unit test classes of an ABAP function group from the test class source given, activating the group, recorded in the transport given. Whether SAP took the change.
+**Description:** Updates the ABAP Unit test classes of an ABAP function group from the test class source given, activating the group, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateFunctionGroupUnitTest.ts`
 
@@ -3429,7 +3429,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateprogramunittest-high-level-unit-test"></a>
 #### UpdateProgramUnitTest (High-Level / Unit Test)
-**Description:** Updates the ABAP Unit test classes of an ABAP report from the test class source given, activating the report, recorded in the transport given. Whether SAP took the change.
+**Description:** Updates the ABAP Unit test classes of an ABAP report from the test class source given, activating the report, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateProgramUnitTest.ts`
 
@@ -3443,7 +3443,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateunittest-high-level-unit-test"></a>
 #### UpdateUnitTest (High-Level / Unit Test)
-**Description:** Updates the ABAP Unit test classes of an ABAP class from the test class source given, activating the class, recorded in the transport given. Whether SAP took the change.
+**Description:** Updates the ABAP Unit test classes of an ABAP class from the test class source given, activating the class, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateUnitTest.ts`
 

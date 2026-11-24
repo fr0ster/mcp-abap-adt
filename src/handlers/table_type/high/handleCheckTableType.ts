@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { checkTool, purpose, results } from '../../../lib/description';
+import { checkTool, purpose } from '../../../lib/description';
 /**
  * CheckTableType: a delegating wrapper over its low-tier sibling. It reaches
  * the sibling's `detail`-bearing projection through that delegation but
@@ -16,7 +16,6 @@ export const TOOL_DEFINITION = {
   description: checkTool({
     tag: 'read-only',
     purpose: purpose('Checks an ABAP table type for errors and warnings.'),
-    result: results.CHECKED_NAMED,
   }),
   inputSchema: z.object({
     table_type_name: z.string().describe('Table type name.'),

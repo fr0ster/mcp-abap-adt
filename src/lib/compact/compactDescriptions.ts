@@ -31,18 +31,13 @@ import {
   valueParts,
 } from '../description/index';
 import {
-  ACTIVATED,
   ACTIVATION_RUN_RESULTS,
   ACTIVATION_RUN_STATUS,
-  ACTIVATION_STARTED,
-  CHECKED,
   DELETED,
   DELETION_CHECKED,
   HELD_LOCK,
   PUBLISHED,
-  TRANSPORT_CHECKED,
   UNLOCKED,
-  VALIDATED,
   WRITTEN,
   WRITTEN_UNDER_LOCK,
 } from '../description/results';
@@ -506,12 +501,7 @@ export function compactValidateParts(
     purpose: purpose(
       'Validates the name of a new ABAP repository object of the type object_type names, before it is created.',
     ),
-    returns: [
-      ...resultReturns(VALIDATED),
-      ...(members.includes('SERVICE_BINDING')
-        ? resultReturns(TRANSPORT_CHECKED, 'for SERVICE_BINDING:')
-        : []),
-    ],
+    returns: [],
     members: membersTaken('object_type required', members.map(validateToken)),
   };
 }
@@ -550,7 +540,7 @@ export function compactCheckRunParts(
     purpose: purpose(
       `Checks the syntax of the ABAP repository object of the type object_type names${when(unsaved.length > 0, ', as stored or as the source given')}.`,
     ),
-    returns: resultReturns(CHECKED),
+    returns: [],
     members: membersTaken('object_type required', members.map(checkToken)),
   };
 }
@@ -622,10 +612,7 @@ export function compactActivateParts(
     purpose: purpose(
       'Activates the ABAP repository object named, by its type or its ADT type, or the objects listed, at once or by an activation run it starts.',
     ),
-    returns: [
-      ...resultReturns(ACTIVATED),
-      ...resultReturns(ACTIVATION_STARTED, 'for an activation run:'),
-    ],
+    returns: [],
     members: membersTaken('object_type', members.map(activateToken)),
   };
 }

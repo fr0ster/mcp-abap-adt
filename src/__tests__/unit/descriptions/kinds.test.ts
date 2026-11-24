@@ -26,8 +26,6 @@ import { factFaults, purposeFaults } from './descriptionRules';
 const WRITTEN = 'Whether SAP took the change.';
 const UNDER_LOCK =
   'Whether SAP took the change and a lock left held when its release failed.';
-const MESSAGES =
-  "For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.";
 
 describe('the kind factories', () => {
   it('create: the object, what the inputs add, whether SAP took it', () => {
@@ -71,40 +69,36 @@ describe('the kind factories', () => {
     );
   });
 
-  it("check: the check's verdict, then each message", () => {
-    const checked = `Whether the check ran and SAP's status text. ${MESSAGES}`;
+  it('check: its function alone', () => {
     assert.equal(
       checkTool({ object: 'an ABAP class', tag: 'read-only' }),
-      `[read-only] Checks the syntax of an ABAP class. ${checked}`,
+      '[read-only] Checks the syntax of an ABAP class.',
     );
     assert.equal(
       checkTool({ object: 'a CDS view', how: 'or of its source as given' }),
-      `Checks the syntax of a CDS view or of its source as given. ${checked}`,
+      'Checks the syntax of a CDS view or of its source as given.',
     );
   });
 
-  it("activate: the activation's verdict, then each message", () => {
-    const activated = `Whether SAP activated it, whether SAP generated it and whether it was already active. ${MESSAGES}`;
+  it('activate: its function alone', () => {
     assert.equal(
       activateTool({ object: 'an ABAP class' }),
-      `Activates an ABAP class. ${activated}`,
+      'Activates an ABAP class.',
     );
     assert.equal(
       activateTool({ object: 'an ABAP table', tag: 'low-level' }),
-      `[low-level] Activates an ABAP table. ${activated}`,
+      '[low-level] Activates an ABAP table.',
     );
   });
 
-  it("validate: the verdict and SAP's message", () => {
-    const validated =
-      "Whether the name is admissible and SAP's message about it.";
+  it('validate: its function alone', () => {
     assert.equal(
       validateTool({ object: 'the name of a new ABAP class' }),
-      `Validates the name of a new ABAP class. ${validated}`,
+      'Validates the name of a new ABAP class.',
     );
     assert.equal(
       validateTool({ object: 'the name of a new service binding' }),
-      `Validates the name of a new service binding. ${validated}`,
+      'Validates the name of a new service binding.',
     );
   });
 

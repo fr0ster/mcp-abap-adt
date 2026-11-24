@@ -46,7 +46,7 @@ import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { results, validateTool } from '../../../lib/description';
+import { validateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import {
@@ -63,7 +63,6 @@ export const TOOL_DEFINITION = {
     tag: 'read-only',
     object: 'a new OData service binding for a service definition',
     how: ", in the package and version given, by SAP's transport check of its name and package",
-    result: results.TRANSPORT_CHECKED,
   }),
   inputSchema: z.object({
     service_binding_name: z

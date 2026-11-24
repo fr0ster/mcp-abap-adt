@@ -9,14 +9,7 @@
 
 import type { Note } from './notes';
 import { type Purpose, purpose } from './purpose';
-import {
-  ACTIVATED,
-  CHECKED,
-  DELETED,
-  VALIDATED,
-  WRITTEN,
-  WRITTEN_UNDER_LOCK,
-} from './results';
+import { DELETED, WRITTEN, WRITTEN_UNDER_LOCK } from './results';
 import { type ResultShape, resultReturns } from './returns';
 import { type DescriptionTag, toolDescription } from './toolDescription';
 
@@ -73,17 +66,34 @@ export function deleteTool(tool: KindTool): string {
   return kind('Deletes', DELETED, tool);
 }
 
-/** A check: `Checks the syntax of <object> <how>.`, then the check's verdict and messages. */
-export function checkTool(tool: KindTool): string {
-  return kind('Checks the syntax of', CHECKED, tool);
+/**
+ * A check, an activation or a validation: its function alone, one sentence
+ * (owner, after the query measurement: the verdict and its messages, the
+ * same on every such tool, diluted each tool's function).
+ */
+function verdictless(verb: string, tool: VerdictTool): string {
+  return toolDescription({
+    tag: tool.tag,
+    purpose: tool.purpose ?? sentenceOf(verb, tool),
+    returns: [],
+    notes: tool.notes,
+  });
 }
 
-/** An activation: `Activates <object> <how>.`, then the activation's verdict and messages. */
-export function activateTool(tool: KindTool): string {
-  return kind('Activates', ACTIVATED, tool);
+/** A check, an activation or a validation: what it acts on, and what its inputs add. */
+export type VerdictTool = Omit<KindTool, 'result'>;
+
+/** A check: `Checks the syntax of <object> <how>.` */
+export function checkTool(tool: VerdictTool): string {
+  return verdictless('Checks the syntax of', tool);
 }
 
-/** A validation: `Validates <object> <how>.`, then the verdict and SAP's message. */
-export function validateTool(tool: KindTool): string {
-  return kind('Validates', VALIDATED, tool);
+/** An activation: `Activates <object> <how>.` */
+export function activateTool(tool: VerdictTool): string {
+  return verdictless('Activates', tool);
+}
+
+/** A validation: `Validates <object> <how>.` */
+export function validateTool(tool: VerdictTool): string {
+  return verdictless('Validates', tool);
 }

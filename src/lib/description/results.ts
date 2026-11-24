@@ -5,7 +5,6 @@
  * not compile; only the members a terse answer writes are stated.
  */
 
-import type { startedActivationAnswer } from '../../handlers/common/low/handleActivateObject';
 import type {
   activationResultsAnswer,
   activationStatusAnswer,
@@ -114,13 +113,6 @@ export const DELETION_CHECKED = resultShape<DeletionCheckAnswer>({
   deletable: 'whether SAP lets the object be deleted',
   object: 'its name',
   message: "SAP's message about it",
-});
-
-/** What a started activation run answers. */
-export const ACTIVATION_STARTED = resultShape<
-  ReturnType<typeof startedActivationAnswer>
->({
-  run_id: 'the id of the started run, by which its status and results are read',
 });
 
 /** What a read of an activation run's status answers. */

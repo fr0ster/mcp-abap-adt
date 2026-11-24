@@ -14,7 +14,7 @@ import {
   credentialOption,
 } from '../../../lib/abapGit/client';
 import { statusAnswer } from '../../../lib/abapGit/formats';
-import { checkTool, purpose, results } from '../../../lib/description';
+import { checkTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
@@ -24,14 +24,13 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       "Checks that the system reaches an abapGit repository's remote and is let in.",
     ),
-    result: results.ABAPGIT_STATUS,
   }),
   inputSchema: z.object({ repository_key: REPOSITORY_KEY_FIELD }),
 } as const;
 
 export async function handleCheckAbapGitRepo(
   context: HandlerContext,
-  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+  _args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return answer(
     { tool: 'CheckAbapGitRepo', detail: 'terse' },

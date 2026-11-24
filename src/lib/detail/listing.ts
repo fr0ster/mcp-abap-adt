@@ -871,16 +871,15 @@ export function kinds<I, K extends string, D extends Discriminant<I>>(
         if ('omit' in spec) {
           // Visited, and left out by the shape: nothing written.
         } else if ('row' in spec) {
-          lines.push(
-            ...rowLines([item], { ...spec.row, header: 'none' }, depth),
+          appendLines(
+            lines,
+            rowLines([item], { ...spec.row, header: 'none' }, depth),
           );
         } else if ('mark' in spec) {
           lines.push({ mark: spec.mark, words: spec.words(item) });
         } else {
-          lines.push(
-            ...spec.heads(item),
-            ...listLines(item, spec.lists, depth),
-          );
+          appendLines(lines, spec.heads(item));
+          appendLines(lines, listLines(item, spec.lists, depth));
         }
       }
       return lines;
@@ -967,7 +966,7 @@ function rowLines<I>(
     }
     for (const [value, members] of gathered) {
       if (value !== first.unless) lines.push({ group: first.label, value });
-      lines.push(...members.flatMap(rowOf));
+      for (const member of members) appendLines(lines, rowOf(member));
     }
     return lines;
   }
@@ -984,7 +983,7 @@ function rowLines<I>(
       }
       if (value !== group.unless) lines.push({ head: group.label, value });
     });
-    lines.push(...rowOf(item));
+    appendLines(lines, rowOf(item));
   }
   return lines;
 }
@@ -1010,6 +1009,15 @@ export interface Listing<R> {
 }
 
 /**
+ * `more` appended to `lines` one by one: a list may hold more items than a
+ * call takes arguments (`push(...more)` overflows the stack past some
+ * hundred thousand), so nothing here spreads a list into a call.
+ */
+function appendLines(lines: Line[], more: readonly Line[]): void {
+  for (const line of more) lines.push(line);
+}
+
+/**
  * The only writer of a terse list: the heads, a tree's root row, then
  * every list of the reading through its schema — each item one row or one
  * mark line, nothing chosen by the caller.
@@ -1028,8 +1036,9 @@ function listingLines<R>(listing: Listing<R>): Line[] {
       depth: 0,
     });
   }
-  lines.push(
-    ...listLines(
+  appendLines(
+    lines,
+    listLines(
       listing.reading,
       listing.lists,
       listing.root === undefined ? undefined : 1,

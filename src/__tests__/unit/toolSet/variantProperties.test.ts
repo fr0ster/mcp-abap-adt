@@ -224,23 +224,49 @@ describe('a compact tool offers on each variant the properties its offered membe
         );
       });
 
-      it(`${kind} on ${variant}: every argument a description names for a member is one that member takes`, async () => {
+      it(`${kind} on ${variant}: every argument a served description names for a member is one that member takes`, async () => {
+        const tools = await listed(set, variant);
+        let read = 0;
+        for (const tool of tools) {
+          const declared = TOOLS[tool.name];
+          if (declared === undefined) continue;
+          read += 1;
+          // Every property the tool takes on any variant, so a description
+          // naming one its variant does not offer is caught too.
+          const properties = takenOn(declared.takes, declared.members.onprem);
+          // The description as served: a purpose of pairs names no
+          // argument today, and any it comes to name is checked here.
+          for (const [member, argument] of namedArguments(
+            tool.description ?? '',
+            declared.members[variant],
+            properties,
+          )) {
+            assert.deepStrictEqual(
+              {
+                tool: tool.name,
+                member,
+                argument,
+                taken: takenOn(declared.takes, [member]).has(argument),
+              },
+              { tool: tool.name, member, argument, taken: true },
+            );
+          }
+        }
+        assert.ok(read >= (kind === 'compact' ? 10 : 4));
+      });
+
+      it(`${kind} on ${variant}: every argument the member table names for a member is one that member takes`, async () => {
         const tools = await listed(set, variant);
         let named = 0;
         for (const tool of tools) {
           const declared = TOOLS[tool.name];
-          if (declared === undefined) continue;
-          const offered = declared.members[variant];
-          // Every property the tool takes on any variant, so a description
-          // naming one its variant does not offer is caught too.
+          if (declared === undefined || !isObjectTypeTool(tool.name)) continue;
           const properties = takenOn(declared.takes, declared.members.onprem);
-          // The members' table names each member's arguments (a
-          // description names no parameter).
+          // The members' table (`memberTokens`): each member with the
+          // arguments it takes, as the prompts and tool search read it.
           for (const [member, argument] of namedArguments(
-            isObjectTypeTool(tool.name)
-              ? memberTokens(tool.name, variant)
-              : (tool.description ?? ''),
-            offered,
+            memberTokens(tool.name, variant),
+            declared.members[variant],
             properties,
           )) {
             named += 1;

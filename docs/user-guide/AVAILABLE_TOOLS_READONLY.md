@@ -186,7 +186,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="checkabapgitrepo-read-only-abapgit"></a>
 #### CheckAbapGitRepo (Read-Only / Abapgit)
-**Description:** [read-only] Checks that the system reaches the repository's remote and is let in. Answers facts only: SAP's status; a refusal answers the status, SAP's message class and number and, on cloud, the git host's HTTP status.
+**Description:** [read-only] Checks that the system reaches an abapGit repository's remote and is let in. SAP's status and whether SAP has done it or accepted it.
 
 **Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitRepo.ts`
 

@@ -28,6 +28,7 @@ import {
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { createBatchAvailability } from '../../../lib/batch/availability';
+import { READS_PER_ENVELOPE } from '../../../lib/batch/phases';
 import { assertMatchObject } from '../../helpers/assertions';
 import {
   envelopeConnection,
@@ -1105,10 +1106,16 @@ describe('GetEnhancements', () => {
       }),
       TURNS,
     );
-    assert.equal(two.envelopes.length, one.envelopes.length);
+    // Two objects probe together, in one envelope: one fewer than the one
+    // object's probes, one per envelope.
+    assert.equal(two.envelopes.length, one.envelopes.length - 1);
     assert.deepStrictEqual(phasesOf(two)[0], [
       'meta:class:ZPROGE',
+      'meta:prog:ZPROGE',
+      'meta:incl:ZPROGE',
       'meta:class:ZPROGF',
+      'meta:prog:ZPROGF',
+      'meta:incl:ZPROGF',
     ]);
     assert.deepStrictEqual(
       payloadOf(result).map(
@@ -1284,6 +1291,129 @@ describe('GetEnhancements', () => {
       status: 500,
       step: 'read enhancements',
     });
+  });
+
+  // Several objects of no known type: their probes (class, program,
+  // include metadata) are independent reads, so every probe of every such
+  // object goes in one envelope; the decision over the answers is the
+  // sequential version's. One object's probes are never put together.
+  const UNTYPED = [
+    { object_name: 'ZPROGE', object_type: 'unknown' },
+    { object_name: 'ZCLE', object_type: 'unknown' },
+    { object_name: 'ZNONE', object_type: 'unknown' },
+  ];
+  const CLASS_ZCLE = {
+    answers: {
+      'meta:class:ZCLE': ok(
+        '<?xml version="1.0" encoding="utf-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZCLE"/>',
+      ),
+    },
+  };
+
+  it('several untyped objects: every probe of each in one envelope, then their enhancements; the sequential answer', async () => {
+    const { a, b, batched } = await bothWays(
+      handleGetEnhancements,
+      { objects: UNTYPED },
+      CLASS_ZCLE,
+    );
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(phasesOf(batched), [
+      [
+        'meta:class:ZPROGE',
+        'meta:prog:ZPROGE',
+        'meta:incl:ZPROGE',
+        'meta:class:ZCLE',
+        'meta:prog:ZCLE',
+        'meta:incl:ZCLE',
+        'meta:class:ZNONE',
+        'meta:prog:ZNONE',
+        'meta:incl:ZNONE',
+      ],
+      ['elements:prog:ZPROGE', 'elements:class:ZCLE'],
+    ]);
+    assert.equal(batched.directs.length, 0);
+    // The 404 parts decide: ZPROGE is no class, ZNONE is nothing; the
+    // others answer beside it.
+    const [proge, cle, none] = payloadOf(a);
+    assertMatchObject(proge, { object_name: 'ZPROGE', object_type: 'program' });
+    assertMatchObject(cle, { object_name: 'ZCLE', object_type: 'class' });
+    assertMatchObject(none, { object_name: 'ZNONE', object_type: 'unknown' });
+    assert.notEqual(none.error, undefined);
+    assert.equal(proge.unreadable, undefined);
+  });
+
+  it('a refused probe the decision never reaches is not reported, as the sequential version never sends it', async () => {
+    const model = {
+      answers: {
+        ...CLASS_ZCLE.answers,
+        'meta:prog:ZCLE': { status: 403, statusText: 'Forbidden', body: '' },
+        'meta:incl:ZPROGE': {
+          status: 403,
+          statusText: 'Forbidden',
+          body: '',
+        },
+      },
+    };
+    const { a, b, batched } = await bothWays(
+      handleGetEnhancements,
+      { objects: UNTYPED },
+      model,
+    );
+    assert.equal(textOf(a), textOf(b));
+    assert.equal(phasesOf(batched)[0]?.length, 9);
+    const [proge, cle] = payloadOf(a);
+    assert.equal(proge.unreadable, undefined);
+    assert.equal(cle.unreadable, undefined);
+  });
+
+  it('one untyped object in objects: its probes one per envelope, never together', async () => {
+    const { a, b, batched } = await bothWays(handleGetEnhancements, {
+      objects: [{ object_name: 'ZPROGE', object_type: 'unknown' }],
+    });
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(phasesOf(batched), [
+      ['meta:class:ZPROGE'],
+      ['meta:prog:ZPROGE'],
+      ['elements:prog:ZPROGE'],
+    ]);
+  });
+
+  it("the probes' envelope fails as a whole: every object's probes fail with it, the sequential answer with those reads failed", async () => {
+    const args = {
+      objects: [
+        { object_name: 'ZPROGE', object_type: 'unknown' },
+        { object_name: 'ZNONE', object_type: 'unknown' },
+      ],
+    };
+    const fake = failingEnvelope(1);
+    const result = await withinTurns(
+      handleGetEnhancements(contextOn(fake), args),
+      TURNS,
+    );
+    const failed = phasesOf(fake)[0] as string[];
+    assert.equal(failed.length, 6);
+    assert.equal(fake.envelopes.length, 1);
+    const expected = await sequentialWithFailed(
+      handleGetEnhancements,
+      args,
+      failed,
+    );
+    expectEnvelopeFailure(result, expected, 6);
+  });
+
+  it(`a phase of more than ${READS_PER_ENVELOPE} reads goes in consecutive envelopes of at most ${READS_PER_ENVELOPE}`, async () => {
+    const objects = Array.from(
+      { length: READS_PER_ENVELOPE / 3 + 1 },
+      (_, i) => ({ object_name: `ZNONE_${i}`, object_type: 'unknown' }),
+    );
+    const { a, b, batched } = await bothWays(handleGetEnhancements, {
+      objects,
+    });
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(
+      batched.envelopes.map((e) => e.parts.length),
+      [READS_PER_ENVELOPE, 3],
+    );
   });
 
   it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {

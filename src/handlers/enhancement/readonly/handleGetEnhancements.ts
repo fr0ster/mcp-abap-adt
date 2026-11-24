@@ -30,7 +30,9 @@ import {
 import type { IAnswerSerializer } from '../../../lib/answerSerializer';
 import { failureOf } from '../../../lib/auth/failures';
 import {
+  chunksOf,
   type PhaseResult,
+  READS_PER_ENVELOPE,
   runPhase,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
@@ -1131,6 +1133,44 @@ function enhancementAnswers(context: HandlerContext) {
     PhaseResult<IAdtResponse<string, IAdtError>>
   >();
   const nodes = new Map<string, PhaseResult<NodeAnswer>>();
+  /** One envelope of a phase's reads, and its answers kept. */
+  const envelope = async (
+    pending: readonly EnhancementRead[],
+  ): Promise<void> => {
+    const results = await runPhase(context, pending, (read, connection) =>
+      sendEnhancementRead(context, connection, read),
+    );
+    results.forEach((result, i) => {
+      const read = pending[i];
+      const key = enhancementKey(read);
+      if (!result.ok) {
+        if (endsTheCall(result.error)) throw result.error;
+        if (read.kind === 'node') nodes.set(key, result);
+        else documents.set(key, result);
+        return;
+      }
+      const answer = result.value;
+      const step = enhancementStep(read);
+      if (
+        answer.response.ok === false &&
+        isCredentialPayload(failureEntry(answer.response.getError(), step))
+      ) {
+        const error = answer.response.getError();
+        throw carryingFailure(
+          read.kind === 'elements'
+            ? new EnhancementInputError(error.message)
+            : new Error(error.message),
+          error,
+          step,
+        );
+      }
+      if (answer.of === 'node') {
+        nodes.set(key, { ok: true, value: answer.response });
+      } else {
+        documents.set(key, { ok: true, value: answer.response });
+      }
+    });
+  };
   return {
     /** The answer to a document's read; `Unanswered` thrown when no phase sent it yet. */
     answered(read: DocumentRead): PhaseResult<IAdtResponse<string, IAdtError>> {
@@ -1150,41 +1190,11 @@ function enhancementAnswers(context: HandlerContext) {
         const key = enhancementKey(read);
         if (!documents.has(key) && !nodes.has(key)) asked.set(key, read);
       }
-      if (asked.size === 0) return;
-      const pending = [...asked.values()];
-      const results = await runPhase(context, pending, (read, connection) =>
-        sendEnhancementRead(context, connection, read),
-      );
-      results.forEach((result, i) => {
-        const read = pending[i];
-        const key = enhancementKey(read);
-        if (!result.ok) {
-          if (endsTheCall(result.error)) throw result.error;
-          if (read.kind === 'node') nodes.set(key, result);
-          else documents.set(key, result);
-          return;
-        }
-        const answer = result.value;
-        const step = enhancementStep(read);
-        if (
-          answer.response.ok === false &&
-          isCredentialPayload(failureEntry(answer.response.getError(), step))
-        ) {
-          const error = answer.response.getError();
-          throw carryingFailure(
-            read.kind === 'elements'
-              ? new EnhancementInputError(error.message)
-              : new Error(error.message),
-            error,
-            step,
-          );
-        }
-        if (answer.of === 'node') {
-          nodes.set(key, { ok: true, value: answer.response });
-        } else {
-          documents.set(key, { ok: true, value: answer.response });
-        }
-      });
+      // Past READS_PER_ENVELOPE, consecutive envelopes; each judged as
+      // it answered, so a credential failure sends no later one.
+      for (const pending of chunksOf([...asked.values()], READS_PER_ENVELOPE)) {
+        await envelope(pending);
+      }
     },
   };
 }
@@ -1205,7 +1215,7 @@ interface EnhancementPath {
  * is thrown as `Unanswered`: the next phase sends it, one probe per object.
  */
 function pathFromAnswers(
-  answers: EnhancementAnswers,
+  answers: Pick<EnhancementAnswers, 'answered'>,
   objectName: string,
   manualProgramContext?: string,
   requestedType?: string,
@@ -1330,17 +1340,62 @@ type Resolved =
   | { ok: true; path: EnhancementPath }
   | { ok: false; error: unknown };
 
+/** What a speculative probe answers: nothing, so the decision asks its next probe. */
+const NOT_ASKED: PhaseResult<IAdtResponse<string, IAdtError>> = {
+  ok: false,
+  error: new Error('not asked'),
+};
+
 /**
- * Every object's path, probe by probe: each phase sends the next probe of
+ * Every probe `pathFromAnswers` may send for `objectName`, in its order:
+ * the probes it asks when each answers nothing (the class, program and
+ * include metadata of an object of no known type; the include metadata of
+ * an include; none for a type that decides alone). Asked of the decision
+ * itself, so the set is the one it reads.
+ */
+function probesOf(
+  objectName: string,
+  manualProgramContext?: string,
+  requestedType?: string,
+): DocumentRead[] {
+  const asked: DocumentRead[] = [];
+  try {
+    pathFromAnswers(
+      {
+        answered(read) {
+          asked.push(read);
+          return NOT_ASKED;
+        },
+      },
+      objectName,
+      manualProgramContext,
+      requestedType,
+    );
+  } catch {
+    // Every probe answered nothing: the object resolves to no path.
+  }
+  return asked;
+}
+
+/**
+ * Every object's path. Two or more objects that probe: every probe of each
+ * (class, program and include metadata — independent reads) goes in one
+ * phase, and each path is decided over those answers as the sequential
+ * version decides it, a probe it never reaches unread by the decision. One
+ * object's probes are not put together: each phase sends the next probe of
  * every object still unresolved (class, then program, then include — each
- * only when the earlier answered none), one per object. One path per object,
- * in the objects' order.
+ * only when the earlier answered none), one per object. One path per
+ * object, in the objects' order.
  */
 async function resolvePaths(
   answers: EnhancementAnswers,
   objects: ReadonlyArray<{ name: string; type?: string | undefined }>,
   manualProgramContext?: string,
 ): Promise<Resolved[]> {
+  const probing = objects
+    .map((o) => probesOf(o.name, manualProgramContext, o.type))
+    .filter((probes) => probes.length > 0);
+  if (probing.length > 1) await answers.phase(probing.flat());
   const resolved: Array<Resolved | undefined> = objects.map(() => undefined);
   for (;;) {
     const next: EnhancementRead[] = [];

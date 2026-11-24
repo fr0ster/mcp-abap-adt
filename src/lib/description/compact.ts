@@ -6,7 +6,6 @@
  */
 
 import type { Purpose } from './purpose';
-import type { ReturnsFact } from './returns';
 import {
   type DescriptionParts,
   partsOfDescription,
@@ -29,15 +28,12 @@ export function assembledParts(description: string): DescriptionParts {
   return parts;
 }
 
-/** A value by its function: what it does, and what it gives back. */
+/** A value by its function: what it does. */
 export function valueParts(
   value: string,
-  parts: {
-    readonly purpose: Purpose;
-    readonly returns: readonly ReturnsFact[];
-  },
+  parts: { readonly purpose: Purpose },
 ): ValueParts {
-  return { value, purpose: parts.purpose, returns: parts.returns };
+  return { value, purpose: parts.purpose };
 }
 
 /** A value that does what the full tool described by `description` does. */

@@ -919,19 +919,6 @@ function jsonShapes<R>(
   );
 }
 
-/** What a tool's terse schemas write, as data: what its description states. */
-export function shapesOf(schemas: Shaped): readonly ListShape[] {
-  return Object.values(schemas).map((schema) => schema.shape);
-}
-
-/** What a tool's medium schemas write, as data: what its description states. */
-export function jsonShapesOf(schemas: Shaped): readonly ListShape[] {
-  return Object.values(schemas).map((schema) => schema.shape);
-}
-
-/** A record of schemas, each carrying what it writes. */
-type Shaped = { readonly [member: string]: { readonly shape: ListShape } };
-
 /** Rows, with their header, group lines and each item's own lists. */
 function rowLines<I>(
   items: readonly I[],
@@ -1029,14 +1016,6 @@ export interface Listing<R> {
  */
 export function writeListing<R>(listing: Listing<R>): Written<string> {
   return new Written(mint, renderLines(listingLines(listing)));
-}
-
-/**
- * The lines a listing writes, as data — what the description tests read to
- * tie a tool's Returns to what it writes (`returnsMatch.ts`).
- */
-export function writtenLines<R>(listing: Listing<R>): readonly Line[] {
-  return listingLines(listing);
 }
 
 /** A listing's lines: its heads, a tree's root row, then every list of the reading. */

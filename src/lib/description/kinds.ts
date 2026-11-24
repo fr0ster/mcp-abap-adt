@@ -2,18 +2,13 @@
  * The descriptions of the uniform tool kinds (plan step 10.6): a create,
  * update, delete, check, activate or validate tool states its function in
  * its name — an action and an object type — so its purpose is built from
- * the action, the object and what the inputs add for that object. A check,
- * activation or validation states its facts from the kind's result type
- * (`results.ts`); a create, update or delete states none: its answer is
- * whether SAP took the change, which tells nothing of the tool's function
- * (owner, after the query measurement). A tool whose function differs from
- * its kind's sentence gives its own purpose.
+ * the action, the object and what the inputs add for that object; it states
+ * its function alone (owner, after the query measurement). A tool whose
+ * function differs from its kind's sentence gives its own purpose.
  */
 
 import type { Note } from './notes';
 import { type Purpose, purpose } from './purpose';
-import { ACTIVATED, CHECKED, VALIDATED } from './results';
-import { type ResultShape, resultReturns } from './returns';
 import { type DescriptionTag, toolDescription } from './toolDescription';
 
 /** A tool of a kind: what it acts on, and what its inputs add. */
@@ -27,8 +22,6 @@ export interface KindTool {
   readonly how?: string | undefined;
   /** The tool's own purpose, when its function differs from the kind's sentence. */
   readonly purpose?: Purpose | undefined;
-  /** The answer, when it is not the kind's own (a check that names its object, say). */
-  readonly result?: ResultShape | undefined;
   readonly tag?: DescriptionTag | undefined;
   readonly notes?: readonly Note[] | undefined;
 }
@@ -73,22 +66,11 @@ function sentenceOf(
   return purpose(`${verb} ${tool.object ?? ''}${how}${transport}.`);
 }
 
-/** A kind's description: its purpose (the tool's own, or the kind's sentence), the kind's facts. */
-function kind(verb: string, result: ResultShape, tool: KindTool): string {
-  return toolDescription({
-    tag: tool.tag,
-    purpose: tool.purpose ?? sentenceOf(verb, tool),
-    returns: resultReturns(tool.result ?? result),
-    notes: tool.notes,
-  });
-}
-
-/** A write's description: its purpose alone (the tool's own, or the kind's sentence). */
+/** A kind's description: its purpose alone (the tool's own, or the kind's sentence). */
 function write(verb: string, tool: WriteTool): string {
   return toolDescription({
     tag: tool.tag,
     purpose: tool.purpose ?? sentenceOf(verb, tool),
-    returns: [],
     notes: tool.notes,
   });
 }
@@ -108,17 +90,17 @@ export function deleteTool(tool: WriteTool): string {
   return write('Deletes', tool);
 }
 
-/** A check: `Checks the syntax of <object> <how>.`, then the check's verdict and messages. */
+/** A check: `Checks the syntax of <object> <how>.` */
 export function checkTool(tool: KindTool): string {
-  return kind('Checks the syntax of', CHECKED, tool);
+  return write('Checks the syntax of', tool);
 }
 
-/** An activation: `Activates <object> <how>.`, then the activation's verdict and messages. */
+/** An activation: `Activates <object> <how>.` */
 export function activateTool(tool: KindTool): string {
-  return kind('Activates', ACTIVATED, tool);
+  return write('Activates', tool);
 }
 
-/** A validation: `Validates <object> <how>.`, then the verdict and SAP's message. */
+/** A validation: `Validates <object> <how>.` */
 export function validateTool(tool: KindTool): string {
-  return kind('Validates', VALIDATED, tool);
+  return write('Validates', tool);
 }

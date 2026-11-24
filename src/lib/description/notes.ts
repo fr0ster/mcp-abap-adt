@@ -31,6 +31,12 @@ export const underLock: Note = new Note(
   "Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).",
 );
 
+/** A tool that answers a state handle every later call of its state carries. */
+export const stateHandleAnswered: Note = new Note(
+  minted,
+  'Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).',
+);
+
 /** Whether and how `tool` runs in batch mode. */
 export function batchable(tool: string): Note {
   return new Note(minted, batchSentence(tool));

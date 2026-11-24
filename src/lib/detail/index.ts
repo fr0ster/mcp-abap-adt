@@ -44,7 +44,6 @@ export {
   headShape,
   type JsonBound,
   type JsonSchemas,
-  jsonShapesOf,
   jsonText,
   type KindShape,
   type KindSpec,
@@ -71,7 +70,6 @@ export {
   rows,
   type SchemaKeys,
   sections,
-  shapesOf,
   shownBeside,
   type TextResult,
   values,
@@ -84,7 +82,6 @@ export {
   writeJsonRoot,
   writeListing,
   writeWhole,
-  writtenLines,
   writtenValues,
 } from './listing';
 export { cellsOf } from './tsvCells';

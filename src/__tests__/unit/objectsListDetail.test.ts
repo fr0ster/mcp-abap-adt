@@ -183,6 +183,51 @@ describe('GetObjectsList detail', () => {
     assert.equal(result.isError, true, result.content[0]?.text);
   });
 
+  // Onprem live run: SAP lists an object (a message class left without its
+  // T100A row) whose metadata it answers 404, "does not exist". The object
+  // is answered as SAP answered it — listed, with that error — and the call
+  // goes on; any other refused read stays the call's error (above).
+  for (const detail of ['medium', 'full'] as const) {
+    it(`${detail}: an object whose metadata SAP answers 404 is listed with that error, the call answered`, async () => {
+      const connection = recordingConnection([
+        { data: LEVEL },
+        {
+          status: 404,
+          data: '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><message lang="EN">Resource FUGR Z_FM does not exist.</message></exc:exception>',
+        },
+        {
+          data: '<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="Top"/>',
+        },
+      ]);
+      declareSystemKind(connection, 'onprem');
+      const batchAvailability = createBatchAvailability();
+      batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+      const result = await handleGetObjectsList(
+        { connection, logger: undefined, batchAvailability },
+        {
+          parent_name: 'ZFG',
+          parent_tech_name: 'ZFG',
+          parent_type: 'FUGR/F',
+          detail,
+        },
+      );
+      const text = result.content[0]?.text ?? '';
+      assert.equal(result.isError, false, text);
+      const answer = JSON.parse(text);
+      const [missing, top] = answer.objects;
+      const error =
+        detail === 'medium' ? missing.metadata_error : missing.METADATA_ERROR;
+      assert.equal(error?.status, 404, text);
+      assert.equal(error?.step, 'read object metadata', text);
+      assert.ok(String(error?.message).includes('404'), text);
+      assert.equal(
+        detail === 'medium' ? top.description : top.DESCRIPTION,
+        'Top',
+        text,
+      );
+    });
+  }
+
   // Codex round 8: a nameless row is addressed by its URI, never by an
   // address built from an empty name.
   it('medium: a typed nameless include is read by its URI', async () => {

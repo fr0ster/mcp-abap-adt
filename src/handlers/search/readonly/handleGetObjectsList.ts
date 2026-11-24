@@ -280,6 +280,13 @@ interface FlatObject {
   DESCRIPTION?: string;
   /** A node SAP could not load (`utilNodeContents`' `notLoaded`): its row, named {@link NOT_LOADED_BY_SAP}. */
   NOT_LOADED?: true;
+  /**
+   * SAP's answer to the object's metadata read when it said the object does
+   * not exist (`404`) — an object SAP lists and serves no metadata for (a
+   * message class left without its T100A row, measured on premise): the
+   * error as it is, with its step.
+   */
+  METADATA_ERROR?: FailureEntry;
 }
 
 function ok(objects: FlatObject[]): IAdtResponse<FlatObject[], IAdtError> {
@@ -581,6 +588,9 @@ const mediumObject = (o: FlatObject) => ({
     : {}),
   ...(o.DESCRIPTION !== undefined ? { description: o.DESCRIPTION } : {}),
   ...(o.NOT_LOADED === true ? { not_loaded: true } : {}),
+  ...(o.METADATA_ERROR !== undefined
+    ? { metadata_error: o.METADATA_ERROR }
+    : {}),
 });
 
 /**
@@ -710,7 +720,9 @@ function secondReads(
  * are independent GETs), else one by one — the description from there,
  * never from the node structure, and the type for an object SAP listed
  * without one. Every object pass 1 found stays; a read that fails is the
- * call's failure, never an object answered without what it lacks.
+ * call's failure, never an object answered without what it lacks — but for
+ * an object SAP answers `404` for: listed, it does not exist for its
+ * metadata read, and it is answered with that error as SAP gave it.
  */
 async function secondPass(
   context: HandlerContext,
@@ -745,8 +757,13 @@ async function secondPass(
   for (const [i, each] of reads.entries()) {
     const answered = answers[i];
     if (answered === undefined) continue;
-    if (!answered.ok) return answered;
     const object = out[each.list]?.[each.index];
+    if (!answered.ok) {
+      const failed = failureEntry(answered.getError(), METADATA_STEP);
+      if (object === undefined || failed.status !== 404) return answered;
+      object.METADATA_ERROR = failed;
+      continue;
+    }
     if (object === undefined) continue;
     const document = answered.getResult().value;
     if (object.OBJECT_TYPE === '') {

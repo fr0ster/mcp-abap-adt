@@ -13,6 +13,8 @@ import { TOOL_DEFINITION as ERROR_LOG } from '../../../handlers/abapgit/readonly
 import { TOOL_DEFINITION as MODIFIED } from '../../../handlers/abapgit/readonly/handleGetAbapGitModifiedObjects';
 import { TOOL_DEFINITION as STAGING } from '../../../handlers/abapgit/readonly/handleGetAbapGitStaging';
 import { TOOL_DEFINITION as REPOS } from '../../../handlers/abapgit/readonly/handleListAbapGitRepos';
+import { TOOL_DEFINITION as LIST_GROUP_INCLUDES } from '../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
+import { TOOL_DEFINITION as LIST_FUNCTION_MODULES } from '../../../handlers/function_include/readonly/handleListFunctionModules';
 import {
   TOOL_DEFINITION as GET_INCLUDES,
   INCLUDES_HEADS,
@@ -65,6 +67,11 @@ import {
   writeJson,
   writtenLines,
 } from '../../../lib/detail';
+import {
+  GROUP_CHILD_HEADS,
+  type GroupChild,
+  groupChildLists,
+} from '../../../lib/strategies/functionGroupChildren';
 import { packageDetails } from '../../../lib/strategies/packageSummary';
 import {
   externalRepo,
@@ -87,6 +94,8 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   GetAbapGitErrorLog: ERROR_LOG.description,
   GetPackage: GET_PACKAGE.description,
   GetIncludesList: GET_INCLUDES.description,
+  ListFunctionModules: LIST_FUNCTION_MODULES.description,
+  ListFunctionGroupIncludes: LIST_GROUP_INCLUDES.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -121,6 +130,41 @@ function abapGitTie(
   };
 }
 
+/**
+ * A function group children tool's tie: one named child with its
+ * description, and one SAP listed without a name, told apart by its URI.
+ */
+function groupChildTie(
+  tool: string,
+  listKey: 'function_modules' | 'includes',
+): ReturnsTie {
+  const parts = partsOfDescription(descriptionOf(tool));
+  assert.ok(parts !== undefined, `${tool} is assembled`);
+  const objects: GroupChild[] = [
+    { name: 'Z_FM_A', type: 'FUGR/FF', description: 'First' },
+    { name: '', type: 'FUGR/FF', uri: '/sap/bc/adt/x' },
+  ];
+  const reading = { objects };
+  return {
+    terse: shapesOf(groupChildLists(listKey)),
+    heads: GROUP_CHILD_HEADS,
+    returns: parts.returns,
+    samples: [
+      {
+        reading,
+        lines: writtenLines({
+          heads: [
+            { head: 'function_group', value: 'ZFG' },
+            { head: 'total', value: '2' },
+          ],
+          reading,
+          lists: groupChildLists(listKey),
+        }),
+      },
+    ],
+  };
+}
+
 /** Both levels' lines of one reading, each written by its schemas. */
 const bothLevels = (
   reading: unknown,
@@ -130,6 +174,10 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  ListFunctionModules: () =>
+    groupChildTie('ListFunctionModules', 'function_modules'),
+  ListFunctionGroupIncludes: () =>
+    groupChildTie('ListFunctionGroupIncludes', 'includes'),
   GetIncludesList: () => {
     const parts = partsOfDescription(descriptionOf('GetIncludesList'));
     assert.ok(parts !== undefined);

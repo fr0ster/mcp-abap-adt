@@ -6,8 +6,11 @@ import type {
 
 import type { AdtCodes } from '../adtProjections';
 import {
+  about,
   entries,
+  headShape,
   type ListAnswerTable,
+  type RowSchemas,
   rows,
   writeJson,
   writeListing,
@@ -111,6 +114,48 @@ export async function fetchFunctionGroupChildren(
  * `detail` under `listKey`, with every field read under `objects`. The answer is built from two requests, so
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
+/** A nameless child's URI, what tells it apart; `''` for a named one. */
+const namelessUri = (o: GroupChild) => (o.name === '' ? (o.uri ?? '') : '');
+
+/** What each listed child is, by the list it is in. */
+const CHILD_ABOUT = {
+  function_modules: 'for each function module',
+  includes: 'for each include',
+} as const;
+
+/** The lists a function group's children listing writes: what its description states. */
+export function groupChildLists(
+  listKey: keyof typeof CHILD_ABOUT,
+): RowSchemas<{ objects: GroupChild[] }> {
+  return {
+    objects: about(
+      CHILD_ABOUT[listKey],
+      rows('objects', {
+        columns: [
+          { name: 'name', means: 'its name', cell: (o: GroupChild) => o.name },
+          {
+            name: 'uri',
+            means: 'its URI when SAP lists it nameless',
+            cell: namelessUri,
+          },
+          {
+            name: 'description',
+            means: 'its description',
+            cell: (o: GroupChild) => o.description ?? '',
+          },
+        ],
+        header: 'always',
+      }),
+    ),
+  };
+}
+
+/** The heads every function group's children listing opens with. */
+export const GROUP_CHILD_HEADS = [
+  headShape('function_group', "the function group's name"),
+  headShape('total', 'how many there are'),
+];
+
 export function functionGroupListAnswers(
   functionGroupName: string,
   listKey: 'function_modules' | 'includes',
@@ -124,8 +169,6 @@ export function functionGroupListAnswers(
     [listKey]: objects.map((o) => o.name),
     objects,
   });
-  /** A nameless child's URI, what tells it apart; `''` for a named one. */
-  const namelessUri = (o: GroupChild) => (o.name === '' ? (o.uri ?? '') : '');
   // Every child the node structure held, written from the list by the
   // listing writers: one row or entry each.
   return {
@@ -136,19 +179,7 @@ export function functionGroupListAnswers(
           { head: 'total', value: String(objects.length) },
         ],
         reading: { objects },
-        lists: {
-          objects: rows('objects', {
-            columns: [
-              { name: 'name', cell: (o: GroupChild) => o.name },
-              { name: 'uri', cell: namelessUri },
-              {
-                name: 'description',
-                cell: (o: GroupChild) => o.description ?? '',
-              },
-            ],
-            header: 'always',
-          }),
-        },
+        lists: groupChildLists(listKey),
       }),
     // Every field the node structure read but the uri — kept for a child
     // SAP listed without a name, what tells it apart.

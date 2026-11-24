@@ -48,6 +48,18 @@
       "list all includes of ZMY_PROG",
       "які інклуди використовує програма ZMY_PROG?",
       "покажи всі інклуди програми ZMY_PROG"
+    ],
+    "ListFunctionModules": [
+      "which function modules are in function group ZMY_FG?",
+      "list the function modules of ZMY_FG",
+      "які функціональні модулі є в групі функцій ZMY_FG?",
+      "покажи функціональні модулі групи ZMY_FG"
+    ],
+    "ListFunctionGroupIncludes": [
+      "list the includes of function group ZMY_FG",
+      "what is the TOP include of function group ZMY_FG?",
+      "покажи інклуди групи функцій ZMY_FG",
+      "які інклуди має група функцій ZMY_FG?"
     ]
   },
   "siblings": {},
@@ -63,6 +75,11 @@
     "GetIncludesList: which includes does program ZMY_PROG use?",
     "GetIncludesList: list all includes of ZMY_PROG",
     "GetIncludesList: які інклуди використовує програма ZMY_PROG?",
-    "GetIncludesList: покажи всі інклуди програми ZMY_PROG"
+    "GetIncludesList: покажи всі інклуди програми ZMY_PROG",
+    "ListFunctionModules: which function modules are in function group ZMY_FG?",
+    "ListFunctionModules: які функціональні модулі є в групі функцій ZMY_FG?",
+    "ListFunctionGroupIncludes: list the includes of function group ZMY_FG",
+    "ListFunctionGroupIncludes: покажи інклуди групи функцій ZMY_FG",
+    "ListFunctionGroupIncludes: які інклуди має група функцій ZMY_FG?"
   ]
 }

@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ReadTransportActionLog — what has happened to a transport request.
@@ -16,9 +17,13 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
+  about,
+  headShape,
   listAnswerAt,
   omitting,
+  type RowSchemas,
   rows,
+  shapesOf,
   values,
   writeJson,
   writeListing,
@@ -29,21 +34,6 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { child, childAt, isList, type XmlRead } from '../../../lib/xml/tree';
-
-export const TOOL_DEFINITION = {
-  name: 'ReadTransportActionLog',
-  available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the action log of the transport request named by transport_number: one entry per lifecycle event — created, object added, object deleted, owner changed. It confirms that an object entry was taken out of the request, since a removal answers by echoing what it was asked.',
-  inputSchema: z.object({
-    transport_number: z
-      .string()
-      .describe(
-        'Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.',
-      ),
-    ...DETAIL_SHAPE,
-  }),
-} as const;
 
 type ReadTransportActionLogArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
@@ -90,6 +80,56 @@ const TERSE_OMITS = omitting(kindOfEntry, {
   empty: 'a line without text: nothing to read',
   separator: 'a separator line: no entry',
 });
+
+/** The lists the action log listing writes: what its description states. */
+export const ACTION_LOG_LISTS: RowSchemas<{ entries: LogEntry[] }> = {
+  entries: about(
+    'for each event, such as created, object added, object deleted or owner changed',
+    rows('entries', {
+      columns: [
+        {
+          name: 'entry',
+          means: 'its text',
+          cell: (entry: LogEntry) => entry.text,
+        },
+      ],
+      header: 'always',
+      omit: TERSE_OMITS,
+    }),
+  ),
+};
+
+/** The heads the action log listing opens with. */
+export const ACTION_LOG_HEADS = [
+  headShape('transport', 'transport number'),
+  headShape('count', 'number of events'),
+];
+
+export const TOOL_DEFINITION = {
+  name: 'ReadTransportActionLog',
+  available_in: ['onprem', 'cloud'] as const,
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the action log of a transport or task: every event of its life, its objects added and taken out among them.',
+    ),
+    returns: returnsOf({
+      heads: ACTION_LOG_HEADS,
+      of: 'the',
+      shapes: [shapesOf(ACTION_LOG_LISTS)],
+    }),
+    inline: true,
+  }),
+  inputSchema: z.object({
+    transport_number: z
+      .string()
+      .describe(
+        'Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
+} as const;
+
 const MEDIUM_OMITS = omitting(kindOfEntry, {
   empty: 'a line without text: nothing to read',
 });
@@ -159,15 +199,7 @@ export async function handleReadTransportActionLog(
             },
           ],
           reading: { entries },
-          lists: {
-            entries: rows('entries', {
-              columns: [
-                { name: 'entry', cell: (entry: LogEntry) => entry.text },
-              ],
-              header: 'always',
-              omit: TERSE_OMITS,
-            }),
-          },
+          lists: ACTION_LOG_LISTS,
         });
       },
       medium: (reading) => mediumLog(reading.value),

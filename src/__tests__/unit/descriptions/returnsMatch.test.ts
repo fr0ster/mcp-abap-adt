@@ -91,6 +91,21 @@ import {
   SEARCH_SOURCE_LISTS,
 } from '../../../handlers/system/readonly/handleSearchSource';
 import {
+  TOOL_DEFINITION as TRANSPORTS,
+  TRANSPORTS_HEADS,
+  TRANSPORTS_LISTS,
+} from '../../../handlers/transport/readonly/handleListTransports';
+import {
+  TOOL_DEFINITION as ACTION_LOG,
+  ACTION_LOG_HEADS,
+  ACTION_LOG_LISTS,
+} from '../../../handlers/transport/readonly/handleReadTransportActionLog';
+import {
+  TOOL_DEFINITION as TRANSPORT_OBJECTS,
+  TRANSPORT_OBJECTS_HEADS,
+  TRANSPORT_OBJECTS_LISTS,
+} from '../../../handlers/transport/readonly/handleReadTransportObjects';
+import {
   ACCESS_MODE_HEADS,
   BRANCH_INFO_MEDIUM,
   BRANCH_INFO_TERSE,
@@ -174,6 +189,9 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   GetObjectVersions: OBJECT_VERSIONS.description,
   GetTransaction: TRANSACTION.description,
   GetPackageTree: PACKAGE_TREE.description,
+  ReadTransportObjects: TRANSPORT_OBJECTS.description,
+  ListTransports: TRANSPORTS.description,
+  ReadTransportActionLog: ACTION_LOG.description,
 };
 
 /** A writer tool's tie: its lists (every variant), its heads, its fixtures' lines. */
@@ -272,6 +290,92 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  ReadTransportObjects: () => {
+    // A request's entries under two tasks and both program IDs, and one SAP
+    // lists untyped.
+    const reading = {
+      entries: [
+        {
+          pgmid: 'R3TR',
+          type: 'CLAS',
+          name: 'ZCL_A',
+          position: '1',
+          task: 'T1',
+        },
+        {
+          pgmid: 'LIMU',
+          type: 'METH',
+          name: 'ZCL_A M',
+          position: '2',
+          task: 'T2',
+        },
+      ],
+      incompleteEntries: [{ pgmid: 'R3TR', name: 'ZX', position: '3' }],
+    };
+    const heads = [
+      { head: 'transport', value: 'K900001' },
+      { head: 'count', value: '3' },
+    ];
+    return writtenTie(
+      'ReadTransportObjects',
+      [TRANSPORT_OBJECTS_LISTS],
+      TRANSPORT_OBJECTS_HEADS,
+      [
+        {
+          reading,
+          lines: writtenLines({
+            heads,
+            reading,
+            lists: TRANSPORT_OBJECTS_LISTS,
+          }),
+        },
+      ],
+      'the',
+    );
+  },
+  ListTransports: () => {
+    const entry = {
+      number: 'K900001',
+      description: 'A change',
+      type: 'K',
+      status: 'D',
+      owner: 'DEV',
+      target: 'QAS',
+    };
+    // A request, and the same one again through another branch.
+    const reading = {
+      requests: [
+        { entry, repeat: false },
+        { entry, repeat: true },
+      ],
+    };
+    const heads = [{ head: 'count', value: '1' }];
+    return writtenTie('ListTransports', [TRANSPORTS_LISTS], TRANSPORTS_HEADS, [
+      {
+        reading,
+        lines: writtenLines({ heads, reading, lists: TRANSPORTS_LISTS }),
+      },
+    ]);
+  },
+  ReadTransportActionLog: () => {
+    const reading = { entries: [{ text: 'Created' }, { text: '=====' }] };
+    const heads = [
+      { head: 'transport', value: 'K900001' },
+      { head: 'count', value: '1' },
+    ];
+    return writtenTie(
+      'ReadTransportActionLog',
+      [ACTION_LOG_LISTS],
+      ACTION_LOG_HEADS,
+      [
+        {
+          reading,
+          lines: writtenLines({ heads, reading, lists: ACTION_LOG_LISTS }),
+        },
+      ],
+      'the',
+    );
+  },
   GetInactiveObjects: () => {
     const reading: IInactiveObjectsResponse = {
       objects: [

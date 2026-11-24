@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import {
   DETAIL_SHAPE,
@@ -36,15 +37,19 @@ import {
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
+  about,
   answered,
   type DetailTable,
   entries,
   fullLevel,
+  headShape,
   type ListDetailTable,
   marks,
+  type RowSchemas,
   rawLevel,
   readingAt,
   rows,
+  shapesOf,
   type Written,
   writeJson,
   writeListing,
@@ -54,11 +59,75 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import type { XmlNode } from '../../../lib/xml/node';
 
+/** An incomplete entry's words: every identity field it carries, `field=value`. */
+const incompleteWords = (entry: ITransportIncompleteEntry) =>
+  incompleteFields(entry).map(([field, value]) => `${field}=${value}`);
+
+/** The lists the transport objects listing writes: what its description states. */
+export const TRANSPORT_OBJECTS_LISTS: RowSchemas<ITransportObjectEntryList> = {
+  entries: about(
+    'for each object, under its task and its program ID',
+    rows('entries', {
+      columns: [
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (entry: ITransportObjectEntry) => entry.type,
+        },
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (entry: ITransportObjectEntry) => entry.name,
+        },
+        {
+          name: 'position',
+          means: 'its position, which a removal names',
+          cell: (entry: ITransportObjectEntry) => entry.position ?? '',
+        },
+      ],
+      header: 'always',
+      groups: [
+        {
+          label: 'task',
+          of: (entry: ITransportObjectEntry) => entry.task ?? '',
+          mode: 'run',
+          unless: '',
+        },
+        {
+          label: 'pgmid',
+          of: (entry: ITransportObjectEntry) => entry.pgmid ?? 'R3TR',
+          mode: 'run',
+        },
+      ],
+    }),
+  ),
+  incompleteEntries: about(
+    'the objects SAP lists nameless or untyped are named by what they carry',
+    marks('incompleteEntries', 'incomplete', incompleteWords),
+  ),
+};
+
+/** The heads the transport objects listing opens with. */
+export const TRANSPORT_OBJECTS_HEADS = [
+  headShape('transport', 'transport number'),
+  headShape('count', 'number of objects'),
+];
+
 export const TOOL_DEFINITION = {
   name: 'ReadTransportObjects',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Lists the objects the transport request or task named by transport_number holds, each with its `position`, which a removal of the entry names. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Lists the objects a transport or one of its tasks holds, each with the position a removal names.',
+    ),
+    returns: returnsOf({
+      heads: TRANSPORT_OBJECTS_HEADS,
+      of: 'the',
+      shapes: [shapesOf(TRANSPORT_OBJECTS_LISTS)],
+    }),
+    inline: true,
+  }),
   inputSchema: z.object({
     transport_number: requiredText('transport_number is required').describe(
       'Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.',
@@ -101,9 +170,6 @@ interface Entry {
  * the rows they hold — a removal names the task, the pgmid, the type, the
  * name and the position. Every entry is answered.
  */
-/** An incomplete entry's words: every identity field it carries, `field=value`. */
-const incompleteWords = (entry: ITransportIncompleteEntry) =>
-  incompleteFields(entry).map(([field, value]) => `${field}=${value}`);
 
 function transportRows(
   transportNumber: string,
@@ -116,37 +182,7 @@ function transportRows(
       { head: 'count', value: String(list.entries.length + incomplete.length) },
     ],
     reading: list,
-    lists: {
-      entries: rows('entries', {
-        columns: [
-          { name: 'type', cell: (entry: ITransportObjectEntry) => entry.type },
-          { name: 'name', cell: (entry: ITransportObjectEntry) => entry.name },
-          {
-            name: 'position',
-            cell: (entry: ITransportObjectEntry) => entry.position ?? '',
-          },
-        ],
-        header: 'always',
-        groups: [
-          {
-            label: 'task',
-            of: (entry: ITransportObjectEntry) => entry.task ?? '',
-            mode: 'run',
-            unless: '',
-          },
-          {
-            label: 'pgmid',
-            of: (entry: ITransportObjectEntry) => entry.pgmid ?? 'R3TR',
-            mode: 'run',
-          },
-        ],
-      }),
-      incompleteEntries: marks(
-        'incompleteEntries',
-        'incomplete',
-        incompleteWords,
-      ),
-    },
+    lists: TRANSPORT_OBJECTS_LISTS,
   });
 }
 

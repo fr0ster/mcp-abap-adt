@@ -14,24 +14,31 @@ import * as z from 'zod';
 import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
   answered,
   type DetailTable,
   entries,
   fullLevel,
+  headShape,
   type ListDetailTable,
   omitting,
+  type RowSchemas,
   rawLevel,
   readingAt,
   rows,
+  shapesOf,
   writeJson,
   writeListing,
   written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { getRequestContext } from '../../../lib/requestContext';
 import { statedUserOf } from '../../../lib/requestSystemResolution';
 import {
@@ -47,30 +54,6 @@ import {
   readSystemInformation,
 } from '../../../lib/systemInformation';
 import type { XmlNode } from '../../../lib/xml/node';
-
-export const TOOL_DEFINITION = {
-  name: 'ListTransports',
-  available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    "[read-only] List the transport requests of a user: the workbench, customizing and transport-of-copies requests the user owns or holds a task in, as SAP selects them. Returns each request's number, description, type, status, owner and target. Modifiable requests by default; with modifiable_only false, released requests too, from SAP's default window of the last 14 days.",
-  ),
-  inputSchema: z.object({
-    background: LONG_BACKGROUND_FIELD,
-    user: z
-      .string()
-      .optional()
-      .describe(
-        "The SAP user whose requests to list, sent in upper case. Default: the session's login user.",
-      ),
-    modifiable_only: z
-      .boolean()
-      .optional()
-      .describe(
-        "Modifiable requests only (true, the default), or modifiable and released requests (false; released ones from SAP's default window of the last 14 days).",
-      ),
-    ...DETAIL_SHAPE,
-  }),
-} as const;
 
 type ListTransportsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
@@ -179,12 +162,91 @@ const REPEATS = omitting(
   { repeat: 'a branch repeating a request already listed' },
 );
 
+/** The lists the transport listing writes: what its description states. */
+export const TRANSPORTS_LISTS: RowSchemas<{ requests: ListedRequest[] }> = {
+  requests: about(
+    'for each transport',
+    rows('requests', {
+      columns: [
+        {
+          name: 'number',
+          means: 'its number',
+          cell: (l: ListedRequest) => l.entry.number,
+        },
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (l: ListedRequest) => l.entry.type ?? '',
+        },
+        {
+          name: 'status',
+          means: 'its status',
+          cell: (l: ListedRequest) => l.entry.status ?? '',
+        },
+        {
+          name: 'owner',
+          means: 'its owner',
+          cell: (l: ListedRequest) => l.entry.owner ?? '',
+        },
+        {
+          name: 'target',
+          means: 'its target system',
+          cell: (l: ListedRequest) => l.entry.target ?? '',
+        },
+        {
+          name: 'description',
+          means: 'its description',
+          cell: (l: ListedRequest) => l.entry.description ?? '',
+        },
+      ],
+      header: 'always',
+      omit: REPEATS,
+    }),
+  ),
+};
+
+/** The head the transport listing opens with. */
+export const TRANSPORTS_HEADS = [headShape('count', 'how many there are')];
+
 /** A listing document's requests — for the #168 regression guard, which asserts against raw XML. */
 export function parseTransportListXml(xmlData: string): TransportEntry[] {
   return listedTransports(
     listingOf({ status: 200, statusText: 'OK', headers: {}, data: xmlData }),
   );
 }
+
+export const TOOL_DEFINITION = {
+  name: 'ListTransports',
+  available_in: ['onprem', 'cloud'] as const,
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      "Lists a user's transports, workbench, customizing and transport-of-copies alike, that the user owns or holds a task in.",
+    ),
+    returns: returnsOf({
+      heads: TRANSPORTS_HEADS,
+      shapes: [shapesOf(TRANSPORTS_LISTS)],
+    }),
+    inline: true,
+    notes: [longRunning],
+  }),
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    user: z
+      .string()
+      .optional()
+      .describe(
+        "The SAP user whose requests to list, sent in upper case. Default: the session's login user.",
+      ),
+    modifiable_only: z
+      .boolean()
+      .optional()
+      .describe(
+        "Modifiable requests only (true, the default), or modifiable and released requests (false; released ones from SAP's default window of the last 14 days).",
+      ),
+    ...DETAIL_SHAPE,
+  }),
+} as const;
 
 /** What `ListTransports` answers: the terse rows, the medium listing, the parse, or the document. */
 type ListAnswer = object | XmlNode | string;
@@ -206,32 +268,7 @@ const LIST_READINGS: ListDetailTable<ListAnswer> = (() => {
       return writeListing({
         heads: [{ head: 'count', value: String(counted(requests)) }],
         reading: { requests },
-        lists: {
-          requests: rows('requests', {
-            columns: [
-              { name: 'number', cell: (l: ListedRequest) => l.entry.number },
-              { name: 'type', cell: (l: ListedRequest) => l.entry.type ?? '' },
-              {
-                name: 'status',
-                cell: (l: ListedRequest) => l.entry.status ?? '',
-              },
-              {
-                name: 'owner',
-                cell: (l: ListedRequest) => l.entry.owner ?? '',
-              },
-              {
-                name: 'target',
-                cell: (l: ListedRequest) => l.entry.target ?? '',
-              },
-              {
-                name: 'description',
-                cell: (l: ListedRequest) => l.entry.description ?? '',
-              },
-            ],
-            header: 'always',
-            omit: REPEATS,
-          }),
-        },
+        lists: TRANSPORTS_LISTS,
       });
     }),
     medium: written(listingOf, (tree) => {

@@ -290,11 +290,48 @@ Time of each batch end, in milliseconds (the last run on each; recording a call 
 | delete | 3265 | 3062 |
 | reads (deleted) | 386 | 212 |
 
+## Reads of several objects inside one call
+
+A tool that reads the same kind of thing about several objects sends those reads in one envelope
+when no read needs another's answer; a read that does goes in a later envelope. Reads about one
+object stay single requests: a tool that reads one object, or probes one name for several types
+(`GetTypeInfo`), sends no envelope for it.
+
+- **Function module group checks.** A group activation (`ActivateObjects`, `HandlerActivate` with
+  `objects`) and `GetWhereUsed` with several `GROUP|FM` targets check, before anything else, that
+  each function module is in the group its reference names, from the module's metadata. Two or
+  more modules have their metadata reads in one envelope; the answer is the one read one after
+  another: the first failure in the references' order. A module that does not exist is its own
+  `404` part beside the other modules' `200`s, answered as SAP's `404` with its key, as before.
+  Every module of an envelope is read, also after a failure in it; no later envelope is sent after
+  one. One module is its one request.
+- **`GetEnhancements` probes.** An object of no known `object_type` is probed as a class, a
+  program and an include, by their metadata. With `objects`, every probe of every such object
+  goes in one envelope (before: up to three, one probe per object each), and each object's kind
+  is decided over those answers as the sequential version decides it: a `404` means not that kind,
+  and a probe the decision does not reach (the program probe of a class) is in nobody's answer.
+  One object's probes still go one per envelope.
+- **At most 300 reads per envelope** (`READS_PER_ENVELOPE`, `src/lib/batch/phases.ts`), as for
+  `SearchSource`'s source reads: more independent reads go in consecutive envelopes, each judged
+  as it answers. The same bound splits every phase of `GetEnhancements`. SAP's own limit is not
+  measured.
+- **An envelope that fails as a whole** is every read's failure in it: the answer is the one the
+  sequential reads give with those reads failed, each naming the envelope's request. A credential
+  refusal ends the call as it came. A destination with no communication batch reads one after
+  another, as before.
+
+A part's `404` beside other parts' `200`s is that part's answer: measured (see "The phases,
+measured" above, and adt-clients' `docs/usage/BATCH.md`). The function module metadata reads and
+the `GetEnhancements` probes in one envelope are pinned by unit tests only
+(`src/__tests__/unit/batch/moduleGroupChecks.test.ts`, `includeTrees.test.ts`); they are not yet
+measured on a system.
+
 ## A system without the communication batch
 
 The tools that read several independent things inside one call (the package walks,
 `GetObjectInfo`, `SearchSource`, `GetIncludesList`, `GetStructuresList`, `GetEnhancements`,
-`DescribeByList`, `GetWhereUsed`, `RuntimeListFeeds`)
+`DescribeByList`, `GetWhereUsed`, `RuntimeListFeeds`, and the function module group checks of a
+group activation — `ActivateObjects`, `HandlerActivate` with `objects`)
 send them in envelopes to `/sap/bc/adt/communication/batch`.
 Whether a destination has that endpoint is learned only from the outer status of its first
 envelope: `2xx` means served, for good; `404` means not served, and from then on that

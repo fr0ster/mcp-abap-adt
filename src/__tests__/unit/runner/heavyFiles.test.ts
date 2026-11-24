@@ -43,7 +43,7 @@ describe('the heavy test files', () => {
   });
 
   it('gives a heavy file 4 GB and every other file the default', () => {
-    assert.ok(RUNNER.includes("? ['--max-old-space-size=4096']\n    : [];"));
+    assert.ok(RUNNER.includes("? ['--max-old-space-size=4096']\n      : [];"));
     assert.ok(RUNNER.includes('...heapOf(source),'));
     // No file process is given a heap outside heapOf.
     assert.equal(RUNNER.split("'--max-old-space-size=4096'").length, 2);

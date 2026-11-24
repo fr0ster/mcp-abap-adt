@@ -46,6 +46,12 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../adtClientContract';
 import type { AdtCodes } from '../adtProjections';
+import {
+  chunksOf,
+  READS_PER_ENVELOPE,
+  runPhase,
+  withSequentialFallback,
+} from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import type { ReadVersion } from '../handlers/readVersion';
@@ -213,20 +219,22 @@ export interface ModuleReference {
   readonly parentName?: string;
 }
 
-/**
- * The group check of every function module reference among `references`
- * (each naming its group in `parentName`), one metadata read each, in their
- * order: the first failure, after which nothing more is read; `undefined`
- * when every module is in the group its reference names.
- */
-export async function checkModuleReferences(
+/** A function module reference: one naming its group. */
+type ModuleInGroup = ModuleReference & { readonly parentName: string };
+
+/** Whether `reference` is a function module reference naming its group. */
+function isModuleInGroup(
+  reference: ModuleReference,
+): reference is ModuleInGroup {
+  return reference.type === MODULE_CODE && reference.parentName !== undefined;
+}
+
+/** The group checks of `modules`, one read after another (see `checkModuleReferences`). */
+async function checkOneByOne(
   context: HandlerContext,
-  references: readonly ModuleReference[],
+  modules: readonly ModuleInGroup[],
 ): Promise<IAdtFailure<StepError> | undefined> {
-  for (const reference of references) {
-    if (reference.type !== MODULE_CODE || reference.parentName === undefined) {
-      continue;
-    }
+  for (const reference of modules) {
     const checked = await checkFunctionModuleGroup(
       context,
       reference.parentName,
@@ -235,4 +243,56 @@ export async function checkModuleReferences(
     if (!checked.ok) return checked;
   }
   return undefined;
+}
+
+/**
+ * The group checks of `modules` in ADT batch envelopes: every metadata read
+ * is independent of the others, so they go together, in consecutive
+ * envelopes of at most `READS_PER_ENVELOPE`. Each envelope's answers are
+ * judged in the references' order, as the sequential version judges them:
+ * the first failure is the answer (a module that does not exist is its
+ * `404` part, beside the others' `200`s), and no later envelope is sent; a
+ * read that threw is thrown at its place.
+ */
+async function checkInEnvelopes(
+  context: HandlerContext,
+  modules: readonly ModuleInGroup[],
+): Promise<IAdtFailure<StepError> | undefined> {
+  for (const chunk of chunksOf(modules, READS_PER_ENVELOPE)) {
+    const results = await runPhase(context, chunk, (reference, connection) =>
+      checkFunctionModuleGroupOn(
+        createAdtClient(connection, context.logger),
+        reference.parentName,
+        reference.name,
+      ),
+    );
+    for (const result of results) {
+      if (!result.ok) throw result.error;
+      if (!result.value.ok) return result.value;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The group check of every function module reference among `references`
+ * (each naming its group in `parentName`), one metadata read each: the
+ * first failure in their order; `undefined` when every module is in the
+ * group its reference names. Two or more modules are read in ADT batch
+ * envelopes (`checkInEnvelopes`), every one of them read even after a
+ * failure in the same envelope; one module is its one read, sent as itself;
+ * a destination with no communication batch reads them one after another,
+ * nothing after the first failure.
+ */
+export async function checkModuleReferences(
+  context: HandlerContext,
+  references: readonly ModuleReference[],
+): Promise<IAdtFailure<StepError> | undefined> {
+  const modules = references.filter(isModuleInGroup);
+  if (modules.length < 2) return checkOneByOne(context, modules);
+  return withSequentialFallback(
+    context,
+    () => checkInEnvelopes(context, modules),
+    () => checkOneByOne(context, modules),
+  );
 }

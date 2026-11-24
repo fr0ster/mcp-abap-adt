@@ -19,6 +19,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import { envelopeResponse } from '../../helpers/batchEnvelope';
 import {
   type PinnedRequest,
   recordCase,
@@ -61,6 +62,47 @@ const inGroup = (module: string, group: string): Partial<IAdtWireResponse> => ({
   data: metadataDocument(module, group),
 });
 
+/**
+ * The metadata reads `checks` in one ADT batch envelope under `boundary`
+ * (the case's seeded one), as adt-clients writes it: two or more module
+ * references are checked together.
+ */
+function checksEnvelope(
+  boundary: string,
+  checks: readonly PinnedRequest[],
+): PinnedRequest {
+  const parts = checks
+    .map(
+      (check) =>
+        `--${boundary}\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\n${check.method} ${check.url} HTTP/1.1\r\nAccept: ${check.headers.Accept}\r\n\r\n\r\n`,
+    )
+    .join('');
+  return {
+    method: 'POST',
+    url: '/sap/bc/adt/communication/batch',
+    headers: {
+      'Content-Type': `multipart/mixed; boundary=${boundary}`,
+      Accept: 'multipart/mixed',
+    },
+    body: `${parts}\r\n--${boundary}--\r\n`,
+  };
+}
+
+/** The envelope's answer: each `[module, group]` the metadata of `module` in `group`. */
+const inGroups = (
+  ...held: ReadonlyArray<readonly [string, string]>
+): Partial<IAdtWireResponse> =>
+  envelopeResponse(
+    held.map(([module, group]) => ({
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        'content-type': 'application/vnd.sap.adt.functions.fmodules+xml',
+      },
+      body: metadataDocument(module, group),
+    })),
+  );
+
 interface GroupCase {
   label: string;
   tool: string;
@@ -71,7 +113,7 @@ interface GroupCase {
   mismatched: ReadonlyArray<Partial<IAdtWireResponse>>;
   /** Whether the matched path answers a failure (its later answers are empty). */
   matchRefused: boolean;
-  /** The metadata reads, one per module reference, in order. */
+  /** The metadata reads, one per module reference, in order: two or more in one envelope. */
   checks: readonly PinnedRequest[];
   /** The path's own requests after the checks, as before the check. */
   after: readonly PinnedRequest[];
@@ -341,13 +383,16 @@ const CASES: readonly GroupCase[] = [
         { name: 'ZPIN_FM2', type: 'FUGR/FF', parentName: 'ZPIN_FG' },
       ],
     },
-    matched: [inGroup('ZPIN_FM', 'ZPIN_FG'), inGroup('ZPIN_FM2', 'ZPIN_FG')],
-    mismatched: [
-      inGroup('ZPIN_FM', 'ZPIN_FG'),
-      inGroup('ZPIN_FM2', 'ZPIN_OTHER'),
-    ],
+    matched: [inGroups(['ZPIN_FM', 'ZPIN_FG'], ['ZPIN_FM2', 'ZPIN_FG'])],
+    mismatched: [inGroups(['ZPIN_FM', 'ZPIN_FG'], ['ZPIN_FM2', 'ZPIN_OTHER'])],
     matchRefused: false,
-    checks: [META('ZPIN_FM', 'workingArea'), META('ZPIN_FM2', 'workingArea')],
+    // Two modules: their metadata reads in one envelope.
+    checks: [
+      checksEnvelope('batch_3f272b1c-a61b-4367-ab16-edf3214a4a3b', [
+        META('ZPIN_FM', 'workingArea'),
+        META('ZPIN_FM2', 'workingArea'),
+      ]),
+    ],
     after: [
       {
         method: 'GET',
@@ -400,23 +445,26 @@ const CASES: readonly GroupCase[] = [
         { object_name: 'ZPIN_FG|ZPIN_FM2', object_type: 'FUGR/FF' },
       ],
     },
-    matched: [inGroup('ZPIN_FM', 'ZPIN_FG'), inGroup('ZPIN_FM2', 'ZPIN_FG')],
-    mismatched: [
-      inGroup('ZPIN_FM', 'ZPIN_FG'),
-      inGroup('ZPIN_FM2', 'ZPIN_OTHER'),
-    ],
+    matched: [inGroups(['ZPIN_FM', 'ZPIN_FG'], ['ZPIN_FM2', 'ZPIN_FG'])],
+    mismatched: [inGroups(['ZPIN_FM', 'ZPIN_FG'], ['ZPIN_FM2', 'ZPIN_OTHER'])],
     matchRefused: false,
-    checks: [META('ZPIN_FM', 'workingArea'), META('ZPIN_FM2', 'workingArea')],
+    // Two modules: their metadata reads in one envelope.
+    checks: [
+      checksEnvelope('batch_a0f8861b-df94-44d9-af23-7186134727a1', [
+        META('ZPIN_FM', 'workingArea'),
+        META('ZPIN_FM2', 'workingArea'),
+      ]),
+    ],
     after: [
       {
         method: 'POST',
         url: '/sap/bc/adt/communication/batch',
         headers: {
           'Content-Type':
-            'multipart/mixed; boundary=batch_a0f8861b-df94-44d9-af23-7186134727a1',
+            'multipart/mixed; boundary=batch_6d1042fc-bcbe-42d8-a016-d92381aab049',
           Accept: 'multipart/mixed',
         },
-        body: '--batch_a0f8861b-df94-44d9-af23-7186134727a1\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nPOST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Ffunctions%2Fgroups%2Fzpin_fg%2Ffmodules%2Fzpin_fm HTTP/1.1\r\nAccept: application/vnd.sap.adt.repository.usagereferences.result.v1+xml\r\nContent-Type: application/vnd.sap.adt.repository.usagereferences.request.v1+xml\r\nContent-Length: 218\r\n\r\n<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>\r\n--batch_a0f8861b-df94-44d9-af23-7186134727a1\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nPOST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Ffunctions%2Fgroups%2Fzpin_fg%2Ffmodules%2Fzpin_fm2 HTTP/1.1\r\nAccept: application/vnd.sap.adt.repository.usagereferences.result.v1+xml\r\nContent-Type: application/vnd.sap.adt.repository.usagereferences.request.v1+xml\r\nContent-Length: 218\r\n\r\n<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>\r\n\r\n--batch_a0f8861b-df94-44d9-af23-7186134727a1--\r\n',
+        body: '--batch_6d1042fc-bcbe-42d8-a016-d92381aab049\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nPOST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Ffunctions%2Fgroups%2Fzpin_fg%2Ffmodules%2Fzpin_fm HTTP/1.1\r\nAccept: application/vnd.sap.adt.repository.usagereferences.result.v1+xml\r\nContent-Type: application/vnd.sap.adt.repository.usagereferences.request.v1+xml\r\nContent-Length: 218\r\n\r\n<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>\r\n--batch_6d1042fc-bcbe-42d8-a016-d92381aab049\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nPOST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Ffunctions%2Fgroups%2Fzpin_fg%2Ffmodules%2Fzpin_fm2 HTTP/1.1\r\nAccept: application/vnd.sap.adt.repository.usagereferences.result.v1+xml\r\nContent-Type: application/vnd.sap.adt.repository.usagereferences.request.v1+xml\r\nContent-Length: 218\r\n\r\n<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>\r\n\r\n--batch_6d1042fc-bcbe-42d8-a016-d92381aab049--\r\n',
       },
     ],
   },
@@ -520,13 +568,16 @@ const CASES: readonly GroupCase[] = [
         { name: 'ZPIN_FM2', type: 'FUGR/FF', parentName: 'ZPIN_FG' },
       ],
     },
-    matched: [inGroup('ZPIN_FM', 'ZPIN_FG'), inGroup('ZPIN_FM2', 'ZPIN_FG')],
-    mismatched: [
-      inGroup('ZPIN_FM', 'ZPIN_FG'),
-      inGroup('ZPIN_FM2', 'ZPIN_OTHER'),
-    ],
+    matched: [inGroups(['ZPIN_FM', 'ZPIN_FG'], ['ZPIN_FM2', 'ZPIN_FG'])],
+    mismatched: [inGroups(['ZPIN_FM', 'ZPIN_FG'], ['ZPIN_FM2', 'ZPIN_OTHER'])],
     matchRefused: true,
-    checks: [META('ZPIN_FM', 'workingArea'), META('ZPIN_FM2', 'workingArea')],
+    // Two modules: their metadata reads in one envelope.
+    checks: [
+      checksEnvelope('batch_db29826f-31b6-491e-acfa-04e6a09b707b', [
+        META('ZPIN_FM', 'workingArea'),
+        META('ZPIN_FM2', 'workingArea'),
+      ]),
+    ],
     after: [
       {
         method: 'POST',

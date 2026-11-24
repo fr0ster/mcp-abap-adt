@@ -5,16 +5,26 @@ import {
   endDebugBatchAnswers,
   requireDebugger,
 } from '../../../lib/debugger/access';
-import { debugAnswer } from '../../../lib/debugger/answer';
+import { debugAnswer, stoppedSession } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { STOPPED } from '../../../lib/description/debugger';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugStop',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening, closes the connections and lets the kept answers of its debugger batch go; a part that failed to undo is reported and kept with the answers.',
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes its connections.',
+      ),
+      result: STOPPED,
+    }),
+  ),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),
 } as const;
 
@@ -31,10 +41,7 @@ export async function handleDebugStop(
       const notes = await d.stop();
       // Complete: a debugger batch's kept answers end with the state.
       endDebugBatchAnswers(context);
-      return {
-        value: { state: 'stopped', ...(notes.length ? { notes } : {}) },
-        raw: JSON.stringify(notes),
-      };
+      return { value: stoppedSession(notes), raw: JSON.stringify(notes) };
     },
     (v) => v,
   );

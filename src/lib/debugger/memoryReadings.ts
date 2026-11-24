@@ -121,3 +121,15 @@ export function terseMemorySizes(r: MemorySizesReading): {
     internal_peak_used: r.internal.peakUsed,
   };
 }
+
+/** What an empty list of snapshots says beside it. */
+export const NO_SNAPSHOT_AUTHORIZATION =
+  'an empty list is also the answer without the memory snapshot authorization';
+
+/** The snapshots under terse: each without its file name; none, with what that may mean. */
+export function terseSnapshotList(xml: string) {
+  const list = readSnapshotList(xml).map(({ fileName: _f, ...s }) => s);
+  return list.length > 0
+    ? list
+    : { snapshots: [], authorization: NO_SNAPSHOT_AUTHORIZATION };
+}

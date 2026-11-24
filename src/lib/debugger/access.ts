@@ -1,6 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../handlers/interfaces';
 import type { DebuggerInstance } from './DebuggerInstance';
+import type { DebuggingMode } from './DebugSession';
 
 /**
  * create: a starting tool — nothing of ours refuses it; SAP's answer to a
@@ -65,7 +66,16 @@ export function heldStateHandle(context: HandlerContext): DebugExtra {
 }
 
 /** What a start answers beside its state: the handle, the SAP ids, and the identity in force. */
-export function startedExtra(context: HandlerContext): DebugExtra {
+/** What a start answers beside its state. */
+export type StartedExtra = {
+  readonly state_handle: string;
+  readonly terminal_id: string;
+  readonly ide_id: string;
+  readonly debugging_mode?: DebuggingMode | undefined;
+  readonly request_user?: string | undefined;
+};
+
+export function startedExtra(context: HandlerContext): StartedExtra {
   const { debugger: debuggerOf, state } = context;
   if (debuggerOf === undefined || state === undefined) {
     throw new Error('A started debug session has no debugger or state here');

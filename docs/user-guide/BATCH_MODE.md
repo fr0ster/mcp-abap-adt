@@ -319,6 +319,17 @@ are single requests.
   one — sends no envelope at all.
 - **`GetObjectsList`.** One parent (`parent_name`, or `objects` naming one) is walked as single
   requests; several parents' node structures go in envelopes, level by level.
+- **`GetObjectInfo`: the structure first, the descriptions second.** The structure comes back
+  first, each node structure sent as its own request — node structures cross-talk inside an
+  envelope — so `include_descriptions: false` (the default) answers the structure alone and reads
+  nothing more. With `include_descriptions: true` the server then runs the metadata phase itself:
+  every leaf's metadata, in envelopes (metadata reads do not cross-talk), and each leaf's
+  description is its metadata's. The sequential version reads the same metadata, one request
+  each, so both paths answer from one source. A leaf whose metadata read SAP refused — a `401`
+  included — has no description, and the call answers, on both paths.
+- **`SearchSource`.** A single target, and any phase of one read (one mask's quickSearch, a walk
+  level of one node structure, a round of one source read), goes as single requests; several
+  targets' rounds go in envelopes.
 - **At most 300 reads per envelope** (`READS_PER_ENVELOPE`, `src/lib/batch/phases.ts`): more
   independent reads go in consecutive envelopes of balanced size (`chunksOf`: 301 reads are 151 and
   150, never 300 and 1), each judged as it answers, none sent after one that met a credential
@@ -327,10 +338,10 @@ are single requests.
   reads. SAP's own limit is not measured.
 - **Descriptions are never taken from a batched node structure.** Inside an envelope a node
   structure part can carry another part's `DESCRIPTION` (measured, 2026-10-18). The package
-  listings and `GetObjectInfo` with `include_descriptions: true` send each node structure as its
-  own request and take each object's description from it, on every destination — the description
-  the sequential version reads; no object's metadata is read for it. `GetObjectsList` answers no
-  description at all (type, name, technical name, URI), whatever `with_short_descriptions` says.
+  listings with `include_descriptions: true` send each node structure as its own request and take
+  each object's description from it; `GetObjectInfo` takes each leaf's from its metadata (above);
+  `GetObjectsList` answers no description at all (type, name, technical name, URI), whatever
+  `with_short_descriptions` says.
 - **Single requests over RFC go one at a time.** Where a tool reads single requests several at a
   time — the package listings and `GetObjectInfo` with `include_descriptions: true` (8 at once),
   `SearchSource` without a communication batch — an RFC connection gets one at a time
@@ -344,6 +355,11 @@ are single requests.
   part's "not found" (`GetEnhancements` reports its probes refused, not the object missing). A
   credential refusal ends the call as it came. A destination with no communication batch reads one
   after another, as before.
+- **A credential refusal in a list reports the first one in object order.** Where two objects of a
+  list meet a credential refusal on different reads, the call answers the refusal of the first
+  object in the list, which may not be the read the sequential version would have sent first. A
+  credential refusal stops everything anyway; the answer names one of them (accepted by the
+  owner).
 
 A part's `404` beside other parts' `200`s is that part's answer: measured (see "The phases,
 measured" above, and adt-clients' `docs/usage/BATCH.md`). The function module metadata reads and

@@ -21,6 +21,13 @@ import {
   type ProjectionVariant,
 } from '../adtProjections';
 import { parentedCodesOf } from '../adtTypeCode';
+import {
+  type DescriptionParts,
+  purpose,
+  resultReturns,
+  toolDescription,
+} from '../description/index';
+import { CLASS_RUN, PROGRAM_RUN } from '../description/runs';
 import { draftPartWords, HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import { withLongToolAdvice } from '../longTools';
 import {
@@ -518,6 +525,41 @@ export function compactActivateDescription(
   return `Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): ${when(byName.length > 0, `object_type is enough for ${listed(byName)}; `)}${when(left.has('FUNCTION_MODULE'), `${activateToken('FUNCTION_MODULE')} is activated under its function group; `)}any other type takes object_adt_type (e.g. ${example}), with parentName for a part of a function group (${parentedCodesOf(codes).join(', ')}). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); an object of ${parentedCodesOf(codes).join(', ')} is listed with objects[].parentName set to its function group. One object of ${either(left.of(COMPACT_SINGLE_ACTIVATION[variant]))} (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id. Where the system's discovery leaves out the activation runs (SAP_BASIS 751, 7.40), that call answers SAP's refusal; a group activation there is ActivateObjects (the full set) or ActivateObjectLow (the low handlers group).`;
 }
 
+/** What each HandlerProfileRun member runs, by its function: the full run tool's result. */
+const PROFILE_RUNS = {
+  CLASS: {
+    value: 'CLASS',
+    purpose: purpose(
+      'Runs an ABAP class implementing if_oo_adt_classrun and gives its console output.',
+    ),
+    returns: resultReturns(CLASS_RUN),
+  },
+  PROGRAM: {
+    value: 'PROGRAM',
+    purpose: purpose('Runs an ABAP report and gives its output.'),
+    returns: resultReturns(PROGRAM_RUN),
+  },
+} as const;
+
+/** HandlerProfileRun's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactProfileRunParts(
+  variant: ProjectionVariant,
+  members: readonly (typeof COMPACT_PROFILE.onprem)[number][] = COMPACT_PROFILE[
+    variant
+  ],
+): DescriptionParts {
+  return {
+    purpose: purpose(
+      `Runs ${either(members.map((member) => (member === 'CLASS' ? 'an ABAP class' : 'an ABAP report')))}, under a scheduled profiler trace when its profiler id is given.`,
+    ),
+    returns: [],
+    values: {
+      of: 'target_type',
+      each: members.map((member) => PROFILE_RUNS[member]),
+    },
+  };
+}
+
 /** HandlerProfileRun's description on `variant`. */
 export function compactProfileRunDescription(
   variant: ProjectionVariant,
@@ -525,10 +567,5 @@ export function compactProfileRunDescription(
     variant
   ],
 ): string {
-  const names = members.map((member) =>
-    member === 'CLASS' ? 'class_name* for CLASS' : 'program_name* for PROGRAM',
-  );
-  return `Runs ${either(
-    members.map((member) => (member === 'CLASS' ? 'a class' : 'a program')),
-  )} in one request. Required: target_type*(${members.join('|')}) + ${either(names)}. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.`;
+  return toolDescription(compactProfileRunParts(variant, members));
 }

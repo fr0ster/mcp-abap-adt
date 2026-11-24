@@ -26,14 +26,8 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'HandlerLeftoverSessionList',
   'HandlerLeftoverSessionLogoff',
   'HandlerLock',
-  'HandlerProfileRun',
-  'HandlerProfileSchedule',
   'HandlerSession',
   'HandlerSystem',
-  'HandlerTransportCreate',
-  'HandlerTransportMoveObjects',
-  'HandlerTransportSortAndCompress',
-  'HandlerUnitTestRun',
   'HandlerUnlock',
   'HandlerUpdate',
   'HandlerValidate',
@@ -44,7 +38,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 31;
+export const NOT_YET_ASSEMBLED_MOST = 25;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

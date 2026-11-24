@@ -23,6 +23,7 @@ import type {
 import type { resultOnceAnswer } from '../../handlers/unit_test/shared/resultOnce';
 import type { projectSync } from '../../handlers/unit_test/shared/runSync';
 import type { projectRun } from '../../handlers/unit_test/shared/runTests';
+import type { startedRunAnswer } from '../../handlers/unit_test/shared/startRun';
 import type { TerseClassRun } from '../strategies/runProjections';
 import type { XmlRead } from '../xml/tree';
 import type { Note } from './notes';
@@ -64,6 +65,16 @@ export const UNIT_TEST_RUN_OR_SYNC = resultShape<
 >({
   run_id: RUN_ID,
   status: RUN_STATUS_UNSTARTED,
+  runner: 'the runner that ran it',
+  finished: RUN_FINISHED,
+  run_result: RUN_RESULT,
+});
+
+/** What a started ABAP Unit run answers: its id, or the finished result in one call. */
+export const UNIT_TEST_STARTED = resultShape<
+  Informative<ReturnType<typeof startedRunAnswer>> | SyncRunAnswer
+>({
+  run_id: RUN_ID,
   runner: 'the runner that ran it',
   finished: RUN_FINISHED,
   run_result: RUN_RESULT,

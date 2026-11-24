@@ -29,6 +29,8 @@ import type {
 import type * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { compactUnitTestRunSchema } from '../../../lib/compact/compactSchemas';
+import { purpose } from '../../../lib/description/purpose';
+import { runParts, UNIT_TEST_STARTED } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -43,6 +45,19 @@ export type { UnitTestRunner } from './runner';
  * (its one caller).
  */
 export type StartUnitTestRunArgs = z.output<typeof compactUnitTestRunSchema>;
+
+/** A started run's answer: the id its status and result are read by. */
+export function startedRunAnswer(runId: string) {
+  return { success: true as const, run_id: runId };
+}
+
+/** What `HandlerUnitTestRun` does, and what its run answers. */
+export const START_RUN_PARTS = runParts({
+  purpose: purpose(
+    "Runs the ABAP Unit tests of chosen test classes, of an object or of a package, giving the run's id at once or the finished result of the test classes.",
+  ),
+  result: UNIT_TEST_STARTED,
+});
 
 export async function handleStartUnitTestRun(
   context: HandlerContext,
@@ -107,7 +122,7 @@ export async function handleStartUnitTestRun(
         riskLevel: riskLevelOf(risk_level),
         duration: durationOf(duration),
       }),
-    (runId: string) => ({ success: true, run_id: runId }),
+    startedRunAnswer,
   );
 }
 
@@ -143,7 +158,7 @@ async function startTargetRun(
         riskLevel,
         duration,
       }),
-    (runId: string) => ({ success: true, run_id: runId }),
+    startedRunAnswer,
   );
 }
 

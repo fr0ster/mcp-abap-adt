@@ -1,8 +1,9 @@
 import {
   byVariant,
   COMPACT_PROFILE,
-  compactProfileRunDescription,
+  compactProfileRunParts,
   compactProfileRunSchemaFor,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -15,7 +16,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerProfileRun',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactProfileRunDescription(variant),
+    description: toolDescription(compactProfileRunParts(variant)),
     inputSchema: compactProfileRunSchemaFor(COMPACT_PROFILE[variant]),
     members: COMPACT_PROFILE[variant],
   })),

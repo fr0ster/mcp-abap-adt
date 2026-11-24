@@ -137,7 +137,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listabapgitrepos-read-only-abapgit"></a>
 #### ListAbapGitRepos (Read-Only / Abapgit)
-**Description:** [read-only] Finds the abapGit repositories linked in the system, or only the one linked to a package or with a key. For each repository linked: its key, its package, its branch, its remote URL, the state of its last pull or push on the cloud (blank initial, R running, S, W, E or A ended), the text of its last run and the key of its run log.
+**Description:** [read-only] Lists the abapGit repositories linked in the system, or the one with a key or of one package. For each repository linked: its key, its package, its branch, its remote URL and the state of its last pull or push on the cloud (blank initial, R running, S, W, E or A ended).
 
 **Source:** `src/handlers/abapgit/readonly/handleListAbapGitRepos.ts`
 
@@ -150,7 +150,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="checkabapgitexternalrepo-read-only-abapgit"></a>
 #### CheckAbapGitExternalRepo (Read-Only / Abapgit)
-**Description:** [read-only] Checks what a remote git repository offers before it is linked, as the system reaches it. Whether the remote repository is public or private. For each branch of the remote repository: its name, whether it is the head, its type and its commit.
+**Description:** [read-only] Checks an external git repository for abapGit before it is linked: its access and its branches. Whether the remote repository is public or private. For each branch of the remote repository: its name and whether it is the head.
 
 **Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitExternalRepo.ts`
 
@@ -162,7 +162,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getabapgitmodifiedobjects-read-only-abapgit"></a>
 #### GetAbapGitModifiedObjects (Read-Only / Abapgit)
-**Description:** [read-only] Shows what a pull of a linked repository would change in the system, before it runs. For each object a pull would overwrite: its type, its name, its package, what the pull would do to it (1 add, 2 update, 3 overwrite, 4 delete, 5 delete and re-create, 6 package move) and its address. For each object a pull would move to another package: its type, its name, its package, what the pull would do to it (1 add, 2 update, 3 overwrite, 4 delete, 5 delete and re-create, 6 package move) and its address.
+**Description:** [read-only] Gets the objects a pull of an abapGit repository would modify in the system, before it runs. For each object a pull would overwrite and each object a pull would move to another package: its type, its name and its package.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitModifiedObjects.ts`
 
@@ -174,7 +174,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getabapgitstaging-read-only-abapgit"></a>
 #### GetAbapGitStaging (Read-Only / Abapgit)
-**Description:** [read-only] Shows what changed between the system and the remote branch of a linked repository, to choose what a push commits. The author SAP proposes. The committer SAP proposes. For each changed file left unstaged: its object's type, its object's name, its object's package, its file name, its state in the system, its state in the remote, its object's workbench key, its object's version, its object's address and its folder. An object with several files is named once for each of its files. For each staged file: its object's type, its object's name, its object's package, its file name, its state in the system, its state in the remote, its object's workbench key, its object's version, its object's address and its folder. For each ignored file: its object's type, its object's name, its object's package, its file name, its state in the system, its state in the remote, its object's workbench key, its object's version, its object's address and its folder.
+**Description:** [read-only] Gets the abapGit staging of a linked repository: what changed, to choose what a push commits. The author SAP proposes. The committer SAP proposes. For each changed file left unstaged, each staged file and each ignored file: its object's type, its object's name, its object's package, its file name, its state in the system and its state in the remote. An object with several files is named once for each of its files.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitStaging.ts`
 
@@ -210,7 +210,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getabapgiterrorlog-read-only-abapgit"></a>
 #### GetAbapGitErrorLog (Read-Only / Abapgit)
-**Description:** [read-only] Shows how the last pull or push of a linked repository went, object by object, by the key of its run log. For each object the run handled: its type, its name, the severity of SAP's message for it (S, I, W, E or A), its package and its status.
+**Description:** [read-only] Gets the error log of the last abapGit pull or push of a repository, object by object. For each object the run handled: its type, its name and the severity of SAP's message for it (S, I, W, E or A).
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitErrorLog.ts`
 
@@ -722,7 +722,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getmessageclass-read-only-message-class"></a>
 #### GetMessageClass (Read-Only / Message Class)
-**Description:** [read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request, at its active version: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP message class: its messages with their numbers and texts, and its master language.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
@@ -786,7 +786,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getpackage-read-only-package"></a>
 #### GetPackage (Read-Only / Package)
-**Description:** [read-only] Reads an ABAP package: its settings and its subpackages, at the version asked. The package's name. Its description. Its type. Its super package. Its software component. Its application component. Its transport layer. Its ABAP language version. Who is responsible for it. For each subpackage: its name and its description. The package's settings.
+**Description:** [read-only] Reads an ABAP package at the version asked: its name, description, type, super package, software component, application component, transport layer, language version and person responsible; for each subpackage: its name and its description.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 

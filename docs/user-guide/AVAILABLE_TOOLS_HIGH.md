@@ -247,7 +247,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getabapgitbranchinfo-high-level-abapgit"></a>
 #### GetAbapGitBranchInfo (High-Level / Abapgit)
-**Description:** Reads one branch of a remote git repository for the package it would be linked to, SAP linking and unlinking it to find out. Whether the remote repository is public or private. For the branch: its name, how its folders map to packages, its type, whether it is the head and its commit.
+**Description:** Gets the abapGit branch information of a remote repository for the package it would be linked to. Whether the remote repository is public or private. For the branch: its name and how its folders map to packages.
 
 **Source:** `src/handlers/abapgit/high/handleGetAbapGitBranchInfo.ts`
 
@@ -343,7 +343,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="unlinkabapgitrepo-high-level-abapgit"></a>
 #### UnlinkAbapGitRepo (High-Level / Abapgit)
-**Description:** Removes the link of the repository repository_key from its package; the package's objects stay in the system, and the remote stays as it is. Answers SAP's status.
+**Description:** Unlinks an abapGit repository by its key, keeping its objects in the system and its remote as it is.
 
 **Source:** `src/handlers/abapgit/high/handleUnlinkAbapGitRepo.ts`
 
@@ -2129,7 +2129,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmessageclass-high-level-message-class"></a>
 #### GetMessageClass (High-Level / Message Class)
-**Description:** [read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request, at its active version: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP message class: its messages with their numbers and texts, and its master language.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
@@ -2235,7 +2235,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createpackage-high-level-package"></a>
 #### CreatePackage (High-Level / Package)
-**Description:** Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.
+**Description:** Creates a new ABAP package under a super package, with its type, software component, transport layer and description.
 
 **Source:** `src/handlers/package/high/handleCreatePackage.ts`
 
@@ -2274,7 +2274,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** [read-only] Reads an ABAP package: its settings and its subpackages, at the version asked. The package's name. Its description. Its type. Its super package. Its software component. Its application component. Its transport layer. Its ABAP language version. Who is responsible for it. For each subpackage: its name and its description. The package's settings.
+**Description:** [read-only] Reads an ABAP package at the version asked: its name, description, type, super package, software component, application component, transport layer, language version and person responsible; for each subpackage: its name and its description.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 

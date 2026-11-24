@@ -1,0 +1,58 @@
+{
+  "queries": {
+    "GetPackage": [
+      "read package ZMY_PKG",
+      "what is package ZMY_PKG?",
+      "прочитай пакет ZMY_PKG",
+      "що за пакет ZMY_PKG?",
+      "who is responsible for package ZMY_PKG?"
+    ],
+    "ListAbapGitRepos": [
+      "list the abapGit repositories in the system",
+      "which git repository is linked to package ZMY_PKG?",
+      "покажи abapGit репозиторії",
+      "який git репозиторій прив'язаний до пакета ZMY_PKG?"
+    ],
+    "CheckAbapGitExternalRepo": [
+      "check the git repository https://github.com/acme/abap before linking it",
+      "is the remote repository public or private, and what branches does it have?",
+      "перевір зовнішній git репозиторій перед підключенням",
+      "які гілки є у віддаленому репозиторії?"
+    ],
+    "GetAbapGitBranchInfo": [
+      "get the branch info of the remote repository for package ZMY_PKG",
+      "what folder logic does branch main have?",
+      "покажи інформацію про гілку main для пакета ZMY_PKG",
+      "яка логіка папок у гілки main?"
+    ],
+    "GetAbapGitModifiedObjects": [
+      "what would a pull of the abapGit repository change?",
+      "which objects would the pull overwrite?",
+      "що змінить pull abapGit репозиторію?",
+      "які об'єкти буде перезаписано при pull?"
+    ],
+    "GetAbapGitStaging": [
+      "show the abapGit staging of the repository",
+      "what changed and can be pushed to git?",
+      "покажи staging abapGit репозиторію",
+      "що змінилось і що можна закомітити в git?"
+    ],
+    "GetAbapGitErrorLog": [
+      "show the error log of the last abapGit pull",
+      "why did the abapGit push fail?",
+      "покажи журнал помилок останнього pull abapGit",
+      "чому не вдався push в abapGit?"
+    ]
+  },
+  "siblings": {},
+  "misses": [
+    "GetPackage: read package ZMY_PKG",
+    "GetPackage: what is package ZMY_PKG?",
+    "GetPackage: прочитай пакет ZMY_PKG",
+    "GetPackage: що за пакет ZMY_PKG?",
+    "GetPackage: who is responsible for package ZMY_PKG?",
+    "GetAbapGitBranchInfo: яка логіка папок у гілки main?",
+    "GetAbapGitErrorLog: why did the abapGit push fail?",
+    "GetAbapGitErrorLog: чому не вдався push в abapGit?"
+  ]
+}

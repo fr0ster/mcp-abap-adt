@@ -427,4 +427,4 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Run the meaning checks
-        run: npm test -- --concurrency 1 --env MEANING_MODELS=bge-m3 src/__tests__/unit/descriptions/meaning.test.ts
+        run: npm test -- --concurrency 1 --env MEANING_MODELS=bge-m3 src/__tests__/unit/descriptions/meaning.test.ts src/__tests__/unit/descriptions/descriptionQueries.test.ts

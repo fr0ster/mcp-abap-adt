@@ -1,18 +1,22 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { toolDescription } from '../../../lib/description';
+import { UNIT_TEST_STATUS, unitTestRead } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
 import type { XmlRead } from '../../../lib/xml/tree';
-import { runIsFinished, runProgressStatus } from '../shared/pollRun';
+import { runStatusAnswer } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestStatus',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[read-only] Retrieve ABAP Unit test run status for a run_id.',
+  description: toolDescription(
+    unitTestRead('the status', 'an ABAP Unit test run', UNIT_TEST_STATUS),
+  ),
   inputSchema: z.object({
     run_id: z.string().describe('Run identifier returned by unit test run.'),
     with_long_polling: z
@@ -51,11 +55,7 @@ export async function handleGetUnitTestStatus(
   // by enumerating every `answer()` call's own projection rather than only
   // calls to the shared `project()` helper, which this handler's own
   // hand-written, `AdtReading`-typed projection does not use.
-  const terseRunStatus = (value: XmlRead) => ({
-    run_id,
-    finished: runIsFinished(value),
-    run_status: runProgressStatus(value),
-  });
+  const terseRunStatus = (value: XmlRead) => runStatusAnswer(run_id, value);
 
   return answer(
     { tool: 'GetUnitTestStatus', detail },

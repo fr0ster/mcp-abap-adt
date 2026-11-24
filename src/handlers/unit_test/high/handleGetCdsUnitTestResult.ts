@@ -1,6 +1,8 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { toolDescription } from '../../../lib/description';
+import { UNIT_TEST_RESULT, unitTestRead } from '../../../lib/description/runs';
 import { wireAnswer } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -9,15 +11,21 @@ import {
   detailOf,
   levelOf,
 } from '../../../lib/strategies/detail';
-import { readGivenRun, unfinishedRun } from '../shared/pollRun';
+import { readGivenRun, runOutcomeAnswer } from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Retrieve CDS unit test run result for a run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
+  description: toolDescription(
+    unitTestRead(
+      'the result',
+      'a CDS unit test run',
+      UNIT_TEST_RESULT,
+      'waits',
+    ),
+  ),
   inputSchema: z.object({
     run_id: requiredText('run_id is required').describe(
       'Run identifier returned by unit test run.',
@@ -85,15 +93,7 @@ async function answeredGetCdsUnitTestResult(
           }),
       ),
     // Task 28 fix round 1 — same finding, same fix as `GetUnitTestResult`.
-    (outcome) =>
-      !outcome.finished
-        ? unfinishedRun(run_id, outcome.runStatus)
-        : {
-            success: true,
-            run_id,
-            finished: true,
-            run_result: outcome.result.value,
-          },
+    (outcome) => runOutcomeAnswer(run_id, outcome),
   );
 }
 

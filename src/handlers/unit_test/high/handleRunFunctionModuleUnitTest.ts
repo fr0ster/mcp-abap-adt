@@ -13,6 +13,8 @@ import { RUNNER_FIELD, SCOPE_FIELD, WAIT_FIELD } from '../shared/runner';
  */
 
 import { answer } from '../../../lib/answer';
+import { toolDescription } from '../../../lib/description';
+import { unitTestRun } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { inCheckedGroup } from '../../../lib/strategies/functionModuleGroup';
@@ -29,8 +31,12 @@ import { projectRun, runAndWait } from '../shared/runTests';
 export const TOOL_DEFINITION = {
   name: 'RunFunctionModuleUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Runs the ABAP Unit tests of the module's whole function group: the function module named by function_module_name is run, and SAP runs the tests of the function group holding it. runner async (default), addressed by function_module_name alone: the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group, called with wait left out.",
+  description: toolDescription(
+    unitTestRun(
+      'the ABAP Unit tests of the function group holding a function module',
+      'sync',
+    ),
+  ),
   inputSchema: z.object({
     function_module_name: z
       .string()

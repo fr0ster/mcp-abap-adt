@@ -235,3 +235,46 @@ async function readRun<TResult>(
 export function unfinishedRun(runId: string, runStatus: string) {
   return { success: true, run_id: runId, status: runStatus };
 }
+
+/**
+ * What a reader answers for a run it read: the result of a run SAP answered
+ * `FINISHED`, the run id and SAP's status of one it answered `NOT_STARTED`.
+ */
+export function runOutcomeAnswer<T>(
+  runId: string,
+  outcome: RunOutcome<{ readonly value: T }>,
+) {
+  return !outcome.finished
+    ? unfinishedRun(runId, outcome.runStatus)
+    : {
+        success: true,
+        run_id: runId,
+        finished: true,
+        run_result: outcome.result.value,
+      };
+}
+
+/** {@link runOutcomeAnswer}, a finished run's status beside its result. */
+export function runOutcomeWithStatus<T>(
+  runId: string,
+  outcome: RunOutcome<{ readonly value: T }>,
+) {
+  return !outcome.finished
+    ? unfinishedRun(runId, outcome.runStatus)
+    : {
+        success: true,
+        run_id: runId,
+        finished: true,
+        run_status: outcome.status.value,
+        run_result: outcome.result.value,
+      };
+}
+
+/** What a status read answers: the run id, whether it finished, SAP's progress status. */
+export function runStatusAnswer(runId: string, statusValue: XmlRead) {
+  return {
+    run_id: runId,
+    finished: runIsFinished(statusValue),
+    run_status: runProgressStatus(statusValue),
+  };
+}

@@ -34,7 +34,7 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import type { XmlRead } from '../../../lib/xml/tree';
-import { type RunOutcome, readStartedRun, unfinishedRun } from './pollRun';
+import { type RunOutcome, readStartedRun, runOutcomeAnswer } from './pollRun';
 
 /** The object types a run can be started for, each with its own runner. */
 export type TestCarrier =
@@ -168,12 +168,6 @@ export function projectRun(detail: 'terse' | 'full' | 'raw') {
   return (run: StartedRun) => {
     const waited = run.waited;
     if (waited === undefined) return { success: true, run_id: run.runId };
-    if (!waited.finished) return unfinishedRun(run.runId, waited.runStatus);
-    return {
-      success: true,
-      run_id: run.runId,
-      finished: true,
-      run_result: waited.result.value,
-    };
+    return runOutcomeAnswer(run.runId, waited);
   };
 }

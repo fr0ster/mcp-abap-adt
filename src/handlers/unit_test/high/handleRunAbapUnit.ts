@@ -36,6 +36,8 @@ import { RUN_TARGET_FIELD } from '../shared/runTarget';
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseUnitTestStart } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
+import { toolDescription } from '../../../lib/description';
+import { unitTestRun } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
@@ -47,8 +49,11 @@ import { projectRun, waitForRun } from '../shared/runTests';
 export const TOOL_DEFINITION = {
   name: 'RunAbapUnit',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Runs the ABAP Unit tests of the run target named by target. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, whose run covers the ABAP Unit tests of the module\'s whole function group, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.',
+  description: toolDescription(
+    unitTestRun(
+      'the ABAP Unit tests of a class, program, function group, function module, CDS view or package',
+    ),
+  ),
   inputSchema: z.object({
     target: RUN_TARGET_FIELD,
     scope: z

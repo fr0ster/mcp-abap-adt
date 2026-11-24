@@ -166,9 +166,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetBehaviorDefinitionVersionSource',
   'GetBehaviorDefinitionVersions',
   'GetBehaviorImplementation',
-  'GetCdsUnitTest',
-  'GetCdsUnitTestResult',
-  'GetCdsUnitTestStatus',
   'GetClass',
   'GetClassVersionDiff',
   'GetClassVersionSource',
@@ -241,9 +238,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetTransaction',
   'GetTransport',
   'GetTypeInfo',
-  'GetUnitTest',
-  'GetUnitTestResult',
-  'GetUnitTestStatus',
   'GetVirtualFoldersLow',
   'GetWhereUsed',
   'HandlerAbapGit',
@@ -306,12 +300,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'ReadTransportObjects',
   'RemoveTransportObject',
   'RunATC',
-  'RunAbapUnit',
-  'RunCdsUnitTest',
-  'RunFunctionGroupUnitTest',
-  'RunFunctionModuleUnitTest',
-  'RunProgramUnitTest',
-  'RunUnitTest',
   'RuntimeAnalyzeProfilerTrace',
   'RuntimeCreateProfilerTraceParameters',
   'RuntimeGetDumpById',
@@ -381,7 +369,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 368;
+export const NOT_YET_ASSEMBLED_MOST = 356;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

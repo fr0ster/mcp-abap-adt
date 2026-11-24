@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 
 /**
  * GetObjectVersions Handler - read-only version history of an ABAP object.
@@ -16,11 +17,15 @@ import {
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
+  about,
   entries,
+  headShape,
   jsonText,
   type ListAnswerTable,
   listAnswerAt,
+  type RowSchemas,
   rows,
+  shapesOf,
   writeJson,
   writeListing,
 } from '../../../lib/detail';
@@ -35,12 +40,62 @@ import {
 import { byVariant } from '../../../lib/variantDefinition';
 import { readVersions, resolveVersionedObject } from './resolveVersionedObject';
 
+/** The lists the version listing writes: what its description states. */
+export const VERSIONS_LISTS: RowSchemas<{ versions: IObjectVersion[] }> = {
+  versions: about(
+    'for each version',
+    rows('versions', {
+      columns: [
+        {
+          name: 'versionId',
+          means: 'its ID',
+          cell: (version: IObjectVersion) => version.versionId,
+        },
+        {
+          name: 'author',
+          means: 'its author',
+          cell: (version: IObjectVersion) => version.author ?? '',
+        },
+        {
+          name: 'updatedAt',
+          means: 'when it was saved',
+          cell: (version: IObjectVersion) => version.updatedAt ?? '',
+        },
+        {
+          name: 'transport',
+          means: 'the transport that produced it',
+          cell: (version: IObjectVersion) => version.transportRequest ?? '',
+        },
+        {
+          name: 'content_uri',
+          means: 'the URI of its source',
+          cell: (version: IObjectVersion) => version.contentUri,
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** The head the version listing opens with. */
+export const VERSIONS_HEADS = [
+  headShape('object', "the object's type and name"),
+];
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectVersions',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description:
-      "[read-only] Lists the version history of the class, program, interface, function module, table, structure, table type, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, the transport request that produced it when available, and the opaque content_uri that names the version's source (by default as TSV rows; with detail medium or full, the title and the transport description too).",
+    description: toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Lists the version history of an ABAP class, program, interface, function module, table, structure, CDS view or other versioned object.',
+      ),
+      returns: returnsOf({
+        heads: VERSIONS_HEADS,
+        shapes: [shapesOf(VERSIONS_LISTS)],
+      }),
+    }),
     inputSchema: objectVersionsSchema(variant),
   })),
 } as const;
@@ -85,33 +140,7 @@ const VERSION_ANSWERS: ListAnswerTable<VersionsRead, string> = {
         { head: 'object', value: `${read.object_type} ${read.object_name}` },
       ],
       reading: read,
-      lists: {
-        versions: rows('versions', {
-          columns: [
-            {
-              name: 'versionId',
-              cell: (version: IObjectVersion) => version.versionId,
-            },
-            {
-              name: 'author',
-              cell: (version: IObjectVersion) => version.author ?? '',
-            },
-            {
-              name: 'updatedAt',
-              cell: (version: IObjectVersion) => version.updatedAt ?? '',
-            },
-            {
-              name: 'transport',
-              cell: (version: IObjectVersion) => version.transportRequest ?? '',
-            },
-            {
-              name: 'content_uri',
-              cell: (version: IObjectVersion) => version.contentUri,
-            },
-          ],
-          header: 'always',
-        }),
-      },
+      lists: VERSIONS_LISTS,
     }),
   medium: (read) =>
     jsonText(

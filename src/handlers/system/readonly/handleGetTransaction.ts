@@ -2,9 +2,14 @@ import { analyseObjectProperties } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 import {
+  about,
+  headShape,
   listAnswerAt,
+  type RowSchemas,
   rows,
+  shapesOf,
   values,
   writeJson,
   writeListing,
@@ -27,11 +32,58 @@ import {
   type XmlRead,
 } from '../../../lib/xml/tree';
 
+/** A transaction's property as read: its facet, name and text. */
+type TransactionProperty = Record<string, string>;
+
+/** The lists the transaction listing writes: what its description states. */
+export const TRANSACTION_LISTS: RowSchemas<{
+  properties: TransactionProperty[];
+}> = {
+  properties: about(
+    'for each property, such as its application component, package, type, owner or language',
+    rows('properties', {
+      columns: [
+        {
+          name: 'facet',
+          means: 'its facet',
+          cell: (property: TransactionProperty) => property.facet ?? '',
+        },
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (property: TransactionProperty) => property.name ?? '',
+        },
+        {
+          name: 'text',
+          means: 'its text',
+          cell: (property: TransactionProperty) => property.text ?? '',
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** The heads the transaction listing opens with: the transaction's own facts. */
+export const TRANSACTION_HEADS = [
+  headShape('transaction', 'name'),
+  headShape('text', 'text'),
+  headShape('package', 'package'),
+];
+
 export const TOOL_DEFINITION = {
   name: 'GetTransaction',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the properties of the ABAP transaction (t-code) named by transaction_name in one request. Answers the transaction under `object` (name, text, type, package) and its facets under `properties`, in the order the system gives them — the application component chain, the package chain, type, owner, language, creation and the others the system names — each entry with its facet, name, displayName and text.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose('Reads the properties of an ABAP transaction code.'),
+    returns: returnsOf({
+      heads: TRANSACTION_HEADS,
+      of: "the transaction's",
+      shapes: [shapesOf(TRANSACTION_LISTS)],
+    }),
+    inline: true,
+  }),
   inputSchema: z.object({
     transaction_name: z.string().describe('Name of the ABAP transaction'),
     ...DETAIL_SHAPE,
@@ -119,28 +171,7 @@ export async function handleGetTransaction(
                 : [{ head: 'package', value: object.package }]),
             ],
             reading: read,
-            lists: {
-              properties: rows('properties', {
-                columns: [
-                  {
-                    name: 'facet',
-                    cell: (property: Record<string, string>) =>
-                      property.facet ?? '',
-                  },
-                  {
-                    name: 'name',
-                    cell: (property: Record<string, string>) =>
-                      property.name ?? '',
-                  },
-                  {
-                    name: 'text',
-                    cell: (property: Record<string, string>) =>
-                      property.text ?? '',
-                  },
-                ],
-                header: 'always',
-              }),
-            },
+            lists: TRANSACTION_LISTS,
           });
         },
         // The object and every property, the properties by the JSON writer.

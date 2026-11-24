@@ -183,7 +183,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetFunctionModuleVersionDiff',
   'GetFunctionModuleVersionSource',
   'GetFunctionModuleVersions',
-  'GetInactiveObjects',
   'GetInclude',
   'GetInterface',
   'GetInterfaceVersionDiff',
@@ -205,8 +204,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetObjectStructure',
   'GetObjectVersionDiff',
   'GetObjectVersionSource',
-  'GetObjectVersions',
-  'GetPackageTree',
   'GetProgram',
   'GetProgramVersionDiff',
   'GetProgramVersionSource',
@@ -229,7 +226,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetTableVersionSource',
   'GetTableVersions',
   'GetTextElements',
-  'GetTransaction',
   'GetTransport',
   'GetUnitTest',
   'GetUnitTestResult',
@@ -366,7 +362,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 353;
+export const NOT_YET_ASSEMBLED_MOST = 349;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

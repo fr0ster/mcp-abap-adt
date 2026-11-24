@@ -6,6 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import type { IInactiveObjectsResponse } from '@mcp-abap-adt/adt-strategies';
 import { abapGitFacts } from '@mcp-abap-adt/adt-strategies';
 import { TOOL_DEFINITION as BRANCH_INFO } from '../../../handlers/abapgit/high/handleGetAbapGitBranchInfo';
 import { TOOL_DEFINITION as EXTERNAL_REPO } from '../../../handlers/abapgit/readonly/handleCheckAbapGitExternalRepo';
@@ -13,6 +14,11 @@ import { TOOL_DEFINITION as ERROR_LOG } from '../../../handlers/abapgit/readonly
 import { TOOL_DEFINITION as MODIFIED } from '../../../handlers/abapgit/readonly/handleGetAbapGitModifiedObjects';
 import { TOOL_DEFINITION as STAGING } from '../../../handlers/abapgit/readonly/handleGetAbapGitStaging';
 import { TOOL_DEFINITION as REPOS } from '../../../handlers/abapgit/readonly/handleListAbapGitRepos';
+import {
+  TOOL_DEFINITION as OBJECT_VERSIONS,
+  VERSIONS_HEADS,
+  VERSIONS_LISTS,
+} from '../../../handlers/common/readonly/handleGetObjectVersions';
 import { TOOL_DEFINITION as LIST_GROUP_INCLUDES } from '../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { TOOL_DEFINITION as LIST_FUNCTION_MODULES } from '../../../handlers/function_include/readonly/handleListFunctionModules';
 import {
@@ -52,6 +58,10 @@ import {
   TOOL_DEFINITION as SEARCH_OBJECT,
 } from '../../../handlers/search/readonly/handleSearchObject';
 import {
+  TOOL_DEFINITION as PACKAGE_TREE,
+  PACKAGE_TREE_LISTS,
+} from '../../../handlers/system/high/handleGetPackageTree';
+import {
   TOOL_DEFINITION as DESCRIBE_BY_LIST,
   DESCRIBED_LISTS,
 } from '../../../handlers/system/readonly/handleDescribeByList';
@@ -60,6 +70,16 @@ import {
   TYPES_HEADS,
   TYPES_LISTS,
 } from '../../../handlers/system/readonly/handleGetAllTypes';
+import {
+  INACTIVE_HEADS,
+  INACTIVE_LISTS,
+  TOOL_DEFINITION as INACTIVE_OBJECTS,
+} from '../../../handlers/system/readonly/handleGetInactiveObjects';
+import {
+  TOOL_DEFINITION as TRANSACTION,
+  TRANSACTION_HEADS,
+  TRANSACTION_LISTS,
+} from '../../../handlers/system/readonly/handleGetTransaction';
 import {
   TOOL_DEFINITION as WHERE_USED,
   WHERE_USED_HEADS,
@@ -117,6 +137,7 @@ import {
   groupChildLists,
 } from '../../../lib/strategies/functionGroupChildren';
 import { packageDetails } from '../../../lib/strategies/packageSummary';
+import type { PackageNode } from '../../../lib/strategies/packageWalk';
 import {
   externalRepo,
   modifiedObjects,
@@ -149,7 +170,31 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   GetObjectsByType: OBJECTS_BY_TYPE.description,
   GetAdtTypes: ADT_TYPES.description,
   GetPackageContents: PACKAGE_CONTENTS.description,
+  GetInactiveObjects: INACTIVE_OBJECTS.description,
+  GetObjectVersions: OBJECT_VERSIONS.description,
+  GetTransaction: TRANSACTION.description,
+  GetPackageTree: PACKAGE_TREE.description,
 };
+
+/** A writer tool's tie: its lists (every variant), its heads, its fixtures' lines. */
+function writtenTie(
+  tool: string,
+  variants: readonly Parameters<typeof shapesOf>[0][],
+  heads: readonly HeadShape[],
+  samples: readonly TieSample[],
+  of?: string,
+): ReturnsTie {
+  const parts = partsOfDescription(descriptionOf(tool));
+  assert.ok(parts !== undefined, `${tool} is assembled`);
+  return {
+    terse: variants.flatMap(shapesOf),
+    heads,
+    of,
+    returns: parts.returns,
+    samples,
+  };
+}
+
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
 /** An answer of SAP, as the abapGit reducers take it. */
@@ -227,6 +272,109 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  GetInactiveObjects: () => {
+    const reading: IInactiveObjectsResponse = {
+      objects: [
+        { type: 'CLAS/OC', name: 'ZCL_A' },
+        {
+          type: 'FUGR/FF',
+          name: 'Z_FM',
+          parentUri: '/sap/bc/adt/functions/groups/zfg',
+        },
+      ],
+    };
+    const heads = [{ head: 'count', value: '2' }];
+    return writtenTie('GetInactiveObjects', [INACTIVE_LISTS], INACTIVE_HEADS, [
+      {
+        reading,
+        lines: writtenLines({ heads, reading, lists: INACTIVE_LISTS }),
+      },
+    ]);
+  },
+  GetObjectVersions: () => {
+    const reading = {
+      versions: [
+        {
+          versionId: '00001',
+          author: 'DEV',
+          updatedAt: '2026-01-01',
+          transportRequest: 'K900001',
+          contentUri: '/sap/bc/adt/x',
+        },
+      ],
+    };
+    const heads = [{ head: 'object', value: 'CLAS/OC ZCL_A' }];
+    return writtenTie('GetObjectVersions', [VERSIONS_LISTS], VERSIONS_HEADS, [
+      {
+        reading,
+        lines: writtenLines({ heads, reading, lists: VERSIONS_LISTS }),
+      },
+    ]);
+  },
+  GetTransaction: () => {
+    const reading = {
+      properties: [{ facet: 'TYPE', name: 'R', text: 'Report' }],
+    };
+    const heads = [
+      { head: 'transaction', value: 'SE38' },
+      { head: 'text', value: 'ABAP Editor' },
+      { head: 'package', value: 'SEDT' },
+    ];
+    return writtenTie(
+      'GetTransaction',
+      [TRANSACTION_LISTS],
+      TRANSACTION_HEADS,
+      [
+        {
+          reading,
+          lines: writtenLines({ heads, reading, lists: TRANSACTION_LISTS }),
+        },
+      ],
+      "the transaction's",
+    );
+  },
+  GetPackageTree: () => {
+    // A package, its subpackage, an object with its description and one
+    // SAP lists nameless.
+    const reading: PackageNode = {
+      name: 'ZPKG',
+      type: 'DEVC/K',
+      isPackage: true,
+      children: [
+        {
+          name: 'ZSUB',
+          type: 'DEVC/K',
+          isPackage: true,
+          children: [
+            {
+              name: 'ZCL_A',
+              type: 'CLAS/OC',
+              isPackage: false,
+              description: 'A class',
+              children: [],
+            },
+            {
+              name: '',
+              type: 'PROG/P',
+              isPackage: false,
+              techName: 'ZT',
+              uri: '/sap/x',
+              children: [],
+            },
+          ],
+        },
+      ],
+    };
+    return writtenTie(
+      'GetPackageTree',
+      Object.values(PACKAGE_TREE_LISTS),
+      [],
+      Object.values(PACKAGE_TREE_LISTS).map((lists) => ({
+        reading,
+        lines: writtenLines({ heads: [], reading, lists }),
+      })),
+    );
+  },
   GetPackageContents: () => {
     const parts = partsOfDescription(descriptionOf('GetPackageContents'));
     assert.ok(parts !== undefined);

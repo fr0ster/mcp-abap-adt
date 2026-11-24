@@ -1,4 +1,10 @@
 import * as z from 'zod';
+import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 /**
@@ -21,6 +27,7 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import {
+  about,
   type Column,
   entries,
   type Head,
@@ -34,6 +41,7 @@ import {
   partsOf,
   type RowSchemas,
   rows,
+  shapesOf,
   type Written,
   wireAnswer,
   writeJsonList,
@@ -43,7 +51,6 @@ import {
   writtenValues,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { withLongToolAdvice } from '../../../lib/longTools';
 import {
   ASSEMBLED_DETAIL_SHAPE,
   detailOf,
@@ -135,12 +142,28 @@ function onePackageForm(
   }
 }
 
+/**
+ * The lists below a package's own row: `described` with each object's
+ * description (`include_descriptions`), `bare` without.
+ */
+export const PACKAGE_TREE_LISTS = {
+  described: treeSchemas(true),
+  bare: treeSchemas(false),
+} as const;
+
 export const TOOL_DEFINITION = {
   name: 'GetPackageTree',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time.',
-  ),
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level.',
+    ),
+    returns: returnsOf({
+      shapes: Object.values(PACKAGE_TREE_LISTS).map(shapesOf),
+    }),
+    notes: [longRunning],
+  }),
   inputSchema: withInCallSchema(
     z
       .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
@@ -414,15 +437,29 @@ function treeOf(
 function treeColumns(descriptions: boolean): Column<PackageNode>[] {
   const nameless = (node: PackageNode) => node.name === '';
   const columns: Column<PackageNode>[] = [
-    { name: 'type', cell: (node) => node.type },
-    { name: 'name', cell: (node) => node.name },
-    { name: 'tech_name', cell: (node) => node.techName ?? '', when: nameless },
-    { name: 'uri', cell: (node) => node.uri ?? '', when: nameless },
+    { name: 'type', means: 'its type', cell: (node) => node.type },
+    { name: 'name', means: 'its name', cell: (node) => node.name },
+    {
+      name: 'tech_name',
+      means: 'its technical name when SAP lists it nameless',
+      cell: (node) => node.techName ?? '',
+      when: nameless,
+    },
+    {
+      name: 'uri',
+      means: 'its URI when SAP lists it nameless',
+      cell: (node) => node.uri ?? '',
+      when: nameless,
+    },
   ];
   return descriptions
     ? [
         ...columns,
-        { name: 'description', cell: (node) => node.description ?? '' },
+        {
+          name: 'description',
+          means: 'its description, with descriptions asked',
+          cell: (node) => node.description ?? '',
+        },
       ]
     : columns;
 }
@@ -430,13 +467,16 @@ function treeColumns(descriptions: boolean): Column<PackageNode>[] {
 /** The tree's rows below its root, every node at its depth (terse). */
 function treeSchemas(descriptions: boolean): RowSchemas<PackageNode> {
   const schemas: RowSchemas<PackageNode> = {
-    children: rows('children', {
-      columns: treeColumns(descriptions),
-      header: 'none',
-      get lists() {
-        return schemas;
-      },
-    }),
+    children: about(
+      'for each subpackage and object below it, at its depth',
+      rows('children', {
+        columns: treeColumns(descriptions),
+        header: 'none',
+        get lists() {
+          return schemas;
+        },
+      }),
+    ),
   };
   return schemas;
 }
@@ -494,7 +534,7 @@ const treeListingOf = (
   heads: [],
   reading: tree,
   root: { columns: treeColumns(includeDescriptions) },
-  lists: treeSchemas(includeDescriptions),
+  lists: PACKAGE_TREE_LISTS[includeDescriptions ? 'described' : 'bare'],
 });
 
 // Every level written from the assembled tree, every node of the walk in
@@ -600,11 +640,11 @@ const TREE_LISTS: ListAnswerTable<TreeList, string> = {
             // Each package's tree, its descriptions where the call asked.
             variants: {
               plain: {
-                lists: treeSchemas(false),
+                lists: PACKAGE_TREE_LISTS.bare,
                 root: { columns: treeColumns(false) },
               },
               described: {
-                lists: treeSchemas(true),
+                lists: PACKAGE_TREE_LISTS.described,
                 root: { columns: treeColumns(true) },
               },
             },

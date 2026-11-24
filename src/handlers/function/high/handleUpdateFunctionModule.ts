@@ -48,7 +48,8 @@ export const TOOL_DEFINITION = {
   name: 'UpdateFunctionModule',
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
-    object: 'the source code of an existing ABAP function module',
+    object:
+      'the source code of an existing ABAP function module in its function group',
     how: ', activating it when asked',
     transported: true,
   }),

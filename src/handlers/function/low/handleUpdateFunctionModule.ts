@@ -30,7 +30,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     tag: 'low-level',
-    object: 'the source code of an existing ABAP function module',
+    object:
+      'the source code of an existing ABAP function module in its function group',
     how: ', under a lock the caller holds',
   }),
   inputSchema: z.object({

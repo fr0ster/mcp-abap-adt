@@ -33,6 +33,10 @@ import {
   packageHeads,
 } from '../../../handlers/package/high/handleGetPackage';
 import {
+  SEARCH_HITS_LISTS,
+  TOOL_DEFINITION as SEARCH_OBJECT,
+} from '../../../handlers/search/readonly/handleSearchObject';
+import {
   TOOL_DEFINITION as SEARCH_SOURCE,
   SEARCH_SOURCE_HEADS,
   SEARCH_SOURCE_LISTS,
@@ -108,6 +112,7 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   ListFunctionGroupIncludes: LIST_GROUP_INCLUDES.description,
   GetMainPrograms: GET_MAIN_PROGRAMS.description,
   SearchSource: SEARCH_SOURCE.description,
+  SearchObject: SEARCH_OBJECT.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -186,6 +191,31 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  SearchObject: () => {
+    const parts = partsOfDescription(descriptionOf('SearchObject'));
+    assert.ok(parts !== undefined);
+    const reading = {
+      hits: [
+        {
+          name: 'ZCL_A',
+          type: 'CLAS/OC' as const,
+          description: 'A class',
+          packageName: 'ZPKG',
+        },
+      ],
+    };
+    return {
+      terse: shapesOf(SEARCH_HITS_LISTS),
+      heads: [],
+      returns: parts.returns,
+      samples: [
+        {
+          reading,
+          lines: writtenLines({ heads: [], reading, lists: SEARCH_HITS_LISTS }),
+        },
+      ],
+    };
+  },
   SearchSource: () => {
     const parts = partsOfDescription(descriptionOf('SearchSource'));
     assert.ok(parts !== undefined);

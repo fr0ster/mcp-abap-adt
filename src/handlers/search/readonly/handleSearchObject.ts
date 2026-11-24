@@ -5,16 +5,26 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtSearchObjectsParamsOf } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
-import { answer } from '../../../lib/answer';
+import { answer, type McpResult } from '../../../lib/answer';
 import { adtClientOf, type ServerAdtClient } from '../../../lib/clients';
 import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
   answered,
+  type Column,
   type DetailTable,
   fullLevel,
   type ListDetailTable,
+  type RowSchemas,
   rawLevel,
   readingAt,
   rows,
+  shapesOf,
   structuredValue,
   type Written,
   whole,
@@ -28,10 +38,7 @@ import {
   withInCallSchema,
 } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
   notASearchType,
   SEARCH_TYPE_DESCRIPTION,
@@ -98,13 +105,36 @@ function schemaOn(variant: RuleVariant) {
   );
 }
 
+/** What each object a search found is written with: what its description states. */
+export const SEARCH_HIT_COLUMNS: readonly Column<ISearchResult>[] = [
+  { name: 'name', means: 'its name', cell: (h) => h.name },
+  { name: 'type', means: 'its type', cell: (h) => h.type ?? h.unknownType },
+  { name: 'description', means: 'its description', cell: (h) => h.description },
+  { name: 'package', means: 'its package', cell: (h) => h.packageName ?? '' },
+];
+
+/** The lists a search's listing writes: what its description states. */
+export const SEARCH_HITS_LISTS: RowSchemas<{
+  hits: readonly ISearchResult[];
+}> = {
+  hits: about(
+    'for each object found',
+    rows('hits', { columns: [...SEARCH_HIT_COLUMNS], header: 'when-rows' }),
+  ),
+};
+
 export const TOOL_DEFINITION = {
   name: 'SearchObject',
   available_in: ['onprem', 'cloud'] as const,
   ...onEveryVariant(
-    withLongToolAdvice(
-      '[read-only] Search ABAP repository by object name or wildcard pattern (e.g. \'Z*\'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system\'s object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.).',
-    ),
+    toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Finds ABAP repository objects by name or name pattern, of any type or of one: classes, programs, tables, interfaces and every other kind.',
+      ),
+      returns: returnsOf({ shapes: [shapesOf(SEARCH_HITS_LISTS)] }),
+      notes: [longRunning],
+    }),
     schemaOn,
   ),
 } as const;
@@ -118,17 +148,7 @@ function hitLines(hits: readonly ISearchResult[]): Written<string> {
   return writeListing({
     heads: [],
     reading: { hits },
-    lists: {
-      hits: rows('hits', {
-        columns: [
-          { name: 'name', cell: (h: ISearchResult) => h.name },
-          { name: 'type', cell: (h: ISearchResult) => h.type ?? h.unknownType },
-          { name: 'description', cell: (h: ISearchResult) => h.description },
-          { name: 'package', cell: (h: ISearchResult) => h.packageName ?? '' },
-        ],
-        header: 'when-rows',
-      }),
-    },
+    lists: SEARCH_HITS_LISTS,
   });
 }
 
@@ -196,10 +216,48 @@ function searchOn(
       .search(params, { analyse: analyseException });
 }
 
+/** SearchObject's arguments, as its schema parses them. */
+type SearchArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/**
+ * A search's answer, and the hits its typed reading read at terse
+ * (`utilSearchHits`): what a tool describing objects by their search reads,
+ * never the answer's text. No hits at another level or on a failure.
+ */
+export interface SearchedObjects {
+  readonly result: McpResult;
+  readonly hits: readonly ISearchResult[];
+}
+
+/** The search of `args`, its typed hits beside its answer. */
+export async function searchObjects(
+  context: HandlerContext,
+  args: SearchArgs,
+): Promise<SearchedObjects> {
+  let hits: readonly ISearchResult[] = [];
+  const result = await searchWith(context, args, {
+    ...SEARCH_READINGS,
+    terse: written((wire) => {
+      hits = utilSearchHits(wire);
+      return hits;
+    }, hitLines),
+  });
+  return { result, hits };
+}
+
 export async function handleSearchObject(
   context: HandlerContext,
-  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
-) {
+  args: SearchArgs,
+): Promise<McpResult> {
+  return searchWith(context, args, SEARCH_READINGS);
+}
+
+/** The search of `args`, read with `readings` at the level asked. */
+async function searchWith(
+  context: HandlerContext,
+  args: SearchArgs,
+  readings: ListDetailTable<XmlNode | string>,
+): Promise<McpResult> {
   const { connection, logger } = context;
   // The schema holds the rules: a name, not blank; the type of the list.
   const { object_name, object_type, maxResults } = args;
@@ -209,7 +267,7 @@ export async function handleSearchObject(
   // The reading the search is given, selected by the level asked for.
   const results: SearchResults = {
     ...ourUtils,
-    search: readingAt(SEARCH_READINGS, levelOf(args)),
+    search: readingAt(readings, levelOf(args)),
   };
   const search = searchOn(
     served,

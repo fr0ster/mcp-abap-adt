@@ -72,6 +72,13 @@
       "search the source code of package ZMY_PKG for SELECT FROM mara",
       "знайди в коді пакета ZMY_PKG текст AUTHORITY-CHECK",
       "де у вихідному коді пакета ZMY_PKG викликається BAPI_TRANSACTION_COMMIT?"
+    ],
+    "SearchObject": [
+      "find the class ZCL_MY_CLASS",
+      "does table ZMY_TABLE exist?",
+      "search for objects whose name starts with ZMY_",
+      "знайди клас ZCL_MY_CLASS",
+      "чи існує таблиця ZMY_TABLE?"
     ]
   },
   "siblings": {},
@@ -98,6 +105,11 @@
     "SearchSource: find where the text AUTHORITY-CHECK appears in the code of package ZMY_PKG",
     "SearchSource: search the source code of package ZMY_PKG for SELECT FROM mara",
     "SearchSource: знайди в коді пакета ZMY_PKG текст AUTHORITY-CHECK",
-    "SearchSource: де у вихідному коді пакета ZMY_PKG викликається BAPI_TRANSACTION_COMMIT?"
+    "SearchSource: де у вихідному коді пакета ZMY_PKG викликається BAPI_TRANSACTION_COMMIT?",
+    "SearchObject: find the class ZCL_MY_CLASS",
+    "SearchObject: does table ZMY_TABLE exist?",
+    "SearchObject: search for objects whose name starts with ZMY_",
+    "SearchObject: знайди клас ZCL_MY_CLASS",
+    "SearchObject: чи існує таблиця ZMY_TABLE?"
   ]
 }

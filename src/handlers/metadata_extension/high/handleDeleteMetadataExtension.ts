@@ -33,6 +33,7 @@ import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { deleteTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { detailOf } from '../../../lib/strategies/detail';
@@ -53,8 +54,10 @@ import {
 export const TOOL_DEFINITION = {
   name: 'DeleteMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Delete an ABAP metadata extension from the SAP system. Transport request optional for local objects.',
+  description: deleteTool({
+    object: 'a CDS metadata extension',
+    how: ', recorded in the transport given',
+  }),
   inputSchema: z.object({
     metadata_extension_name: z.string().describe('MetadataExtension name.'),
     transport_request: z

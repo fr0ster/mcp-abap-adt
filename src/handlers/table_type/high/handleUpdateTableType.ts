@@ -35,6 +35,7 @@ import {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { results, updateTool } from '../../../lib/description';
 import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -63,8 +64,11 @@ import {
 export const TOOL_DEFINITION = {
   name: 'UpdateTableType',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the version the stored definition was read at (stored_version), the definition itself with detail full: the active version, read after a successful activation; with activate false or a refused activation, the inactive version, read after the unlock. The write is checked under the lock, before that read: a refused check is answered alone. A definition whose read failed is answered with SAP's answer to that read.",
+  description: updateTool({
+    object: 'the definition of an existing ABAP table type',
+    how: ': its description, the type it holds, its access type and primary key, activating it when asked',
+    result: results.STORED_TABLE_TYPE,
+  }),
   inputSchema: z.object({
     table_type_name: z
       .string()

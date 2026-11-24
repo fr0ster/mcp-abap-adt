@@ -4,17 +4,34 @@
  * the shared notes. See `toolDescription`.
  */
 
+export {
+  activateTool,
+  checkTool,
+  createTool,
+  deleteTool,
+  type KindTool,
+  updateTool,
+  validateTool,
+} from './kinds';
 export { batchable, longRunning, type Note } from './notes';
 export { type Purpose, purpose } from './purpose';
 export { type ReaderParts, readerParts } from './readers';
+export * as results from './results';
 export {
   type EachNouns,
+  type ListNouns,
+  listOf,
   type MemberNoun,
   type MemberNouns,
   membersOf,
+  type ResultNouns,
+  type ResultShape,
   type ReturnsFact,
+  resultReturns,
+  resultShape,
   returnsOf,
   sapData,
+  untypedReturns,
 } from './returns';
 export {
   type DescriptionParts,

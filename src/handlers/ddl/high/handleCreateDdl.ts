@@ -24,6 +24,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -34,8 +35,10 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'CreateDdl',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Creates the CDS view or classic DDL view named by ddl_name in the package named by package_name, in initial state: the DDL source object, its DDL source code written afterwards.',
+  description: createTool({
+    object: 'a CDS view or classic DDL view',
+    how: 'in a package, with its description, recorded in the transport given',
+  }),
   inputSchema: createArguments('CreateDdl', {
     ddl_name: z.string().describe('DDL source name.'),
     package_name: z.string().describe('Package name'),

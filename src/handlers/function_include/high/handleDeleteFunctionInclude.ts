@@ -16,6 +16,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { functionIncludeDocuments } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { deleteTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { detailOf } from '../../../lib/strategies/detail';
@@ -26,8 +27,10 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'DeleteFunctionInclude',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Delete an ABAP function group include from the SAP system via ADT deletion API. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for local objects.',
+  description: deleteTool({
+    object: 'an include of an ABAP function group',
+    how: ', recorded in the transport given',
+  }),
   inputSchema: z.object({
     function_group_name: z
       .string()

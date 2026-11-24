@@ -22,6 +22,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { results, updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -31,8 +32,12 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateBehaviorDefinitionLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Update source code of an existing ABAP behavior definition. Requires lock handle from LockObject. - use UpdateBehaviorDefinition (high-level) for full workflow with lock/unlock/activate.',
+  description: updateTool({
+    tag: 'low-level',
+    object: 'the source code of an existing RAP behavior definition',
+    how: ', under a lock the caller holds',
+    result: results.WRITTEN,
+  }),
   inputSchema: z.object({
     name: z
       .string()

@@ -12,6 +12,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { deleteTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { detailOf } from '../../../lib/strategies/detail';
@@ -22,8 +23,10 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'DeleteTableType',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Deletes the ABAP table type named by table_type_name through the ADT deletion service, after asking whether it can be deleted. Returns the deletion result.',
+  description: deleteTool({
+    object: 'an ABAP table type',
+    how: ', recorded in the transport given',
+  }),
   inputSchema: z.object({
     table_type_name: z.string().describe('Table type name.'),
     transport_request: z

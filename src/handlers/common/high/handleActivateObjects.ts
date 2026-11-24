@@ -10,6 +10,7 @@ import * as z from 'zod';
 
 import type { ProjectionVariant } from '../../../lib/adtProjections';
 import { activationParentDescription } from '../../../lib/adtTypeCode';
+import { activateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { byVariant } from '../../../lib/variantDefinition';
@@ -23,8 +24,10 @@ export const TOOL_DEFINITION = {
   name: 'ActivateObjects',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description:
-      'Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.',
+    description: activateTool({
+      object: 'several ABAP repository objects of any type together',
+      how: 'in one activation, such as domains, data elements and tables at once',
+    }),
     inputSchema: activateObjectsSchema(variant),
   })),
 } as const;

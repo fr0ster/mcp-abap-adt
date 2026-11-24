@@ -34,14 +34,17 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Adds the message numbered msgno, with the text msgtext, to the existing ABAP message class (T100) named by message_class_name.',
+  description: createTool({
+    object: 'a message, with its number and text,',
+    how: 'in an existing ABAP message class (T100), recorded in the transport given',
+  }),
   inputSchema: createArguments('CreateMessageClassMessage', {
     message_class_name: z.string().describe('Parent message class name.'),
     msgno: z.string().describe('Message number (e.g., "001").'),

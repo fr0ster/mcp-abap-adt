@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { checkTool } from '../../../lib/description';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -25,8 +26,10 @@ import { handleCheckProgram as handleCheckProgramLow } from '../low/handleCheckP
 export const TOOL_DEFINITION = {
   name: 'CheckProgram',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages. On ABAP Cloud, the programs are SAP's standard programs.",
+  description: checkTool({
+    tag: 'read-only',
+    object: 'an ABAP program (report)',
+  }),
   inputSchema: z.object({
     program_name: z.string().describe('Program name.'),
     version: z

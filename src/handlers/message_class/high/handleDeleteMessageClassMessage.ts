@@ -43,14 +43,37 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { deleteTool, purpose, resultShape } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
+
+/** What the delete answers: SAP took it, for the class and the number asked. */
+function messageDeleted(className: string, msgno: string) {
+  return {
+    success: true,
+    message_class_name: className,
+    msgno,
+    message: `Message ${msgno} deleted from message class ${className}`,
+  } as const;
+}
+
+/** What the delete answers, by its nouns. */
+const MESSAGE_DELETED = resultShape<ReturnType<typeof messageDeleted>>({
+  success: 'whether SAP deleted the message',
+  message_class_name: 'the message class',
+  msgno: 'the message number',
+  message: 'a sentence saying so',
+});
 
 export const TOOL_DEFINITION = {
   name: 'DeleteMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.',
+  description: deleteTool({
+    purpose: purpose(
+      'Deletes one message, by its number, from an ABAP message class (T100), keeping the class and its other messages.',
+    ),
+    result: MESSAGE_DELETED,
+  }),
   inputSchema: z.object({
     message_class_name: z.string().describe('Parent message class name.'),
     msgno: z.string().describe('Message number to delete (e.g., "001").'),
@@ -109,11 +132,6 @@ export async function handleDeleteMessageClassMessage(
     // could add by looking — but a hard-coded success on a delete path is
     // the one shape this repository has been burned by twice already, so it
     // does not get to skip saying why it is not lying.
-    () => ({
-      success: true,
-      message_class_name: className,
-      msgno: args.msgno,
-      message: `Message ${args.msgno} deleted from message class ${className}`,
-    }),
+    () => messageDeleted(className, args.msgno),
   );
 }

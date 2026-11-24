@@ -23,6 +23,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { deleteTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { detailOf } from '../../../lib/strategies/detail';
@@ -34,8 +35,10 @@ import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils'
 export const TOOL_DEFINITION = {
   name: 'DeleteServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Delete ABAP service binding via ADT deletion API. Transport request optional for local objects.',
+  description: deleteTool({
+    object: 'an OData service binding',
+    how: ', recorded in the transport given',
+  }),
   inputSchema: z.object({
     service_binding_name: z
       .string()

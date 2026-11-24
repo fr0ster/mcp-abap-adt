@@ -25,6 +25,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -35,8 +36,10 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'CreateProgram',
   available_in: ['onprem'] as const,
-  description:
-    'Create a new ABAP program (report) in SAP system. Creates the program object in initial state.',
+  description: createTool({
+    object: 'an ABAP program (report)',
+    how: 'in a package, with its description, recorded in the transport given',
+  }),
   inputSchema: createArguments('CreateProgram', {
     program_name: z.string().describe('Program name.'),
     description: z

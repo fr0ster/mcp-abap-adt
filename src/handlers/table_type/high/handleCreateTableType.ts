@@ -37,6 +37,7 @@ import {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool, results } from '../../../lib/description';
 import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -146,8 +147,11 @@ export const TABLE_TYPE_DEFINITION_PROPERTIES = {
 export const TOOL_DEFINITION = {
   name: 'CreateTableType',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the version the stored definition was read at (stored_version), the definition itself with detail full: the active version, read after a successful activation; with activate false, a refused check or a refused activation, the inactive version, read after the write. A definition whose read failed is answered with SAP's answer to that read.",
+  description: createTool({
+    object: 'an ABAP table type',
+    how: 'in a package, with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given',
+    result: results.STORED_TABLE_TYPE,
+  }),
   inputSchema: createArguments('CreateTableType', {
     table_type_name: z.string().describe('Table type name.'),
     package_name: z.string().describe('Package the table type is created in.'),

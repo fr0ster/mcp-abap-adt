@@ -40,6 +40,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, messageCarriedBy } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { results, updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
@@ -52,8 +53,12 @@ import { return_error, return_response } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdatePackageLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.',
+  description: updateTool({
+    tag: 'low-level',
+    object: 'the description of an existing ABAP package',
+    how: ', under a lock the caller holds',
+    result: results.WRITTEN,
+  }),
   inputSchema: z.object({
     package_name: z
       .string()

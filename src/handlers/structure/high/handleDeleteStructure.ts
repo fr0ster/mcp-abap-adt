@@ -12,6 +12,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { structureDocuments } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { deleteTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { detailOf } from '../../../lib/strategies/detail';
@@ -22,8 +23,10 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'DeleteStructure',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for local objects.',
+  description: deleteTool({
+    object: 'an ABAP structure',
+    how: ', recorded in the transport given',
+  }),
   inputSchema: z.object({
     structure_name: z.string().describe('Structure name.'),
     transport_request: z

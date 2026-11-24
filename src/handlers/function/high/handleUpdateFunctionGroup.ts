@@ -33,6 +33,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
@@ -49,8 +50,10 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateFunctionGroup',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules, which carry the source; this updates the group's metadata alone. Locks the group, writes, and unlocks it.",
+  description: updateTool({
+    object: 'the description of an existing ABAP function group',
+    how: ', recorded in the transport given',
+  }),
   inputSchema: z.object({
     function_group_name: z
       .string()

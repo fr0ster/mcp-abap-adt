@@ -420,7 +420,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkabapgitrepo-read-only-abapgit"></a>
 #### CheckAbapGitRepo (Read-Only / Abapgit)
-**Description:** [read-only] Checks that the system reaches the repository's remote and is let in. Answers facts only: SAP's status; a refusal answers the status, SAP's message class and number and, on cloud, the git host's HTTP status.
+**Description:** [read-only] Checks that the system reaches an abapGit repository's remote and is let in. SAP's status and whether SAP has done it or accepted it.
 
 **Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitRepo.ts`
 
@@ -1800,7 +1800,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatebehaviordefinition-high-level-behavior-definition"></a>
 #### ActivateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Activates the RAP behavior definition named by name, so its inactive version is in force.
+**Description:** Activates a RAP behavior definition, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
 
@@ -1814,7 +1814,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkbehaviordefinition-high-level-behavior-definition"></a>
 #### CheckBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Runs a syntax check on the RAP behavior definition (BDEF) named by name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of a RAP behavior definition. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts`
 
@@ -1828,7 +1828,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.
+**Description:** Creates a RAP behavior definition for a root entity in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
 
@@ -1849,7 +1849,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletebehaviordefinition-high-level-behavior-definition"></a>
 #### DeleteBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes a RAP behavior definition, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/behavior_definition/high/handleDeleteBehaviorDefinition.ts`
 
@@ -1881,7 +1881,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatebehaviordefinition-high-level-behavior-definition"></a>
 #### UpdateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing RAP behavior definition, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`
 
@@ -1901,7 +1901,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Creates the RAP behavior implementation class named by class_name for the behavior definition named by behavior_definition, in initial state: the FOR BEHAVIOR OF main source and the implementations include are written afterwards, the main source as a class source and the implementations include under the class lock.
+**Description:** Creates the RAP behavior implementation class of a behavior definition in a package, with its description, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
@@ -1919,7 +1919,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletebehaviorimplementation-high-level-behavior-implementation"></a>
 #### DeleteBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Delete an ABAP behavior implementation from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes a RAP behavior implementation class, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/behavior_implementation/high/handleDeleteBehaviorImplementation.ts`
 
@@ -1951,7 +1951,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatebehaviorimplementation-high-level-behavior-implementation"></a>
 #### UpdateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Update source code of an existing ABAP behavior implementation class. Updates the implementations include. Manages lock, update, unlock, and optional activation.
+**Description:** Updates the implementations of an existing RAP behavior implementation class, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/behavior_implementation/high/handleUpdateBehaviorImplementation.ts`
 
@@ -1972,7 +1972,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateclass-high-level-class"></a>
 #### ActivateClass (High-Level / Class)
-**Description:** Activates the ABAP class named by class_name, so its inactive version is in force.
+**Description:** Activates an ABAP class, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/class/low/handleActivateClass.ts`
 
@@ -1986,7 +1986,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkclass-high-level-class"></a>
 #### CheckClass (High-Level / Class)
-**Description:** [read-only] Runs a syntax check on the ABAP class named by class_name. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP class as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/class/high/handleCheckClass.ts`
 
@@ -2001,7 +2001,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Creates the ABAP class named by class_name in the package named by package_name, in initial state: the class object alone; its source code is written by an update of the class.
+**Description:** Creates an ABAP class in a package, with its description, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -2022,7 +2022,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteclass-high-level-class"></a>
 #### DeleteClass (High-Level / Class)
-**Description:** Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP class, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/class/high/handleDeleteClass.ts`
 
@@ -2037,7 +2037,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletelocaldefinitions-high-level-class"></a>
 #### DeleteLocalDefinitions (High-Level / Class)
-**Description:** Delete local definitions from an ABAP class by clearing the definitions include. Manages lock, update, unlock, and optional activation.
+**Description:** Clears the local definitions of an ABAP class, activating the class when asked. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalDefinitions.ts`
 
@@ -2053,7 +2053,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletelocalmacros-high-level-class"></a>
 #### DeleteLocalMacros (High-Level / Class)
-**Description:** Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros belong to older ABAP versions.
+**Description:** Clears the local macros of an ABAP class, activating the class when asked. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalMacros.ts`
 
@@ -2085,7 +2085,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletelocaltypes-high-level-class"></a>
 #### DeleteLocalTypes (High-Level / Class)
-**Description:** Delete local types from an ABAP class by clearing the implementations include. Manages lock, update, unlock, and optional activation.
+**Description:** Clears the local types of an ABAP class, activating the class when asked. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTypes.ts`
 
@@ -2182,7 +2182,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateclass-high-level-class"></a>
 #### UpdateClass (High-Level / Class)
-**Description:** Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing ABAP class, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/class/high/handleUpdateClass.ts`
 
@@ -2199,7 +2199,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatelocaldefinitions-high-level-class"></a>
 #### UpdateLocalDefinitions (High-Level / Class)
-**Description:** Update local definitions (class-local types/constants) in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
+**Description:** Updates the local definitions of an existing ABAP class, activating the class when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalDefinitions.ts`
 
@@ -2216,7 +2216,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatelocalmacros-high-level-class"></a>
 #### UpdateLocalMacros (High-Level / Class)
-**Description:** Update local macros in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
+**Description:** Updates the local macros of an existing ABAP class, activating the class when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalMacros.ts`
 
@@ -2233,7 +2233,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatelocaltestclass-high-level-class"></a>
 #### UpdateLocalTestClass (High-Level / Class)
-**Description:** Writes test_class_code as the local test classes include of the ABAP class named by class_name. The include is written under the class lock; with activate_on_update the class is activated.
+**Description:** Updates the local test classes of an existing ABAP class, activating the class when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
@@ -2250,7 +2250,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatelocaltypes-high-level-class"></a>
 #### UpdateLocalTypes (High-Level / Class)
-**Description:** Update local types definitions in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
+**Description:** Updates the local types of an existing ABAP class, activating the class when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTypes.ts`
 
@@ -2270,7 +2270,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateobjects-high-level-common"></a>
 #### ActivateObjects (High-Level / Common)
-**Description:** Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.
+**Description:** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
@@ -2279,7 +2279,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, PROG/P, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, program, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes; any other call is a group activation.
 
-**On ABAP Cloud (`cloud`):** Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.
+**On ABAP Cloud (`cloud`):** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Parameters (`cloud`):**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
@@ -2611,7 +2611,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatedataelement-high-level-data-element"></a>
 #### ActivateDataElement (High-Level / Data Element)
-**Description:** Activates the ABAP data element named by data_element_name, so its inactive version is in force.
+**Description:** Activates an ABAP data element, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
 
@@ -2625,7 +2625,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkdataelement-high-level-data-element"></a>
 #### CheckDataElement (High-Level / Data Element)
-**Description:** [read-only] Runs a syntax check on the ABAP data element named by data_element_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP data element. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/data_element/high/handleCheckDataElement.ts`
 
@@ -2639,7 +2639,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createdataelement-high-level-data-element"></a>
 #### CreateDataElement (High-Level / Data Element)
-**Description:** Create a new ABAP data element in SAP system. Creates the data element object in initial state.
+**Description:** Creates an ABAP data element in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
 
@@ -2669,7 +2669,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletedataelement-high-level-data-element"></a>
 #### DeleteDataElement (High-Level / Data Element)
-**Description:** Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP data element, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/data_element/high/handleDeleteDataElement.ts`
 
@@ -2698,7 +2698,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatedataelement-high-level-data-element"></a>
 #### UpdateDataElement (High-Level / Data Element)
-**Description:** Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
+**Description:** Updates the properties of an existing ABAP data element, replacing them whole and activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/data_element/high/handleUpdateDataElement.ts`
 
@@ -2731,7 +2731,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateddl-high-level-ddl"></a>
 #### ActivateDdl (High-Level / Ddl)
-**Description:** Activates the CDS view (DDL source) named by ddl_name, so its inactive version is in force.
+**Description:** Activates a CDS view, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
 
@@ -2745,7 +2745,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkddl-high-level-ddl"></a>
 #### CheckDdl (High-Level / Ddl)
-**Description:** [read-only] Runs a syntax check on the CDS view named by ddl_name. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of a CDS view as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
 
@@ -2760,7 +2760,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Creates the CDS view or classic DDL view named by ddl_name in the package named by package_name, in initial state: the DDL source object, its DDL source code written afterwards.
+**Description:** Creates a CDS view or classic DDL view in a package, with its description, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
@@ -2778,7 +2778,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteddl-high-level-ddl"></a>
 #### DeleteDdl (High-Level / Ddl)
-**Description:** Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes a CDS view or classic DDL view, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
@@ -2810,7 +2810,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateddl-high-level-ddl"></a>
 #### UpdateDdl (High-Level / Ddl)
-**Description:** Updates the DDL source code of the existing CDS view or classic DDL view named by ddl_name to ddl_source. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the DDL source of an existing CDS view or classic DDL view, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
 
@@ -2830,7 +2830,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatemetadataextension-high-level-ddlx"></a>
 #### ActivateMetadataExtension (High-Level / Ddlx)
-**Description:** Activates the CDS metadata extension named by name, so its inactive version is in force.
+**Description:** Activates a CDS metadata extension, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
 
@@ -2844,7 +2844,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkmetadataextension-high-level-ddlx"></a>
 #### CheckMetadataExtension (High-Level / Ddlx)
-**Description:** [read-only] Runs a syntax check on the CDS metadata extension (DDLX) named by name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of a CDS metadata extension. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/ddlx/high/handleCheckMetadataExtension.ts`
 
@@ -2858,7 +2858,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
-**Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.
+**Description:** Creates a CDS metadata extension in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
 
@@ -2877,7 +2877,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatemetadataextension-high-level-ddlx"></a>
 #### UpdateMetadataExtension (High-Level / Ddlx)
-**Description:** Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing CDS metadata extension, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`
 
@@ -2897,7 +2897,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatedomain-high-level-domain"></a>
 #### ActivateDomain (High-Level / Domain)
-**Description:** Activates the ABAP domain named by domain_name, so its inactive version is in force.
+**Description:** Activates an ABAP domain, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/domain/low/handleActivateDomain.ts`
 
@@ -2911,7 +2911,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkdomain-high-level-domain"></a>
 #### CheckDomain (High-Level / Domain)
-**Description:** [read-only] Runs a syntax check on the ABAP domain named by domain_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP domain. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/domain/high/handleCheckDomain.ts`
 
@@ -2925,7 +2925,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createdomain-high-level-domain"></a>
 #### CreateDomain (High-Level / Domain)
-**Description:** Create a new ABAP domain in SAP system. Creates the domain object in initial state.
+**Description:** Creates an ABAP domain in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
 
@@ -2952,7 +2952,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletedomain-high-level-domain"></a>
 #### DeleteDomain (High-Level / Domain)
-**Description:** Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP domain, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/domain/high/handleDeleteDomain.ts`
 
@@ -2981,7 +2981,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatedomain-high-level-domain"></a>
 #### UpdateDomain (High-Level / Domain)
-**Description:** Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
+**Description:** Updates the properties of an existing ABAP domain, replacing them whole and activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/domain/high/handleUpdateDomain.ts`
 
@@ -3010,7 +3010,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatefunctiongroup-high-level-function"></a>
 #### ActivateFunctionGroup (High-Level / Function)
-**Description:** Activates the ABAP function group named by function_group_name, so its inactive version is in force.
+**Description:** Activates an ABAP function group, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionGroup.ts`
 
@@ -3024,7 +3024,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatefunctionmodule-high-level-function"></a>
 #### ActivateFunctionModule (High-Level / Function)
-**Description:** Activates the ABAP function module named by function_module_name in the function group named by function_group_name, so its inactive version is in force.
+**Description:** Activates an ABAP function module of a function group, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
 
@@ -3039,7 +3039,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkfunctiongroup-high-level-function"></a>
 #### CheckFunctionGroup (High-Level / Function)
-**Description:** [read-only] Runs a syntax check on the ABAP function group named by function_group_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP function group. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/function/high/handleCheckFunctionGroup.ts`
 
@@ -3053,7 +3053,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkfunctionmodule-high-level-function"></a>
 #### CheckFunctionModule (High-Level / Function)
-**Description:** [read-only] Runs a syntax check on the ABAP function module named by function_module_name in the function group named by function_group_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP function module of a function group. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/function/high/handleCheckFunctionModule.ts`
 
@@ -3068,7 +3068,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
-**Description:** Create a new ABAP function group in SAP system. Function groups serve as containers for function modules.
+**Description:** Creates an ABAP function group in a package, with its description, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionGroup.ts`
 
@@ -3087,7 +3087,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createfunctionmodule-high-level-function"></a>
 #### CreateFunctionModule (High-Level / Function)
-**Description:** Create a new ABAP function module within an existing function group. Creates the function module in initial state.
+**Description:** Creates an ABAP function module in an existing function group, with its description, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionModule.ts`
 
@@ -3104,7 +3104,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
-**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules, which carry the source; this updates the group's metadata alone. Locks the group, writes, and unlocks it.
+**Description:** Updates the description of an existing ABAP function group, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 
@@ -3120,7 +3120,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatefunctionmodule-high-level-function"></a>
 #### UpdateFunctionModule (High-Level / Function)
-**Description:** Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing ABAP function module, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionModule.ts`
 
@@ -3141,7 +3141,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletefunctiongroup-high-level-function-group"></a>
 #### DeleteFunctionGroup (High-Level / Function Group)
-**Description:** Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP function group, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
 
@@ -3173,7 +3173,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createfunctioninclude-high-level-function-include"></a>
 #### CreateFunctionInclude (High-Level / Function Include)
-**Description:** Create a new ABAP include within an existing function group. Creates the include in initial state.
+**Description:** Creates an include in an existing ABAP function group, with its description, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
 
@@ -3188,7 +3188,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletefunctioninclude-high-level-function-include"></a>
 #### DeleteFunctionInclude (High-Level / Function Include)
-**Description:** Delete an ABAP function group include from the SAP system via ADT deletion API. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for local objects.
+**Description:** Deletes an include of an ABAP function group, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
@@ -3221,7 +3221,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletefunctionmodule-high-level-function-module"></a>
 #### DeleteFunctionModule (High-Level / Function Module)
-**Description:** Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP function module, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
@@ -3258,7 +3258,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateinclude-high-level-include"></a>
 #### ActivateInclude (High-Level / Include)
-**Description:** Activates the ABAP include named by include_name, so its inactive version is in force.
+**Description:** Activates an ABAP include, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/include/low/handleActivateInclude.ts`
 
@@ -3272,7 +3272,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createinclude-high-level-include"></a>
 #### CreateInclude (High-Level / Include)
-**Description:** Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive, holding the comment header SAP writes into a new include; its source is written afterwards.
+**Description:** Creates an ABAP include in a package, with its description and the comment header SAP writes into it, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/include/high/handleCreateInclude.ts`
 
@@ -3290,7 +3290,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteinclude-high-level-include"></a>
 #### DeleteInclude (High-Level / Include)
-**Description:** Deletes the ABAP include named by include_name through the ADT deletion service, after asking whether it can be deleted. Returns the deletion result.
+**Description:** Deletes an ABAP include, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/include/high/handleDeleteInclude.ts`
 
@@ -3305,7 +3305,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateinclude-high-level-include"></a>
 #### UpdateInclude (High-Level / Include)
-**Description:** Writes source_code as the whole source of the ABAP include named by include_name: locks it, writes, unlocks, and activates when activate is true. Returns SAP's answer to the write (and to the activation).
+**Description:** Updates the source code of an existing ABAP include, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/include/high/handleUpdateInclude.ts`
 
@@ -3322,7 +3322,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateincludemetadata-high-level-include"></a>
 #### UpdateIncludeMetadata (High-Level / Include)
-**Description:** Writes the given metadata document as the whole stored metadata of the ABAP include named by include_name: locks it, writes, unlocks. Returns SAP's answer to the write.
+**Description:** Updates the stored metadata of an existing ABAP include, replacing it whole, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/include/high/handleUpdateIncludeMetadata.ts`
 
@@ -3339,7 +3339,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateinterface-high-level-interface"></a>
 #### ActivateInterface (High-Level / Interface)
-**Description:** Activates the ABAP interface named by interface_name, so its inactive version is in force.
+**Description:** Activates an ABAP interface, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/interface/low/handleActivateInterface.ts`
 
@@ -3353,7 +3353,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkinterface-high-level-interface"></a>
 #### CheckInterface (High-Level / Interface)
-**Description:** [read-only] Runs a syntax check on the ABAP interface named by interface_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP interface. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/interface/high/handleCheckInterface.ts`
 
@@ -3367,7 +3367,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
-**Description:** Create a new ABAP interface in SAP system. Creates the interface object in initial state.
+**Description:** Creates an ABAP interface in a package, with its description, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
 
@@ -3385,7 +3385,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteinterface-high-level-interface"></a>
 #### DeleteInterface (High-Level / Interface)
-**Description:** Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP interface, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
 
@@ -3437,7 +3437,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createmessageclass-high-level-message-class"></a>
 #### CreateMessageClass (High-Level / Message Class)
-**Description:** Creates the ABAP message class (T100) named by message_class_name, with its description, in the package named by package_name: a shell whose messages are added afterwards. A message class is in effect once saved.
+**Description:** Creates an ABAP message class (T100) in a package, with its description, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
 
@@ -3453,7 +3453,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createmessageclassmessage-high-level-message-class"></a>
 #### CreateMessageClassMessage (High-Level / Message Class)
-**Description:** Adds the message numbered msgno, with the text msgtext, to the existing ABAP message class (T100) named by message_class_name.
+**Description:** Creates a message, with its number and text, in an existing ABAP message class (T100), recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClassMessage.ts`
 
@@ -3469,7 +3469,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletemessageclass-high-level-message-class"></a>
 #### DeleteMessageClass (High-Level / Message Class)
-**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local objects.
+**Description:** Deletes an ABAP message class (T100) with all its messages, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
 
@@ -3482,7 +3482,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletemessageclassmessage-high-level-message-class"></a>
 #### DeleteMessageClassMessage (High-Level / Message Class)
-**Description:** Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.
+**Description:** Deletes one message, by its number, from an ABAP message class (T100), keeping the class and its other messages. Whether SAP deleted the message, the message class, the message number and a sentence saying so.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClassMessage.ts`
 
@@ -3519,7 +3519,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatemessageclass-high-level-message-class"></a>
 #### UpdateMessageClass (High-Level / Message Class)
-**Description:** Updates the header of the ABAP message class named by message_class_name: its description.
+**Description:** Updates the description of an existing ABAP message class (T100), recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClass.ts`
 
@@ -3533,7 +3533,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatemessageclassmessage-high-level-message-class"></a>
 #### UpdateMessageClassMessage (High-Level / Message Class)
-**Description:** Change the text / flags of an existing message in an ABAP message class (T100). Creates the message when the class lacks it (upsert).
+**Description:** Updates the text and flags of a message in an ABAP message class (T100), creating the message when the class lacks it, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClassMessage.ts`
 
@@ -3552,7 +3552,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletemetadataextension-high-level-metadata-extension"></a>
 #### DeleteMetadataExtension (High-Level / Metadata Extension)
-**Description:** Delete an ABAP metadata extension from the SAP system. Transport request optional for local objects.
+**Description:** Deletes a CDS metadata extension, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/metadata_extension/high/handleDeleteMetadataExtension.ts`
 
@@ -3624,7 +3624,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletepackage-high-level-package"></a>
 #### DeletePackage (High-Level / Package)
-**Description:** Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server save a package on a session apart from this one, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.
+**Description:** Deletes an ABAP package, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/package/high/handleDeletePackage.ts`
 
@@ -3655,7 +3655,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatepackage-high-level-package"></a>
 #### UpdatePackage (High-Level / Package)
-**Description:** Update the description of an existing ABAP package. Locks the package, writes, and unlocks it again, whatever the write answered. Over RFC this runs in an ABAP session of its own, closed afterwards.
+**Description:** Updates the description of an existing ABAP package, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/package/high/handleUpdatePackage.ts`
 
@@ -3674,7 +3674,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateprogram-high-level-program"></a>
 #### ActivateProgram (High-Level / Program)
-**Description:** Activates the ABAP program (report) named by program_name, so its inactive version is in force.
+**Description:** Activates an ABAP program (report), so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/program/low/handleActivateProgram.ts`
 
@@ -3688,7 +3688,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkprogram-high-level-program"></a>
 #### CheckProgram (High-Level / Program)
-**Description:** [read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** [read-only] Checks the syntax of an ABAP program (report). Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
@@ -3702,7 +3702,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
-**Description:** Create a new ABAP program (report) in SAP system. Creates the program object in initial state.
+**Description:** Creates an ABAP program (report) in a package, with its description, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
@@ -3721,7 +3721,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteprogram-high-level-program"></a>
 #### DeleteProgram (High-Level / Program)
-**Description:** Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP program (report), recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
 
@@ -3753,7 +3753,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateprogram-high-level-program"></a>
 #### UpdateProgram (High-Level / Program)
-**Description:** Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing ABAP program (report), activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/program/high/handleUpdateProgram.ts`
 
@@ -3773,7 +3773,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateservicebinding-high-level-service-binding"></a>
 #### ActivateServiceBinding (High-Level / Service Binding)
-**Description:** Activates the OData service binding named by name, so its inactive version is in force.
+**Description:** Activates an OData service binding, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/service_binding/low/handleActivateServiceBinding.ts`
 
@@ -3787,7 +3787,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
-**Description:** Create an OData service binding (V2 or V4, UI or Web API) for a service definition, in initial state.
+**Description:** Creates an OData service binding (V2 or V4, UI or Web API) for a service definition in a package, with its description, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
@@ -3811,7 +3811,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteservicebinding-high-level-service-binding"></a>
 #### DeleteServiceBinding (High-Level / Service Binding)
-**Description:** Delete ABAP service binding via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an OData service binding, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/service_binding/high/handleDeleteServiceBinding.ts`
 
@@ -3853,7 +3853,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateservicebinding-high-level-service-binding"></a>
 #### UpdateServiceBinding (High-Level / Service Binding)
-**Description:** Update publication state of an existing ABAP service binding. On premise the change is done when the call answers (result SUCCESS, completion 'done'). On ABAP Cloud SAP runs it as a background job: the call answers result STARTED, completion 'background', with SAP's severity and short text, and the service becomes usable (or stops being usable) once that job ends.
+**Description:** Updates the publication state of an existing OData service binding, publishing or unpublishing its service. Whether SAP made the change or started it, whether it has completed or runs in the background, SAP's severity, SAP's status text, what a started change means for the service and a lock left held when its release failed.
 
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
 
@@ -3872,7 +3872,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="validateservicebinding-high-level-service-binding"></a>
 #### ValidateServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint. The answer is the verdict of SAP's transport check for the binding's name and package: admissible true where SAP answers S, false where it answers E, each with SAP's messages, and any other value as result; creating the binding checks the name, the package and the service definition itself.
+**Description:** [read-only] Validates a new OData service binding for a service definition, in the package and version given, by SAP's transport check of its name and package. Whether SAP admits it and SAP's verdict when it is another. For each message: its severity and its text.
 
 **Source:** `src/handlers/service_binding/high/handleValidateServiceBinding.ts`
 
@@ -3891,7 +3891,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateservicedefinition-high-level-service-definition"></a>
 #### ActivateServiceDefinition (High-Level / Service Definition)
-**Description:** Activates the service definition named by name, so its inactive version is in force.
+**Description:** Activates a service definition, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/service_definition/low/handleActivateServiceDefinition.ts`
 
@@ -3905,7 +3905,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
-**Description:** Create a service definition that exposes CDS views as an OData service, in initial state.
+**Description:** Creates a service definition exposing CDS views as an OData service in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
 
@@ -3925,7 +3925,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteservicedefinition-high-level-service-definition"></a>
 #### DeleteServiceDefinition (High-Level / Service Definition)
-**Description:** Delete an ABAP service definition from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes a service definition, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/service_definition/high/handleDeleteServiceDefinition.ts`
 
@@ -3957,7 +3957,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateservicedefinition-high-level-service-definition"></a>
 #### UpdateServiceDefinition (High-Level / Service Definition)
-**Description:** Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing service definition, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/service_definition/high/handleUpdateServiceDefinition.ts`
 
@@ -3977,7 +3977,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatestructure-high-level-structure"></a>
 #### ActivateStructure (High-Level / Structure)
-**Description:** Activates the ABAP structure named by structure_name, so its inactive version is in force.
+**Description:** Activates an ABAP structure, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/structure/low/handleActivateStructure.ts`
 
@@ -3991,7 +3991,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkstructure-high-level-structure"></a>
 #### CheckStructure (High-Level / Structure)
-**Description:** [read-only] Runs a syntax check on the ABAP structure named by structure_name. Can check existing structure (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP structure as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/structure/high/handleCheckStructure.ts`
 
@@ -4006,7 +4006,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createstructure-high-level-structure"></a>
 #### CreateStructure (High-Level / Structure)
-**Description:** Create a new ABAP structure in SAP system. Creates the structure object in initial state.
+**Description:** Creates an ABAP structure in a package, with its description, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/structure/high/handleCreateStructure.ts`
 
@@ -4027,7 +4027,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletestructure-high-level-structure"></a>
 #### DeleteStructure (High-Level / Structure)
-**Description:** Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP structure, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/structure/high/handleDeleteStructure.ts`
 
@@ -4059,7 +4059,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatestructure-high-level-structure"></a>
 #### UpdateStructure (High-Level / Structure)
-**Description:** Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the DDL source of an existing ABAP structure, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/structure/high/handleUpdateStructure.ts`
 
@@ -4181,7 +4181,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatetable-high-level-table"></a>
 #### ActivateTable (High-Level / Table)
-**Description:** Activates the ABAP database table named by table_name, so its inactive version is in force.
+**Description:** Activates an ABAP database table, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/table/low/handleActivateTable.ts`
 
@@ -4195,7 +4195,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checktable-high-level-table"></a>
 #### CheckTable (High-Level / Table)
-**Description:** [read-only] Runs a syntax check on the ABAP database table named by table_name. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP database table as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/table/high/handleCheckTable.ts`
 
@@ -4210,7 +4210,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
-**Description:** Create a new ABAP table in SAP system. Creates the table object in initial state.
+**Description:** Creates an ABAP database table in a package, with its description, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
@@ -4228,7 +4228,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletetable-high-level-table"></a>
 #### DeleteTable (High-Level / Table)
-**Description:** Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP database table, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/table/high/handleDeleteTable.ts`
 
@@ -4277,7 +4277,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatetablesettings-high-level-table"></a>
 #### UpdateTableSettings (High-Level / Table)
-**Description:** Writes technical settings of the existing database table named by table_name: each setting given is written over the stored one, every other setting keeps its stored value. Locks the settings, writes them, unlocks them, and activates the table when activate is true. Answers whether SAP saved the settings and, when activated, whether SAP activated the table, with its messages.
+**Description:** Updates the technical settings of an existing ABAP database table, each setting given over the stored one, activating the table when asked. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/table/high/handleUpdateTableSettings.ts`
 
@@ -4295,7 +4295,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `translation` (string, optional) - Translation value; the translation flags keep their stored values.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if the table is local or already in a transport request.
 
-**On ABAP Cloud (`cloud`):** Writes technical settings of the existing database table named by table_name: each setting given is written over the stored one, every other setting keeps its stored value. Locks the settings, writes them, unlocks them, and activates the table when activate is true. Answers whether SAP saved the settings and, when activated, whether SAP activated the table, with its messages.
+**On ABAP Cloud (`cloud`):** Updates the technical settings of an existing ABAP database table, each setting given over the stored one, activating the table when asked. Whether SAP took the change and a lock left held when its release failed.
 
 **Parameters (`cloud`):**
 - `activate` (boolean, required) - true activates the table after the settings are written; false leaves them inactive.
@@ -4319,7 +4319,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatetabletype-high-level-table-type"></a>
 #### ActivateTableType (High-Level / Table Type)
-**Description:** Activates the ABAP table type named by table_type_name, so its inactive version is in force.
+**Description:** Activates an ABAP table type, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/table_type/low/handleActivateTableType.ts`
 
@@ -4333,7 +4333,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checktabletype-high-level-table-type"></a>
 #### CheckTableType (High-Level / Table Type)
-**Description:** [read-only] Runs a check on the ABAP table type named by table_type_name. Returns errors, warnings, and messages.
+**Description:** [read-only] Checks an ABAP table type for errors and warnings. The object checked, whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/table_type/high/handleCheckTableType.ts`
 
@@ -4347,7 +4347,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createtabletype-high-level-table-type"></a>
 #### CreateTableType (High-Level / Table Type)
-**Description:** Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the version the stored definition was read at (stored_version), the definition itself with detail full: the active version, read after a successful activation; with activate false, a refused check or a refused activation, the inactive version, read after the write. A definition whose read failed is answered with SAP's answer to that read.
+**Description:** Creates an ABAP table type in a package, with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given. Whether SAP took the change, a lock left held when its release failed, the version its stored definition was read at and SAP's failure when that read failed.
 
 **Source:** `src/handlers/table_type/high/handleCreateTableType.ts`
 
@@ -4373,7 +4373,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletetabletype-high-level-table-type"></a>
 #### DeleteTableType (High-Level / Table Type)
-**Description:** Deletes the ABAP table type named by table_type_name through the ADT deletion service, after asking whether it can be deleted. Returns the deletion result.
+**Description:** Deletes an ABAP table type, recorded in the transport given. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/table_type/high/handleDeleteTableType.ts`
 
@@ -4402,7 +4402,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatetabletype-high-level-table-type"></a>
 #### UpdateTableType (High-Level / Table Type)
-**Description:** Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the version the stored definition was read at (stored_version), the definition itself with detail full: the active version, read after a successful activation; with activate false or a refused activation, the inactive version, read after the unlock. The write is checked under the lock, before that read: a refused check is answered alone. A definition whose read failed is answered with SAP's answer to that read.
+**Description:** Updates the definition of an existing ABAP table type : its description, the type it holds, its access type and primary key, activating it when asked. Whether SAP took the change, a lock left held when its release failed, the version its stored definition was read at and SAP's failure when that read failed.
 
 **Source:** `src/handlers/table_type/high/handleUpdateTableType.ts`
 
@@ -4430,7 +4430,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatetextelements-high-level-text-elements"></a>
 #### UpdateTextElements (High-Level / Text Elements)
-**Description:** Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers parts: each part SAP saved with SAP's answer, the list saved; when activated, whether SAP activated them, with its messages, beside the parts. A part SAP refuses ends the writes: the answer is SAP's failure, beside the parts saved before it (inactive).
+**Description:** Updates the text elements of an existing ABAP program, function group or class, each part given replacing its stored one, activating the object when asked. Whether SAP took the change and a lock left held when its release failed. For each part SAP saved: its name and what was saved.
 
 **Source:** `src/handlers/text_elements/high/handleUpdateTextElements.ts`
 
@@ -4444,7 +4444,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `symbols` (array, optional) - The text symbols: the whole list; symbols left out are deleted.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if the object is local or already in a transport request.
 
-**On ABAP Cloud (`cloud`):** Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers parts: each part SAP saved with SAP's answer, the list saved; when activated, whether SAP activated them, with its messages, beside the parts. A part SAP refuses ends the writes: the answer is SAP's failure, beside the parts saved before it (inactive).
+**On ABAP Cloud (`cloud`):** Updates the text elements of an existing ABAP program, function group or class, each part given replacing its stored one, activating the object when asked. Whether SAP took the change and a lock left held when its release failed. For each part SAP saved: its name and what was saved.
 
 **Parameters (`cloud`):**
 - `activate` (boolean, required) - true activates the object together with its text elements after the write; false leaves them inactive.
@@ -4565,7 +4565,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test class named by class_name for the CDS view named by cds_view_name, from test_class_source. The view is checked to support CDS test doubles, the test class holding the local test classes is created in the package named by package_name, and it is activated.
+**Description:** Creates an ABAP Unit test class for a CDS view in a package, from the test class source given, once the view supports CDS test doubles. Whether SAP took the change.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
@@ -4583,7 +4583,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createfunctiongroupunittest-high-level-unit-test"></a>
 #### CreateFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of the function group named by function_group_name, from test_class_source. They are written to a test include, which is activated with the group.
+**Description:** Creates the ABAP Unit test classes of an ABAP function group from the test class source given, in a test include activated with the group. Whether SAP took the change.
 
 **Source:** `src/handlers/unit_test/high/handleCreateFunctionGroupUnitTest.ts`
 
@@ -4597,7 +4597,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createprogramunittest-high-level-unit-test"></a>
 #### CreateProgramUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of the report named by program_name, from test_class_source. They are written to a test include, which is included into the report, and the report is activated.
+**Description:** Creates the ABAP Unit test classes of an ABAP report from the test class source given, in a test include of the report, and activates the report. Whether SAP took the change.
 
 **Source:** `src/handlers/unit_test/high/handleCreateProgramUnitTest.ts`
 
@@ -4611,7 +4611,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of the ABAP class named by class_name, from test_class_source. They are written as the class's local test classes, and the class is activated.
+**Description:** Creates the ABAP Unit test classes of an ABAP class from the test class source given, as its local test classes, and activates the class. Whether SAP took the change.
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
@@ -4642,7 +4642,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteunittest-high-level-unit-test"></a>
 #### DeleteUnitTest (High-Level / Unit Test)
-**Description:** Deletes the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are deleted, and the class stays.
+**Description:** Deletes the ABAP Unit test classes of an ABAP class, keeping the class. Whether SAP took the change.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteUnitTest.ts`
 
@@ -4773,7 +4773,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** Writes test_class_source as the ABAP Unit test classes of the CDS view test class named by class_name. The local test classes in the test class are rewritten, and it is activated.
+**Description:** Updates the ABAP Unit test classes of a CDS view test class from the test class source given, activating it, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
@@ -4789,7 +4789,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatefunctiongroupunittest-high-level-unit-test"></a>
 #### UpdateFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Writes test_class_source as the ABAP Unit test classes of the function group named by function_group_name. The local test classes in its test include are rewritten, and it is activated.
+**Description:** Updates the ABAP Unit test classes of an ABAP function group from the test class source given, activating the group, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateFunctionGroupUnitTest.ts`
 
@@ -4803,7 +4803,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateprogramunittest-high-level-unit-test"></a>
 #### UpdateProgramUnitTest (High-Level / Unit Test)
-**Description:** Writes test_class_source as the ABAP Unit test classes of the report named by program_name. The local test classes in its test include are rewritten, and it is activated.
+**Description:** Updates the ABAP Unit test classes of an ABAP report from the test class source given, activating the report, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateProgramUnitTest.ts`
 
@@ -4817,7 +4817,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateunittest-high-level-unit-test"></a>
 #### UpdateUnitTest (High-Level / Unit Test)
-**Description:** Writes test_class_source as the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are rewritten, and the class is activated.
+**Description:** Updates the ABAP Unit test classes of an ABAP class from the test class source given, activating the class, recorded in the transport given. Whether SAP took the change.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateUnitTest.ts`
 

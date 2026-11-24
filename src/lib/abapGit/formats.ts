@@ -619,10 +619,17 @@ function resultOf(status: number): 'accepted' | 'done' {
  * its status and its result. Minified JSON.
  */
 export function statusAnswer(value: { readonly status: number }): string {
-  return JSON.stringify({
+  const answered: StatusAnswer = {
     status: value.status,
     result: resultOf(value.status),
-  });
+  };
+  return JSON.stringify(answered);
+}
+
+/** What `statusAnswer` writes: SAP's status, and whether it is done or accepted. */
+export interface StatusAnswer {
+  readonly status: number;
+  readonly result: ReturnType<typeof resultOf>;
 }
 
 /**

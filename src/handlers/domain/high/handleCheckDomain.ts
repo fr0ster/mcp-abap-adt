@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { checkTool } from '../../../lib/description';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -25,8 +26,7 @@ import { handleCheckDomain as handleCheckDomainLow } from '../low/handleCheckDom
 export const TOOL_DEFINITION = {
   name: 'CheckDomain',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Runs a syntax check on the ABAP domain named by domain_name. Returns syntax errors, warnings, and messages.',
+  description: checkTool({ tag: 'read-only', object: 'an ABAP domain' }),
   inputSchema: z.object({
     domain_name: z.string().describe('Domain name.'),
     version: z

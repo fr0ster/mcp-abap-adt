@@ -6,6 +6,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  */
 
 import { answer } from '../../../lib/answer';
+import { results, updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -15,8 +16,11 @@ import { writeClassTests } from '../shared/writeTests';
 export const TOOL_DEFINITION = {
   name: 'UpdateCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Writes test_class_source as the ABAP Unit test classes of the CDS view test class named by class_name. The local test classes in the test class are rewritten, and it is activated.',
+  description: updateTool({
+    object: 'the ABAP Unit test classes of a CDS view test class',
+    how: 'from the test class source given, activating it, recorded in the transport given',
+    result: results.WRITTEN,
+  }),
   inputSchema: z.object({
     class_name: z
       .string()

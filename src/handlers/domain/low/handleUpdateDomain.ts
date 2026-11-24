@@ -37,6 +37,7 @@ import {
   messageCarriedBy,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { results, updateTool } from '../../../lib/description';
 import type {
   HandlerContext,
   ToolArgValue,
@@ -62,8 +63,12 @@ import { return_error, return_response } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateDomainLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Update properties of an existing ABAP domain. Requires lock handle from LockObject. - use UpdateDomain (high-level) for full workflow with lock/unlock/activate.',
+  description: updateTool({
+    tag: 'low-level',
+    object: 'the properties of an existing ABAP domain',
+    how: ', under a lock the caller holds',
+    result: results.WRITTEN,
+  }),
   inputSchema: z.object({
     domain_name: z.string().describe('Domain name. Domain must already exist.'),
     properties: z

@@ -3,13 +3,16 @@
  * of every tool definition is a `toolDescription(…)` call, never a string
  * literal, a template or a concatenation — except for a tool still listed in
  * `NOT_YET_ASSEMBLED`, which is refused once it is assembled, so the list
- * only shrinks. Read from the source with the TypeScript parser.
+ * only shrinks. A kind factory of `kinds.ts` (`createTool`, `checkTool`, …)
+ * assembles through `toolDescription` and counts as its call. Read from the
+ * source with the TypeScript parser.
  */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import ts from 'typescript';
+import * as kinds from '../../../lib/description/kinds';
 import { globSync } from '../../helpers/platform';
 import {
   NOT_YET_ASSEMBLED,
@@ -22,6 +25,12 @@ const DEFINING = [
   ...globSync('src/lib/compact/**/*.ts'),
   ...globSync('compact-*/src/handlers/**/*.ts'),
 ].filter((file) => !file.includes('__tests__'));
+
+/** The calls that assemble a description: the builder, and each kind factory. */
+const ASSEMBLING: ReadonlySet<string> = new Set([
+  'toolDescription',
+  ...Object.keys(kinds),
+]);
 
 /** One tool definition found: its name, and how its description is made. */
 interface Defined {
@@ -144,7 +153,7 @@ function definitionsOfSource(file: string, source: ts.SourceFile): Defined[] {
             name: nameProperty.initializer.text,
             assembled:
               ts.isCallExpression(description) &&
-              description.expression.getText(source) === 'toolDescription',
+              ASSEMBLING.has(description.expression.getText(source)),
             made: description.getText(source).slice(0, 60),
           });
         }
@@ -215,6 +224,27 @@ describe('every tool description is assembled, or its tool still listed as not y
         each.assembled,
       ]),
       [['ToolZ', true]],
+    );
+  });
+
+  it('reads a kind factory call as assembled, and any other call as written whole', () => {
+    const file = 'kind.ts';
+    const source = ts.createSourceFile(
+      file,
+      "export const A = { name: 'ToolA', description: createTool(parts) };\nexport const B = { name: 'ToolB', description: wordsOf(parts) };",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    assert.ok(ASSEMBLING.has('createTool') && ASSEMBLING.has('checkTool'));
+    assert.deepStrictEqual(
+      definitionsOfSource(file, source).map((each) => [
+        each.name,
+        each.assembled,
+      ]),
+      [
+        ['ToolA', true],
+        ['ToolB', false],
+      ],
     );
   });
 

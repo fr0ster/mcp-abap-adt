@@ -45,6 +45,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import {
@@ -67,8 +68,10 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'UpdateDataElement',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
+  description: updateTool({
+    object: 'the properties of an existing ABAP data element',
+    how: ', replacing them whole and activating it when asked, recorded in the transport given',
+  }),
   inputSchema: z.object({
     data_element_name: z.string().describe('Data element name to update'),
     description: z.string().optional().describe('New data element description'),

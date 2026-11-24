@@ -39,6 +39,12 @@ import {
   createOnPremAdtClient,
   variantOf,
 } from '../../../lib/clients';
+import {
+  purpose,
+  resultReturns,
+  resultShape,
+  toolDescription,
+} from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionForPackageLock } from '../../../lib/packageSessions';
 import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
@@ -50,11 +56,26 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { lockSubResource } from './subResourceLocks';
 
+/** What a lock answers: the handle the update and the unlock take. */
+export interface LockAnswer {
+  readonly lock_handle: string;
+}
+
+/** What a lock answers, by its noun. */
+const LOCKED = resultShape<LockAnswer>({
+  lock_handle: 'the lock handle the update and the unlock take',
+});
+
 export const TOOL_DEFINITION = {
   name: 'LockObjectLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Lock an ABAP object for modification. Returns the lock handle the update and the unlock take; the lock stays in the instance’s session until the unlock or the instance’s end.',
+  description: toolDescription({
+    tag: 'low-level',
+    purpose: purpose(
+      "Locks an ABAP object for modification in this instance's session, until it is unlocked or the instance ends.",
+    ),
+    returns: resultReturns(LOCKED),
+  }),
   inputSchema: z.object({
     object_name: z
       .string()
@@ -313,7 +334,10 @@ export async function lockObject(
 ) {
   // What the update and the unlock need, and nothing sent back: the name and
   // the type are the caller's own, and the prose said what a handle is for.
-  return lockObjectAnswering(context, args, 'LockObjectLow', (lockHandle) => ({
-    lock_handle: lockHandle,
-  }));
+  return lockObjectAnswering(
+    context,
+    args,
+    'LockObjectLow',
+    (lockHandle): LockAnswer => ({ lock_handle: lockHandle }),
+  );
 }

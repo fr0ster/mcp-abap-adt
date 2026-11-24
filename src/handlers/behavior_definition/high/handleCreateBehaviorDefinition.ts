@@ -31,6 +31,7 @@ import type {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool, results } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -46,8 +47,11 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'CreateBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.',
+  description: createTool({
+    object: 'a RAP behavior definition',
+    how: 'for a root entity in a package, with its description, recorded in the transport given',
+    result: results.WRITTEN_UNDER_LOCK,
+  }),
   inputSchema: createArguments('CreateBehaviorDefinition', {
     name: z
       .string()

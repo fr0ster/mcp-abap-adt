@@ -173,16 +173,13 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetClassVersionDiff',
   'GetClassVersionSource',
   'GetClassVersions',
-  'GetDataElement',
   'GetDdl',
   'GetDdlVersionDiff',
   'GetDdlVersionSource',
   'GetDdlVersions',
-  'GetDomain',
   'GetEnhancementImpl',
   'GetEnhancementSpot',
   'GetEnhancements',
-  'GetFunctionGroup',
   'GetFunctionInclude',
   'GetFunctionModule',
   'GetFunctionModuleVersionDiff',
@@ -198,7 +195,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetLocalMacros',
   'GetLocalTestClass',
   'GetLocalTypes',
-  'GetMessageClassMessage',
   'GetMetadataExtension',
   'GetMetadataExtensionVersionDiff',
   'GetMetadataExtensionVersionSource',
@@ -224,15 +220,11 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetServiceBindingPreviewUrl',
   'GetServiceDefinition',
   'GetSqlQuery',
-  'GetStructure',
   'GetStructureVersionDiff',
   'GetStructureVersionSource',
   'GetStructureVersions',
   'GetStructuresList',
-  'GetTable',
   'GetTableContents',
-  'GetTableSettings',
-  'GetTableType',
   'GetTableTypeVersions',
   'GetTableVersionDiff',
   'GetTableVersionSource',
@@ -381,7 +373,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 368;
+export const NOT_YET_ASSEMBLED_MOST = 360;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

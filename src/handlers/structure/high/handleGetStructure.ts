@@ -3,6 +3,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { readerParts, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -18,7 +19,6 @@ import {
   answerSourceRead,
   rangeFields,
   SOURCE_RANGE_SHAPE,
-  SOURCE_RANGE_WORDS,
   type SourceRangeArgs,
   sourceRangeOf,
 } from '../../../lib/handlers/sourceRange';
@@ -30,7 +30,13 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetStructure',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[read-only] Reads the ABAP structure named by structure_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. ${SOURCE_RANGE_WORDS}`,
+  description: toolDescription(
+    readerParts({
+      object: 'an ABAP structure',
+      holding:
+        'its definition source, or its package, person responsible and description',
+    }),
+  ),
   inputSchema: z.object({
     structure_name: requiredText('structure_name is required').describe(
       'Structure name.',

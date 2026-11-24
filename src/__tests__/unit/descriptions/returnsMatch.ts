@@ -197,9 +197,11 @@ export function tieFaults(tie: ReturnsTie): string[] {
     }
   }
   const reach = new Set<string>();
+  const writtenHeads = new Set<string>();
   const mediumReach = new Set<string>();
   for (const sample of tie.samples) {
     for (const line of sample.lines) {
+      if ('head' in line) writtenHeads.add(line.head);
       lineFaults(line, headers, heads, marks, named, faults);
     }
     for (const each of reached(tie.terse, sample.reading)) {
@@ -258,6 +260,13 @@ export function tieFaults(tie: ReturnsTie): string[] {
           );
         }
       }
+    }
+  }
+  // Every declared head written by some fixture: the Returns names no head
+  // the writer does not write.
+  for (const head of tie.heads) {
+    if (!writtenHeads.has(head.label)) {
+      faults.push(`no fixture writes the head "${head.label}"`);
     }
   }
   // Every declared medium list reached by some fixture's medium answer.

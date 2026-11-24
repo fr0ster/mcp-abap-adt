@@ -26,10 +26,7 @@ import {
   TOOL_DEFINITION as CDS_RESULT_TOOL,
   handleHandlerCdsUnitTestResult,
 } from '../handlers/handleHandlerCdsUnitTestResult';
-import {
-  TOOL_DEFINITION as GET_TOOL,
-  handleHandlerGet,
-} from '../handlers/handleHandlerGet';
+import { handleHandlerGet } from '../handlers/handleHandlerGet';
 import {
   handleHandlerUnitTestResult,
   TOOL_DEFINITION as RESULT_TOOL,
@@ -130,9 +127,6 @@ const RESULT_CALLS: Array<
   ],
 ];
 
-const FINISHED_SENTENCE =
-  "Valid once the status is FINISHED; a finished run's result carries executionTime.";
-
 describe('compact unit-test results are read once', () => {
   for (const [_label, handler, args, step] of RESULT_CALLS) {
     describe(format('%s', _label), () => {
@@ -209,9 +203,13 @@ describe('compact unit-test results are read once', () => {
     }
   });
 
-  it('the description carries the FINISHED sentence', () => {
-    for (const tool of [RESULT_TOOL, CDS_RESULT_TOOL, GET_TOOL]) {
-      assert.ok(tool.description.includes(FINISHED_SENTENCE));
+  it("the description states the run's id and its result", () => {
+    for (const tool of [RESULT_TOOL, CDS_RESULT_TOOL]) {
+      assert.ok(
+        tool.description.includes(
+          "The run's id and the run's result as SAP gave it.",
+        ),
+      );
     }
   });
 });

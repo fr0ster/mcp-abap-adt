@@ -211,19 +211,11 @@ for (const variant of ['onprem', 'cloud'] as const) {
 }
 
 describe("HandlerServiceBindingValidate states package_name, the binding's package, as required", () => {
-  it('lists package_name among the required arguments in the description', () => {
-    assert.ok(
-      HandlerServiceBindingValidate_Tool.description.includes(
-        "Required: service_binding_name*, service_definition_name*, package_name* (the binding's package).",
-      ),
-    );
-  });
-
   it('says the answer is the transport check verdict', () => {
-    assert.ok(
-      HandlerServiceBindingValidate_Tool.description.includes(
-        "The answer is the verdict of SAP's transport check for the binding's name and package",
-      ),
+    // The compact tool states the full tool's parts.
+    assert.equal(
+      HandlerServiceBindingValidate_Tool.description,
+      ValidateServiceBinding_Tool.description,
     );
     // Assembled (plan step 10.6): the purpose names the check, the facts
     // its verdict.
@@ -237,7 +229,7 @@ describe("HandlerServiceBindingValidate states package_name, the binding's packa
     );
     assert.ok(
       compactValidateDescription('onprem').includes(
-        "For SERVICE_BINDING the answer is the verdict of SAP's transport check",
+        "For SERVICE_BINDING: whether SAP admits it and SAP's verdict when it is another.",
       ),
     );
   });

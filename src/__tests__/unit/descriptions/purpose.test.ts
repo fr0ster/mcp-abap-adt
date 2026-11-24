@@ -281,7 +281,10 @@ describe('the description builder', () => {
           },
         ],
       },
-      members: membersTaken('object_type', ['PACKAGE(package_name*)', 'CLASS']),
+      members: membersTaken('object_type required', [
+        'PACKAGE(package_name*)',
+        'CLASS',
+      ]),
     });
     assert.equal(
       text,

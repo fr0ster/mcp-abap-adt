@@ -140,12 +140,8 @@ const NARROWING_LIST: readonly Narrowing[] = [
     codes: (variant) => ACTIVATION_CODES[variant],
     definition(variant, values, codes) {
       const members = keptOf(COMPACT_ACTIVATE[variant], values);
-      const left =
-        codes === undefined
-          ? ACTIVATION_CODES[variant]
-          : keptOf(ACTIVATION_CODES[variant], codes);
       return {
-        description: compactActivateDescription(variant, members, left),
+        description: compactActivateDescription(variant, members),
         inputSchema: compactActivateSchemaFor(members, variant, codes),
         members,
       };

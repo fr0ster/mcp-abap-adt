@@ -25,9 +25,10 @@ import {
   byVariant,
   COMPACT_CHECK,
   COMPACT_CHECK_KINDS,
-  compactCheckRunDescription,
+  compactCheckRunParts,
   compactCheckRunSchemaFor,
   supported,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { checkObject } from '@mcp-abap-adt/lib/handlers/read';
@@ -36,7 +37,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerCheckRun',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactCheckRunDescription(variant),
+    description: toolDescription(compactCheckRunParts(variant)),
     inputSchema: compactCheckRunSchemaFor(COMPACT_CHECK[variant]),
     members: COMPACT_CHECK[variant],
   })),

@@ -1010,6 +1010,11 @@ export async function activatePlanOnce(
       }
       return succeededWith(runId);
     },
-    (runId: string) => ({ run_id: runId }),
+    startedActivationAnswer,
   );
+}
+
+/** A started activation run's answer: the id its status and results are read by. */
+export function startedActivationAnswer(runId: string) {
+  return { run_id: runId };
 }

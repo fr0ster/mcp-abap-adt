@@ -49,13 +49,13 @@ export class Members {
     void this.#members;
   }
 
-  /** `object_type required: A(a*), B(b*).` */
+  /** `object_type required: A(a*), B(b*).`, `of` naming the parameter and whether it is required. */
   get text(): string {
-    return `${this.of} required: ${this.tokens.join(', ')}.`;
+    return `${this.of}: ${this.tokens.join(', ')}.`;
   }
 }
 
-/** The members `of` (`object_type`) takes, each as its token names it. */
+/** The members `of` (`object_type required`) takes, each as its token names it. */
 export function membersTaken(of: string, tokens: readonly string[]): Members {
   return new Members(membersMinted, of, tokens);
 }

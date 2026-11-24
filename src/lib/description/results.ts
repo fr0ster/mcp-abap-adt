@@ -5,12 +5,14 @@
  * not compile; only the members a terse answer writes are stated.
  */
 
+import type { startedActivationAnswer } from '../../handlers/common/low/handleActivateObject';
 import type { StatusAnswer } from '../abapGit/formats';
 import type {
   PublicationAnswer,
   TerseActivationAnswer,
   terseCheck,
   terseDeletion,
+  terseDeletionCheck,
   terseTransportCheck,
   terseValidation,
   terseWrite,
@@ -97,6 +99,23 @@ export const DELETED = resultShape<DeletionAnswer>({
   deleted: 'whether SAP deleted the object',
   object: 'its name',
   message: "SAP's message about it",
+});
+
+/** A deletion check's answer. */
+type DeletionCheckAnswer = NonNullable<ReturnType<typeof terseDeletionCheck>>;
+
+/** What a deletion check answers: SAP's verdict whether the object can be deleted. */
+export const DELETION_CHECKED = resultShape<DeletionCheckAnswer>({
+  deletable: 'whether SAP lets the object be deleted',
+  object: 'its name',
+  message: "SAP's message about it",
+});
+
+/** What a started activation run answers. */
+export const ACTIVATION_STARTED = resultShape<
+  ReturnType<typeof startedActivationAnswer>
+>({
+  run_id: 'the id of the started run, by which its status and results are read',
 });
 
 /** What a check run answers. */

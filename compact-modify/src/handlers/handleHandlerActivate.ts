@@ -4,9 +4,10 @@ import {
   COMPACT_ACTIVATE,
   COMPACT_ACTIVATE_ROUTES,
   type CompactObjectType,
-  compactActivateDescription,
+  compactActivateParts,
   compactActivateSchemaWithNamesFor,
   subResourceRefusal,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -50,7 +51,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerActivate',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactActivateDescription(variant),
+    description: toolDescription(compactActivateParts(variant)),
     inputSchema: compactActivateSchemaWithNamesFor(
       COMPACT_ACTIVATE[variant],
       variant,

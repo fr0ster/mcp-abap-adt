@@ -5,7 +5,7 @@
  * and a member the variant does not serve is not named.
  */
 import {
-  ACTIVATION_CODES,
+  type ACTIVATION_CODES,
   COMPACT_ACTIVATE,
   COMPACT_CHECK,
   COMPACT_CREATE,
@@ -30,10 +30,16 @@ import {
   underLock,
 } from '../description/index';
 import {
+  ACTIVATED,
+  ACTIVATION_STARTED,
+  CHECKED,
   DELETED,
+  DELETION_CHECKED,
   HELD_LOCK,
   PUBLISHED,
+  TRANSPORT_CHECKED,
   UNLOCKED,
+  VALIDATED,
   WRITTEN,
   WRITTEN_UNDER_LOCK,
 } from '../description/results';
@@ -109,7 +115,7 @@ export function compactCreateParts(
       ...resultReturns(WRITTEN),
       ...(transport ? resultReturns(TRANSPORT_CREATED, 'for TRANSPORT:') : []),
     ],
-    members: membersTaken('object_type', members.map(createToken)),
+    members: membersTaken('object_type required', members.map(createToken)),
   };
 }
 
@@ -298,7 +304,7 @@ export function compactUpdateParts(
         ? resultReturns(PUBLISHED, 'for SERVICE_BINDING:')
         : []),
     ],
-    members: membersTaken('object_type', members.map(updateToken)),
+    members: membersTaken('object_type required', members.map(updateToken)),
     notes: [underLock],
   };
 }
@@ -369,7 +375,7 @@ export function compactDeleteParts(
       `Deletes the ABAP repository object of the type object_type names${when(includes.length > 0, ", or empties a class include under the class's lock")}.`,
     ),
     returns: resultReturns(DELETED),
-    members: membersTaken('object_type', members.map(deleteToken)),
+    members: membersTaken('object_type required', members.map(deleteToken)),
     notes: [underLock],
   };
 }
@@ -412,7 +418,7 @@ export function compactLockParts(
       'Locks the ABAP repository object of the type object_type names on the server instance that then holds the lock for its write, delete and unlock.',
     ),
     returns: resultReturns(HELD_LOCK),
-    members: membersTaken('object_type', members.map(lockToken)),
+    members: membersTaken('object_type required', members.map(lockToken)),
   };
 }
 
@@ -441,7 +447,7 @@ export function compactUnlockParts(
       'Releases the lock this server instance holds on the ABAP repository object of the type object_type names, under its lock handle.',
     ),
     returns: resultReturns(UNLOCKED),
-    members: membersTaken('object_type', members.map(unlockToken)),
+    members: membersTaken('object_type required', members.map(unlockToken)),
     notes: [underLock],
   };
 }
@@ -481,13 +487,32 @@ function validateToken(member: ValidateMember): string {
   );
 }
 
+/** HandlerValidate's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactValidateParts(
+  variant: ProjectionVariant,
+  members: readonly ValidateMember[] = COMPACT_VALIDATE[variant],
+): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: purpose(
+      'Validates the name of a new ABAP repository object of the type object_type names, before it is created.',
+    ),
+    returns: [
+      ...resultReturns(VALIDATED),
+      ...(members.includes('SERVICE_BINDING')
+        ? resultReturns(TRANSPORT_CHECKED, 'for SERVICE_BINDING:')
+        : []),
+    ],
+    members: membersTaken('object_type required', members.map(validateToken)),
+  };
+}
+
 /** HandlerValidate's description on `variant`, naming `members` (default: all the variant's). */
 export function compactValidateDescription(
   variant: ProjectionVariant,
   members: readonly ValidateMember[] = COMPACT_VALIDATE[variant],
 ): string {
-  const left = leftOf(COMPACT_VALIDATE[variant], members);
-  return `[read-only] Validates a new object named by object_type and object_name before it is created. object_type required: ${named(members, validateToken)}.${when(left.has('SERVICE_BINDING'), " For SERVICE_BINDING the answer is the verdict of SAP's transport check for the binding's name and package: admissible true where SAP answers S, false where it answers E, each with SAP's messages, and any other value as result; creating the binding checks the name, the package and the service definition itself.")}`;
+  return toolDescription(compactValidateParts(variant, members));
 }
 
 type CheckMember = (typeof COMPACT_CHECK.onprem)[number];
@@ -501,34 +526,69 @@ export function checkToken(member: CheckMember): string {
   );
 }
 
-/** HandlerCheckRun's description on `variant`, naming `members` (default: all the variant's). */
-export function compactCheckRunDescription(
+/** HandlerCheckRun's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactCheckRunParts(
   variant: ProjectionVariant,
   members: readonly CheckMember[] = COMPACT_CHECK[variant],
-): string {
+): DescriptionParts {
   const unsaved = leftOf(COMPACT_CHECK[variant], members).of<CheckMember>([
     'CLASS',
     'STRUCTURE',
     'DDL',
   ]);
-  return `[read-only] Runs a syntax check on the object named by object_type and object_name. object_type required: ${named(members, checkToken)}.${when(unsaved.length > 0, ` source_code checks unsaved source given in the call, for ${listed(unsaved)}.`)}`;
+  return {
+    tag: 'read-only',
+    purpose: purpose(
+      `Checks the syntax of the ABAP repository object of the type object_type names${when(unsaved.length > 0, ', as stored or as the source given')}.`,
+    ),
+    returns: resultReturns(CHECKED),
+    members: membersTaken('object_type required', members.map(checkToken)),
+  };
+}
+
+/** HandlerCheckRun's description on `variant`, naming `members` (default: all the variant's). */
+export function compactCheckRunDescription(
+  variant: ProjectionVariant,
+  members: readonly CheckMember[] = COMPACT_CHECK[variant],
+): string {
+  return toolDescription(compactCheckRunParts(variant, members));
 }
 
 type DeletionCheckMember = (typeof COMPACT_DELETION_CHECK.onprem)[number];
+
+/** A HandlerDeletionCheck member as the description names it. */
+function deletionCheckToken(member: DeletionCheckMember): string {
+  return member === 'CDS_UNIT_TEST'
+    ? 'CDS_UNIT_TEST (its test class)'
+    : member === 'FUNCTION_MODULE'
+      ? 'FUNCTION_MODULE (object_name GROUP|MODULE)'
+      : member;
+}
+
+/** HandlerDeletionCheck's parts on `variant`, naming `given` (default: all the variant's). */
+export function compactDeletionCheckParts(
+  variant: ProjectionVariant,
+  given: readonly DeletionCheckMember[] = COMPACT_DELETION_CHECK[variant],
+): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: purpose(
+      'Asks SAP whether the ABAP repository object of the type object_type names can be deleted.',
+    ),
+    returns: resultReturns(DELETION_CHECKED),
+    members: membersTaken(
+      'object_type and object_name required',
+      given.map(deletionCheckToken),
+    ),
+  };
+}
 
 /** HandlerDeletionCheck's description on `variant`, naming `given` (default: all the variant's). */
 export function compactDeletionCheckDescription(
   variant: ProjectionVariant,
   given: readonly DeletionCheckMember[] = COMPACT_DELETION_CHECK[variant],
 ): string {
-  const members = given.map((member) =>
-    member === 'CDS_UNIT_TEST'
-      ? 'CDS_UNIT_TEST (its test class)'
-      : member === 'FUNCTION_MODULE'
-        ? 'FUNCTION_MODULE (object_name GROUP|MODULE)'
-        : member,
-  );
-  return `[read-only] Asks SAP whether the object named by object_type and object_name can be deleted: sends the deletion check request for its type, and answers SAP's verdict as it came: deletable true with the object and SAP's message when it carries one, or SAP's refusal with its words. object_type and object_name required: ${members.join(', ')}.`;
+  return toolDescription(compactDeletionCheckParts(variant, given));
 }
 
 type ActivateMember = (typeof COMPACT_ACTIVATE.onprem)[number];
@@ -545,26 +605,29 @@ export function activateToken(member: ActivateMember): string {
     : member;
 }
 
-/** The code HandlerActivate's description names as its example. */
-const ACTIVATE_EXAMPLE: readonly ActivationCode[] = ['CLAS/OC'];
+/** HandlerActivate's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactActivateParts(
+  variant: ProjectionVariant,
+  members: readonly ActivateMember[] = COMPACT_ACTIVATE[variant],
+): DescriptionParts {
+  return {
+    purpose: purpose(
+      'Activates the ABAP repository object named, by its type or its ADT type, or the objects listed, at once or by an activation run it starts.',
+    ),
+    returns: [
+      ...resultReturns(ACTIVATED),
+      ...resultReturns(ACTIVATION_STARTED, 'for an activation run:'),
+    ],
+    members: membersTaken('object_type', members.map(activateToken)),
+  };
+}
 
-/**
- * HandlerActivate's description on `variant`, naming `members` and `codes`
- * (default: all the variant's).
- */
+/** HandlerActivate's description on `variant`, naming `members` (default: all the variant's). */
 export function compactActivateDescription(
   variant: ProjectionVariant,
   members: readonly ActivateMember[] = COMPACT_ACTIVATE[variant],
-  codes: readonly ActivationCode[] = ACTIVATION_CODES[variant],
 ): string {
-  const left = leftOf(COMPACT_ACTIVATE[variant], members);
-  const byName = members
-    .filter((member) => member !== 'FUNCTION_MODULE')
-    .map(activateToken);
-  const example = exampleCodes(ACTIVATE_EXAMPLE, codes, 1)
-    .map((code) => `"${code}"`)
-    .join(', ');
-  return `Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): ${when(byName.length > 0, `object_type is enough for ${listed(byName)}; `)}${when(left.has('FUNCTION_MODULE'), `${activateToken('FUNCTION_MODULE')} is activated under its function group; `)}any other type takes object_adt_type (e.g. ${example}), with parentName for a part of a function group (${parentedCodesOf(codes).join(', ')}). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); an object of ${parentedCodesOf(codes).join(', ')} is listed with objects[].parentName set to its function group. One object of ${either(left.of(COMPACT_SINGLE_ACTIVATION[variant]))} (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id. Where the system's discovery leaves out the activation runs (SAP_BASIS 751, 7.40), that call answers SAP's refusal; a group activation there is ActivateObjects (the full set) or ActivateObjectLow (the low handlers group).`;
+  return toolDescription(compactActivateParts(variant, members));
 }
 
 /** What each HandlerProfileRun member runs, by its function: the full run tool's result. */

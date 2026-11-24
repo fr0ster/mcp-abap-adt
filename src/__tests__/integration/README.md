@@ -49,6 +49,10 @@ the run's refusal marker and call log, and objects one file's cleanup must not r
 The unit run's concurrency is another matter (`docs/development/tests/TESTING_GUIDE.md`, "The
 node:test run's concurrency").
 
+**Run `npm run build` first.** The live scripts build the tests, not the packages: the suites that
+launch a server binary (the launcher and transport suites, every case through a started server)
+run it from `dist`, so `dist` must be built from the code under test before any live suite.
+
 ```bash
 # All integration tests — save the full log
 npm run test:integration 2>&1 | tee /tmp/integration-test.log

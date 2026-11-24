@@ -280,49 +280,8 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'SortAndCompressTransportTask',
   'SwitchAbapGitBranch',
   'UnlockObjectLow',
-  'UpdateBehaviorDefinition',
-  'UpdateBehaviorDefinitionLow',
-  'UpdateBehaviorImplementation',
-  'UpdateCdsUnitTest',
-  'UpdateClass',
-  'UpdateClassLow',
-  'UpdateDataElement',
-  'UpdateDataElementLow',
-  'UpdateDdl',
-  'UpdateDdlLow',
-  'UpdateDomain',
-  'UpdateDomainLow',
-  'UpdateFunctionGroup',
-  'UpdateFunctionGroupUnitTest',
-  'UpdateFunctionModule',
-  'UpdateFunctionModuleLow',
-  'UpdateInclude',
-  'UpdateIncludeMetadata',
   'UpdateInterface',
-  'UpdateInterfaceLow',
-  'UpdateLocalDefinitions',
-  'UpdateLocalMacros',
-  'UpdateLocalTestClass',
-  'UpdateLocalTypes',
-  'UpdateMessageClass',
-  'UpdateMessageClassMessage',
-  'UpdateMetadataExtension',
-  'UpdateMetadataExtensionLow',
-  'UpdatePackage',
-  'UpdatePackageLow',
-  'UpdateProgram',
-  'UpdateProgramLow',
-  'UpdateProgramUnitTest',
-  'UpdateServiceBinding',
-  'UpdateServiceDefinition',
-  'UpdateStructure',
-  'UpdateStructureLow',
   'UpdateTable',
-  'UpdateTableLow',
-  'UpdateTableSettings',
-  'UpdateTableType',
-  'UpdateTextElements',
-  'UpdateUnitTest',
   'ValidateObjectLow',
   'ValidateServiceBinding',
 ]);
@@ -332,7 +291,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 319;
+export const NOT_YET_ASSEMBLED_MOST = 278;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

@@ -18,6 +18,7 @@ import {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -33,8 +34,10 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateInclude',
   available_in: ['onprem'] as const,
-  description:
-    "Writes source_code as the whole source of the ABAP include named by include_name: locks it, writes, unlocks, and activates when activate is true. Returns SAP's answer to the write (and to the activation).",
+  description: updateTool({
+    object: 'the source code of an existing ABAP include',
+    how: ', activating it when asked, recorded in the transport given',
+  }),
   inputSchema: z.object({
     include_name: z
       .string()

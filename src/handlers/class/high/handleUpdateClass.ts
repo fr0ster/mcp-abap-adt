@@ -34,6 +34,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -49,8 +50,10 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateClass',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.',
+  description: updateTool({
+    object: 'the source code of an existing ABAP class',
+    how: ', activating it when asked, recorded in the transport given',
+  }),
   inputSchema: z.object({
     class_name: z.string().describe('Class name.'),
     source_code: z.string().describe('Complete ABAP class source code.'),

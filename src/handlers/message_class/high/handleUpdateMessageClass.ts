@@ -37,6 +37,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
@@ -50,8 +51,10 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateMessageClass',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Updates the header of the ABAP message class named by message_class_name: its description.',
+  description: updateTool({
+    object: 'the description of an existing ABAP message class (T100)',
+    how: ', recorded in the transport given',
+  }),
   inputSchema: z.object({
     message_class_name: z.string().describe('Message class name.'),
     description: z

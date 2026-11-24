@@ -41,6 +41,7 @@ import {
   messageCarriedBy,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { results, updateTool } from '../../../lib/description';
 import type {
   HandlerContext,
   ToolArgValue,
@@ -61,8 +62,12 @@ import { return_error, return_response } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateDataElementLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Update properties of an existing ABAP data element. Requires lock handle from LockObject. - use UpdateDataElement (high-level) for full workflow with lock/unlock/activate.',
+  description: updateTool({
+    tag: 'low-level',
+    object: 'the properties of an existing ABAP data element',
+    how: ', under a lock the caller holds',
+    result: results.WRITTEN,
+  }),
   inputSchema: z.object({
     data_element_name: z
       .string()

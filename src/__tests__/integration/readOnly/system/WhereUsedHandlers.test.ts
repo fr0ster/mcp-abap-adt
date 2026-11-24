@@ -20,6 +20,7 @@ import { handleGetWhereUsed } from '../../../../handlers/system/readonly/handleG
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { servedSuite } from '../../helpers/servedHere';
+import { headOf, terseOf, terseText } from '../../helpers/terseAnswer';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -33,26 +34,21 @@ const WhereUsedParams = z.looseObject({
 
 /**
  * The reference total of GetWhereUsed's terse answer (the default): its
- * first line, `# total N`.
+ * `# total N` head; its rows read by the header's column names.
  */
 function terseTotal(result: any): number {
-  const text = String(
-    (result.content.find((c: any) => c.type === 'text') as any)?.text ?? '',
-  );
-  const lines = text.split('\n');
-  const first = lines[0] ?? '';
-  assert.ok(first.startsWith('# total '), text.slice(0, 2000));
-  const total = Number(first.slice('# total '.length));
-  // The usages SAP answered, as rows under their package: a total above
-  // zero has rows, each a type and a name.
-  assert.equal(lines[1], 'type\tname\tusage', text.slice(0, 2000));
-  const rows = lines
-    .slice(2)
-    .filter((line) => line !== '' && !line.startsWith('#'));
-  if (total > 0) assert.ok(rows.length > 0, text.slice(0, 2000));
-  for (const row of rows.slice(0, 50)) {
-    const [type, name] = row.split('\t');
-    assert.ok(type && name, row);
+  const answer = terseOf(terseText(result));
+  const shown = answer.text.slice(0, 2000);
+  const total = Number(headOf(answer, 'total'));
+  assert.ok(Number.isFinite(total), shown);
+  // The usages SAP answered, as rows under their package: each a type, a
+  // name and a usage, wherever the header puts them.
+  for (const column of ['type', 'name', 'usage']) {
+    assert.ok(answer.columns.includes(column), shown);
+  }
+  if (total > 0) assert.ok(answer.rows.length > 0, shown);
+  for (const row of answer.rows.slice(0, 50)) {
+    assert.ok(row.type && row.name, JSON.stringify(row));
   }
   return total;
 }

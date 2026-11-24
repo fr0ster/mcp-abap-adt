@@ -222,7 +222,8 @@ function readPairs(member: ReadMember): string[] {
     case 'TRANSPORT':
       return [of('objects'), of('header')];
     case 'SERVICE_BINDING':
-      return [of('source code'), of('metadata'), of('URLs')];
+      // Its source part is the binding definition (GetServiceBinding).
+      return [of('binding definition'), of('metadata'), of('URLs')];
     case 'UNIT_TEST':
       return ["reads an ABAP Unit run's result"];
     case 'CDS_UNIT_TEST':
@@ -336,7 +337,14 @@ export function compactUpdateParts(
   members: readonly UpdateMember[] = COMPACT_UPDATE[variant],
 ): DescriptionParts {
   return {
-    purpose: pairsPurpose(pairsOf('updates', members)),
+    // A service binding's write is its publication request.
+    purpose: pairsPurpose(
+      members.flatMap((member) =>
+        member === 'SERVICE_BINDING'
+          ? ['publishes or unpublishes a service binding']
+          : pairsOf('updates', [member]),
+      ),
+    ),
     notes: [underLock],
   };
 }

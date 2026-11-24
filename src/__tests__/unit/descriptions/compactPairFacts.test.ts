@@ -14,7 +14,14 @@ import {
   compactDeleteDescription,
   compactDeletionCheckDescription,
   compactGetDescription,
+  compactLockDescription,
+  compactUpdateDescription,
 } from '../../../lib/compact/compactDescriptions';
+import {
+  lockAnswersStateHandle,
+  stateHandleAnswered,
+  unlockUnderLock,
+} from '../../../lib/description';
 import { withTypeCodes } from '../../../lib/description/purpose';
 import { listedJson } from '../../helpers/listedJson';
 
@@ -78,5 +85,57 @@ describe('the compact pairs say what each route does', () => {
       withTypeCodes('Reads every include of a program or include.'),
       'Reads every include (PROG) of a program (PROG) or include.',
     );
+  });
+
+  it('HandlerGet reads the binding definition of a service binding, not its source code', () => {
+    for (const variant of ['onprem', 'cloud'] as const) {
+      const text = compactGetDescription(variant);
+      assert.ok(
+        text.includes(
+          'reads the binding definition of a service binding (SRVB)',
+        ),
+        text,
+      );
+      assert.equal(
+        text.includes('reads the source code of a service binding'),
+        false,
+      );
+    }
+  });
+
+  it('HandlerUpdate publishes or unpublishes a service binding', () => {
+    for (const variant of ['onprem', 'cloud'] as const) {
+      const text = compactUpdateDescription(variant);
+      assert.ok(
+        text.includes('publishes or unpublishes a service binding (SRVB)'),
+        text,
+      );
+      assert.equal(text.includes('updates a service binding'), false);
+    }
+  });
+
+  it("HandlerLock's state_handle notes name their action", () => {
+    const both = compactLockDescription('onprem');
+    assert.ok(both.includes(lockAnswersStateHandle.text));
+    assert.ok(both.includes(unlockUnderLock.text));
+    assert.equal(both.includes(stateHandleAnswered.text), false);
+    const lockOnly = NARROWINGS.get('HandlerLock')?.definition(
+      'onprem',
+      ['CLASS'],
+      undefined,
+      ['lock'],
+    ).description;
+    assert.ok(lockOnly?.includes(lockAnswersStateHandle.text));
+    assert.equal(lockOnly?.includes(unlockUnderLock.text), false);
+    const unlockOnly = NARROWINGS.get('HandlerLock')?.definition(
+      'onprem',
+      ['CLASS'],
+      undefined,
+      ['unlock'],
+    ).description;
+    assert.ok(unlockOnly?.includes(unlockUnderLock.text));
+    assert.equal(unlockOnly?.includes(lockAnswersStateHandle.text), false);
+    assert.ok(lockAnswersStateHandle.text.includes('a lock that gives'));
+    assert.ok(unlockUnderLock.text.includes('an unlock runs under'));
   });
 });

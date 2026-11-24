@@ -137,7 +137,11 @@ liveSuite(['onprem', 'cloud'], 'Repository reads', () => {
 
   it('GetPackage reads the shared package', async () => {
     const name = sharedPackage();
-    const read = await liveCall('GetPackage', { package_name: name });
+    // The metadata fields read below: the JSON of detail medium.
+    const read = await liveCall('GetPackage', {
+      package_name: name,
+      detail: 'medium',
+    });
     const metadata = member(
       payloadOf(succeeded('GetPackage', read)),
       'metadata',

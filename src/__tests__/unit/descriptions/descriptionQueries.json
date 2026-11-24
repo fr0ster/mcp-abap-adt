@@ -109,6 +109,12 @@
       "list all ADT object types",
       "які типи об'єктів знає система?",
       "покажи всі типи об'єктів ADT"
+    ],
+    "GetPackageContents": [
+      "what objects are in package ZMY_PKG?",
+      "list the contents of package ZMY_PKG with its subpackages",
+      "які об'єкти є в пакеті ZMY_PKG?",
+      "покажи вміст пакета ZMY_PKG разом з підпакетами"
     ]
   },
   "siblings": {},
@@ -130,7 +136,6 @@
     "ListFunctionGroupIncludes: list the includes of function group ZMY_FG",
     "ListFunctionGroupIncludes: покажи інклуди групи функцій ZMY_FG",
     "ListFunctionGroupIncludes: які інклуди має група функцій ZMY_FG?",
-    "GetMainPrograms: which programs include ZMY_INC?",
     "GetMainPrograms: які програми включають інклуд ZMY_INC?",
     "SearchSource: find where the text AUTHORITY-CHECK appears in the code of package ZMY_PKG",
     "SearchSource: search the source code of package ZMY_PKG for SELECT FROM mara",
@@ -157,6 +162,10 @@
     "GetObjectsByType: покажи класи пакета ZMY_PKG",
     "GetObjectsByType: які таблиці є в пакеті ZMY_PKG?",
     "GetAdtTypes: list all ADT object types",
-    "GetAdtTypes: покажи всі типи об'єктів ADT"
+    "GetAdtTypes: покажи всі типи об'єктів ADT",
+    "GetPackageContents: what objects are in package ZMY_PKG?",
+    "GetPackageContents: list the contents of package ZMY_PKG with its subpackages",
+    "GetPackageContents: які об'єкти є в пакеті ZMY_PKG?",
+    "GetPackageContents: покажи вміст пакета ZMY_PKG разом з підпакетами"
   ]
 }

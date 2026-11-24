@@ -33,6 +33,10 @@ import {
   packageHeads,
 } from '../../../handlers/package/high/handleGetPackage';
 import {
+  CONTENTS_LISTS,
+  TOOL_DEFINITION as PACKAGE_CONTENTS,
+} from '../../../handlers/package/readonly/handleGetPackageContents';
+import {
   TOOL_DEFINITION as OBJECTS_BY_TYPE,
   OBJECTS_BY_TYPE_HEADS,
   OBJECTS_BY_TYPE_LISTS,
@@ -143,6 +147,7 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   GetObjectsList: OBJECTS_LIST.description,
   GetObjectsByType: OBJECTS_BY_TYPE.description,
   GetAdtTypes: ADT_TYPES.description,
+  GetPackageContents: PACKAGE_CONTENTS.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -221,6 +226,28 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  GetPackageContents: () => {
+    const parts = partsOfDescription(descriptionOf('GetPackageContents'));
+    assert.ok(parts !== undefined);
+    // An object of the package, one of a subpackage, one SAP lists nameless.
+    const reading = {
+      name: 'ZPKG',
+      items: [
+        { name: 'ZCL_A', type: 'CLAS/OC', packageName: 'ZPKG', techName: 'X' },
+        { name: 'ZTAB', type: 'TABL/DT', packageName: 'ZSUB' },
+        { name: '', type: 'PROG/P', packageName: 'ZSUB', uri: '/sap/x' },
+      ],
+    };
+    return {
+      terse: Object.values(CONTENTS_LISTS).flatMap(shapesOf),
+      heads: [],
+      returns: parts.returns,
+      samples: Object.values(CONTENTS_LISTS).map((lists) => ({
+        reading,
+        lines: writtenLines({ heads: [], reading, lists }),
+      })),
+    };
+  },
   GetAdtTypes: () => {
     const parts = partsOfDescription(descriptionOf('GetAdtTypes'));
     assert.ok(parts !== undefined);

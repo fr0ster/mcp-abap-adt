@@ -11,6 +11,13 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
   type Column,
   entries,
   type Head,
@@ -19,6 +26,7 @@ import {
   listAnswerAt,
   rows,
   sections,
+  shapesOf,
   type Written,
   wireAnswer,
   writeJsonList,
@@ -26,10 +34,7 @@ import {
 } from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
   ASSEMBLED_DETAIL_SHAPE,
   detailOf,
@@ -104,12 +109,28 @@ function onePackageForm(
   }
 }
 
+/**
+ * The lists of one package's listing: `described` with its objects'
+ * descriptions (`include_descriptions`), `bare` without.
+ */
+export const CONTENTS_LISTS = {
+  described: { items: contentsRows(true) },
+  bare: { items: contentsRows(false) },
+} as const;
+
 export const TOOL_DEFINITION = {
   name: 'GetPackageContents',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes; with include_descriptions, as single requests, several at a time.',
-  ),
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Lists the objects of one or more ABAP packages, with the objects of their subpackages when asked.',
+    ),
+    returns: returnsOf({
+      shapes: Object.values(CONTENTS_LISTS).map(shapesOf),
+    }),
+    notes: [longRunning],
+  }),
   inputSchema: withInCallSchema(
     z
       .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
@@ -180,33 +201,45 @@ const TOOL = 'GetPackageContents';
  */
 function contentsRows(descriptions: boolean) {
   const columns: Column<WalkedItem>[] = [
-    { name: 'type', cell: (item) => item.type },
-    { name: 'name', cell: (item) => item.name },
+    { name: 'type', means: 'its type', cell: (item) => item.type },
+    { name: 'name', means: 'its name', cell: (item) => item.name },
     {
       name: 'tech_name',
+      means: 'its technical name where it differs',
       cell: (item) =>
         item.techName !== undefined && item.techName !== item.name
           ? item.techName
           : '',
     },
-    { name: 'uri', cell: (item) => (item.name === '' ? (item.uri ?? '') : '') },
+    {
+      name: 'uri',
+      means: 'its URI when SAP lists it nameless',
+      cell: (item) => (item.name === '' ? (item.uri ?? '') : ''),
+    },
   ];
-  return rows('items', {
-    columns: descriptions
-      ? [
-          ...columns,
-          { name: 'description', cell: (item) => item.description ?? '' },
-        ]
-      : columns,
-    header: 'always',
-    groups: [
-      {
-        label: 'package',
-        of: (item: WalkedItem) => item.packageName ?? '',
-        mode: 'gathered',
-      },
-    ],
-  });
+  return about(
+    'for each object of the package or a subpackage, under its own package',
+    rows('items', {
+      columns: descriptions
+        ? [
+            ...columns,
+            {
+              name: 'description',
+              means: 'its description, with descriptions asked',
+              cell: (item) => item.description ?? '',
+            },
+          ]
+        : columns,
+      header: 'always',
+      groups: [
+        {
+          label: 'package',
+          of: (item: WalkedItem) => item.packageName ?? '',
+          mode: 'gathered',
+        },
+      ],
+    }),
+  );
 }
 
 /** Every field the walk read of an object, without its uri. */
@@ -268,7 +301,7 @@ const CONTENTS_ANSWERS: ListAnswerTable<ContentsRead, string> = {
       return writeListing({
         heads: [],
         reading: onlyPart(read),
-        lists: { items: contentsRows(read.descriptions) },
+        lists: CONTENTS_LISTS[read.descriptions ? 'described' : 'bare'],
       });
     }
     return writeListing({
@@ -283,7 +316,7 @@ const CONTENTS_ANSWERS: ListAnswerTable<ContentsRead, string> = {
               ? []
               : [{ head: 'error', value: JSON.stringify(part.error) }]),
           ],
-          { items: contentsRows(read.descriptions) },
+          CONTENTS_LISTS[read.descriptions ? 'described' : 'bare'],
         ),
       },
     });

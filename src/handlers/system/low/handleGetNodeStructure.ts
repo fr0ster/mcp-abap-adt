@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { membersOf, purpose, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import { succeeded } from '../../../lib/strategies/stepResponse';
 /**
@@ -86,8 +87,33 @@ import { bodyTextOf } from '../../../lib/wireValue';
 export const TOOL_DEFINITION = {
   name: 'GetNodeStructureLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery.',
+  description: toolDescription({
+    tag: 'low-level',
+    purpose: purpose(
+      'Reads one level of the repository browser of a package, class, program or other repository object, at its root or the node asked.',
+    ),
+    returns: membersOf<LevelAnswer>({
+      nouns: {
+        objects: {
+          each: 'object',
+          nouns: {
+            name: 'name',
+            type: 'type',
+            description: 'description',
+            techName: 'technical name',
+            uri: 'ADT URI',
+          },
+        },
+        childNodes: {
+          each: 'child node',
+          nouns: { type: 'type', nodeId: 'node ID' },
+        },
+        notLoaded: { clause: 'whether SAP could load the level' },
+        blank: { clause: 'what an empty package level means' },
+      },
+    }),
+    inline: true,
+  }),
   inputSchema: z.object({
     parent_type: requiredText('parent_type is required').describe(
       'Parent object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K")',

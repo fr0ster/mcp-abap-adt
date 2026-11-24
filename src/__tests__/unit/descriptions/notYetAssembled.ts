@@ -178,7 +178,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetDdlVersionSource',
   'GetDdlVersions',
   'GetEnhancementImpl',
-  'GetEnhancementSpot',
   'GetEnhancements',
   'GetFunctionInclude',
   'GetFunctionModule',
@@ -199,9 +198,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetMetadataExtensionVersionDiff',
   'GetMetadataExtensionVersionSource',
   'GetMetadataExtensionVersions',
-  'GetNodeStructureLow',
   'GetObjectDraft',
-  'GetObjectInfo',
   'GetObjectNodeFromCache',
   'GetObjectOutline',
   'GetObjectStructure',
@@ -216,8 +213,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetProgramVersionDiff',
   'GetProgramVersionSource',
   'GetProgramVersions',
-  'GetServiceBinding',
-  'GetServiceBindingPreviewUrl',
   'GetServiceDefinition',
   'GetSqlQuery',
   'GetStructureVersionDiff',
@@ -236,7 +231,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetUnitTest',
   'GetUnitTestResult',
   'GetUnitTestStatus',
-  'GetVirtualFoldersLow',
   'GetWhereUsed',
   'HandlerAbapGit',
   'HandlerAbapGitGet',
@@ -284,7 +278,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'ListATCResults',
   'ListBackgroundRuns',
   'ListLeftoverSessions',
-  'ListServiceBindingTypes',
   'ListTransports',
   'LockObjectLow',
   'LogoffLeftoverSession',
@@ -373,7 +366,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 360;
+export const NOT_YET_ASSEMBLED_MOST = 353;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

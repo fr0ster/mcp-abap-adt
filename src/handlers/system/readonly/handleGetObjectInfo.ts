@@ -26,16 +26,19 @@ import {
 import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
+  longRunning,
+  membersOf,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
+import {
   onEveryVariant,
   type RuleVariant,
   stated,
   withInCallSchema,
 } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
   type MetadataTarget,
   metadataKeyOf,
@@ -166,9 +169,34 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectInfo',
   available_in: ['onprem', 'cloud'] as const,
   ...onEveryVariant(
-    withLongToolAdvice(
-      '[read-only] Returns the object tree of the package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other object named by parent_type and parent_name. Shows root, group nodes, and terminal leaves up to maxDepth. With enrich=true each node also carries its description and package, from a repository search. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last.',
-    ),
+    toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads the repository browser of a package, class, program, function group or other repository object, with descriptions and packages when asked.',
+      ),
+      returns: [
+        ...membersOf<TreeNode>({
+          each: 'object',
+          nouns: {
+            OBJECT_TYPE: 'type',
+            OBJECT_NAME: 'name',
+            OBJECT_DESCRIPTION: 'description',
+            OBJECT_PACKAGE: 'package',
+            CHILDREN: 'objects it holds, down to the depth asked',
+          },
+        }),
+        ...membersOf<FailedTree>({
+          each: 'object whose read failed',
+          nouns: {
+            OBJECT_TYPE: 'type',
+            OBJECT_NAME: 'name',
+            error: 'failure',
+          },
+        }),
+      ],
+      inline: true,
+      notes: [longRunning],
+    }),
     schemaOn,
   ),
 } as const;

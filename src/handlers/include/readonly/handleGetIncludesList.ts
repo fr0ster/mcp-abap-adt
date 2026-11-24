@@ -168,7 +168,7 @@ const unreadableName = (entry: AnswerObject) => String(entry.name ?? '');
 /** The lists a IncludesRead listing writes: what its description states. */
 export const INCLUDES_LISTS: RowSchemas<IncludesRead> = {
   unreadable: about(
-    'the includes SAP could not read are named',
+    'the includes left unread are named',
     marks('unreadable', 'unreadable', (entry: AnswerObject) => [
       unreadableName(entry),
     ]),

@@ -365,7 +365,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'UpdateServiceDefinition',
   'UpdateStructure',
   'UpdateStructureLow',
-  'UpdateTable',
   'UpdateTableLow',
   'UpdateTableSettings',
   'UpdateTableType',
@@ -380,7 +379,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 367;
+export const NOT_YET_ASSEMBLED_MOST = 366;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

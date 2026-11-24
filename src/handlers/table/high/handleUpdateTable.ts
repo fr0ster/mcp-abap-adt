@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateTable Handler - Update Existing ABAP Table DDL Source
@@ -46,8 +47,12 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateTable',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.',
+  description: toolDescription({
+    purpose: purpose(
+      'Writes new DDL source code into an existing ABAP database table, activating it when asked.',
+    ),
+    returns: [],
+  }),
   inputSchema: z.object({
     table_name: z.string().describe('Table name. Table must already exist.'),
     ddl_code: z

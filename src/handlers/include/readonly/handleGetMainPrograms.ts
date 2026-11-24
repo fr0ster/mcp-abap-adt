@@ -4,15 +4,20 @@ import { XMLParser } from 'fast-xml-parser';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 import {
+  about,
   answered,
   type DetailTable,
   entries,
   formatted,
+  headShape,
   type ListDetailTable,
+  type RowSchemas,
   rawLevel,
   readingAt,
   rows,
+  shapesOf,
   writeJson,
   writeListing,
   written,
@@ -29,11 +34,45 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { parseXml } from '../../../lib/xml/node';
 import { child, isElement, listOf } from '../../../lib/xml/tree';
 
+/** The lists a main programs listing writes: what its description states. */
+export const MAIN_PROGRAMS_LISTS: RowSchemas<{ programs: MainProgram[] }> = {
+  programs: about(
+    'for each main program',
+    rows('programs', {
+      columns: [
+        {
+          name: 'type',
+          means:
+            'its type, PROG/P for a program or FUGR/F for a function group',
+          cell: (program: MainProgram) => program.type,
+        },
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (program: MainProgram) => program.name,
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** The head every main programs listing opens with. */
+export const MAIN_PROGRAMS_HEADS = [headShape('include', "the include's name")];
+
 export const TOOL_DEFINITION = {
   name: 'GetMainPrograms',
   available_in: ['onprem'] as const,
-  description:
-    '[read-only] Reads the main programs of the ABAP include named by include_name in one request: each program that includes it, or for an include of a function group the group. Returns the type and name of each main program (PROG/P for a program, FUGR/F for a function group): by default as TSV rows; with detail full, main_programs, a list of { name, type, uri }.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Finds the main programs of an ABAP include: each program that includes it, or the function group it belongs to.',
+    ),
+    returns: returnsOf({
+      heads: MAIN_PROGRAMS_HEADS,
+      shapes: [shapesOf(MAIN_PROGRAMS_LISTS)],
+    }),
+  }),
   inputSchema: z.object({
     include_name: requiredText('Include name is required').describe(
       'Include name.',
@@ -100,15 +139,7 @@ function mainProgramReadings(
       writeListing({
         heads: [{ head: 'include', value: includeName }],
         reading: { programs },
-        lists: {
-          programs: rows('programs', {
-            columns: [
-              { name: 'type', cell: (program: MainProgram) => program.type },
-              { name: 'name', cell: (program: MainProgram) => program.name },
-            ],
-            header: 'always',
-          }),
-        },
+        lists: MAIN_PROGRAMS_LISTS,
       }),
     ),
     medium: written(programsOf, (programs: MainProgram[]) =>

@@ -21,6 +21,11 @@ import {
   INCLUDES_LISTS,
 } from '../../../handlers/include/readonly/handleGetIncludesList';
 import {
+  TOOL_DEFINITION as GET_MAIN_PROGRAMS,
+  MAIN_PROGRAMS_HEADS,
+  MAIN_PROGRAMS_LISTS,
+} from '../../../handlers/include/readonly/handleGetMainPrograms';
+import {
   TOOL_DEFINITION as GET_PACKAGE,
   PACKAGE_HEADS,
   PACKAGE_MEDIUM,
@@ -96,6 +101,7 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   GetIncludesList: GET_INCLUDES.description,
   ListFunctionModules: LIST_FUNCTION_MODULES.description,
   ListFunctionGroupIncludes: LIST_GROUP_INCLUDES.description,
+  GetMainPrograms: GET_MAIN_PROGRAMS.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -174,6 +180,39 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  GetMainPrograms: () => {
+    const parts = partsOfDescription(descriptionOf('GetMainPrograms'));
+    assert.ok(parts !== undefined);
+    const reading = {
+      programs: [
+        {
+          name: 'ZPROG',
+          type: 'PROG/P',
+          uri: '/sap/bc/adt/programs/programs/zprog',
+        },
+        {
+          name: 'ZFG',
+          type: 'FUGR/F',
+          uri: '/sap/bc/adt/functions/groups/zfg',
+        },
+      ],
+    };
+    return {
+      terse: shapesOf(MAIN_PROGRAMS_LISTS),
+      heads: MAIN_PROGRAMS_HEADS,
+      returns: parts.returns,
+      samples: [
+        {
+          reading,
+          lines: writtenLines({
+            heads: [{ head: 'include', value: 'ZINC' }],
+            reading,
+            lists: MAIN_PROGRAMS_LISTS,
+          }),
+        },
+      ],
+    };
+  },
   ListFunctionModules: () =>
     groupChildTie('ListFunctionModules', 'function_modules'),
   ListFunctionGroupIncludes: () =>

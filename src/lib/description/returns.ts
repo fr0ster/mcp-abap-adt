@@ -44,53 +44,57 @@ function joined(words: readonly string[]): string {
   return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
 }
 
-/** The facts of one list, then of its items' own lists. */
-function listFacts(shape: ListShape, seen: Set<object>): ReturnsFact[] {
+/**
+ * One fact before it is written: what it is about, and the nouns of what it
+ * tells of it (none for a fact that is its subject alone). Facts of one
+ * subject — a list at terse and at medium — are one fact, their nouns
+ * joined.
+ */
+interface Stated {
+  readonly about: string;
+  readonly nouns: readonly string[];
+}
+
+const stated = (
+  about: string,
+  nouns: readonly (string | undefined)[] = [],
+) => ({
+  about,
+  nouns: nouns.flatMap((noun) => (noun === undefined ? [] : [noun])),
+});
+
+/** What one list states, then its items' own lists. */
+function listStated(shape: ListShape, seen: Set<object>): Stated[] {
   const omits = (reasons: Readonly<Record<string, string>> | undefined) =>
-    Object.values(reasons ?? {}).map((reason) => fact(sentence(reason)));
-  const below = (lists: () => readonly ListShape[]): ReturnsFact[] =>
+    Object.values(reasons ?? {}).map((reason) => stated(reason));
+  const below = (lists: () => readonly ListShape[]): Stated[] =>
     lists().flatMap((child) => {
       // A tree's lists name themselves: each list is stated once.
       if (seen.has(child)) return [];
       seen.add(child);
-      return listFacts(child, seen);
+      return listStated(child, seen);
     });
   const about = shape.about;
+  const subject = about === undefined ? [] : [stated(about)];
   switch (shape.kind) {
     case 'omitted':
-      return [fact(sentence(shape.reason))];
+      return [stated(shape.reason)];
     case 'rows':
-    case 'node': {
-      const means = shape.means.flatMap((noun) =>
-        noun === undefined ? [] : [noun],
-      );
+    case 'node':
       return [
-        ...(about === undefined
-          ? []
-          : [
-              fact(
-                sentence(
-                  means.length === 0 ? about : `${about}: ${joined(means)}`,
-                ),
-              ),
-            ]),
+        ...(about === undefined ? [] : [stated(about, shape.means)]),
         ...omits(shape.omits),
         ...below(shape.lists),
       ];
-    }
     case 'kinds':
       return [
-        ...(about === undefined ? [] : [fact(sentence(about))]),
-        ...shape.kinds.flatMap((kind: KindShape): ReturnsFact[] => {
-          if ('omit' in kind) return [fact(sentence(kind.omit))];
+        ...subject,
+        ...shape.kinds.flatMap((kind: KindShape): Stated[] => {
+          if ('omit' in kind) return [stated(kind.omit)];
           // A row kind's cells, by their nouns — headerless or not.
-          const nouns =
-            'means' in kind
-              ? kind.means.flatMap((noun) => (noun === undefined ? [] : [noun]))
-              : [];
           return [
-            ...(nouns.length > 0 && about !== undefined
-              ? [fact(sentence(`${about}: ${joined(nouns)}`))]
+            ...('means' in kind && about !== undefined
+              ? [stated(about, kind.means)]
               : []),
             ...('lists' in kind ? below(kind.lists) : []),
           ];
@@ -100,13 +104,15 @@ function listFacts(shape: ListShape, seen: Set<object>): ReturnsFact[] {
       // Each part's listing: what every declared variant writes, a tree's
       // root by the part's own noun.
       return [
-        ...(about === undefined ? [] : [fact(sentence(about))]),
-        ...shape.nested().flatMap((child) => {
+        ...subject,
+        ...shape.nested().flatMap((child): Stated[] => {
           if (seen.has(child)) return [];
           seen.add(child);
           return child.kind === 'node' && child.list === ''
-            ? rootFacts(child, about)
-            : listFacts(child, seen);
+            ? about === undefined
+              ? []
+              : [stated(`${about}, its root`, child.means)]
+            : listStated(child, seen);
         }),
       ];
     case 'bullets':
@@ -115,51 +121,41 @@ function listFacts(shape: ListShape, seen: Set<object>): ReturnsFact[] {
     case 'entries':
     case 'member':
       return [
-        ...(about === undefined ? [] : [fact(sentence(about))]),
+        ...subject,
         ...('omits' in shape ? omits(shape.omits) : []),
         ...below(shape.lists),
       ];
     default:
-      return [
-        ...(about === undefined ? [] : [fact(sentence(about))]),
-        ...('omits' in shape ? omits(shape.omits) : []),
-      ];
+      return [...subject, ...('omits' in shape ? omits(shape.omits) : [])];
   }
-}
-
-/** A part's tree root: its cells' nouns, under the part's own noun. */
-function rootFacts(shape: ListShape, about: string | undefined): ReturnsFact[] {
-  if (shape.kind !== 'node') return [];
-  const nouns = shape.means.flatMap((noun) =>
-    noun === undefined ? [] : [noun],
-  );
-  return nouns.length > 0 && about !== undefined
-    ? [fact(sentence(`${about}, its root: ${joined(nouns)}`))]
-    : [];
 }
 
 /**
  * The facts a tool's schemas give: its heads' (each a domain noun), then
  * each list's, in the order of its schemas (`shapesOf`, `jsonShapesOf`) —
- * terse's, then any medium adds — each fact once.
+ * terse's, then any medium adds. The facts of one subject are one fact,
+ * every noun of it once, in the order first met.
  */
 export function returnsOf(source: {
   readonly heads?: readonly HeadShape[] | undefined;
   readonly shapes: readonly (readonly ListShape[])[];
 }): ReturnsFact[] {
   const seen = new Set<ListShape>();
-  const facts = [
-    ...(source.heads ?? []).map((head) => fact(sentence(head.about))),
+  const all: Stated[] = [
+    ...(source.heads ?? []).map((head) => stated(head.about)),
     ...source.shapes.flat().flatMap((shape) => {
       if (seen.has(shape)) return [];
       seen.add(shape);
-      return listFacts(shape, seen);
+      return listStated(shape, seen);
     }),
   ];
-  const once = new Set<string>();
-  return facts.filter((each) => {
-    if (once.has(each.text)) return false;
-    once.add(each.text);
-    return true;
-  });
+  const merged = new Map<string, string[]>();
+  for (const each of all) {
+    const nouns = merged.get(each.about) ?? [];
+    for (const noun of each.nouns) if (!nouns.includes(noun)) nouns.push(noun);
+    merged.set(each.about, nouns);
+  }
+  return [...merged].map(([about, nouns]) =>
+    fact(sentence(nouns.length === 0 ? about : `${about}: ${joined(nouns)}`)),
+  );
 }

@@ -167,7 +167,7 @@ describe('the description builder', () => {
   it('states the purpose first, then the facts from the schemas, then the notes', () => {
     const text = toolDescription({
       purpose: purpose('Reads the objects a package holds.'),
-      returns: returnsOf({ shapes: [shapesOf<Reading>(schemas)] }),
+      returns: returnsOf({ shapes: [shapesOf(schemas)] }),
       notes: [longRunning],
     });
     assert.ok(text.startsWith('Reads the objects a package holds. '), text);
@@ -196,7 +196,7 @@ describe('the description builder', () => {
   });
 
   it('generates facts free of every form marker', () => {
-    for (const fact of returnsOf({ shapes: [shapesOf<Reading>(schemas)] })) {
+    for (const fact of returnsOf({ shapes: [shapesOf(schemas)] })) {
       assert.deepStrictEqual(factFaults(fact.text), [], fact.text);
     }
   });

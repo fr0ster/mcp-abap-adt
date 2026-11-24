@@ -920,14 +920,17 @@ function jsonShapes<R>(
 }
 
 /** What a tool's terse schemas write, as data: what its description states. */
-export function shapesOf<R>(schemas: RowSchemas<R>): readonly ListShape[] {
-  return rowShapes(schemas);
+export function shapesOf(schemas: Shaped): readonly ListShape[] {
+  return Object.values(schemas).map((schema) => schema.shape);
 }
 
 /** What a tool's medium schemas write, as data: what its description states. */
-export function jsonShapesOf<R>(schemas: JsonSchemas<R>): readonly ListShape[] {
-  return jsonShapes(schemas);
+export function jsonShapesOf(schemas: Shaped): readonly ListShape[] {
+  return Object.values(schemas).map((schema) => schema.shape);
 }
+
+/** A record of schemas, each carrying what it writes. */
+type Shaped = { readonly [member: string]: { readonly shape: ListShape } };
 
 /** Rows, with their header, group lines and each item's own lists. */
 function rowLines<I>(

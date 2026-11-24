@@ -40,6 +40,13 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
   asJsonResult,
   asTextResult,
   byListing,
@@ -47,6 +54,7 @@ import {
   type DetailLevel,
   entries,
   type Head,
+  headShape,
   type JsonSchemas,
   jsonText,
   type ListAnswerTable,
@@ -59,6 +67,7 @@ import {
   partsOf,
   type RowSchemas,
   rows,
+  shapesOf,
   type TextResult,
   values,
   type Written,
@@ -97,13 +106,105 @@ import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
+
+/** A node's mark: `cyclic` or `duplicate` where it is so, else none. */
+const markOf = (node: IncludeNode) =>
+  node.cyclic === true ? 'cyclic' : node.duplicate === true ? 'duplicate' : '';
+
+/** The tree as indented rows: name, and `cyclic` or `duplicate` where it is so. */
+const includeColumns: Column<IncludeNode>[] = [
+  { name: 'name', means: 'its name', cell: (node) => node.name },
+  {
+    name: 'mark',
+    means: 'whether it includes itself again or was met before elsewhere',
+    cell: markOf,
+    when: (node) => markOf(node) !== '',
+  },
+];
+
+/** Every node below a node, one level deeper. */
+const includeSchemas: RowSchemas<IncludeNode> = {
+  children: about(
+    'for each include it includes',
+    rows('children', {
+      columns: includeColumns,
+      header: 'none',
+      get lists() {
+        return includeSchemas;
+      },
+    }),
+  ),
+};
+
+/** A node with every field read, nothing implied (medium). */
+const mediumEntry = (node: IncludeNode) => ({
+  name: node.name,
+  ...(node.type !== undefined ? { type: node.type } : {}),
+  ...(node.cyclic !== undefined ? { cyclic: node.cyclic } : {}),
+  ...(node.duplicate !== undefined ? { duplicate: node.duplicate } : {}),
+});
+
+/** The nodes below a node, medium: a leaf without its empty `children`. */
+const mediumSchemas: JsonSchemas<IncludeNode> = {
+  children: entries('children', mediumEntry, {
+    omitEmpty: true,
+    get lists() {
+      return mediumSchemas;
+    },
+  }),
+};
+
+/**
+ * What GetIncludesList answers of one object at each `detail`, selected
+ * before the reads (`src/lib/detail`): terse the tree as indented names
+ * under `# object`, a `# unreadable<TAB>NAME` line per include that could not be
+ * read; medium the tree without empty children; full the answer before
+ * `detail`. A tree reads many documents, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
+ */
+/** An include that could not be read, by its name. */
+const unreadableName = (entry: AnswerObject) => String(entry.name ?? '');
+
+/** The lists a IncludesRead listing writes: what its description states. */
+export const INCLUDES_LISTS: RowSchemas<IncludesRead> = {
+  unreadable: about(
+    'the includes SAP could not read are named',
+    marks('unreadable', 'unreadable', (entry: AnswerObject) => [
+      unreadableName(entry),
+    ]),
+  ),
+  // The tree from its root: the root a row, every node below it.
+  tree: about(
+    'the object itself, its root',
+    node('tree', {
+      columns: includeColumns,
+      header: 'none',
+      tree: true,
+      lists: includeSchemas,
+    }),
+  ),
+};
+
+/** The head every object's listing opens with. */
+export const INCLUDES_HEADS = [
+  headShape('object', "the object's type and name"),
+];
+
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: withLongToolAdvice(
-      '[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }).',
-    ),
+    description: toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Lists every include of an ABAP program or include, with the includes each one includes, down to the last.',
+      ),
+      returns: returnsOf({
+        heads: INCLUDES_HEADS,
+        shapes: [shapesOf(INCLUDES_LISTS)],
+      }),
+      notes: [longRunning],
+    }),
     inputSchema: includesListSchema(variant),
   })),
 } as const;
@@ -355,70 +456,6 @@ function readAnswer(shown: IncludesShown, read: IncludesRead): McpResult {
   readsOf.set(result, read);
   return result;
 }
-
-/** A node's mark: `cyclic` or `duplicate` where it is so, else none. */
-const markOf = (node: IncludeNode) =>
-  node.cyclic === true ? 'cyclic' : node.duplicate === true ? 'duplicate' : '';
-
-/** The tree as indented rows: name, and `cyclic` or `duplicate` where it is so. */
-const includeColumns: Column<IncludeNode>[] = [
-  { name: 'name', cell: (node) => node.name },
-  { name: 'mark', cell: markOf, when: (node) => markOf(node) !== '' },
-];
-
-/** Every node below a node, one level deeper. */
-const includeSchemas: RowSchemas<IncludeNode> = {
-  children: rows('children', {
-    columns: includeColumns,
-    header: 'none',
-    get lists() {
-      return includeSchemas;
-    },
-  }),
-};
-
-/** A node with every field read, nothing implied (medium). */
-const mediumEntry = (node: IncludeNode) => ({
-  name: node.name,
-  ...(node.type !== undefined ? { type: node.type } : {}),
-  ...(node.cyclic !== undefined ? { cyclic: node.cyclic } : {}),
-  ...(node.duplicate !== undefined ? { duplicate: node.duplicate } : {}),
-});
-
-/** The nodes below a node, medium: a leaf without its empty `children`. */
-const mediumSchemas: JsonSchemas<IncludeNode> = {
-  children: entries('children', mediumEntry, {
-    omitEmpty: true,
-    get lists() {
-      return mediumSchemas;
-    },
-  }),
-};
-
-/**
- * What GetIncludesList answers of one object at each `detail`, selected
- * before the reads (`src/lib/detail`): terse the tree as indented names
- * under `# object`, a `# unreadable<TAB>NAME` line per include that could not be
- * read; medium the tree without empty children; full the answer before
- * `detail`. A tree reads many documents, so
- * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
- */
-/** An include that could not be read, by its name. */
-const unreadableName = (entry: AnswerObject) => String(entry.name ?? '');
-
-/** The lists a IncludesRead listing writes: what its description states. */
-const INCLUDES_LISTS: RowSchemas<IncludesRead> = {
-  unreadable: marks('unreadable', 'unreadable', (entry: AnswerObject) => [
-    unreadableName(entry),
-  ]),
-  // The tree from its root: the root a row, every node below it.
-  tree: node('tree', {
-    columns: includeColumns,
-    header: 'none',
-    tree: true,
-    lists: includeSchemas,
-  }),
-};
 
 /**
  * One object's terse text, written from its read: its `# object` line, a

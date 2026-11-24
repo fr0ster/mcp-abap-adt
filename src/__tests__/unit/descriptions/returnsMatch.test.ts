@@ -14,6 +14,11 @@ import { TOOL_DEFINITION as MODIFIED } from '../../../handlers/abapgit/readonly/
 import { TOOL_DEFINITION as STAGING } from '../../../handlers/abapgit/readonly/handleGetAbapGitStaging';
 import { TOOL_DEFINITION as REPOS } from '../../../handlers/abapgit/readonly/handleListAbapGitRepos';
 import {
+  TOOL_DEFINITION as GET_INCLUDES,
+  INCLUDES_HEADS,
+  INCLUDES_LISTS,
+} from '../../../handlers/include/readonly/handleGetIncludesList';
+import {
   TOOL_DEFINITION as GET_PACKAGE,
   PACKAGE_HEADS,
   PACKAGE_MEDIUM,
@@ -81,6 +86,7 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   GetAbapGitStaging: STAGING.description,
   GetAbapGitErrorLog: ERROR_LOG.description,
   GetPackage: GET_PACKAGE.description,
+  GetIncludesList: GET_INCLUDES.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -124,6 +130,43 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  GetIncludesList: () => {
+    const parts = partsOfDescription(descriptionOf('GetIncludesList'));
+    assert.ok(parts !== undefined);
+    // A tree with an include met twice and one including itself, and an
+    // include SAP could not read.
+    const reading = {
+      object_name: 'ZPROG',
+      object_type: 'PROG/P',
+      tree: {
+        name: 'ZPROG',
+        children: [
+          {
+            name: 'ZINC_A',
+            children: [{ name: 'ZINC_A', cyclic: true, children: [] }],
+          },
+          { name: 'ZINC_B', children: [] },
+          { name: 'ZINC_B', duplicate: true, children: [] },
+        ],
+      },
+      unreadable: [{ name: 'ZINC_GONE' }],
+    };
+    return {
+      terse: shapesOf(INCLUDES_LISTS),
+      heads: INCLUDES_HEADS,
+      returns: parts.returns,
+      samples: [
+        {
+          reading,
+          lines: writtenLines({
+            heads: [{ head: 'object', value: 'PROG/P ZPROG' }],
+            reading,
+            lists: INCLUDES_LISTS,
+          }),
+        },
+      ],
+    };
+  },
   ListAbapGitRepos: () =>
     abapGitTie(
       'ListAbapGitRepos',

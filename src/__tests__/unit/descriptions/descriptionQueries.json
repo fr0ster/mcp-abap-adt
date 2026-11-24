@@ -42,6 +42,12 @@
       "why did the abapGit push fail?",
       "покажи журнал помилок останнього pull abapGit",
       "чому не вдався push в abapGit?"
+    ],
+    "GetIncludesList": [
+      "which includes does program ZMY_PROG use?",
+      "list all includes of ZMY_PROG",
+      "які інклуди використовує програма ZMY_PROG?",
+      "покажи всі інклуди програми ZMY_PROG"
     ]
   },
   "siblings": {},
@@ -53,6 +59,10 @@
     "GetPackage: who is responsible for package ZMY_PKG?",
     "GetAbapGitBranchInfo: яка логіка папок у гілки main?",
     "GetAbapGitErrorLog: why did the abapGit push fail?",
-    "GetAbapGitErrorLog: чому не вдався push в abapGit?"
+    "GetAbapGitErrorLog: чому не вдався push в abapGit?",
+    "GetIncludesList: which includes does program ZMY_PROG use?",
+    "GetIncludesList: list all includes of ZMY_PROG",
+    "GetIncludesList: які інклуди використовує програма ZMY_PROG?",
+    "GetIncludesList: покажи всі інклуди програми ZMY_PROG"
   ]
 }

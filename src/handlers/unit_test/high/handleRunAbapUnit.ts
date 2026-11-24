@@ -51,7 +51,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: toolDescription(
     unitTestRun(
-      'the ABAP Unit tests of a class, program, function group, function module, CDS view or package',
+      "the ABAP Unit tests of a class, report, function group, function module's group, CDS view, package",
     ),
   ),
   inputSchema: z.object({

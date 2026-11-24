@@ -1,6 +1,7 @@
 import type { AdtCodes } from '../adtProjections';
 import { appendAll } from '../appendAll';
 import {
+  chunksOf,
   type PhaseResult,
   READS_PER_ENVELOPE,
   runPhaseOutcome,
@@ -682,12 +683,8 @@ async function runSearchSourceInPhases(
         ...new Map(asked.map((read) => [sourceReadKey(read), read])).values(),
       ];
       if (unique.length === 0) break;
-      for (let i = 0; i < unique.length; i += READS_PER_ENVELOPE) {
-        await readSourcesInPhase(
-          ctx,
-          unique.slice(i, i + READS_PER_ENVELOPE),
-          sources,
-        );
+      for (const reads of chunksOf(unique, READS_PER_ENVELOPE)) {
+        await readSourcesInPhase(ctx, reads, sources);
       }
     }
     // `max_hits` (DO23): the scan stops at a chunk boundary — once the

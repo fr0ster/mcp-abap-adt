@@ -486,7 +486,7 @@ describe('the metadata phase is bounded (GetObjectInfo include_descriptions)', (
     );
     assert.deepStrictEqual(
       fake.envelopes.map((e) => e.parts.length),
-      [READS_PER_ENVELOPE, 2],
+      [151, 151],
     );
     assert.equal(descriptions.size, READS_PER_ENVELOPE + 2);
     assert.equal(refused, undefined);

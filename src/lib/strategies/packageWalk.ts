@@ -131,14 +131,23 @@ export type LevelReader<I, R> = ((
 ) => Promise<PhaseResult<R>[]>) & { readonly ownAnswers?: boolean };
 
 /**
- * One level's reads in one ADT batch envelope (spec §11): `read(item,
- * connection)` for every item, on the phase's batch connection (`runPhase`).
+ * One level's reads in ADT batch envelopes (spec §11): `read(item,
+ * connection)` for every item, on the phase's batch connection (`runPhase`),
+ * in consecutive envelopes of at most `READS_PER_ENVELOPE` (`chunksOf`);
+ * each item's settlement, in item order. A failure that ends the call is
+ * thrown at its envelope, and no later envelope is sent.
  */
 export function batchReader<I, R>(
   context: HandlerContext,
   read: (item: I, connection: IAbapConnection) => Promise<R>,
 ): LevelReader<I, R> {
-  return (items) => runPhase(context, items, read);
+  return async (items) => {
+    const results: PhaseResult<R>[] = [];
+    for (const chunk of chunksOf(items, READS_PER_ENVELOPE)) {
+      results.push(...(await runPhase(context, chunk, read)));
+    }
+    return results;
+  };
 }
 
 /** How many node structure requests `concurrentReader` keeps open at once. */

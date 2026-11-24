@@ -1459,7 +1459,7 @@ describe('GetEnhancements', () => {
     assert.equal(textOf(a), textOf(b));
     assert.deepStrictEqual(
       batched.envelopes.map((e) => e.parts.length),
-      [READS_PER_ENVELOPE, 3],
+      [152, 151],
     );
   });
 

@@ -160,10 +160,10 @@ describe('SearchSource: source reads in envelopes of at most 300', () => {
     assert.deepStrictEqual(p.truncated, { by_object_cap: false });
   });
 
-  it("a function group's second round of 400 reads goes as 300 + 100; nothing dropped", async () => {
+  it("a function group's second round of 400 reads goes as 200 + 200 (balanced); nothing dropped", async () => {
     const fake = on(bigGroup());
     const result = await search(fake, ['ZFGP'], { max_hits_per_object: 1000 });
-    assert.deepStrictEqual(sourceSizes(fake, 2), [1, 300, 100]);
+    assert.deepStrictEqual(sourceSizes(fake, 2), [1, 200, 200]);
     assert.deepStrictEqual(partKeys(fake.envelopes[2]), ['STRUCTURE ZFG_BIG']);
     assert.equal(new Set(fake.envelopes.slice(3).flatMap(partKeys)).size, 400);
     assert.equal(payloadOf(result).results.length, 400);

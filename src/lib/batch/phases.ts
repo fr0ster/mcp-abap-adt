@@ -71,11 +71,22 @@ import { NO_BATCH_ENDPOINT_STATUS } from './availability';
  */
 export const READS_PER_ENVELOPE = 300;
 
-/** The consecutive slices of `items`, each at most `size` long, in order. */
+/**
+ * The consecutive slices of `items`, in order: as few as hold at most
+ * `size` each, balanced — their lengths differ by one at most, so past the
+ * bound no slice is a single read beside a full one (301 reads at 300 are
+ * 151 and 150, never 300 and 1).
+ */
 export function chunksOf<I>(items: readonly I[], size: number): I[][] {
+  const count = Math.ceil(items.length / size);
   const chunks: I[][] = [];
-  for (let at = 0; at < items.length; at += size) {
-    chunks.push(items.slice(at, at + size));
+  let at = 0;
+  for (let i = 0; i < count; i++) {
+    // The first `items.length % count` slices take one more.
+    const length =
+      Math.floor(items.length / count) + (i < items.length % count ? 1 : 0);
+    chunks.push(items.slice(at, at + length));
+    at += length;
   }
   return chunks;
 }

@@ -284,8 +284,8 @@ describe('function module group checks of several references (checkModuleReferen
     assert.equal(fake.envelopes.length, 1);
   });
 
-  it(`more than ${READS_PER_ENVELOPE} modules: consecutive envelopes of at most ${READS_PER_ENVELOPE} reads`, async () => {
-    const many = Array.from({ length: READS_PER_ENVELOPE + 2 }, (_, i) =>
+  it(`more than ${READS_PER_ENVELOPE} modules: consecutive balanced envelopes of at most ${READS_PER_ENVELOPE} reads`, async () => {
+    const many = Array.from({ length: READS_PER_ENVELOPE + 1 }, (_, i) =>
       moduleRef(`ZFM_${i}`),
     );
     const fake = system();
@@ -296,7 +296,8 @@ describe('function module group checks of several references (checkModuleReferen
     assert.equal(checked, undefined);
     assert.deepStrictEqual(
       fake.envelopes.map((e) => e.parts.length),
-      [READS_PER_ENVELOPE, 2],
+      // Balanced: never a one-read envelope beside a full one.
+      [151, 150],
     );
     assert.deepStrictEqual(
       phasesOf(fake).flat(),

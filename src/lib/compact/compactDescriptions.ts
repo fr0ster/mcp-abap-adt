@@ -77,10 +77,24 @@ function pairsOf(
   return typeWords(members).map((type) => `${verb} ${withArticle(type)}`);
 }
 
-/** The object types `members` names, in words, each once. */
-function typeWords(members: readonly CompactObjectType[]): string[] {
-  return [...new Set(members.map((member) => TYPE_WORDS[member]))];
+/** The object types `members` names, in words, each once; `own` replaces a member's words. */
+function typeWords(
+  members: readonly CompactObjectType[],
+  own: Partial<Record<CompactObjectType, string>> = {},
+): string[] {
+  return [
+    ...new Set(members.map((member) => own[member] ?? TYPE_WORDS[member])),
+  ];
 }
+
+/**
+ * The members a deletion removes as another object than the type words
+ * say: CDS_UNIT_TEST is the CDS view's global test class, deleted whole
+ * (`deletionTargets.ts`).
+ */
+const DELETION_WORDS: Partial<Record<CompactObjectType, string>> = {
+  CDS_UNIT_TEST: 'the global test class (CLAS) of a CDS view',
+};
 
 type CreateMember = (typeof COMPACT_CREATE.onprem)[number];
 
@@ -374,7 +388,11 @@ export function compactDeleteParts(
   members: readonly DeleteMember[] = COMPACT_DELETE[variant],
 ): DescriptionParts {
   return {
-    purpose: pairsPurpose(pairsOf('deletes', members)),
+    purpose: pairsPurpose(
+      typeWords(members, DELETION_WORDS).map(
+        (type) => `deletes ${withArticle(type)}`,
+      ),
+    ),
     notes: [underLock],
   };
 }
@@ -539,7 +557,7 @@ export function compactDeletionCheckParts(
   return {
     tag: 'read-only',
     purpose: pairsPurpose(
-      typeWords(given).map(
+      typeWords(given, DELETION_WORDS).map(
         (type) => `checks whether ${withArticle(type)} can be deleted`,
       ),
     ),

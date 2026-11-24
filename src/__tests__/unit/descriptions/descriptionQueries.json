@@ -97,6 +97,12 @@
       "show all the parts of class ZCL_MY_CLASS",
       "покажи всі складові програми ZMY_PROG",
       "з чого складається клас ZCL_MY_CLASS?"
+    ],
+    "GetObjectsByType": [
+      "list the classes of package ZMY_PKG",
+      "which tables are in package ZMY_PKG?",
+      "покажи класи пакета ZMY_PKG",
+      "які таблиці є в пакеті ZMY_PKG?"
     ]
   },
   "siblings": {},
@@ -139,6 +145,10 @@
     "GetWhereUsed: хто викликає функціональний модуль Z_MY_FM?",
     "GetObjectsList: show all the parts of class ZCL_MY_CLASS",
     "GetObjectsList: покажи всі складові програми ZMY_PROG",
-    "GetObjectsList: з чого складається клас ZCL_MY_CLASS?"
+    "GetObjectsList: з чого складається клас ZCL_MY_CLASS?",
+    "GetObjectsByType: list the classes of package ZMY_PKG",
+    "GetObjectsByType: which tables are in package ZMY_PKG?",
+    "GetObjectsByType: покажи класи пакета ZMY_PKG",
+    "GetObjectsByType: які таблиці є в пакеті ZMY_PKG?"
   ]
 }

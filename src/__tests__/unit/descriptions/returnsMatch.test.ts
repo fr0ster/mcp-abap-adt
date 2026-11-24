@@ -33,6 +33,11 @@ import {
   packageHeads,
 } from '../../../handlers/package/high/handleGetPackage';
 import {
+  TOOL_DEFINITION as OBJECTS_BY_TYPE,
+  OBJECTS_BY_TYPE_HEADS,
+  OBJECTS_BY_TYPE_LISTS,
+} from '../../../handlers/search/readonly/handleGetObjectsByType';
+import {
   TOOL_DEFINITION as OBJECTS_LIST,
   OBJECTS_LIST_HEADS,
   OBJECTS_LIST_LISTS,
@@ -131,6 +136,7 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   DescribeByList: DESCRIBE_BY_LIST.description,
   GetWhereUsed: WHERE_USED.description,
   GetObjectsList: OBJECTS_LIST.description,
+  GetObjectsByType: OBJECTS_BY_TYPE.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -336,6 +342,41 @@ const TIED: Readonly<Record<string, () => ReturnsTie>> = {
           }),
         },
       ],
+    };
+  },
+  GetObjectsByType: () => {
+    const parts = partsOfDescription(descriptionOf('GetObjectsByType'));
+    assert.ok(parts !== undefined);
+    // Every list a level holds: an object, one SAP lists in part, a node it
+    // left unloaded, a node below.
+    const reading = {
+      objects: [
+        {
+          type: 'CLAS/OC' as const,
+          objectName: 'ZCL_A',
+          techName: 'ZCL_A',
+          objectUri: '/sap/bc/adt/oo/classes/zcl_a',
+          description: 'A class',
+        },
+      ],
+      incompleteObjects: [{ type: 'CLAS/OC' as const, objectUri: '/sap/x' }],
+      notLoaded: [{ notLoaded: true as const }],
+      childNodes: [{ type: 'CLAS/OC' as const, nodeId: '000001' }],
+    };
+    const heads = [
+      { head: 'parent', value: 'DEVC/K ZPKG' },
+      { head: 'node_id', value: '000001' },
+      { head: 'count', value: '2' },
+    ];
+    return {
+      terse: Object.values(OBJECTS_BY_TYPE_LISTS).flatMap(shapesOf),
+      heads: OBJECTS_BY_TYPE_HEADS,
+      of: 'the',
+      returns: parts.returns,
+      samples: Object.values(OBJECTS_BY_TYPE_LISTS).map((lists) => ({
+        reading,
+        lines: writtenLines({ heads, reading, lists }),
+      })),
     };
   },
   SearchSource: () => {

@@ -4,36 +4,21 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtAnsweredObject } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
-import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
-export const TOOL_DEFINITION = {
-  name: 'GetObjectsByType',
-  available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type. Answers TSV under `# parent`, `# node_id` and `# count` lines: a row per object, its type, name, the technical name where it differs from the name and, for an object listed by its uri alone, that uri — with with_short_descriptions, its description too; each node SAP marks as unloaded is a `#` line of its own, and each child node of the type node a `# child_node` line naming its type and node id.',
-  inputSchema: z.object({
-    parent_name: z.string().describe('[read-only] Parent object name'),
-    parent_tech_name: z.string().describe('[read-only] Parent technical name'),
-    parent_type: z.string().describe('[read-only] Parent object type'),
-    node_id: z.string().describe('[read-only] Node ID'),
-    format: z
-      .string()
-      .optional()
-      .describe(
-        "[read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility and answers the same TSV.",
-      ),
-    with_short_descriptions: z
-      .boolean()
-      .optional()
-      .describe(
-        '[read-only] Include short descriptions (default true): a description column on each row',
-      ),
-  }),
-} as const;
-
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
-import { type Column, marks, rows, writeListing } from '../../../lib/detail';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import {
+  about,
+  type Column,
+  headShape,
+  marks,
+  type RowSchemas,
+  rows,
+  shapesOf,
+  writeListing,
+} from '../../../lib/detail';
 import {
   type CachedObject,
   objectsListCache,
@@ -82,25 +67,7 @@ function formatObjects(
       { head: 'count', value: String(objects.length + notLoaded.length) },
     ],
     reading: level,
-    lists: {
-      objects: rows('objects', {
-        columns: columnsOf(descriptions),
-        header: 'always',
-      }),
-      incompleteObjects: rows('incompleteObjects', {
-        columns: columnsOf(descriptions),
-        header: 'none',
-      }),
-      notLoaded: marks('notLoaded', NOT_LOADED_BY_SAP, () => []),
-      childNodes: marks(
-        'childNodes',
-        'child_node',
-        (node: IRepositoryNodeChild) => [
-          node.type ?? node.unknownType,
-          node.nodeId,
-        ],
-      ),
-    },
+    lists: OBJECTS_BY_TYPE_LISTS[descriptions ? 'described' : 'bare'],
   }).answer;
   return { text, cached };
 }
@@ -120,10 +87,11 @@ type LevelEntry = IAdtAnsweredObject & {
 function columnsOf(descriptions: boolean): Column<LevelEntry>[] {
   const name = (o: LevelEntry) => o.objectName ?? '';
   const columns: Column<LevelEntry>[] = [
-    { name: 'type', cell: (o) => o.type ?? o.unknownType },
-    { name: 'name', cell: name },
+    { name: 'type', means: 'its type', cell: (o) => o.type ?? o.unknownType },
+    { name: 'name', means: 'its name', cell: name },
     {
       name: 'tech_name',
+      means: 'its technical name where it differs',
       cell: (o) => {
         const techName = o.techName || undefined;
         return techName !== undefined && techName !== name(o) ? techName : '';
@@ -131,13 +99,110 @@ function columnsOf(descriptions: boolean): Column<LevelEntry>[] {
     },
     {
       name: 'uri',
+      means: 'its URI when SAP lists it nameless',
       cell: (o) => (name(o) === '' ? (o.objectUri ?? '') : ''),
     },
   ];
   return descriptions
-    ? [...columns, { name: 'description', cell: (o) => o.description ?? '' }]
+    ? [
+        ...columns,
+        {
+          name: 'description',
+          means: 'its short description, by default',
+          cell: (o) => o.description ?? '',
+        },
+      ]
     : columns;
 }
+
+/** What each listed object is, complete or not. */
+const OBJECT_NOUN = 'for each object of the type';
+
+/** The lists one type's listing writes, with its descriptions or without. */
+function objectsByTypeLists(descriptions: boolean): RowSchemas<NodeLevel> {
+  return {
+    objects: about(
+      OBJECT_NOUN,
+      rows('objects', {
+        columns: columnsOf(descriptions),
+        header: 'always',
+      }),
+    ),
+    incompleteObjects: about(
+      OBJECT_NOUN,
+      rows('incompleteObjects', {
+        columns: columnsOf(descriptions),
+        header: 'none',
+      }),
+    ),
+    notLoaded: about(
+      'the nodes SAP left unloaded are named',
+      marks(
+        'notLoaded',
+        NOT_LOADED_BY_SAP,
+        (_node: NonNullable<NodeLevel['notLoaded']>[number]) => [],
+      ),
+    ),
+    childNodes: about(
+      'the nodes below it are named by their type and node ID',
+      marks('childNodes', 'child_node', (node: IRepositoryNodeChild) => [
+        node.type ?? node.unknownType,
+        node.nodeId,
+      ]),
+    ),
+  };
+}
+
+/**
+ * The lists of a type's listing: `described` with short descriptions (the
+ * default), `bare` with `with_short_descriptions` false.
+ */
+export const OBJECTS_BY_TYPE_LISTS = {
+  described: objectsByTypeLists(true),
+  bare: objectsByTypeLists(false),
+} as const;
+
+/** The heads every type's listing opens with. */
+export const OBJECTS_BY_TYPE_HEADS = [
+  headShape('parent', "parent's type and name"),
+  headShape('node_id', 'node ID'),
+  headShape('count', 'number of objects'),
+];
+
+export const TOOL_DEFINITION = {
+  name: 'GetObjectsByType',
+  available_in: ['onprem', 'cloud'] as const,
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Lists the objects of one type, such as classes, tables, programs or interfaces, in an ABAP package or other composite object.',
+    ),
+    returns: returnsOf({
+      heads: OBJECTS_BY_TYPE_HEADS,
+      of: 'the',
+      shapes: Object.values(OBJECTS_BY_TYPE_LISTS).map(shapesOf),
+    }),
+    inline: true,
+  }),
+  inputSchema: z.object({
+    parent_name: z.string().describe('[read-only] Parent object name'),
+    parent_tech_name: z.string().describe('[read-only] Parent technical name'),
+    parent_type: z.string().describe('[read-only] Parent object type'),
+    node_id: z.string().describe('[read-only] Node ID'),
+    format: z
+      .string()
+      .optional()
+      .describe(
+        "[read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility and answers the same TSV.",
+      ),
+    with_short_descriptions: z
+      .boolean()
+      .optional()
+      .describe(
+        '[read-only] Include short descriptions (default true): a description column on each row',
+      ),
+  }),
+} as const;
 
 export async function handleGetObjectsByType(
   context: HandlerContext,

@@ -3,12 +3,15 @@ import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  longRunning,
+  purpose,
+  toolDescription,
+  untypedReturns,
+} from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -41,9 +44,14 @@ export interface SqlQueryResponse {
 export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries.',
-  ),
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Runs an ABAP SQL SELECT over database tables and CDS views and reads the data it selects, up to the number of records asked.',
+    ),
+    returns: untypedReturns(),
+    notes: [longRunning],
+  }),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
     sql_query: requiredText('SQL query is required').describe(

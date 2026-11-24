@@ -28,6 +28,12 @@ import {
 } from '../adtProjections';
 import { activationParentDescription } from '../adtTypeCode';
 import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
+import {
+  longRunning,
+  purpose,
+  toolDescription,
+  untypedReturns,
+} from '../description/index';
 import { DETAIL_LEVELS } from '../detail/levels';
 import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import { dumpFiltersRefusal } from '../dumpFilters';
@@ -2758,9 +2764,14 @@ export function handlerGetDataDefinition(sql: boolean) {
 /** `HandlerGetData` with `sql_query`: the definition's own statement. */
 export function handlerGetDataWithSqlDefinition() {
   return {
-    description: withLongToolAdvice(
-      '[read-only] Reads the rows of the table or CDS view named by object_name, or the rows sql_query selects: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON.',
-    ),
+    description: toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads the data of an ABAP database table or CDS view, or the data an ABAP SQL SELECT selects, up to the number of records asked.',
+      ),
+      returns: untypedReturns(),
+      notes: [longRunning],
+    }),
     inputSchema: compactGetDataSchema,
   };
 }
@@ -2768,9 +2779,14 @@ export function handlerGetDataWithSqlDefinition() {
 /** `HandlerGetData` without `sql_query`: the table read alone. */
 export function handlerGetDataWithoutSqlDefinition() {
   return {
-    description: withLongToolAdvice(
-      '[read-only] Reads the rows of the table or CDS view named by object_name: every column of object_name. Required: object_name. Optional: max_rows (default 100). Response: JSON.',
-    ),
+    description: toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads the data of an ABAP database table or CDS view, up to the number of records asked.',
+      ),
+      returns: untypedReturns(),
+      notes: [longRunning],
+    }),
     inputSchema: withInCallSchema(
       z
         .object({

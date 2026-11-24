@@ -6,8 +6,6 @@
  * refused once it is assembled, so the list only shrinks.
  */
 export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
-  'GetSqlQuery',
-  'GetTableContents',
   'HandlerAbapGit',
   'HandlerAbapGitGet',
   'HandlerActivate',
@@ -25,14 +23,11 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'HandlerDelete',
   'HandlerDeletionCheck',
   'HandlerGet',
-  'HandlerGetData',
   'HandlerLeftoverSessionList',
   'HandlerLeftoverSessionLogoff',
   'HandlerLock',
   'HandlerProfileRun',
   'HandlerProfileSchedule',
-  'HandlerServiceBindingListTypes',
-  'HandlerServiceBindingValidate',
   'HandlerSession',
   'HandlerSystem',
   'HandlerTransportCreate',
@@ -49,7 +44,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 36;
+export const NOT_YET_ASSEMBLED_MOST = 31;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

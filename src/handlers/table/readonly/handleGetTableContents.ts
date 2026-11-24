@@ -3,13 +3,16 @@ import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  longRunning,
+  purpose,
+  toolDescription,
+  untypedReturns,
+} from '../../../lib/description';
 import { DETAIL_LEVELS } from '../../../lib/detail/levels';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { DETAIL_WORDS, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -18,9 +21,14 @@ import type { SqlQueryResponse } from '../../system/readonly/handleGetSqlQuery';
 export const TOOL_DEFINITION = {
   name: 'GetTableContents',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows.',
-  ),
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the data of an ABAP database table or CDS view, as SE16 previews it, up to the number of records asked.',
+    ),
+    returns: untypedReturns(),
+    notes: [longRunning],
+  }),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
     table_name: requiredText('Table name is required').describe(

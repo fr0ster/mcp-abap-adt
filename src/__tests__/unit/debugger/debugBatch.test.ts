@@ -50,7 +50,6 @@ import {
   DebuggerInstance,
   DebugSession,
 } from '../../../lib/debugger/index';
-import { partsOfDescription } from '../../../lib/description';
 import {
   DebugBatchHandlersGroup,
   debugBatchToolEntries,
@@ -916,13 +915,13 @@ describe("DebugBatchAnswers, the full set's reader of the debugger batch", () =>
     assert.equal(schema.safeParse({ numbers: [] }).success, false);
   });
 
-  it("means what HandlerDebugBatch's answers action means, in the same parts", () => {
-    const full = partsOfDescription(DebugBatchAnswers_Tool.description);
-    const answers = partsOfDescription(
+  it('HandlerDebugBatch names its answers action by the same function', () => {
+    assert.ok(
+      HandlerDebugBatch_Tool.description.includes(
+        "reads each recorded debugger call's outcome by its number",
+      ),
       HandlerDebugBatch_Tool.description,
-    )?.values?.each.find((value) => value.value === 'answers');
-    assert.ok(full !== undefined && answers !== undefined);
-    assert.equal(answers.purpose, full.purpose);
+    );
   });
 });
 

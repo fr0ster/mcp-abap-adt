@@ -71,13 +71,7 @@ const isCompact = (kind: ToolSetKind) =>
 
 // HandlerBatch's words, copied here, never imported: the test is the copy.
 const PURPOSE_WORDS =
-  "Records the calls of the tools that allow it and sends them to SAP together, then reads each call's answer by its number.";
-const BEGIN_WORDS =
-  'starts recording the calls of the tools that allow it, each under the next number, to send them together.';
-const END_WORDS =
-  "sends the recorded calls to SAP together, with the credentials in force, and splits SAP's answer by call.";
-const ANSWERS_WORDS =
-  'reads the answer of each recorded call of the last sending, by its number.';
+  "Begins recording the calls of the tools that allow it, ends the recording and sends the recorded calls to SAP together, reads each recorded call's answer by its number.";
 const HANDLE_WORDS =
   'Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).';
 const RECORDABLE_TAIL =
@@ -262,13 +256,15 @@ describe('the batch tools on the surface', () => {
           assert.ok(
             byName
               .get('HandlerLock')
-              ?.includes(' When object_type is one of CLASS,'),
+              ?.includes(
+                'action is lock (absent reads as lock) and object_type is one of CLASS,',
+              ),
           );
           assert.ok(
             byName
               .get('HandlerLock')
               ?.includes(
-                `; or object_type is PACKAGE and the connection is HTTP, ${RECORDABLE_TAIL}`,
+                'action is unlock and object_type is PACKAGE and the connection is HTTP',
               ),
           );
           assert.ok(
@@ -313,7 +309,7 @@ describe('the batch tools on the surface', () => {
     const byName = new Map(tools.map((t) => [t.name, t.description]));
     assert.equal(
       byName.get('HandlerBatch'),
-      `[read-only] ${PURPOSE_WORDS} action begin: ${BEGIN_WORDS} action end: ${END_WORDS} action answers: ${ANSWERS_WORDS} ${HANDLE_WORDS}`,
+      `[read-only] ${PURPOSE_WORDS} ${HANDLE_WORDS}`,
     );
   });
 

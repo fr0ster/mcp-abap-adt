@@ -149,7 +149,9 @@ describe('the listed schema declares each action’s arguments once', () => {
 describe('the description', () => {
   it('starts with what it reads, marked read-only', () => {
     assert.equal(
-      TOOL_DEFINITION.description.startsWith('[read-only] Finds '),
+      TOOL_DEFINITION.description.startsWith(
+        '[read-only] Searches the source code of packages for text, ',
+      ),
       true,
     );
   });

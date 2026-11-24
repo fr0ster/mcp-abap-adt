@@ -14,10 +14,11 @@ import {
   batchable,
   compactOf,
   longRunning,
+  pairsPurpose,
   partsOfDescription,
   purpose,
   toolDescription,
-  valueFrom,
+  withArticle,
 } from '../../../lib/description';
 import { LEVEL_SENTENCES, levelWords } from '../../../lib/strategies/detail';
 import { BINARIES } from '../../../lib/toolSet';
@@ -147,25 +148,22 @@ describe('the description builder', () => {
     assert.ok(purposeFaults('[read-only] Reads a class.').includes('says "["'));
   });
 
-  it("states a compact tool's values, each by its function", () => {
-    const listing = toolDescription({
-      tag: 'read-only',
-      purpose: purpose('Reads the objects a package holds.'),
-    });
-    const text = toolDescription({
-      purpose: purpose('Reads a package or a class.'),
-      values: {
-        of: 'part',
-        each: [
-          valueFrom('contents', listing),
-          { value: 'source', purpose: purpose('Reads the source of a class.') },
-        ],
-      },
-    });
+  it("states a compact tool's purpose by its action and object pairs", () => {
     assert.equal(
-      text,
-      'Reads a package or a class. part contents: reads the objects a package holds. part source: reads the source of a class.',
+      toolDescription({
+        purpose: pairsPurpose(
+          ['class', 'include'].map((type) => `updates ${withArticle(type)}`),
+          ', under its lock.',
+        ),
+      }),
+      'Updates a class, updates an include, under its lock.',
     );
+    // The pairs are generated: the length rule counts them as one word.
+    const many = pairsPurpose(
+      Array.from({ length: 40 }, () => 'updates a class'),
+    );
+    assert.deepStrictEqual(purposeFaults(many.text, many.types), []);
+    assert.ok(purposeFaults(many.text).length > 0);
   });
 
   it("assembles a compact tool from the full tool's parts, a part of its own replacing one", () => {
@@ -182,24 +180,6 @@ describe('the description builder', () => {
       partsOfDescription(full)?.purpose,
     );
     assert.throws(() => compactOf('Written whole.'), /not assembled/);
-  });
-
-  it("keeps an opening name in capitals when a value's purpose continues the sentence", () => {
-    assert.equal(
-      toolDescription({
-        purpose: purpose('Reads a table.'),
-        values: {
-          of: 'action',
-          each: [
-            {
-              value: 'data',
-              purpose: purpose('SAP gives the data of a table.'),
-            },
-          ],
-        },
-      }),
-      'Reads a table. action data: SAP gives the data of a table.',
-    );
   });
 
   it('keeps each part of an assembled description, by its text', () => {
@@ -446,13 +426,6 @@ describe('every served tool is assembled', () => {
             faults.push(
               `${tool.name}: its purpose opens with "${first}", its name's action is ${action}`,
             );
-          }
-        }
-        // A compact tool's values, each by its function: a purpose of the
-        // same rules.
-        for (const value of parts.values?.each ?? []) {
-          for (const fault of purposeFaults(value.purpose.text)) {
-            faults.push(`${tool.name}: the purpose of ${value.value} ${fault}`);
           }
         }
         for (const note of parts.notes ?? []) {

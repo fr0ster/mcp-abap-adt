@@ -635,28 +635,13 @@ describe('descriptions, positive', () => {
 
   // Each operation by its function: what SAP does at it is the parameters'.
   for (const [tool, words] of [
-    [
-      'HandlerDebugStep',
-      'operation stepRunToLine: runs the ABAP debuggee to the source position named.',
-    ],
-    [
-      'HandlerDebugSession',
-      'operation terminateDebuggee: ends the ABAP debuggee where it stands',
-    ],
-    [
-      'HandlerDebugSession',
-      'operation detachDebugger: detaches the debugger from the ABAP debuggee, which runs on',
-    ],
-    [
-      'HandlerDebugSession',
-      'operation listen: listens for an ABAP debuggee for the seconds asked',
-    ],
-    [
-      'HandlerDebugSession',
-      "operation end: logs off every connection of the debug state and ends it, the user's breakpoints staying set",
-    ],
+    ['HandlerDebugStep', 'runs to a source position'],
+    ['HandlerDebugSession', 'terminates the ABAP debuggee'],
+    ['HandlerDebugSession', 'detaches the debugger from the debuggee'],
+    ['HandlerDebugSession', 'listens for an ABAP debuggee'],
+    ['HandlerDebugSession', 'ends the debug state'],
   ] as const) {
-    it(`${tool} states ${words.split(':')[0]} by its function`, () => {
+    it(`${tool} states "${words}" as one of its pairs`, () => {
       assert.ok(description(tool).includes(words), description(tool));
     });
   }

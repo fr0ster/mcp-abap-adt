@@ -124,6 +124,7 @@ const PROSE: ReadonlyArray<readonly [string, string]> = [
   ['answers', 'then answers it'],
   // A full abapGit tool's words, which a compact action states.
   ['checks', 'checks an external git repository'],
+  ['checks', 'checks a remote repository'],
   ['file', 'each ignored file'],
   ['file', 'each staged file'],
   ['file', 'each changed file'],

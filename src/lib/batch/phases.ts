@@ -452,6 +452,32 @@ export async function runPhaseOutcome<I, R>(
 }
 
 /**
+ * `runPhaseOutcome`, or — with `alone`, by default when there is only one
+ * item — each item read as single requests on the call's connection, one
+ * after another: a batch is for reads of several objects, and one read is
+ * never an envelope. The settlements in item order; no envelope, so none
+ * failed.
+ */
+export async function runPhaseOrAlone<I, R>(
+  context: HandlerContext,
+  items: readonly I[],
+  read: (item: I, connection: IAbapConnection) => Promise<R>,
+  alone = items.length < 2,
+): Promise<PhaseOutcome<R>> {
+  if (!alone) return runPhaseOutcome(context, items, read);
+  const results: PhaseResult<R>[] = [];
+  for (const item of items) {
+    results.push(
+      await read(item, context.connection).then(
+        (value): PhaseResult<R> => ({ ok: true, value }),
+        (error: unknown): PhaseResult<R> => ({ ok: false, error }),
+      ),
+    );
+  }
+  return { results, envelope: { failed: false } };
+}
+
+/**
  * `sequential` where the destination has no communication batch — known
  * (`context.batchAvailability`), or learned now from an envelope of
  * `batched` answered with the outer `404` that is the verdict; `batched` otherwise. Any other

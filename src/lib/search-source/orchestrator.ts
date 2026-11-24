@@ -4,7 +4,7 @@ import {
   chunksOf,
   type PhaseResult,
   READS_PER_ENVELOPE,
-  runPhaseOutcome,
+  runPhaseOrAlone,
   withSequentialFallback,
 } from '../batch/phases';
 import { createAdtClient } from '../clients';
@@ -597,7 +597,8 @@ async function runSearchSourceInPhases(
   // Each level in one envelope; a failed envelope is decided here, once,
   // before any part reaches the walk.
   const levels: LevelReader<NodeRequest, NodeAnswer> = async (requests) => {
-    const { results, envelope } = await runPhaseOutcome(
+    // A level of one node structure is a single request.
+    const { results, envelope } = await runPhaseOrAlone(
       ctx,
       requests,
       (request, connection) =>
@@ -683,8 +684,15 @@ async function runSearchSourceInPhases(
         ...new Map(asked.map((read) => [sourceReadKey(read), read])).values(),
       ];
       if (unique.length === 0) break;
+      // A chunk of one target reads as single requests; so does a round of
+      // one read.
       for (const reads of chunksOf(unique, READS_PER_ENVELOPE)) {
-        await readSourcesInPhase(ctx, reads, sources);
+        await readSourcesInPhase(
+          ctx,
+          reads,
+          sources,
+          chunk.length < 2 || reads.length < 2,
+        );
       }
     }
     // `max_hits` (DO23): the scan stops at a chunk boundary — once the

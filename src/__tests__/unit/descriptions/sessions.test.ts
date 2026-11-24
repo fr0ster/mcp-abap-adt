@@ -17,7 +17,7 @@ import * as sessions from '../../../lib/description/sessions';
 import { factFaults } from './descriptionRules';
 
 describe('the session and transport facts', () => {
-  it('a leftover session list and a logoff: the purpose, then the answer', () => {
+  it('a leftover session list and a transport sort: the purpose, then the answer', () => {
     assert.equal(
       toolDescription(
         runParts({
@@ -31,11 +31,11 @@ describe('the session and transport facts', () => {
     assert.equal(
       toolDescription(
         runParts({
-          purpose: purpose('Logs off a leftover SAP session.'),
-          result: sessions.LEFTOVER_LOGGED_OFF,
+          purpose: purpose('Sorts a transport task.'),
+          result: sessions.TRANSPORT_SORTED,
         }),
       ),
-      "Logs off a leftover SAP session. The session's handle and that it is logged off.",
+      'Sorts a transport task. Whether SAP took the change, the transport task and where the change is confirmed.',
     );
   });
 

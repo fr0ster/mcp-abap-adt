@@ -7,6 +7,12 @@
  * from the answer type the tool builds, every member by its domain noun.
  */
 
+import type { transportAddition } from '../../handlers/transport/high/handleAddTransportObject';
+import type { createdTransportNumbers } from '../../handlers/transport/high/handleCreateTransport';
+import type { createdTaskNumbers } from '../../handlers/transport/high/handleCreateTransportTask';
+import type { transportMove } from '../../handlers/transport/high/handleMoveTransportObjects';
+import type { transportRemoval } from '../../handlers/transport/high/handleRemoveTransportObject';
+import type { transportSort } from '../../handlers/transport/high/handleSortAndCompressTransportTask';
 import type { backgroundRunList } from '../backgroundRuns/answers';
 import type { BackgroundRunRecord } from '../backgroundRuns/contract';
 import type { BackgroundRunTools } from '../backgroundRuns/port';
@@ -74,4 +80,68 @@ export const BACKGROUND_RUN_ENDED = resultShape<
 >({
   run_handle: 'its run handle',
   state: 'whether it was cancelled or its answer deleted',
+});
+
+const ACCEPTED = 'whether SAP took the change';
+const TASK = 'the transport task';
+const CONFIRM = 'where the change is confirmed';
+
+/** What an object added to a transport task answers. */
+export const TRANSPORT_ADDITION = resultShape<
+  ReturnType<typeof transportAddition>
+>({
+  accepted: ACCEPTED,
+  added: "that SAP's answer leaves the attachment unconfirmed",
+  transport_number: TASK,
+  object: 'the object named',
+  confirm_with: CONFIRM,
+});
+
+/** What an object removed from a transport task answers. */
+export const TRANSPORT_REMOVAL = resultShape<
+  ReturnType<typeof transportRemoval>
+>({
+  accepted: ACCEPTED,
+  removed: "that SAP's answer leaves the removal unconfirmed",
+  transport_number: TASK,
+  object: 'the object named',
+  position: 'its position in the task',
+  confirm_with: CONFIRM,
+});
+
+/** What objects moved between transport tasks answer. */
+export const TRANSPORT_MOVE = resultShape<ReturnType<typeof transportMove>>({
+  accepted: ACCEPTED,
+  transport_number: 'the task they leave',
+  target_number: 'the task they move to',
+  objects: listOf('for each object sent', {
+    object: 'the object named',
+    position: 'its position in the task it leaves',
+  }),
+  confirm_with: CONFIRM,
+});
+
+/** What a sorted and compressed transport task answers. */
+export const TRANSPORT_SORTED = resultShape<ReturnType<typeof transportSort>>({
+  accepted: ACCEPTED,
+  transport_number: TASK,
+  confirm_with: CONFIRM,
+});
+
+/** What a created transport answers. */
+export const TRANSPORT_CREATED = resultShape<
+  ReturnType<typeof createdTransportNumbers>
+>({
+  transport_number: 'the number of the transport created',
+  task_number: 'the number of its task',
+  task_type_error: "SAP's refusal of the task type",
+  note: 'what is left to do when the task stays untyped',
+});
+
+/** What a created transport task answers. */
+export const TASK_CREATED = resultShape<ReturnType<typeof createdTaskNumbers>>({
+  task_number: 'the number of the task created',
+  task_type: 'its type',
+  task_type_error: "SAP's refusal of the task type",
+  note: 'what is left to do when the task stays untyped',
 });

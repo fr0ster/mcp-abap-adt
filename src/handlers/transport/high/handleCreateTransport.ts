@@ -37,6 +37,9 @@ import {
   type McpResult,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
+import { TRANSPORT_CREATED } from '../../../lib/description/sessions';
 import {
   type DetailTable,
   type LevelReading,
@@ -93,8 +96,14 @@ export function readBackFailedNote(
 export const TOOL_DEFINITION = {
   name: 'CreateTransport',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Creates a transport request and gives the task SAP creates with it the type task_type (default S, Development/Correction). Response: JSON with transport_number and task_number (and task_type_error or a note when the task is left untyped); with detail medium, the request as created too.',
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        'Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked.',
+      ),
+      result: TRANSPORT_CREATED,
+    }),
+  ),
   inputSchema: createArguments('CreateTransport', {
     transport_type: z
       .enum(['workbench', 'customizing'])
@@ -215,17 +224,8 @@ async function answeredCreateTransport(
   // Terse what the next call needs: the request's and its task's numbers,
   // and why the task is untyped when it is; medium the request as created
   // (the former terse).
-  const terseNumbers = (created: ICreatedTransport, settled: TypedTask) => {
-    const answered = terseCreatedTransport(created, settled);
-    return {
-      transport_number: answered.transport_number,
-      task_number: answered.task_number,
-      ...(answered.task_type_error === undefined
-        ? {}
-        : { task_type_error: answered.task_type_error }),
-      ...(answered.note === undefined ? {} : { note: answered.note }),
-    };
-  };
+  const terseNumbers = (created: ICreatedTransport, settled: TypedTask) =>
+    createdTransportNumbers(terseCreatedTransport(created, settled));
   const createdReadings: DetailTable<CreatedAnswer<Terse>> = {
     terse: createdAt((created) => (settled) => terseNumbers(created, settled)),
     medium: createdAt(
@@ -448,5 +448,22 @@ function firstTaskOf(number: string) {
     } catch (thrown) {
       return { kind: 'threw', thrown };
     }
+  };
+}
+
+/** What a created transport answers at terse: its number, its task's, and why the task is untyped when it is. */
+export function createdTransportNumbers(answered: {
+  readonly transport_number: string;
+  readonly task_number: string | null;
+  readonly task_type_error?: FailureEntry | undefined;
+  readonly note?: string | undefined;
+}) {
+  return {
+    transport_number: answered.transport_number,
+    task_number: answered.task_number,
+    ...(answered.task_type_error === undefined
+      ? {}
+      : { task_type_error: answered.task_type_error }),
+    ...(answered.note === undefined ? {} : { note: answered.note }),
   };
 }

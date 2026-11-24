@@ -20,6 +20,9 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
+import { TRANSPORT_MOVE } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
@@ -53,8 +56,14 @@ export const MOVED_ENTRY = z.object({
 export const TOOL_DEFINITION = {
   name: 'MoveTransportObjects',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Moves the object entries named by objects from the transport task named by transport_number to the task named by target_number. Each entry is named by its position in the source task's object list.",
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        'Moves objects from one transport task to another, each at its position in the task it leaves.',
+      ),
+      result: TRANSPORT_MOVE,
+    }),
+  ),
   inputSchema: z.object({
     transport_number: z
       .string()
@@ -116,16 +125,7 @@ export async function handleMoveTransportObjects(
   // echoes what it was sent, so the answer says the document was understood,
   // not that any entry changed task. `accepted`, and the re-read of both tasks
   // that settles it.
-  const terseMove = () => ({
-    accepted: true,
-    transport_number: args.transport_number,
-    target_number: args.target_number,
-    objects: args.objects.map((entry) => ({
-      object: `${entry.pgmid || 'R3TR'} ${entry.object_type} ${entry.object_name}`,
-      position: entry.position,
-    })),
-    confirm_with: `ReadTransportObjects on ${args.transport_number} and on ${args.target_number} — this answer only echoes the entries it was sent, never that they moved.`,
-  });
+  const terseMove = () => transportMove(args);
 
   return answer(
     { tool: 'MoveTransportObjects', detail },
@@ -147,4 +147,27 @@ export async function handleMoveTransportObjects(
       ),
     project(detail, terseMove),
   );
+}
+
+/** What a move answers: SAP took it, both tasks, each entry sent, and where to confirm it. */
+export function transportMove(args: {
+  readonly transport_number: string;
+  readonly target_number: string;
+  readonly objects: readonly {
+    readonly object_name: string;
+    readonly object_type: string;
+    readonly position: string;
+    readonly pgmid?: string | undefined;
+  }[];
+}) {
+  return {
+    accepted: true,
+    transport_number: args.transport_number,
+    target_number: args.target_number,
+    objects: args.objects.map((entry) => ({
+      object: `${entry.pgmid || 'R3TR'} ${entry.object_type} ${entry.object_name}`,
+      position: entry.position,
+    })),
+    confirm_with: `ReadTransportObjects on ${args.transport_number} and on ${args.target_number} — this answer only echoes the entries it was sent, never that they moved.`,
+  };
 }

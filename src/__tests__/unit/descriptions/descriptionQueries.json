@@ -103,6 +103,12 @@
       "which tables are in package ZMY_PKG?",
       "покажи класи пакета ZMY_PKG",
       "які таблиці є в пакеті ZMY_PKG?"
+    ],
+    "GetAdtTypes": [
+      "which object types does the system know?",
+      "list all ADT object types",
+      "які типи об'єктів знає система?",
+      "покажи всі типи об'єктів ADT"
     ]
   },
   "siblings": {},
@@ -149,6 +155,8 @@
     "GetObjectsByType: list the classes of package ZMY_PKG",
     "GetObjectsByType: which tables are in package ZMY_PKG?",
     "GetObjectsByType: покажи класи пакета ZMY_PKG",
-    "GetObjectsByType: які таблиці є в пакеті ZMY_PKG?"
+    "GetObjectsByType: які таблиці є в пакеті ZMY_PKG?",
+    "GetAdtTypes: list all ADT object types",
+    "GetAdtTypes: покажи всі типи об'єктів ADT"
   ]
 }

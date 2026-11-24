@@ -11,14 +11,19 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 import {
+  about,
   answered,
   type DetailTable,
   fullLevel,
+  headShape,
   type ListDetailTable,
+  type RowSchemas,
   rawLevel,
   readingAt,
   rows,
+  shapesOf,
   writeListing,
   writeWhole,
   written,
@@ -28,11 +33,46 @@ import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import type { XmlNode } from '../../../lib/xml/node';
 
+/** The lists the type listing writes: what its description states. */
+export const TYPES_LISTS: RowSchemas<{ items: INamedItem[] }> = {
+  items: about(
+    'for each object type',
+    rows('items', {
+      columns: [
+        {
+          name: 'name',
+          means: 'its code',
+          cell: (item: INamedItem) => item.name,
+        },
+        {
+          name: 'description',
+          means: 'its description',
+          cell: (item: INamedItem) =>
+            (item.description ?? '').split('\n')[0] ?? '',
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** The head the type listing opens with. */
+export const TYPES_HEADS = [headShape('count', 'how many there are')];
+
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Retrieve all valid ADT object types (CLAS, TABL, PROG, DEVC, FUGR, INTF, DDLS, DTEL, DOMA, SRVD, SRVB, BDEF, DDLX, etc.) or validate a specific type name.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Lists the repository object types the ABAP system knows, by their type codes.',
+    ),
+    returns: returnsOf({
+      heads: TYPES_HEADS,
+      shapes: [shapesOf(TYPES_LISTS)],
+    }),
+    inline: true,
+  }),
   inputSchema: z.object({
     validate_type: z
       .string()
@@ -57,19 +97,7 @@ const TYPE_READINGS: ListDetailTable<INamedItem[] | XmlNode | string> = {
     writeListing({
       heads: [{ head: 'count', value: String(items.length) }],
       reading: { items },
-      lists: {
-        items: rows('items', {
-          columns: [
-            { name: 'name', cell: (item: INamedItem) => item.name },
-            {
-              name: 'description',
-              cell: (item: INamedItem) =>
-                (item.description ?? '').split('\n')[0] ?? '',
-            },
-          ],
-          header: 'always',
-        }),
-      },
+      lists: TYPES_LISTS,
     }),
   ),
   // The named items whole, as read.

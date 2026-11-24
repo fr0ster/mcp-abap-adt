@@ -155,7 +155,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetATCResult',
   'GetATCRunStatus',
   'GetAbapGitFile',
-  'GetAdtTypes',
   'GetBackgroundRun',
   'GetBehaviorDefinition',
   'GetBehaviorDefinitionVersionDiff',
@@ -368,7 +367,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 355;
+export const NOT_YET_ASSEMBLED_MOST = 354;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

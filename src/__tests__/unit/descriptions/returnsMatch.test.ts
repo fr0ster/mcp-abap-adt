@@ -52,6 +52,11 @@ import {
   DESCRIBED_LISTS,
 } from '../../../handlers/system/readonly/handleDescribeByList';
 import {
+  TOOL_DEFINITION as ADT_TYPES,
+  TYPES_HEADS,
+  TYPES_LISTS,
+} from '../../../handlers/system/readonly/handleGetAllTypes';
+import {
   TOOL_DEFINITION as WHERE_USED,
   WHERE_USED_HEADS,
   WHERE_USED_LISTS,
@@ -137,6 +142,7 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   GetWhereUsed: WHERE_USED.description,
   GetObjectsList: OBJECTS_LIST.description,
   GetObjectsByType: OBJECTS_BY_TYPE.description,
+  GetAdtTypes: ADT_TYPES.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -215,6 +221,31 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  GetAdtTypes: () => {
+    const parts = partsOfDescription(descriptionOf('GetAdtTypes'));
+    assert.ok(parts !== undefined);
+    const reading = {
+      items: [
+        { name: 'CLAS', description: 'Class\nits members' },
+        { name: 'TABL' },
+      ],
+    };
+    return {
+      terse: shapesOf(TYPES_LISTS),
+      heads: TYPES_HEADS,
+      returns: parts.returns,
+      samples: [
+        {
+          reading,
+          lines: writtenLines({
+            heads: [{ head: 'count', value: '2' }],
+            reading,
+            lists: TYPES_LISTS,
+          }),
+        },
+      ],
+    };
+  },
   SearchObject: () => {
     const parts = partsOfDescription(descriptionOf('SearchObject'));
     assert.ok(parts !== undefined);

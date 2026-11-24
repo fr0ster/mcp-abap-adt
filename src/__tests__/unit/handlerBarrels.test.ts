@@ -95,8 +95,8 @@ describe("lib's read and write handler barrels", () => {
     // (68). A table's technical settings and the text elements: their reads
     // (70). GetTransport, for `HandlerGet` TRANSPORT part `metadata` (71).
     // The parts compact reads state from their full tools' descriptions:
-    // one page of a feed, a run's result read once, HandlerGet's sources (74).
-    assert.equal(read.length, 74);
+    // one page of a feed and a run's result read once (73).
+    assert.equal(read.length, 73);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the

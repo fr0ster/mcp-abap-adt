@@ -19,7 +19,6 @@ import {
   SYSTEM_ACTION_TOOLS,
   SYSTEM_ACTIONS,
 } from '../../../lib/compact';
-import { partsOfDescription } from '../../../lib/description';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
 import { READ_DEFINITIONS } from '../../../lib/handlers/read';
 import type { ServedTransport, ToolSetKind } from '../../../lib/toolSet';
@@ -150,27 +149,10 @@ describe('the listed schema declares each action’s arguments once', () => {
 describe('the description', () => {
   it('starts with what it reads, marked read-only', () => {
     assert.equal(
-      TOOL_DEFINITION.description.startsWith(
-        '[read-only] Reads across the ABAP system: ',
-      ),
+      TOOL_DEFINITION.description.startsWith('[read-only] Finds '),
       true,
     );
   });
-
-  for (const action of SYSTEM_ACTIONS) {
-    it(format("states %s by its full tool's parts", action), () => {
-      const full = partsOfDescription(
-        READ_DEFINITIONS[SYSTEM_ACTION_TOOLS[action]].description,
-      );
-      for (const variant of VARIANTS) {
-        const value = partsOfDescription(
-          TOOL_DEFINITION.variants[variant].description,
-        )?.values?.each.find((each) => each.value === action);
-        assert.ok(full !== undefined && value !== undefined, action);
-        assert.equal(value.purpose, full.purpose);
-      }
-    });
-  }
 });
 
 const BINARIES: ReadonlyArray<readonly [ServedTransport, ToolSetKind]> = [

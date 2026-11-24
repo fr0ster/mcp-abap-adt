@@ -13,9 +13,31 @@ const minted: unique symbol = Symbol('purpose');
 export interface Purpose {
   readonly [minted]: true;
   readonly text: string;
+  /**
+   * The object types the sentence names, as generated from a compact tool's
+   * schema enum: not free text, so the length rule counts them as one word.
+   */
+  readonly types?: string | undefined;
 }
 
 /** The purpose sentence of a tool: what it does, in domain words. */
 export function purpose(text: string): Purpose {
   return { [minted]: true, text };
+}
+
+/**
+ * A purpose naming the object types a compact tool works on, in words —
+ * `before`, the types joined with `or`, then `after`: `Updates an ABAP class,
+ * program or table, under its lock.`
+ */
+export function typesPurpose(
+  before: string,
+  types: readonly string[],
+  after: string,
+): Purpose {
+  const named =
+    types.length <= 1
+      ? types.join('')
+      : `${types.slice(0, -1).join(', ')} or ${types[types.length - 1]}`;
+  return { [minted]: true, text: `${before}${named}${after}`, types: named };
 }

@@ -33,7 +33,6 @@ import {
   longRunning,
   purpose,
   toolDescription,
-  valueFrom,
 } from '../description/index';
 import { DETAIL_LEVELS } from '../detail/levels';
 import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
@@ -2619,38 +2618,46 @@ function actionTargetRule(variant: ProjectionVariant | undefined) {
 }
 
 /** What each read gives, in the purpose's words. */
-const SYSTEM_PHRASES: Readonly<Record<SystemAction, string>> = {
-  search_source: 'source code',
-  search_object: 'objects by name',
-  where_used: 'usages',
-  package_tree: 'package hierarchies',
-  transports: 'transport orders',
-  atc_findings: 'ATC findings',
-  atc_results: 'ATC results',
-  atc_result: 'one ATC result',
+const SYSTEM_PHRASES: Readonly<
+  Record<
+    SystemAction,
+    { readonly verb: 'finds' | 'reads'; readonly words: string }
+  >
+> = {
+  search_source: { verb: 'finds', words: 'source code text' },
+  search_object: { verb: 'finds', words: 'objects by name' },
+  where_used: { verb: 'finds', words: 'where objects are used' },
+  package_tree: { verb: 'finds', words: 'package contents' },
+  transports: { verb: 'reads', words: 'transport orders' },
+  atc_findings: { verb: 'reads', words: 'ATC findings' },
+  atc_results: { verb: 'reads', words: 'ATC results' },
+  atc_result: { verb: 'reads', words: 'one ATC result' },
 };
 
+/** `Finds a, b and c, and reads d and e.`, for the actions given. */
+function systemPurposeText(actions: readonly SystemAction[]): string {
+  const of = (verb: 'finds' | 'reads') =>
+    actions
+      .map((action) => SYSTEM_PHRASES[action])
+      .filter((phrase) => phrase.verb === verb)
+      .map((phrase) => phrase.words);
+  const clauses = [
+    ...(of('finds').length > 0 ? [`finds ${listed(of('finds'))}`] : []),
+    ...(of('reads').length > 0 ? [`reads ${listed(of('reads'))}`] : []),
+  ].join(', and ');
+  return `${clauses.charAt(0).toUpperCase()}${clauses.slice(1)}.`;
+}
+
 /**
- * `HandlerSystem`'s parts with `actions`: each action does what its full
- * tool does (`SYSTEM_ACTION_TOOLS`), stated in that tool's parts.
+ * `HandlerSystem`'s parts with `actions`: what its actions find and read,
+ * in action words.
  */
 export function handlerSystemParts(
   actions: readonly SystemAction[] = SYSTEM_ACTIONS,
 ): DescriptionParts {
   return {
     tag: 'read-only',
-    purpose: purpose(
-      `Reads across the ABAP system: ${listed(actions.map((action) => SYSTEM_PHRASES[action]))}.`,
-    ),
-    values: {
-      of: 'action',
-      each: actions.map((action) =>
-        valueFrom(
-          action,
-          READ_DEFINITIONS[SYSTEM_ACTION_TOOLS[action]].description,
-        ),
-      ),
-    },
+    purpose: purpose(systemPurposeText(actions)),
     notes: [longRunning],
   };
 }

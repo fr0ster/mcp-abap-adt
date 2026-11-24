@@ -91,7 +91,6 @@ import {
 } from '../compact/longSession/handleHandlerSession';
 import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import type { VariantToolDefinition } from '../handlers/interfaces';
-import { HANDLER_GET_SOURCES } from '../handlers/readDefinitions';
 
 /** How a deny list narrows one compact tool. */
 export interface Narrowing {
@@ -204,11 +203,7 @@ const NARROWING_LIST: readonly Narrowing[] = [
     definition(variant, values, codes) {
       const members = keptOf(COMPACT_READ[variant], values);
       return {
-        description: compactGetDescription(
-          variant,
-          HANDLER_GET_SOURCES,
-          members,
-        ),
+        description: compactGetDescription(variant, members),
         inputSchema: compactGetSchemaFor(
           members,
           keptOf(COMPACT_MAIN_PROGRAMS[variant], values),

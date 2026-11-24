@@ -77,7 +77,7 @@ export function handlerDebugStepParts(
   return {
     tag: 'debug',
     purpose: purpose(
-      'Moves the stopped ABAP or AMDP debuggee by one step, one SAP call per operation.',
+      'Steps the stopped ABAP or AMDP debuggee, one SAP call per operation.',
     ),
     values: {
       of: 'operation',

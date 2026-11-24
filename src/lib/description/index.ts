@@ -26,7 +26,7 @@ export {
   stateHandleAnswered,
   underLock,
 } from './notes';
-export { type Purpose, purpose } from './purpose';
+export { type Purpose, purpose, typesPurpose } from './purpose';
 export { type ReaderParts, readerParts } from './readers';
 export {
   type SourceReader,

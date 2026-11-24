@@ -111,4 +111,4 @@ export { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGet
 // A unit-test run's result read once: what the compact reads state.
 export { RESULT_ONCE_PARTS } from '../../handlers/unit_test/shared/resultOnce.js';
 // The read tools' definitions, for the compact routes' entries.
-export { HANDLER_GET_SOURCES, READ_DEFINITIONS } from './readDefinitions.js';
+export { READ_DEFINITIONS } from './readDefinitions.js';

@@ -21,7 +21,6 @@ import {
   withInCallSchema,
 } from '@mcp-abap-adt/lib/handlers';
 import {
-  HANDLER_GET_SOURCES,
   handleGetActivationResults,
   handleGetActivationStatus,
   handleGetNodeStructureOnce,
@@ -71,7 +70,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerGet',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: toolDescription(compactGetParts(variant, HANDLER_GET_SOURCES)),
+    description: toolDescription(compactGetParts(variant)),
     inputSchema: schemaOn(variant),
     members: COMPACT_READ[variant],
   })),

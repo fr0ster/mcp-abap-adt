@@ -22,20 +22,56 @@ import {
   type DescriptionParts,
   longRunning,
   purpose,
-  sourceReader,
   stateHandleAnswered,
   toolDescription,
+  typesPurpose,
   underLock,
-  valueFrom,
-  valueParts,
 } from '../description/index';
-import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
-import { COMPACT_MAIN_PROGRAMS } from './compactSchemas';
-import type { HandlerGetSources } from './handlerGetSources';
+import type { CompactObjectType } from './compactObjectTypes';
 import { either, leftOf, when } from './memberTexts';
 
 /** Each member as the description names it, with the arguments it takes. */
 type Tokens<M extends string> = { readonly [K in M]: string };
+
+/** Each object type in words, as a purpose names it. */
+const TYPE_WORDS: { readonly [K in CompactObjectType]: string } = {
+  PACKAGE: 'package',
+  DOMAIN: 'domain',
+  DATA_ELEMENT: 'data element',
+  TRANSPORT: 'transport',
+  TABLE: 'table',
+  STRUCTURE: 'structure',
+  TABLE_TYPE: 'table type',
+  DDL: 'CDS view',
+  SERVICE_DEFINITION: 'service definition',
+  SERVICE_BINDING: 'service binding',
+  CLASS: 'class',
+  UNIT_TEST: 'class unit test',
+  CDS_UNIT_TEST: 'CDS unit test',
+  LOCAL_TEST_CLASS: 'local test class',
+  LOCAL_TYPES: 'class local types',
+  LOCAL_DEFINITIONS: 'class local definitions',
+  LOCAL_MACROS: 'class local macros',
+  PROGRAM: 'program',
+  INCLUDE: 'include',
+  INTERFACE: 'interface',
+  FUNCTION_GROUP: 'function group',
+  FUNCTION_MODULE: 'function module',
+  BEHAVIOR_DEFINITION: 'behavior definition',
+  BEHAVIOR_IMPLEMENTATION: 'behavior implementation',
+  METADATA_EXTENSION: 'metadata extension',
+  RUNTIME_PROFILE: 'profiler trace',
+  RUNTIME_DUMP: 'short dump',
+  PROGRAM_TEXT_ELEMENTS: 'program text elements',
+  FUNCTION_GROUP_TEXT_ELEMENTS: 'function group text elements',
+  CLASS_TEXT_ELEMENTS: 'class text elements',
+  TABLE_SETTINGS: 'table technical settings',
+};
+
+/** The object types `members` names, in words, each once. */
+function typeWords(members: readonly CompactObjectType[]): string[] {
+  return [...new Set(members.map((member) => TYPE_WORDS[member]))];
+}
 
 type CreateMember = (typeof COMPACT_CREATE.onprem)[number];
 
@@ -78,8 +114,10 @@ export function compactCreateParts(
 ): DescriptionParts {
   const transport = members.includes('TRANSPORT');
   return {
-    purpose: purpose(
-      `Creates the ABAP repository object of the type object_type names, inactive${when(transport, ', or a transport')}.`,
+    purpose: typesPurpose(
+      'Creates an ABAP ',
+      typeWords(members),
+      ', inactive where it is activated.',
     ),
   };
 }
@@ -135,20 +173,6 @@ export function readToken(member: ReadMember): string {
   return READ_TOKENS[member];
 }
 
-export type { HandlerGetSources } from './handlerGetSources';
-
-/** The parts HandlerGet reads whatever the members, by their function. */
-const ACTIVATION_PARTS = [
-  valueParts('activation_status', {
-    purpose: purpose('Reads the status of an activation run by its id.'),
-  }),
-  valueParts('activation_results', {
-    purpose: purpose(
-      "Reads the results of an activation run by its id: SAP's verdict and the messages the run produced.",
-    ),
-  }),
-] as const;
-
 /**
  * HandlerGet's parts on `variant`, naming `members` (default: all the
  * variant's): each part by its function, a part whose members are all
@@ -156,42 +180,15 @@ const ACTIVATION_PARTS = [
  */
 export function compactGetParts(
   variant: ProjectionVariant,
-  sources: HandlerGetSources,
   members: readonly ReadMember[] = COMPACT_READ[variant],
 ): DescriptionParts {
-  const left = leftOf(COMPACT_READ[variant], members);
-  const mainPrograms = left.of<ReadMember>(COMPACT_MAIN_PROGRAMS[variant]);
-  const drafts = left.of(HANDLER_GET_DRAFT_TYPES[variant]);
   return {
     tag: 'read-only',
-    purpose: purpose(
-      'Reads one part of the ABAP repository object of the type object_type names, of the repository by ADT address, or of an activation run by its id.',
+    purpose: typesPurpose(
+      'Reads the source code, metadata, contents, structure or unactivated change of an ABAP ',
+      typeWords(members),
+      ', or the status and results of an activation run.',
     ),
-    values: {
-      of: 'part',
-      each: [
-        valueParts('source', sourceReader({ object: 'the object' })),
-        valueParts('metadata', {
-          purpose: purpose(
-            'Reads the metadata of the object at the version asked, as its type keeps it.',
-          ),
-        }),
-        ...(left.has('SERVICE_BINDING')
-          ? [valueFrom('urls', sources.urls)]
-          : []),
-        ...(left.has('PACKAGE')
-          ? [valueFrom('contents', sources.contents)]
-          : []),
-        ...(mainPrograms.length > 0
-          ? [valueFrom('main_programs', sources.main_programs)]
-          : []),
-        ...(drafts.length > 0 ? [valueFrom('draft', sources.draft)] : []),
-        valueFrom('object_structure', sources.object_structure),
-        valueFrom('node_structure', sources.node_structure),
-        valueFrom('virtual_folders', sources.virtual_folders),
-        ...ACTIVATION_PARTS,
-      ],
-    },
     notes: [longRunning],
   };
 }
@@ -199,10 +196,9 @@ export function compactGetParts(
 /** HandlerGet's description on `variant`, naming `members` (default: all the variant's). */
 export function compactGetDescription(
   variant: ProjectionVariant,
-  sources: HandlerGetSources,
   members: readonly ReadMember[] = COMPACT_READ[variant],
 ): string {
-  return toolDescription(compactGetParts(variant, sources, members));
+  return toolDescription(compactGetParts(variant, members));
 }
 
 type UpdateMember = (typeof COMPACT_UPDATE.onprem)[number];
@@ -261,11 +257,13 @@ export function updateToken(member: UpdateMember): string {
 /** HandlerUpdate's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactUpdateParts(
   variant: ProjectionVariant,
-  _members: readonly UpdateMember[] = COMPACT_UPDATE[variant],
+  members: readonly UpdateMember[] = COMPACT_UPDATE[variant],
 ): DescriptionParts {
   return {
-    purpose: purpose(
-      'Writes the whole content of the ABAP repository object of the type object_type names, under the lock its lock handle names.',
+    purpose: typesPurpose(
+      'Updates an ABAP ',
+      typeWords(members),
+      ', under its lock.',
     ),
     notes: [underLock],
   };
@@ -333,8 +331,11 @@ export function compactDeleteParts(
     'UNIT_TEST',
   ]);
   return {
-    purpose: purpose(
-      `Deletes the ABAP repository object of the type object_type names${when(includes.length > 0, ", or empties a class include under the class's lock")}.`,
+    purpose: typesPurpose(
+      'Deletes an ABAP ',
+      typeWords(members),
+      when(includes.length > 0, ", a class include under the class's lock") +
+        '.',
     ),
     notes: [underLock],
   };
@@ -371,11 +372,13 @@ export function lockToken(member: LockMember): string {
 /** HandlerLock's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactLockParts(
   variant: ProjectionVariant,
-  _members: readonly LockMember[] = COMPACT_LOCK[variant],
+  members: readonly LockMember[] = COMPACT_LOCK[variant],
 ): DescriptionParts {
   return {
-    purpose: purpose(
-      'Locks the ABAP repository object of the type object_type names on the server instance that then holds the lock for its write, delete and unlock.',
+    purpose: typesPurpose(
+      'Locks an ABAP ',
+      typeWords(members),
+      ' for its update, delete and unlock on the server instance that holds the lock.',
     ),
     notes: [stateHandleAnswered],
   };
@@ -399,11 +402,13 @@ export function unlockToken(member: UnlockMember): string {
 /** HandlerUnlock's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactUnlockParts(
   variant: ProjectionVariant,
-  _members: readonly UnlockMember[] = COMPACT_UNLOCK[variant],
+  members: readonly UnlockMember[] = COMPACT_UNLOCK[variant],
 ): DescriptionParts {
   return {
-    purpose: purpose(
-      'Releases the lock this server instance holds on the ABAP repository object of the type object_type names, under its lock handle.',
+    purpose: typesPurpose(
+      'Unlocks an ABAP ',
+      typeWords(members),
+      ', releasing the lock this server instance holds.',
     ),
     notes: [underLock],
   };
@@ -447,12 +452,14 @@ export function validateToken(member: ValidateMember): string {
 /** HandlerValidate's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactValidateParts(
   variant: ProjectionVariant,
-  _members: readonly ValidateMember[] = COMPACT_VALIDATE[variant],
+  members: readonly ValidateMember[] = COMPACT_VALIDATE[variant],
 ): DescriptionParts {
   return {
     tag: 'read-only',
-    purpose: purpose(
-      'Validates the name of a new ABAP repository object of the type object_type names, before it is created.',
+    purpose: typesPurpose(
+      'Validates the name of a new ABAP ',
+      typeWords(members),
+      ', before it is created.',
     ),
   };
 }
@@ -488,8 +495,10 @@ export function compactCheckRunParts(
   ]);
   return {
     tag: 'read-only',
-    purpose: purpose(
-      `Checks the syntax of the ABAP repository object of the type object_type names${when(unsaved.length > 0, ', as stored or as the source given')}.`,
+    purpose: typesPurpose(
+      'Checks the syntax of an ABAP ',
+      typeWords(members),
+      `${when(unsaved.length > 0, ', as stored or as the source given')}.`,
     ),
   };
 }
@@ -516,12 +525,14 @@ export function deletionCheckToken(member: DeletionCheckMember): string {
 /** HandlerDeletionCheck's parts on `variant`, naming `given` (default: all the variant's). */
 export function compactDeletionCheckParts(
   variant: ProjectionVariant,
-  _given: readonly DeletionCheckMember[] = COMPACT_DELETION_CHECK[variant],
+  given: readonly DeletionCheckMember[] = COMPACT_DELETION_CHECK[variant],
 ): DescriptionParts {
   return {
     tag: 'read-only',
-    purpose: purpose(
-      'Asks SAP whether the ABAP repository object of the type object_type names can be deleted.',
+    purpose: typesPurpose(
+      'Checks whether SAP lets an ABAP ',
+      typeWords(given),
+      ' be deleted.',
     ),
   };
 }
@@ -550,11 +561,13 @@ export function activateToken(member: ActivateMember): string {
 /** HandlerActivate's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactActivateParts(
   variant: ProjectionVariant,
-  _members: readonly ActivateMember[] = COMPACT_ACTIVATE[variant],
+  members: readonly ActivateMember[] = COMPACT_ACTIVATE[variant],
 ): DescriptionParts {
   return {
-    purpose: purpose(
-      'Activates the ABAP repository object named, by its type or its ADT type, or the objects listed, at once or by an activation run it starts.',
+    purpose: typesPurpose(
+      'Activates an ABAP ',
+      typeWords(members),
+      ', another object by its ADT type, or several objects together by an activation run.',
     ),
   };
 }

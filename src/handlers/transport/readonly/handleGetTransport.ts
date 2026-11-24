@@ -43,9 +43,18 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { answer, answerCaught } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
+  purpose,
+  type ReturnsFact,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
   entries,
   formatted,
   fullLevel,
+  headShape,
+  jsonShapesOf,
   type ListDetailTable,
   rawLevel,
   readingAt,
@@ -63,11 +72,86 @@ import { failed } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
 import type { XmlNode } from '../../../lib/xml/node';
 
+/** A request's tasks, one entry each: what its terse answer lists. */
+const REQUEST_LISTS = {
+  tasks: about(
+    'for each of its tasks: its number, owner, status, description and how many objects it holds',
+    entries('tasks', (task: ITransportRequestItem['tasks'][number]) => ({
+      number: task.header.number,
+      owner: task.header.owner,
+      status: task.header.status,
+      description: task.header.description,
+      object_count: task.objectCount,
+    })),
+  ),
+};
+
+/** A task's objects, one entry each: what its terse answer lists. */
+const TASK_LISTS = {
+  objects: about(
+    'for each of its objects: its program ID, type, name and position',
+    entries(
+      'objects',
+      (entry: ITransportTaskItem['objects'][number]): ObjectRow => ({
+        pgmid: entry.pgmid,
+        type: entry.type,
+        name: entry.name,
+        position: entry.position,
+      }),
+    ),
+  ),
+  incompleteEntries: about(
+    'the objects SAP lists only in part, with what it gives of each',
+    entries('incompleteEntries', incompleteRow, {
+      as: 'incomplete_objects',
+      omitEmpty: true,
+    }),
+  ),
+};
+
+/**
+ * What GetTransport gives back, by the kind of number read: a request's
+ * facts and tasks, or a task's facts, its parent request's and its objects.
+ */
+const TRANSPORT_RETURNS: readonly ReturnsFact[] = [
+  ...returnsOf({
+    of: 'for a transport:',
+    heads: [
+      headShape(
+        'transport',
+        'its number, description, type, status, owner and target system',
+      ),
+      headShape('task_count', 'how many tasks it has'),
+    ],
+    shapes: [jsonShapesOf(REQUEST_LISTS)],
+  }),
+  ...returnsOf({
+    of: 'for a task:',
+    heads: [
+      headShape(
+        'task',
+        'its number, its transport, description, type, status and owner',
+      ),
+      headShape(
+        'parent_request',
+        "its transport's number, type, status and target system",
+      ),
+      headShape('object_count', 'how many objects it holds'),
+    ],
+    shapes: [jsonShapesOf(TASK_LISTS)],
+  }),
+];
+
 export const TOOL_DEFINITION = {
   name: 'GetTransport',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Reads the transport request or transport task named by transport_number; kind says which: 'request' or 'task'. A transport request answers its header (number, description, type, status, owner, target system) and its tasks, each with number, owner, status, description and object count. A transport task answers its header (number, parent request, description, type, status, owner), its parent request (number, type, status, target system), and its objects, each with pgmid, type, name and position, with their count; an object SAP lists nameless or untyped is listed apart, under incomplete_objects, with the fields it has, and counted.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads an ABAP transport or one of its tasks by its number, and says which of the two it is.',
+    ),
+    returns: TRANSPORT_RETURNS,
+  }),
   inputSchema: z.object({
     transport_number: z.string().describe('Transport request or task number'),
     include_objects: z
@@ -124,18 +208,7 @@ function terseRequest(item: ITransportRequestItem, options: TerseOptions) {
       },
     },
     options.includeTasks ? { tasks: item.tasks } : {},
-    {
-      tasks: entries(
-        'tasks',
-        (task: ITransportRequestItem['tasks'][number]) => ({
-          number: task.header.number,
-          owner: task.header.owner,
-          status: task.header.status,
-          description: task.header.description,
-          object_count: task.objectCount,
-        }),
-      ),
-    },
+    REQUEST_LISTS,
     { task_count: item.tasks.length },
   );
 }
@@ -183,21 +256,7 @@ function terseTask(item: ITransportTaskItem, options: TerseOptions) {
     options.includeObjects
       ? { objects: item.objects, incompleteEntries: item.incompleteEntries }
       : {},
-    {
-      objects: entries(
-        'objects',
-        (entry: ITransportTaskItem['objects'][number]): ObjectRow => ({
-          pgmid: entry.pgmid,
-          type: entry.type,
-          name: entry.name,
-          position: entry.position,
-        }),
-      ),
-      incompleteEntries: entries('incompleteEntries', incompleteRow, {
-        as: 'incomplete_objects',
-        omitEmpty: true,
-      }),
-    },
+    TASK_LISTS,
     // Every entry SAP lists, one without a name or a type included.
     { object_count: item.objects.length + incompleteCount },
   );

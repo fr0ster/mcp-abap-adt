@@ -174,7 +174,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetDomain',
   'GetEnhancementImpl',
   'GetEnhancementSpot',
-  'GetEnhancements',
   'GetFunctionGroup',
   'GetFunctionInclude',
   'GetFunctionModule',
@@ -212,7 +211,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetStructureVersionDiff',
   'GetStructureVersionSource',
   'GetStructureVersions',
-  'GetStructuresList',
   'GetTable',
   'GetTableContents',
   'GetTableSettings',
@@ -222,7 +220,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetTableVersionSource',
   'GetTableVersions',
   'GetTextElements',
-  'GetTransport',
   'GetUnitTest',
   'GetUnitTestResult',
   'GetUnitTestStatus',
@@ -294,7 +291,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'RuntimeCreateProfilerTraceParameters',
   'RuntimeGetDumpById',
   'RuntimeGetProfilerTraceData',
-  'RuntimeListFeeds',
   'RuntimeRunClass',
   'RuntimeRunProgram',
   'SessionClose',
@@ -352,7 +348,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 339;
+export const NOT_YET_ASSEMBLED_MOST = 335;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

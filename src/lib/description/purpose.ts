@@ -24,33 +24,37 @@ export interface Purpose {
   readonly types?: string | undefined;
 }
 
+import type { AdtMainType } from '@mcp-abap-adt/interfaces-adt';
+
 /**
- * Each object noun a purpose may name, with its ADT object type: the main
- * type, or the type with its subtype where objects share a main type (a
- * function module `FUGR/FF`, an include `PROG/I`, a structure `TABL/DS`).
- * A behavior implementation is `BIMP`, as the owner named it (ADT serves
- * it as a class, `CLAS/OC`). Matched longest first.
+ * Each object noun a purpose may name, with the main type of its ADT object
+ * type, as the owner's examples name them (`CLAS`, `TABL`): a function
+ * module and a function group are both `FUGR`, an include and a program
+ * `PROG`, a structure and a table `TABL`. A behavior implementation is the
+ * class ADT serves it as (`CLAS/OC`): no table of ADT types holds a `BIMP`.
+ * Matched longest first; a report is a program, a behavior implementation
+ * class a behavior implementation (`SAME_OBJECT`).
  */
-const TYPE_CODES: ReadonlyArray<readonly [string, string]> = [
-  ['behavior implementation class', 'BIMP'],
+const TYPE_CODES: ReadonlyArray<readonly [string, AdtMainType]> = [
+  ['behavior implementation class', 'CLAS'],
   ['enhancement implementation', 'ENHO'],
-  ['behavior implementation', 'BIMP'],
+  ['behavior implementation', 'CLAS'],
   ['behavior definition', 'BDEF'],
   ['metadata extension', 'DDLX'],
   ['service definition', 'SRVD'],
   ['enhancement spot', 'ENHS'],
   ['service binding', 'SRVB'],
-  ['function module', 'FUGR/FF'],
+  ['function module', 'FUGR'],
   ['function group', 'FUGR'],
   ['message class', 'MSAG'],
   ['data element', 'DTEL'],
   ['table type', 'TTYP'],
   ['interface', 'INTF'],
-  ['structure', 'TABL/DS'],
+  ['structure', 'TABL'],
   ['CDS view', 'DDLS'],
   ['program', 'PROG'],
   ['package', 'DEVC'],
-  ['include', 'PROG/I'],
+  ['include', 'PROG'],
   ['report', 'PROG'],
   ['domain', 'DOMA'],
   ['class', 'CLAS'],
@@ -109,16 +113,23 @@ function nounEnd(text: string, phrase: string, at: number): number {
   return end;
 }
 
+/** Nouns that name one object: the first naming alone carries the code. */
+const SAME_OBJECT: Readonly<Record<string, string>> = {
+  report: 'program',
+  'behavior implementation class': 'behavior implementation',
+};
+
 /**
  * `text` with each object's type code after its first naming as a noun: the
- * longest noun first, a shorter noun never inside a longer one, each code
+ * longest noun first, a shorter noun never inside a longer one, each object
  * once.
  */
 export function withTypeCodes(text: string): string {
   const taken: Array<readonly [number, number, string]> = [];
   const coded = new Set<string>();
   for (const [phrase, code] of TYPE_CODES) {
-    if (coded.has(code)) continue;
+    const object = SAME_OBJECT[phrase] ?? phrase;
+    if (coded.has(object)) continue;
     for (let at = text.indexOf(phrase); at >= 0; ) {
       const end = nounEnd(text, phrase, at);
       const inside = taken.some(
@@ -126,7 +137,7 @@ export function withTypeCodes(text: string): string {
       );
       if (end >= 0 && !inside) {
         taken.push([at, end, code]);
-        coded.add(code);
+        coded.add(object);
         break;
       }
       at = text.indexOf(phrase, at + 1);

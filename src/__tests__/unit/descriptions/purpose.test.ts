@@ -56,7 +56,7 @@ describe('the type codes beside the objects', () => {
       withTypeCodes(
         'Reads an ABAP class, program, function module or CDS view, or another class.',
       ),
-      'Reads an ABAP class (CLAS), program (PROG), function module (FUGR/FF) or CDS view (DDLS), or another class.',
+      'Reads an ABAP class (CLAS), program (PROG), function module (FUGR) or CDS view (DDLS), or another class.',
     );
     // The longest noun wins: a table type is no table, a behavior
     // implementation class no class.
@@ -64,7 +64,7 @@ describe('the type codes beside the objects', () => {
       withTypeCodes(
         'Creates a table type for a behavior implementation class.',
       ),
-      'Creates a table type (TTYP) for a behavior implementation class (BIMP).',
+      'Creates a table type (TTYP) for a behavior implementation class (CLAS).',
     );
     // A plural is the object too.
     assert.equal(
@@ -215,7 +215,7 @@ describe('the description builder', () => {
           ', under its lock.',
         ),
       }),
-      'Updates a class (CLAS), updates an include (PROG/I), under its lock.',
+      'Updates a class (CLAS), updates an include (PROG), under its lock.',
     );
     // The pairs are generated: the length rule counts them as one word.
     const many = pairsPurpose(

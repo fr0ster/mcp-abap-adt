@@ -2,6 +2,7 @@ import type { AdtCodes } from '../adtProjections';
 import { appendAll } from '../appendAll';
 import {
   type PhaseResult,
+  READS_PER_ENVELOPE,
   runPhaseOutcome,
   withSequentialFallback,
 } from '../batch/phases';
@@ -535,8 +536,8 @@ export async function runSearchSource(
   return result;
 }
 
-/** The most reads one envelope of the source-read phase carries. */
-export const READS_PER_ENVELOPE = 300;
+/** The most reads one envelope of the source-read phase carries (`phases.ts`). */
+export { READS_PER_ENVELOPE };
 
 /**
  * The targets read together through their rounds: a chunk's first round (one

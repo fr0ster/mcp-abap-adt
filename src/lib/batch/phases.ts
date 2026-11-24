@@ -63,6 +63,23 @@ import { failureOf, readOwn } from '../auth/failures';
 import { withSystemKindOf } from '../connectionFactory';
 import { NO_BATCH_ENDPOINT_STATUS } from './availability';
 
+/**
+ * The most reads one envelope carries where a call's independent reads may
+ * outnumber it: past it, they go in consecutive envelopes of at most this
+ * many (`SearchSource`'s source reads, the function module group checks,
+ * `GetEnhancements`' phases). SAP's own limit is not measured.
+ */
+export const READS_PER_ENVELOPE = 300;
+
+/** The consecutive slices of `items`, each at most `size` long, in order. */
+export function chunksOf<I>(items: readonly I[], size: number): I[][] {
+  const chunks: I[][] = [];
+  for (let at = 0; at < items.length; at += size) {
+    chunks.push(items.slice(at, at + size));
+  }
+  return chunks;
+}
+
 /** One item's settlement in a phase. */
 export type PhaseResult<R> =
   | { ok: true; value: R }

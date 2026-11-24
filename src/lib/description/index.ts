@@ -16,7 +16,6 @@ export {
   createTool,
   deleteTool,
   type KindTool,
-  namedCheckTool,
   updateTool,
   validateTool,
 } from './kinds';

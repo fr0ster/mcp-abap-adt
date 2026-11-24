@@ -12,7 +12,6 @@ import { type Purpose, purpose } from './purpose';
 import {
   ACTIVATED,
   CHECKED,
-  CHECKED_NAMED,
   DELETED,
   VALIDATED,
   WRITTEN,
@@ -77,15 +76,6 @@ export function deleteTool(tool: KindTool): string {
 /** A check: `Checks the syntax of <object> <how>.`, then the check's verdict and messages. */
 export function checkTool(tool: KindTool): string {
   return kind('Checks the syntax of', CHECKED, tool);
-}
-
-/**
- * A check that names the object it checked (a high-level check, whose answer
- * `normalizeCheckResponse` names): `Checks the syntax of <object> <how>.`,
- * then the object, the check's verdict and messages.
- */
-export function namedCheckTool(tool: KindTool): string {
-  return kind('Checks the syntax of', CHECKED_NAMED, tool);
 }
 
 /** An activation: `Activates <object> <how>.`, then the activation's verdict and messages. */

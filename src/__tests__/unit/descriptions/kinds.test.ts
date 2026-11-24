@@ -13,7 +13,6 @@ import {
   createTool,
   deleteTool,
   listOf,
-  namedCheckTool,
   purpose,
   resultReturns,
   resultShape,
@@ -81,18 +80,6 @@ describe('the kind factories', () => {
     assert.equal(
       checkTool({ object: 'a CDS view', how: 'or of its source as given' }),
       `Checks the syntax of a CDS view or of its source as given. ${checked}`,
-    );
-  });
-
-  it("named check: the object checked, the check's verdict, then each message", () => {
-    const checked = `The object checked, whether the check ran and SAP's status text. ${MESSAGES}`;
-    assert.equal(
-      namedCheckTool({ object: 'an ABAP class', tag: 'read-only' }),
-      `[read-only] Checks the syntax of an ABAP class. ${checked}`,
-    );
-    assert.equal(
-      namedCheckTool({ object: 'an ABAP domain', tag: 'read-only' }),
-      `[read-only] Checks the syntax of an ABAP domain. ${checked}`,
     );
   });
 

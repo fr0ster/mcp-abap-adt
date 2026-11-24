@@ -818,7 +818,7 @@ const TYPE_FIELDS = new Map(TYPES);
 const fieldsOf = (objectType: string) => TYPE_FIELDS.get(objectType) ?? {};
 
 const NOT_SENT_WORDS =
-  'leave it out; then HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock and HandlerActivate';
+  'leave it out; then HandlerLock, HandlerUpdate with the lock_handle, HandlerLock with action unlock and HandlerActivate';
 
 describe('HandlerCreate refuses an argument its create does not send', () => {
   withSystemContext();

@@ -1,5 +1,6 @@
 import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
+
 /**
  * ListFunctionGroupIncludes Handler
  *
@@ -21,7 +22,8 @@ import * as z from 'zod';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { listAnswerAt, wireAnswer } from '../../../lib/detail';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { listAnswerAt, shapesOf, wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   ASSEMBLED_DETAIL_SHAPE,
@@ -31,6 +33,8 @@ import {
 import {
   fetchFunctionGroupChildren,
   functionGroupListAnswers,
+  GROUP_CHILD_HEADS,
+  groupChildLists,
 } from '../../../lib/strategies/functionGroupChildren';
 import { nodeStructureOn } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -41,8 +45,16 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'ListFunctionGroupIncludes',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] List the includes (TOP, custom) of an ABAP function group, read at its active version.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Lists the includes of an ABAP function group, its TOP include among them, at its active version.',
+    ),
+    returns: returnsOf({
+      heads: GROUP_CHILD_HEADS,
+      shapes: [shapesOf(groupChildLists('includes'))],
+    }),
+  }),
   inputSchema: z.object({
     function_group_name: z.string().describe('Function group name.'),
     ...ASSEMBLED_DETAIL_SHAPE,

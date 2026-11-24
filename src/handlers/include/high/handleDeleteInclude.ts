@@ -14,6 +14,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { includeDocuments } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
+import { deleteTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { detailOf } from '../../../lib/strategies/detail';
@@ -24,8 +25,10 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'DeleteInclude',
   available_in: ['onprem'] as const,
-  description:
-    'Deletes the ABAP include named by include_name through the ADT deletion service, after asking whether it can be deleted. Returns the deletion result.',
+  description: deleteTool({
+    object: 'an ABAP include',
+    how: ', recorded in the transport given',
+  }),
   inputSchema: z.object({
     include_name: z.string().describe('Include name.'),
     transport_request: z

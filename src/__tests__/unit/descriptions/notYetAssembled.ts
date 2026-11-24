@@ -102,33 +102,8 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'DebugTakeOverListener',
   'DebugTerminate',
   'DebugWait',
-  'DeleteBehaviorDefinition',
-  'DeleteBehaviorImplementation',
   'DeleteCdsUnitTest',
-  'DeleteClass',
-  'DeleteDataElement',
-  'DeleteDdl',
-  'DeleteDomain',
-  'DeleteFunctionGroup',
-  'DeleteFunctionInclude',
-  'DeleteFunctionModule',
-  'DeleteInclude',
-  'DeleteInterface',
-  'DeleteLocalDefinitions',
-  'DeleteLocalMacros',
   'DeleteLocalTestClass',
-  'DeleteLocalTypes',
-  'DeleteMessageClass',
-  'DeleteMessageClassMessage',
-  'DeleteMetadataExtension',
-  'DeletePackage',
-  'DeleteProgram',
-  'DeleteServiceBinding',
-  'DeleteServiceDefinition',
-  'DeleteStructure',
-  'DeleteTable',
-  'DeleteTableType',
-  'DeleteUnitTest',
   'DescribeByList',
   'DiscardBackgroundRun',
   'GetATCFindings',
@@ -357,7 +332,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 344;
+export const NOT_YET_ASSEMBLED_MOST = 319;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

@@ -21,6 +21,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { deleteTool, purpose, results } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -35,8 +36,12 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'DeleteLocalTypes',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Delete local types from an ABAP class by clearing the implementations include. Manages lock, update, unlock, and optional activation.',
+  description: deleteTool({
+    purpose: purpose(
+      'Clears the local types of an ABAP class, activating the class when asked.',
+    ),
+    result: results.WRITTEN_UNDER_LOCK,
+  }),
   inputSchema: z.object({
     class_name: z.string().describe('Parent class name.'),
     transport_request: z

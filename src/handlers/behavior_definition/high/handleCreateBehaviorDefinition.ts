@@ -50,7 +50,7 @@ export const TOOL_DEFINITION = {
   description: createTool({
     object:
       'a managed, unmanaged, abstract or projection RAP behavior definition',
-    how: 'for a root entity in a package',
+    how: 'for a root entity',
     transported: true,
   }),
   inputSchema: createArguments('CreateBehaviorDefinition', {

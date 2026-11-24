@@ -149,7 +149,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'an ABAP table type',
-    how: 'in a package, with the type it holds, its access type and primary key, activating it when asked',
+    how: ', with the type it holds, its access type and primary key, activating it when asked',
     transported: true,
   }),
   inputSchema: createArguments('CreateTableType', {

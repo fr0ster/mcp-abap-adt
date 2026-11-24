@@ -64,7 +64,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'an ABAP domain',
-    how: 'in a package, with its data type, length, decimals, conversion exit, value table and fixed values',
+    how: ', with its data type, length, decimals, conversion exit, value table and fixed values',
     transported: true,
   }),
   inputSchema: createArguments('CreateDomain', {

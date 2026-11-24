@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'a CDS view or classic DDL view',
-    how: 'in a package, with its description',
+    how: ', with its description',
     transported: true,
   }),
   inputSchema: createArguments('CreateDdl', {

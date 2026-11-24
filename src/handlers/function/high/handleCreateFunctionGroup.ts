@@ -52,7 +52,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'an ABAP function group',
-    how: 'in a package, with its description, activating it when asked',
+    how: ', with its description, activating it when asked',
     transported: true,
   }),
   inputSchema: createArguments('CreateFunctionGroup', {

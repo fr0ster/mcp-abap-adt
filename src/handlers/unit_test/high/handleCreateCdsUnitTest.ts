@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     purpose: purpose(
-      'Creates an ABAP Unit test class for a CDS view in a package, from the test class source given, once the view supports CDS test doubles.',
+      'Creates an ABAP Unit test class for a CDS view, from the test class source given, once the view supports CDS test doubles.',
     ),
   }),
   inputSchema: createArguments('CreateCdsUnitTest', {

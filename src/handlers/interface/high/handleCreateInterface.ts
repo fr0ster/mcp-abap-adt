@@ -31,7 +31,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'an ABAP interface',
-    how: 'in a package, with its description',
+    how: ', with its description',
     transported: true,
   }),
   inputSchema: createArguments('CreateInterface', {

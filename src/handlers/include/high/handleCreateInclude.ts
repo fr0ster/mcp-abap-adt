@@ -31,7 +31,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description: createTool({
     object: 'an ABAP include',
-    how: 'in a package, with its description and the comment header SAP writes into it',
+    how: ', with its description and the comment header SAP writes into it',
     transported: true,
   }),
   inputSchema: createArguments('CreateInclude', {

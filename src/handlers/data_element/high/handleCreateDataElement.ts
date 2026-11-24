@@ -65,7 +65,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'an ABAP data element',
-    how: 'in a package, typed by a domain, a built-in type or a reference, with its labels and search help',
+    how: ', typed by a domain, a built-in type or a reference, with its labels and search help',
     transported: true,
   }),
   inputSchema: createArguments('CreateDataElement', {

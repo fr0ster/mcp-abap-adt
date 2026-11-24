@@ -41,7 +41,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'the RAP behavior implementation class of a behavior definition',
-    how: 'in a package, with its description',
+    how: ', with its description',
     transported: true,
   }),
   inputSchema: createArguments('CreateBehaviorImplementation', {

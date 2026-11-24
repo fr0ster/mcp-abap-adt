@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { checkTool } from '../../../lib/description';
+import { namedCheckTool } from '../../../lib/description';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,7 +26,7 @@ import { handleCheckMetadataExtension as handleCheckMetadataExtensionLow } from 
 export const TOOL_DEFINITION = {
   name: 'CheckMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
-  description: checkTool({
+  description: namedCheckTool({
     tag: 'read-only',
     object: 'a CDS metadata extension',
   }),

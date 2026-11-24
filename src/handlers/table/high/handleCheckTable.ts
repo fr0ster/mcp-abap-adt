@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { checkTool } from '../../../lib/description';
+import { namedCheckTool } from '../../../lib/description';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,7 +26,7 @@ import { handleCheckTable as handleCheckTableLow } from '../low/handleCheckTable
 export const TOOL_DEFINITION = {
   name: 'CheckTable',
   available_in: ['onprem', 'cloud'] as const,
-  description: checkTool({
+  description: namedCheckTool({
     tag: 'read-only',
     object: 'an ABAP database table',
     how: 'as stored or as the source given',

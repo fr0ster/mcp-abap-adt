@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { checkTool } from '../../../lib/description';
+import { namedCheckTool } from '../../../lib/description';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,7 +26,10 @@ import { handleCheckDataElement as handleCheckDataElementLow } from '../low/hand
 export const TOOL_DEFINITION = {
   name: 'CheckDataElement',
   available_in: ['onprem', 'cloud'] as const,
-  description: checkTool({ tag: 'read-only', object: 'an ABAP data element' }),
+  description: namedCheckTool({
+    tag: 'read-only',
+    object: 'an ABAP data element',
+  }),
   inputSchema: z.object({
     data_element_name: z.string().describe('Data element name.'),
     version: z

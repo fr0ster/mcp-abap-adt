@@ -35,6 +35,7 @@ import type {
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { textElementsClientOf } from '../../../lib/clients';
+import { membersOf, purpose, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
 import { succeeded } from '../../../lib/strategies/stepResponse';
@@ -50,8 +51,31 @@ import {
 export const TOOL_DEFINITION = {
   name: 'GetTextElements',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Reads the text elements of the program, function group or class named by object_kind and object_name, in the object's original language, at the version asked: text symbols (key, text, maximum length), selection texts (name, text, and whether the text is the dictionary's label) and the list and column headings. A class has text symbols only. Reads the parts named by parts, every part of the object by default.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the text elements of an ABAP program, function group or class in its original language at the version asked: text symbols, selection texts and headings.',
+    ),
+    returns: [
+      ...membersOf<TextSymbolAnswer>('for each text symbol:', {
+        key: 'its key',
+        text: 'its text',
+        max_length: 'its maximum length',
+      }),
+      ...membersOf<SelectionTextAnswer>('for each selection text:', {
+        name: 'its name',
+        text: 'its text',
+        ddic_reference: "whether it is the dictionary's label",
+      }),
+      ...membersOf<HeadingsAnswer>('its headings:', {
+        list_header: 'the list heading',
+        column_header_1: 'the first of the four headings below it',
+        column_header_2: 'the second',
+        column_header_3: 'the third',
+        column_header_4: 'the fourth',
+      }),
+    ],
+  }),
   inputSchema: z
     .object({
       object_kind: z
@@ -82,6 +106,17 @@ export const TOOL_DEFINITION = {
 } as const;
 
 type GetTextElementsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/** One text symbol, as the tool answers it. */
+type TextSymbolAnswer = NonNullable<TextElementsAnswer['symbols']>[number];
+
+/** One selection text, as the tool answers it. */
+type SelectionTextAnswer = NonNullable<
+  TextElementsAnswer['selections']
+>[number];
+
+/** The headings, as the tool answers them. */
+type HeadingsAnswer = NonNullable<TextElementsAnswer['headings']>;
 
 /** The text elements read, part by part, as the tool answers them. */
 export interface TextElementsAnswer {

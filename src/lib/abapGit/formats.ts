@@ -619,11 +619,17 @@ function resultOf(status: number): 'accepted' | 'done' {
  * its status and its result. Minified JSON.
  */
 export function statusAnswer(value: { readonly status: number }): string {
-  return JSON.stringify({
-    status: value.status,
-    result: resultOf(value.status),
-  });
+  return JSON.stringify(statusFacts(value));
 }
+
+/** A write's status and its result. */
+export function statusFacts(value: { readonly status: number }) {
+  return { status: value.status, result: resultOf(value.status) };
+}
+
+/** What a link or a pull answers: its status and result, and each object SAP lists. */
+export type ObjectsAnswerFacts = ReturnType<typeof statusFacts> &
+  IAbapGitObjectsFacts;
 
 /**
  * What a link or a pull answers (R2, R4): its status, its result and every
@@ -634,14 +640,10 @@ export function objectsAnswer(
   value: IAbapGitFactsResponse<IAbapGitObjectsFacts>,
 ): string {
   return jsonText(
-    writeJson(
-      { status: value.status, result: resultOf(value.status) },
-      value.facts,
-      {
-        objects: entries('objects', (object: LoggedObject) => object, {
-          omitEmpty: true,
-        }),
-      },
-    ),
+    writeJson(statusFacts(value), value.facts, {
+      objects: entries('objects', (object: LoggedObject) => object, {
+        omitEmpty: true,
+      }),
+    }),
   ).answer;
 }

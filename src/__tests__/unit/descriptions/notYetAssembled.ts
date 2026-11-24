@@ -276,15 +276,12 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'HandlerUnlock',
   'HandlerUpdate',
   'HandlerValidate',
-  'LinkAbapGitRepo',
   'ListServiceBindingTypes',
   'ListTransports',
   'LockObjectLow',
   'MemorySnapshotDelta',
   'MemorySnapshotGet',
   'MemorySnapshotList',
-  'PullAbapGitRepo',
-  'PushAbapGitRepo',
   'ReadTransportActionLog',
   'ReadTransportObjects',
   'RuntimeGetGatewayErrorLog',
@@ -293,7 +290,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'RuntimeListSystemMessages',
   'SearchObject',
   'SearchSource',
-  'SwitchAbapGitBranch',
   'UnlockObjectLow',
   'UpdateBehaviorDefinition',
   'UpdateBehaviorDefinitionLow',
@@ -347,7 +343,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 334;
+export const NOT_YET_ASSEMBLED_MOST = 330;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

@@ -24,6 +24,9 @@ import {
 import { statusAnswer } from '../../../lib/abapGit/formats';
 import type { KindToolDefinition } from '../../../lib/abapGit/kindTool';
 import { BACKGROUND_FIELD } from '../../../lib/backgroundRuns/tools';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
+import { ABAPGIT_STATUS } from '../../../lib/description/sessions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 const FIELDS = {
@@ -37,24 +40,33 @@ const FIELDS = {
 const ONPREM_SCHEMA = z.object({ ...FIELDS, background: BACKGROUND_FIELD });
 const CLOUD_SCHEMA = z.object(FIELDS);
 
-const COMMITS =
-  'Commits the objects and files chosen from the staging with comment, author and committer, and pushes the commit to the remote branch of the repository repository_key.';
-
-const ONPREM_DESCRIPTION = `${COMMITS} Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status and done.`;
+const ONPREM_PARTS = runParts({
+  purpose: purpose(
+    "Commits the objects and files chosen from an abapGit repository's staging, with its comment, author and committer, and pushes the commit to its remote branch.",
+  ),
+  result: ABAPGIT_STATUS,
+});
 
 export const TOOL_DEFINITION: KindToolDefinition<
   typeof ONPREM_SCHEMA,
   typeof CLOUD_SCHEMA
 > = {
   name: 'PushAbapGitRepo',
-  description: ONPREM_DESCRIPTION,
+  description: toolDescription(ONPREM_PARTS),
   inputSchema: ONPREM_SCHEMA,
   onprem: {
-    description: ONPREM_DESCRIPTION,
+    description: toolDescription(ONPREM_PARTS),
     inputSchema: ONPREM_SCHEMA,
   },
   cloud: {
-    description: `${COMMITS} SAP accepts it as its own job, which runs to its end; the repository list shows its run state. Answers facts only: SAP's status and accepted.`,
+    description: toolDescription(
+      runParts({
+        purpose: purpose(
+          "Commits the objects and files chosen from an abapGit repository's staging and pushes the commit to its remote branch, as an SAP job.",
+        ),
+        result: ABAPGIT_STATUS,
+      }),
+    ),
     inputSchema: CLOUD_SCHEMA,
   },
 };

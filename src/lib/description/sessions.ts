@@ -13,6 +13,7 @@ import type { createdTaskNumbers } from '../../handlers/transport/high/handleCre
 import type { transportMove } from '../../handlers/transport/high/handleMoveTransportObjects';
 import type { transportRemoval } from '../../handlers/transport/high/handleRemoveTransportObject';
 import type { transportSort } from '../../handlers/transport/high/handleSortAndCompressTransportTask';
+import type { ObjectsAnswerFacts, statusFacts } from '../abapGit/formats';
 import type { backgroundRunList } from '../backgroundRuns/answers';
 import type { BackgroundRunRecord } from '../backgroundRuns/contract';
 import type { BackgroundRunTools } from '../backgroundRuns/port';
@@ -144,4 +145,26 @@ export const TASK_CREATED = resultShape<ReturnType<typeof createdTaskNumbers>>({
   task_type: 'its type',
   task_type_error: "SAP's refusal of the task type",
   note: 'what is left to do when the task stays untyped',
+});
+
+const STATUS = "SAP's status";
+const RESULT = 'whether SAP made the change or accepted it as its own job';
+
+/** What an abapGit write answers that SAP answers with its status alone. */
+export const ABAPGIT_STATUS = resultShape<ReturnType<typeof statusFacts>>({
+  status: STATUS,
+  result: RESULT,
+});
+
+/** What an abapGit link or pull answers: its status, and each object SAP lists. */
+export const ABAPGIT_OBJECTS = resultShape<ObjectsAnswerFacts>({
+  status: STATUS,
+  result: RESULT,
+  objects: listOf('for each object SAP lists', {
+    type: 'its type',
+    name: 'its name',
+    package: 'its package',
+    status: 'its status',
+    messageType: "the severity of SAP's message for it",
+  }),
 });

@@ -7,8 +7,27 @@
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 
+/**
+ * The kind each view carries from the connection it was built over
+ * (`carryConnectionKind`): a batch connection, a forwarding or recording
+ * view has no configuration of its own (adt-clients' `AdtBatchConnection`
+ * declares no `getConfig`), so it reads as the connection under it.
+ */
+const carriedKinds = new WeakMap<object, boolean>();
+
 export function isRfcConnection(connection: IAbapConnection): boolean {
-  return connection.getConfig?.().connectionType === 'rfc';
+  return (
+    carriedKinds.get(connection) ??
+    connection.getConfig?.().connectionType === 'rfc'
+  );
+}
+
+/** Gives `view`, built over `outer`, the connection kind `outer` has. */
+export function carryConnectionKind(
+  view: object,
+  outer: IAbapConnection,
+): void {
+  carriedKinds.set(view, isRfcConnection(outer));
 }
 
 /**

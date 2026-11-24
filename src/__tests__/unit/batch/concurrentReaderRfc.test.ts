@@ -9,8 +9,11 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../../handlers/interfaces';
+import { withSystemKindOf } from '../../../lib/connectionFactory';
+import { isRfcConnection, readsInFlight } from '../../../lib/connectionKind';
 import {
   concurrentReader,
   NODE_READ_CONCURRENCY,
@@ -66,5 +69,20 @@ describe('concurrentReader: reads in flight by connection kind', () => {
       results.map((r) => (r.ok ? r.value : undefined)),
       Array.from({ length: 20 }, (_, i) => i * 2),
     );
+  });
+
+  it('a batch connection over RFC reads as RFC: one in flight, as the connection it wraps', () => {
+    for (const kind of ['rfc', 'http'] as const) {
+      const inner = connectionOf(kind);
+      const batch = withSystemKindOf(
+        new AdtBatchConnection(inner, { endpoint: 'communication' }),
+        inner,
+      );
+      assert.equal(isRfcConnection(batch), kind === 'rfc');
+      assert.equal(readsInFlight(batch, 8), kind === 'rfc' ? 1 : 8);
+      // A view over that view keeps it too.
+      const view = withSystemKindOf({ ...batch }, batch);
+      assert.equal(isRfcConnection(view as IAbapConnection), kind === 'rfc');
+    }
   });
 });

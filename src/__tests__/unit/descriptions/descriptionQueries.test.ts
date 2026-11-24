@@ -1,13 +1,17 @@
 /**
  * Plan step 10 (owner): a description is ready when a user's typical
  * questions find its tool first. Each moved tool has 3–5 queries, in
- * Ukrainian and in English (`descriptionQueries.json`); embedded with the
- * Ollama model, every query must rank its own tool first among every
- * served description — or a sibling `siblings` names, which also answers
- * it, the owner's decision beside it. What misses today is recorded in
- * `misses`, for the owner, and must match the measurement exactly. A model the Ollama does not serve
- * skips with its reason; `MEANING_REQUIRED` naming the model makes that a
- * failure (CI, `meaning-vectors`).
+ * Ukrainian and in English (`descriptionQueries.json`), embedded with the
+ * Ollama model over every served description.
+ *
+ * Report only (owner, while the descriptions are being generated): the ranks
+ * are measured once, at the end of the pass. The test prints each tool's
+ * rank on each of its queries and each miss with the tool that won it, and
+ * passes whatever the ranks are. It becomes a check again — the misses
+ * compared with `misses` — only by the owner's decision after that final
+ * measurement. A model the Ollama does not serve skips with its reason;
+ * `MEANING_REQUIRED` naming the model makes that a failure (CI,
+ * `meaning-vectors`).
  */
 
 import assert from 'node:assert/strict';
@@ -26,9 +30,8 @@ interface QueryFile {
   /** A query's accepted first tool, by query: a true sibling that answers it too. */
   readonly siblings: Readonly<Record<string, string>>;
   /**
-   * The queries measured not yet first, as `<tool>: <query>`:
-   * each named for the owner, shrinking as descriptions get ready. A new miss
-   * fails, and so does a recorded one that no longer misses.
+   * The queries last recorded not yet first, as `<tool>: <query>`, for
+   * the owner. Read by no assertion while the check is report only.
    */
   readonly misses: readonly string[];
 }
@@ -91,12 +94,12 @@ describe('each moved tool ranks first on its typical queries', () => {
       : served.has(QUERY_MODEL)
         ? undefined
         : `the Ollama at ${OLLAMA_URL} does not serve ${QUERY_MODEL}`;
-  it(`${QUERY_MODEL}: every query finds its own tool first`, {
+  it(`${QUERY_MODEL}: each query's rank of its own tool, reported`, {
     skip:
       unserved !== undefined && required !== QUERY_MODEL
         ? `skipped: ${unserved}`
         : false,
-  }, async () => {
+  }, async (t) => {
     assert.equal(unserved, undefined, unserved);
     assert.ok(model !== undefined);
     const names = descriptions.map((each) => each.name);
@@ -118,23 +121,24 @@ describe('each moved tool ranks first on its typical queries', () => {
       [],
       model.cpu === true,
     );
-    const misses = asked.flatMap(({ tool, query }, i) => {
+    const measured = asked.map(({ tool, query }, i) => {
       const vector = queries[i] ?? [];
       const ranked = names
         .map((name, j) => ({ name, score: cosine(vector, documents[j] ?? []) }))
         .sort((a, b) => b.score - a.score);
-      const first = ranked[0]?.name;
+      const first = ranked[0]?.name ?? '';
       const rank = ranked.findIndex((each) => each.name === tool) + 1;
-      if (first === tool || file.siblings[query] === first) return [];
-      return [{ key: `${tool}: ${query}`, rank, first }];
+      const accepted = first === tool || file.siblings[query] === first;
+      return { tool, query, rank, first, accepted };
     });
-    // The ranks and first tools go to the message: the record names the miss.
-    assert.deepStrictEqual(
-      misses.map((each) => each.key),
-      file.misses,
-      misses
-        .map((each) => `${each.key} (at ${each.rank}, first: ${each.first})`)
-        .join('\n'),
-    );
+    // Report only: every rank, then every miss with the tool that won it.
+    for (const each of measured) {
+      t.diagnostic(`rank ${each.rank}\t${each.tool}: ${each.query}`);
+    }
+    for (const each of measured.filter((one) => !one.accepted)) {
+      t.diagnostic(
+        `miss\t${each.tool}: ${each.query} (at ${each.rank}, first: ${each.first})`,
+      );
+    }
   });
 });

@@ -416,6 +416,12 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    is recorded under `siblings`. The name ↔ description rank of 10.8a becomes a secondary check.
    `descriptionQueries.test.ts` runs it locally through the Ollama helper (skipped with its
    reason when bge-m3 is not served) and in the `meaning-vectors` CI job (`MEANING_REQUIRED`).
+   **Report only during the pass** (owner): the query ranks are measured once, at the end of
+   the pass over every tool. Until then the test prints each tool's rank on each of its
+   queries and each miss with the tool that won it, and passes whatever the ranks are; no
+   queries are added while descriptions are generated. It becomes a check again only by the
+   owner's decision after that final measurement. The name and description checks of
+   `meaning-vectors` (10.8a) stay as they are.
 
    10.8 **Retrieval stays as good.** Tool selection does not read the description alone: the
    search texts (`tools/tool-search.json`: keywords and semantic sentences) are unchanged by this

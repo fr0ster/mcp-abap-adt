@@ -1,10 +1,17 @@
 import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
   byListing,
-  type Column,
   entries,
   type Head,
+  headShape,
   type ListAnswerTable,
   type Listing,
   listAnswerAt,
@@ -12,7 +19,9 @@ import {
   nest,
   parts,
   partsOf,
+  type RowSchemas,
   rows,
+  shapesOf,
   type Written,
   wireAnswer,
   writeJson,
@@ -27,10 +36,7 @@ import {
   stated,
   withInCallSchema,
 } from '../../../lib/handlers/argumentRules';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
   ASSEMBLED_DETAIL_SHAPE,
   detailOf,
@@ -151,13 +157,68 @@ function schemaOn(variant: RuleVariant) {
   );
 }
 
+/** The lists one parent's listing writes: what its description states. */
+export const OBJECTS_LIST_LISTS: RowSchemas<ParentList> = {
+  objects: about(
+    'for each object inside it',
+    rows('objects', {
+      columns: [
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (o: FlatObject) => o.OBJECT_TYPE,
+        },
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (o: FlatObject) => o.OBJECT_NAME,
+        },
+        {
+          name: 'tech_name',
+          means: 'its technical name where it differs',
+          cell: (o: FlatObject) =>
+            o.TECH_NAME !== undefined && o.TECH_NAME !== o.OBJECT_NAME
+              ? o.TECH_NAME
+              : '',
+        },
+        {
+          name: 'uri',
+          means: 'its URI when SAP lists it nameless',
+          cell: (o: FlatObject) =>
+            o.OBJECT_NAME === '' ? (o.OBJECT_URI ?? '') : '',
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** The heads every parent's listing opens with: the parent's own facts. */
+export const OBJECTS_LIST_HEADS = [
+  headShape('parent', 'type and name'),
+  headShape('total', 'number of objects'),
+];
+
+/** Whose facts the heads tell. */
+export const OBJECTS_LIST_OF = "the parent's";
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
   available_in: ['onprem', 'cloud'] as const,
   ...onEveryVariant(
-    withLongToolAdvice(
-      '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope, for the identities of the objects. By default (detail terse) TSV of identifier rows: type, name, tech_name, uri. With detail medium or full the description of each object is read from its own metadata in a second ADT batch envelope, where its type has a metadata endpoint.',
-    ),
+    toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Lists every object inside an ABAP program, function group, class, package or other composite object, down to its nested includes and subcomponents.',
+      ),
+      returns: returnsOf({
+        heads: OBJECTS_LIST_HEADS,
+        of: OBJECTS_LIST_OF,
+        shapes: [shapesOf(OBJECTS_LIST_LISTS)],
+      }),
+      inline: true,
+      notes: [longRunning],
+    }),
     schemaOn,
   ),
 } as const;
@@ -504,28 +565,9 @@ interface ParentList {
 
 /**
  * One parent's objects as TSV, written from its list by `writeListing`:
- * type, name, the technical name where it differs, a nameless one's URI,
- * the short description when it was asked for.
+ * type, name, the technical name where it differs, a nameless one's URI.
  */
-function parentListing(
-  list: ParentList,
-  descriptions: boolean,
-): Listing<ParentList> {
-  const columns: Column<FlatObject>[] = [
-    { name: 'type', cell: (o) => o.OBJECT_TYPE },
-    { name: 'name', cell: (o) => o.OBJECT_NAME },
-    {
-      name: 'tech_name',
-      cell: (o) =>
-        o.TECH_NAME !== undefined && o.TECH_NAME !== o.OBJECT_NAME
-          ? o.TECH_NAME
-          : '',
-    },
-    {
-      name: 'uri',
-      cell: (o) => (o.OBJECT_NAME === '' ? (o.OBJECT_URI ?? '') : ''),
-    },
-  ];
+function parentListing(list: ParentList): Listing<ParentList> {
   return {
     heads: [
       {
@@ -535,29 +577,9 @@ function parentListing(
       { head: 'total', value: String(list.objects.length) },
     ],
     reading: list,
-    lists: {
-      objects: rows('objects', {
-        columns: descriptions
-          ? [
-              ...columns,
-              { name: 'description', cell: (o) => o.DESCRIPTION ?? '' },
-            ]
-          : columns,
-        header: 'always',
-      }),
-    },
+    lists: OBJECTS_LIST_LISTS,
   };
 }
-
-/**
- * A parent with no objects: its listing's lists are the same for every
- * parent (they depend on `descriptions` alone), read from it once.
- */
-const NO_OBJECTS: ParentList = {
-  parent_name: undefined,
-  parent_type: undefined,
-  objects: [],
-};
 
 /** An object at medium: every field read, a nameless one's URI. */
 const mediumObject = (o: FlatObject) => ({
@@ -592,7 +614,7 @@ function objectsListAnswers(): ListAnswerTable<ParentList, string | object> {
   });
   return {
     // Identifier rows: no description at terse (pass 2 reads none there).
-    terse: (list) => writeListing(parentListing(list, false)),
+    terse: (list) => writeListing(parentListing(list)),
     medium: (list) =>
       writeJson(
         {
@@ -799,9 +821,7 @@ const PARENT_LISTS: ListAnswerTable<ParentLists, string | object> = {
                   { head: 'error', value: JSON.stringify(outcome.error) },
                 ],
           'list',
-          byListing(parentListing(NO_OBJECTS, false).lists, (list) =>
-            parentListing(list, false),
-          ),
+          byListing(OBJECTS_LIST_LISTS, parentListing),
         ),
       },
     }),

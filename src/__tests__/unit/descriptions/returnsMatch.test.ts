@@ -33,6 +33,12 @@ import {
   packageHeads,
 } from '../../../handlers/package/high/handleGetPackage';
 import {
+  TOOL_DEFINITION as OBJECTS_LIST,
+  OBJECTS_LIST_HEADS,
+  OBJECTS_LIST_LISTS,
+  OBJECTS_LIST_OF,
+} from '../../../handlers/search/readonly/handleGetObjectsList';
+import {
   SEARCH_HITS_LISTS,
   TOOL_DEFINITION as SEARCH_OBJECT,
 } from '../../../handlers/search/readonly/handleSearchObject';
@@ -124,6 +130,7 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   SearchObject: SEARCH_OBJECT.description,
   DescribeByList: DESCRIBE_BY_LIST.description,
   GetWhereUsed: WHERE_USED.description,
+  GetObjectsList: OBJECTS_LIST.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -295,6 +302,37 @@ const TIED: Readonly<Record<string, () => ReturnsTie>> = {
             heads: [{ head: 'total', value: '3' }],
             reading,
             lists: WHERE_USED_LISTS,
+          }),
+        },
+      ],
+    };
+  },
+  GetObjectsList: () => {
+    const parts = partsOfDescription(descriptionOf('GetObjectsList'));
+    assert.ok(parts !== undefined);
+    const reading = {
+      parent_name: 'ZPROG',
+      parent_type: 'PROG/P',
+      objects: [
+        { OBJECT_TYPE: 'PROG/I', OBJECT_NAME: 'ZINC', TECH_NAME: 'ZINC_T' },
+        { OBJECT_TYPE: 'PROG/PL', OBJECT_NAME: '', OBJECT_URI: '/sap/x' },
+      ],
+    };
+    return {
+      terse: shapesOf(OBJECTS_LIST_LISTS),
+      heads: OBJECTS_LIST_HEADS,
+      of: OBJECTS_LIST_OF,
+      returns: parts.returns,
+      samples: [
+        {
+          reading,
+          lines: writtenLines({
+            heads: [
+              { head: 'parent', value: 'PROG/P ZPROG' },
+              { head: 'total', value: '2' },
+            ],
+            reading,
+            lists: OBJECTS_LIST_LISTS,
           }),
         },
       ],

@@ -91,6 +91,12 @@
       "which objects call function module Z_MY_FM?",
       "де використовується клас ZCL_MY_CLASS?",
       "хто викликає функціональний модуль Z_MY_FM?"
+    ],
+    "GetObjectsList": [
+      "list every object inside program ZMY_PROG, its includes and subcomponents",
+      "show all the parts of class ZCL_MY_CLASS",
+      "покажи всі складові програми ZMY_PROG",
+      "з чого складається клас ZCL_MY_CLASS?"
     ]
   },
   "siblings": {},
@@ -130,6 +136,9 @@
     "GetWhereUsed: where is class ZCL_MY_CLASS used?",
     "GetWhereUsed: which objects call function module Z_MY_FM?",
     "GetWhereUsed: де використовується клас ZCL_MY_CLASS?",
-    "GetWhereUsed: хто викликає функціональний модуль Z_MY_FM?"
+    "GetWhereUsed: хто викликає функціональний модуль Z_MY_FM?",
+    "GetObjectsList: show all the parts of class ZCL_MY_CLASS",
+    "GetObjectsList: покажи всі складові програми ZMY_PROG",
+    "GetObjectsList: з чого складається клас ZCL_MY_CLASS?"
   ]
 }

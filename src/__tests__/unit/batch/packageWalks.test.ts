@@ -853,16 +853,38 @@ describe('GetObjectsList', () => {
     );
   });
 
-  it("envelopes per spec §11's row (per level: every node of the level)", async () => {
+  it('one parent: no envelope; its node structures as single requests, as the sequential version', async () => {
     const fake = system();
+    const reference = system();
     await withinTurns(handleGetObjectsList(contextOn(fake), single));
-    assert.deepStrictEqual(fake.envelopes.map(partKeys), [
-      [nodeKey('PROG/P', 'ZPROG_X')],
-      [
-        nodeKey('PROG/P', 'ZPROG_X', '101'),
-        nodeKey('PROG/P', 'ZPROG_X', '102'),
-      ],
-      [nodeKey('PROG/P', 'ZPROG_X', '103')],
+    await withinTurns(
+      handleGetObjectsList(contextOn(reference, 'absent'), single),
+    );
+    assert.equal(fake.envelopes.length, 0);
+    assert.deepStrictEqual(fake.directs, reference.directs);
+    // A list naming one parent reads it the same way.
+    const listed = system();
+    await withinTurns(
+      handleGetObjectsList(contextOn(listed), {
+        objects: [{ parent_type: 'PROG/P', parent_name: 'ZPROG_X' }],
+      }),
+    );
+    assert.equal(listed.envelopes.length, 0);
+    assert.equal(listed.directs.length, reference.directs.length);
+  });
+
+  it("several parents: envelopes per spec §11's row (per level: every node of the level)", async () => {
+    const fake = system();
+    await withinTurns(
+      handleGetObjectsList(contextOn(fake), {
+        objects: [
+          { parent_type: 'PROG/P', parent_name: 'ZPROG_X' },
+          { parent_type: 'PROG/P', parent_name: 'ZPROG_Y' },
+        ],
+      }),
+    );
+    assert.deepStrictEqual(fake.envelopes.map(partKeys).slice(0, 1), [
+      [nodeKey('PROG/P', 'ZPROG_X'), nodeKey('PROG/P', 'ZPROG_Y')],
     ]);
   });
 
@@ -926,7 +948,12 @@ describe('GetObjectsList', () => {
       throw credential();
     });
     const result = await withinTurns(
-      handleGetObjectsList(contextOn(fake), single),
+      handleGetObjectsList(contextOn(fake), {
+        objects: [
+          { parent_type: 'PROG/P', parent_name: 'ZPROG_X' },
+          { parent_type: 'PROG/P', parent_name: 'ZPROG_Y' },
+        ],
+      }),
     );
     assert.equal((result as { isError?: boolean }).isError, true);
     assert.equal(payloadOf(result).error, 'authentication_failed');

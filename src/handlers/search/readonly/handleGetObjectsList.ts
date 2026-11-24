@@ -466,11 +466,17 @@ export async function handleGetObjectsList(
     return answer(
       { tool: 'GetObjectsList', detail: 'terse' },
       async () => {
-        read = await withSequentialFallback(
-          context,
-          () => walkParentsBatched(context, parents, withDescriptions),
-          () => walkParentsSequential(context, parents, withDescriptions),
-        );
+        // One parent (two spellings of one are one) reads as single
+        // requests; several in envelopes.
+        const distinct = new Set(parents.map((p) => `${p.type}|${p.name}`));
+        read =
+          distinct.size < 2
+            ? await walkParentsSequential(context, parents, withDescriptions)
+            : await withSequentialFallback(
+                context,
+                () => walkParentsBatched(context, parents, withDescriptions),
+                () => walkParentsSequential(context, parents, withDescriptions),
+              );
         // A credential failure SAP answered ends the call as it came.
         if (read.ended !== undefined) {
           return read.ended;
@@ -513,31 +519,19 @@ export async function handleGetObjectsList(
   // `detail: 'raw'` to answer without changing that shared strategy, and
   // this tool's own answer besides is a composite assembled from a
   // recursive walk over many such calls, not one reading.
+  // One parent is read as single requests, never in an envelope: a batch
+  // is for reads of several objects.
   return answer(
     { tool: 'GetObjectsList', detail: 'terse' },
     () =>
-      withSequentialFallback(
+      collectValidObjects(
         context,
-        async () => {
-          const read = await walkParentsBatched(
-            context,
-            [{ type: parentType, name: parentName }],
-            withDescriptions,
-          );
-          const walk = read.ended ?? read.walks[0];
-          if ('thrown' in walk) throw walk.thrown;
-          return walk;
-        },
-        () =>
-          collectValidObjects(
-            context,
-            utilsOf(context),
-            parentType,
-            parentName,
-            '000000',
-            withDescriptions,
-            new Set(),
-          ),
+        utilsOf(context),
+        parentType,
+        parentName,
+        '000000',
+        withDescriptions,
+        new Set(),
       ),
     (objects: FlatObject[]) => {
       const result = {

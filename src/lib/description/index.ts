@@ -6,7 +6,16 @@
 
 export { batchable, longRunning, type Note } from './notes';
 export { type Purpose, purpose } from './purpose';
-export { type ReturnsFact, returnsOf } from './returns';
+export { type ReaderParts, readerParts } from './readers';
+export {
+  type EachNouns,
+  type MemberNoun,
+  type MemberNouns,
+  membersOf,
+  type ReturnsFact,
+  returnsOf,
+  sapData,
+} from './returns';
 export {
   type DescriptionParts,
   type DescriptionTag,

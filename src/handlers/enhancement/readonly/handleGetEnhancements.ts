@@ -871,7 +871,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Lists the enhancement implementations of ABAP programs, includes, function groups or classes at their active version, and of their includes when asked.',
+      'Reads the enhancement implementations of ABAP programs, includes, function groups or classes at their active version, and of their includes when asked.',
     ),
   }),
   inputSchema: z.object({

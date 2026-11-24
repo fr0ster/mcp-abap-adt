@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Gets the abapGit staging of a linked repository: what changed, to choose what a push commits.',
+      'Reads the abapGit staging of a linked repository: what changed, to choose what a push commits.',
     ),
   }),
   inputSchema: z.object({

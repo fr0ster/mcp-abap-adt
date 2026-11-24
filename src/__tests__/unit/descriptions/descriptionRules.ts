@@ -102,10 +102,16 @@ export function markersIn(text: string): string[] {
 }
 
 /** What breaks the purpose rules in `text`, each fault in words; none for a good purpose. */
-export function purposeFaults(text: string): string[] {
+export function purposeFaults(text: string, types?: string): string[] {
   const faults: string[] = [];
-  if (text.length > PURPOSE_LIMIT) {
-    faults.push(`longer than ${PURPOSE_LIMIT} characters (${text.length})`);
+  // The object types a compact purpose names come from its schema enum:
+  // counted as one word.
+  const length =
+    types === undefined
+      ? text.length
+      : text.length - types.length + 'types'.length;
+  if (length > PURPOSE_LIMIT) {
+    faults.push(`longer than ${PURPOSE_LIMIT} characters (${length})`);
   }
   const trimmed = text.trim();
   if (!trimmed.endsWith('.')) faults.push('does not end with a full stop');

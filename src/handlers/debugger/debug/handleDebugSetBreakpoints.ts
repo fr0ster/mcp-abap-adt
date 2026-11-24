@@ -20,7 +20,7 @@ export const TOOL_DEFINITION = {
     runParts({
       tag: 'debug',
       purpose: purpose(
-        'Adds breakpoints to an ABAP debug session: at a source position, optionally conditional, on an exception class, an ABAP statement or a message.',
+        'Sets breakpoints in an ABAP debug session: at a source position, optionally conditional, on an exception class, an ABAP statement or a message.',
       ),
     }),
   ),

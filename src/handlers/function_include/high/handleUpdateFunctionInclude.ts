@@ -51,7 +51,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: toolDescription({
     purpose: purpose(
-      'Writes new source code into an existing include of an ABAP function group, activating it when asked.',
+      'Updates the source code of an existing include of an ABAP function group, activating it when asked.',
     ),
   }),
   inputSchema: z.object({

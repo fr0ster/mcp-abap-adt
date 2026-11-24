@@ -45,7 +45,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Runs an ABAP SQL SELECT over database tables and CDS views and reads the data it selects, up to the number of records asked.',
+      'Reads the data an ABAP SQL SELECT selects from database tables and CDS views, up to the number of records asked.',
     ),
     notes: [longRunning],
   }),

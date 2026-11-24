@@ -14,7 +14,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'debug',
     purpose: purpose(
-      'Watches a variable of the stopped ABAP debuggee, stopping it when the variable changes, under a condition when one is set.',
+      'Creates a watchpoint on a variable of the stopped ABAP debuggee, stopping it when the variable changes, under a condition when one is set.',
     ),
   }),
   inputSchema: z.object({

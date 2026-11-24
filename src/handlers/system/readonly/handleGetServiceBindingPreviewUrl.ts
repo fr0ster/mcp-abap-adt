@@ -193,7 +193,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Builds the Fiori preview URL of a published OData service binding, with its service and $metadata URLs.',
+      'Reads the Fiori preview URL of a published OData service binding, with its service and $metadata URLs.',
     ),
   }),
   inputSchema: z.object({

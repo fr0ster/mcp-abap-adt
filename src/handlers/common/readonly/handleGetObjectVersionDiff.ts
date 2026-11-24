@@ -138,7 +138,7 @@ export function versionDiffParts(object: string): DescriptionParts {
   return {
     tag: 'read-only',
     purpose: purpose(
-      `Compares two versions of ${object}, taken from its version history.`,
+      `Reads two versions of ${object} from its version history and compares them.`,
     ),
   };
 }

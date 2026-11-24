@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'debug',
     purpose: purpose(
-      'Selects the stack frame of a stopped debuggee whose variables are then shown, execution going on from the same point.',
+      'Sets the stack frame of a stopped debuggee whose variables are then shown, execution going on from the same point.',
     ),
   }),
   inputSchema: z.object({

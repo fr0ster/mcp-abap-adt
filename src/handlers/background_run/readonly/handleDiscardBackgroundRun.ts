@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
     runParts({
       tag: 'read-only',
       purpose: purpose(
-        "Ends a background run by its run handle: a running read is cancelled and its session logged off, an ended run's answer deleted.",
+        "Discards a background run by its run handle: a running read is cancelled and its session logged off, an ended run's answer deleted.",
       ),
     }),
   ),

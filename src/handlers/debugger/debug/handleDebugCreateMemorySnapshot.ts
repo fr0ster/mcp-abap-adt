@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: toolDescription({
     tag: 'debug',
-    purpose: purpose('Writes a memory snapshot of the stopped ABAP debuggee.'),
+    purpose: purpose('Creates a memory snapshot of the stopped ABAP debuggee.'),
   }),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),
 } as const;

@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
     runParts({
       tag: 'debug',
       purpose: purpose(
-        'Removes one breakpoint of an ABAP debug session by its id, the rest staying armed.',
+        'Deletes one breakpoint of an ABAP debug session by its id, the rest staying armed.',
       ),
     }),
   ),

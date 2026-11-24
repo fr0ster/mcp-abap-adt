@@ -122,7 +122,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Lists the objects of one or more ABAP packages, with the objects of their subpackages when asked.',
+      'Reads the objects of one or more ABAP packages, with the objects of their subpackages when asked.',
     ),
     notes: [longRunning],
   }),

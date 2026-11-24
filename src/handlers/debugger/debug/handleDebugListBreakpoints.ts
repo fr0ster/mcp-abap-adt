@@ -14,7 +14,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription(
     runParts({
       tag: 'read-only',
-      purpose: purpose('Shows the breakpoints an ABAP debug session armed.'),
+      purpose: purpose('Lists the breakpoints an ABAP debug session armed.'),
     }),
   ),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),

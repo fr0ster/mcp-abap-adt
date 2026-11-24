@@ -12,7 +12,7 @@ export const TOOL_DEFINITION = {
     runParts({
       tag: 'debug',
       purpose: purpose(
-        "Sends the recorded debugger calls together on the session they were recorded on, and splits SAP's answer by call.",
+        "Ends the recording of debugger calls, sending them together on the session they were recorded on, and splits SAP's answer by call.",
       ),
     }),
   ),

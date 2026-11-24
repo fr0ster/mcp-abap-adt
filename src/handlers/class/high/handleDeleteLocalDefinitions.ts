@@ -54,7 +54,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: deleteTool({
     purpose: purpose(
-      'Clears the local definitions of an ABAP class, activating the class when asked.',
+      'Deletes the local definitions of an ABAP class, activating the class when asked.',
     ),
   }),
   inputSchema: z.object({

@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
     description: toolDescription({
       tag: 'read-only',
       purpose: purpose(
-        'Tells whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose.',
+        'Reads whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose.',
       ),
     }),
     inputSchema: objectDraftSchema(variant),

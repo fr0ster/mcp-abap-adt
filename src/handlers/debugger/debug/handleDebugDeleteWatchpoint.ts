@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
     runParts({
       tag: 'debug',
       purpose: purpose(
-        'Removes a watchpoint of the stopped ABAP debuggee by its id.',
+        'Deletes a watchpoint of the stopped ABAP debuggee by its id.',
       ),
     }),
   ),

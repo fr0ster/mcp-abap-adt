@@ -63,7 +63,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Finds the main programs of an ABAP include: each program that includes it, or the function group it belongs to.',
+      'Reads the main programs of an ABAP include: each program that includes it, or the function group it belongs to.',
     ),
   }),
   inputSchema: z.object({

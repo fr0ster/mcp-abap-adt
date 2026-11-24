@@ -26,7 +26,7 @@ export const TOOL_DEFINITION = {
     runParts({
       tag: 'debug',
       purpose: purpose(
-        'Opens an ABAP debug session taking its user over from another debugger: arms breakpoints, listens for a debuggee and attaches the first one caught.',
+        'Takes the ABAP debugging of a user over from another debugger: arms breakpoints, listens for a debuggee and attaches the first one caught.',
       ),
     }),
   ),

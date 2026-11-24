@@ -257,7 +257,7 @@ export const TOOL_DEFINITION = {
     description: toolDescription({
       tag: 'read-only',
       purpose: purpose(
-        'Finds where an ABAP class, function module, table or other repository object is used: every object that uses, calls or references it.',
+        'Reads where an ABAP class, function module, table or other repository object is used: every object that uses, calls or references it.',
       ),
       notes: [longRunning],
     }),

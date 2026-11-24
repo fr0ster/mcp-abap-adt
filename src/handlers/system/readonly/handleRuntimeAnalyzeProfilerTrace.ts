@@ -31,7 +31,7 @@ export const TOOL_DEFINITION = {
     runParts({
       tag: 'read-only',
       purpose: purpose(
-        'Summarises one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time.',
+        'Analyzes one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time.',
       ),
       notes: [longRunning],
     }),

@@ -117,7 +117,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Lists the objects a transport or one of its tasks holds, each with the position a removal names.',
+      'Reads the objects a transport or one of its tasks holds, each with the position a removal names.',
     ),
   }),
   inputSchema: z.object({

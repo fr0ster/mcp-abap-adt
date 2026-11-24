@@ -20,7 +20,7 @@ export const TOOL_DEFINITION = {
     runParts({
       tag: 'debug',
       purpose: purpose(
-        'Changes the debugger settings of an ABAP debug session at its current stop, applied again after each later attach.',
+        'Sets the debugger settings of an ABAP debug session at its current stop, applied again after each later attach.',
       ),
     }),
   ),

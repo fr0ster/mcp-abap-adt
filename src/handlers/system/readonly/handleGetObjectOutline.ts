@@ -94,7 +94,7 @@ export const TOOL_DEFINITION = {
     description: toolDescription({
       tag: 'read-only',
       purpose: purpose(
-        'Lists the components of an ABAP class, interface, program or function group, with where each one is defined in its source.',
+        'Reads the components of an ABAP class, interface, program or function group, with where each one is defined in its source.',
       ),
     }),
     inputSchema: outlineSchema(variant),

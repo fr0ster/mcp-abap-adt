@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription(
     runParts({
       purpose: purpose(
-        'Schedules an ABAP profiler trace with its parameters, for a later profiled run of a class or a report.',
+        'Creates the parameters of an ABAP profiler trace, scheduling it for a later profiled run of a class or a report.',
       ),
     }),
   ),

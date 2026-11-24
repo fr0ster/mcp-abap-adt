@@ -174,7 +174,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Lists the objects of one type, such as classes, tables, programs or interfaces, in an ABAP package or other composite object.',
+      'Reads the objects of one type, such as classes, tables, programs or interfaces, in an ABAP package or other composite object.',
     ),
   }),
   inputSchema: z.object({

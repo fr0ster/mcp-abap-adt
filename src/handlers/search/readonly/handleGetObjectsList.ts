@@ -205,7 +205,7 @@ export const TOOL_DEFINITION = {
     toolDescription({
       tag: 'read-only',
       purpose: purpose(
-        'Lists every object inside an ABAP program, function group, class, package or other composite object, down to its nested includes and subcomponents.',
+        'Reads every object inside an ABAP program, function group, class, package or other composite object, down to its nested includes and subcomponents.',
       ),
       notes: [longRunning],
     }),

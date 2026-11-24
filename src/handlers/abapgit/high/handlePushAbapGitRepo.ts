@@ -41,7 +41,7 @@ const CLOUD_SCHEMA = z.object(FIELDS);
 
 const ONPREM_PARTS = runParts({
   purpose: purpose(
-    "Commits the objects and files chosen from an abapGit repository's staging, with its comment, author and committer, and pushes the commit to its remote branch.",
+    "Pushes the objects and files chosen from an abapGit repository's staging to its remote branch, as a commit with its comment, author and committer.",
   ),
 });
 
@@ -60,7 +60,7 @@ export const TOOL_DEFINITION: KindToolDefinition<
     description: toolDescription(
       runParts({
         purpose: purpose(
-          "Commits the objects and files chosen from an abapGit repository's staging and pushes the commit to its remote branch, as an SAP job.",
+          "Pushes the objects and files chosen from an abapGit repository's staging to its remote branch as a commit, run as an SAP job.",
         ),
       }),
     ),

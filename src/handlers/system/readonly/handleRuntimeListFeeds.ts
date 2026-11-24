@@ -522,7 +522,7 @@ export const FEED_HEADS = [
 export const FEED_PAGE_PARTS: DescriptionParts = {
   tag: 'read-only',
   purpose: purpose(
-    'Reads one page of the short dumps, system messages or SAP Gateway errors of an ABAP system, newest first, by user, object and time.',
+    'Lists one page of the short dumps, system messages or SAP Gateway errors of an ABAP system, newest first, by user, object and time.',
   ),
   notes: [longRunning],
 };
@@ -533,7 +533,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Reads the runtime feeds of an ABAP system: its short dumps, system messages or SAP Gateway errors by user and time, or the feeds there are and their variants.',
+      'Lists the short dumps, system messages or SAP Gateway errors of an ABAP system by user and time, or the runtime feeds there are and their variants.',
     ),
     notes: [longRunning],
   }),

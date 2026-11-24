@@ -213,6 +213,98 @@ describe('the description builder', () => {
   });
 });
 
+/**
+ * The verb a purpose opens with, by the action in the tool's name (owner):
+ * `Get…` reads, `Update…` updates, `List…` lists — a read is never stated as
+ * a write. A compact tool's action is the last action word of its name
+ * (`HandlerBackgroundRunGet`), but where the name says otherwise.
+ */
+const VERBS: Readonly<Record<string, readonly string[]>> = {
+  Get: ['Reads'],
+  Read: ['Reads'],
+  Update: ['Updates'],
+  Create: ['Creates'],
+  Delete: ['Deletes'],
+  Activate: ['Activates'],
+  Check: ['Checks'],
+  Validate: ['Validates'],
+  List: ['Lists'],
+  Search: ['Searches', 'Finds'],
+  Find: ['Finds', 'Searches'],
+  Lock: ['Locks'],
+  Unlock: ['Unlocks'],
+  Run: ['Runs'],
+  Add: ['Adds'],
+  Remove: ['Removes'],
+  Move: ['Moves'],
+  Sort: ['Sorts'],
+  Link: ['Links'],
+  Unlink: ['Unlinks'],
+  Pull: ['Pulls'],
+  Push: ['Pushes'],
+  Switch: ['Switches'],
+  Open: ['Opens'],
+  Close: ['Closes'],
+  Logoff: ['Logs'],
+  Discard: ['Discards'],
+  Set: ['Sets'],
+  Wait: ['Waits'],
+  Stop: ['Stops'],
+  Start: ['Starts'],
+  Step: ['Steps'],
+  Terminate: ['Terminates'],
+  Cancel: ['Cancels'],
+  Analyze: ['Analyzes'],
+  Take: ['Takes'],
+  End: ['Ends'],
+  Begin: ['Starts', 'Begins'],
+  Describe: ['Describes'],
+};
+
+/** The compact tools whose action is not their last action word. */
+const ACTION_OF: Readonly<Record<string, string>> = {
+  HandlerCheckRun: 'Check',
+};
+
+/** The tools whose name holds no action word: their purpose names the function. */
+const NO_ACTION: readonly string[] = [
+  'HandlerAbapGit',
+  'HandlerBatch',
+  'HandlerCdsUnitTestResult',
+  'HandlerCdsUnitTestStatus',
+  'HandlerDebugBatch',
+  'HandlerDebugBreakpoints',
+  'HandlerDebugMaintain',
+  'HandlerDebugSession',
+  'HandlerDumpView',
+  'DebugBatchAnswers',
+  'HandlerProfileSchedule',
+  'HandlerProfileView',
+  'HandlerSession',
+  'HandlerSystem',
+  'HandlerUnitTestResult',
+  'HandlerUnitTestStatus',
+  'MemorySnapshotDelta',
+];
+
+/** The action a tool's name states, or none. */
+function actionOf(name: string): string | undefined {
+  const own = ACTION_OF[name];
+  if (own !== undefined) return own;
+  const words = name.match(/[A-Z][a-z]*/g) ?? [];
+  const actions = words.filter((word) => VERBS[word] !== undefined);
+  return name.startsWith('Handler') ? actions[actions.length - 1] : actions[0];
+}
+
+describe("a purpose opens with the verb of the tool's own action", () => {
+  it('reads the action of a name', () => {
+    assert.equal(actionOf('GetClassVersionSource'), 'Get');
+    assert.equal(actionOf('HandlerBackgroundRunGet'), 'Get');
+    assert.equal(actionOf('HandlerCheckRun'), 'Check');
+    assert.equal(actionOf('HandlerSystem'), undefined);
+  });
+});
+
 describe('the batch sentence of an assembled description is its note', () => {
   const parts = {
     tag: 'read-only' as const,
@@ -337,8 +429,24 @@ describe('every served tool is assembled', () => {
         if (toolDescription(parts) !== tool.description) {
           faults.push(`${tool.name}: served text is not its assembled text`);
         }
-        for (const fault of purposeFaults(parts.purpose.text)) {
+        for (const fault of purposeFaults(
+          parts.purpose.text,
+          parts.purpose.types,
+        )) {
           faults.push(`${tool.name}: its purpose ${fault}`);
+        }
+        const action = actionOf(tool.name);
+        if (action === undefined) {
+          if (!NO_ACTION.includes(tool.name)) {
+            faults.push(`${tool.name}: its name states no action`);
+          }
+        } else {
+          const first = parts.purpose.text.split(' ')[0] ?? '';
+          if (!(VERBS[action] ?? []).includes(first)) {
+            faults.push(
+              `${tool.name}: its purpose opens with "${first}", its name's action is ${action}`,
+            );
+          }
         }
         // A compact tool's values, each by its function: a purpose of the
         // same rules.

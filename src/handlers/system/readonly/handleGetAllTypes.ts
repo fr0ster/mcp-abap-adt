@@ -63,7 +63,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Lists the repository object types the ABAP system knows, by their type codes.',
+      'Reads the repository object types the ABAP system knows, by their type codes.',
     ),
   }),
   inputSchema: z.object({

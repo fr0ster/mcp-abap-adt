@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
     runParts({
       tag: 'debug',
       purpose: purpose(
-        'Opens an AMDP debug session of the connected SAP user with breakpoints in SQLScript methods, starting a background run once they are confirmed.',
+        'Starts an AMDP debug session of the connected SAP user with breakpoints in SQLScript methods, starting a background run once they are confirmed.',
       ),
     }),
   ),

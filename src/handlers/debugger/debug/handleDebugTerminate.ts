@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
     runParts({
       tag: 'debug',
       purpose: purpose(
-        'Ends the stopped ABAP debuggee and its program where it stands.',
+        'Terminates the stopped ABAP debuggee and its program where it stands.',
       ),
     }),
   ),

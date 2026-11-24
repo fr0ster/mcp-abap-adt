@@ -111,7 +111,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Lists the inactive ABAP objects of the system: classes, tables, CDS views and other objects changed and awaiting activation.',
+      'Reads the inactive ABAP objects of the system: classes, tables, CDS views and other objects changed and awaiting activation.',
     ),
   }),
   inputSchema: z.object({ ...DETAIL_SHAPE }),

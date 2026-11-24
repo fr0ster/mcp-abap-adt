@@ -31,7 +31,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Gets the error log of the last abapGit pull or push of a repository, object by object.',
+      'Reads the error log of the last abapGit pull or push of a repository, object by object.',
     ),
   }),
   inputSchema: z.object({

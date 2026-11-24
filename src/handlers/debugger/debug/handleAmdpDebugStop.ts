@@ -16,7 +16,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'debug',
     purpose: purpose(
-      'Ends the AMDP part of a debug session, releasing a suspended debuggee first.',
+      'Stops the AMDP part of a debug session, releasing a suspended debuggee first.',
     ),
   }),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),

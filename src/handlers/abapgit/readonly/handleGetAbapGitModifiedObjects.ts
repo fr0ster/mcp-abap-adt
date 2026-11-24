@@ -35,7 +35,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Gets the objects a pull of an abapGit repository would modify in the system, before it runs.',
+      'Reads the objects a pull of an abapGit repository would modify in the system, before it runs.',
     ),
   }),
   inputSchema: z.object({

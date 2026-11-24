@@ -84,7 +84,7 @@ export const TOOL_DEFINITION = {
     description: toolDescription({
       tag: 'read-only',
       purpose: purpose(
-        'Lists the version history of an ABAP class, program, interface, function module, table, structure, CDS view or other versioned object.',
+        'Reads the version history of an ABAP class, program, interface, function module, table, structure, CDS view or other versioned object.',
       ),
     }),
     inputSchema: objectVersionsSchema(variant),

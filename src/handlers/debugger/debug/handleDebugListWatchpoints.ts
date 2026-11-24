@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: toolDescription({
     tag: 'read-only',
-    purpose: purpose('Shows the watchpoints of the stopped ABAP debuggee.'),
+    purpose: purpose('Lists the watchpoints of the stopped ABAP debuggee.'),
   }),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),
 } as const;

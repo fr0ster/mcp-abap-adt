@@ -191,7 +191,7 @@ export const TOOL_DEFINITION = {
     description: toolDescription({
       tag: 'read-only',
       purpose: purpose(
-        'Lists every include of an ABAP program or include, with the includes each one includes, down to the last.',
+        'Reads every include of an ABAP program or include, with the includes each one includes, down to the last.',
       ),
       notes: [longRunning],
     }),

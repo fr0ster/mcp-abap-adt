@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
   available_in: ['cloud'] as const,
   description: toolDescription({
     purpose: purpose(
-      'Gets the abapGit branch information of a remote repository for the package it would be linked to.',
+      'Reads the abapGit branch information of a remote repository for the package it would be linked to.',
     ),
   }),
   inputSchema: z.object({

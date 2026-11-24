@@ -36,7 +36,10 @@ const FAKE_NPM = [
   '  if (plan.viewFails) { process.stderr.write("npm error code ECONNRESET\\n"); process.exit(1); }',
   '  if (plan.hidden.includes(name)) { process.stderr.write(`npm error code E404\\nnpm error 404 No match found for version ${version}\\n`); process.exit(1); }',
   '  if (!plan.empty.includes(name)) process.stdout.write(`${version}\\n`);',
-  '  process.exit(0);',
+  // Ends by itself once the version is flushed: an exit right after an
+  // asynchronous pipe write can cut it short.
+  '  process.exitCode = 0;',
+  '  return;',
   '}',
   "if (args[0] === 'install') {",
   "  const packages = { '': { name: 'x' } };",

@@ -48,8 +48,9 @@ export const TOOL_DEFINITION = {
   name: 'CreateBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
-    object: 'a RAP behavior definition',
-    how: 'for a root entity in a package, with its description',
+    object:
+      'a managed, unmanaged, abstract or projection RAP behavior definition',
+    how: 'for a root entity in a package',
     transported: true,
   }),
   inputSchema: createArguments('CreateBehaviorDefinition', {

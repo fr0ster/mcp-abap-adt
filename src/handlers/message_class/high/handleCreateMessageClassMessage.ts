@@ -42,8 +42,8 @@ export const TOOL_DEFINITION = {
   name: 'CreateMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
-    object: 'a message, with its number and text,',
-    how: 'in an existing ABAP message class (T100)',
+    object: 'a message',
+    how: 'in an existing ABAP message class (T100), with its number, text and self-explanatory flag',
     transported: true,
   }),
   inputSchema: createArguments('CreateMessageClassMessage', {

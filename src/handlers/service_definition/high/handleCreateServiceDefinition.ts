@@ -53,8 +53,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'a service definition exposing CDS views as an OData service',
-    how: 'in a package, with its description',
-    transported: true,
+    how: 'in a package, with its source code when given, activating it when asked',
   }),
   inputSchema: createArguments('CreateServiceDefinition', {
     service_definition_name: z.string().describe('Service definition name.'),

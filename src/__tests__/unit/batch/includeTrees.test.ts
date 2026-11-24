@@ -1052,7 +1052,7 @@ describe('GetEnhancements', () => {
         assert.equal(batched.envelopes.length, 0);
         assert.deepStrictEqual(directsOf(batched), directsOf(sequential));
       } else {
-        assert.equal(batched.directs.length, 0);
+        assert.ok(batched.envelopes.length > 0);
       }
     });
   }
@@ -1314,11 +1314,10 @@ describe('GetEnhancements', () => {
       TURNS,
     );
     const failed = phasesOf(fake)[0] as string[];
+    // The includes roots wait for the enhancements: not in this envelope.
     assert.deepStrictEqual(failed, [
       'elements:prog:ZPROGE',
-      'ns:PROG/P:ZPROGE:',
       'elements:prog:ZPROGF',
-      'ns:PROG/P:ZPROGF:',
     ]);
     assert.equal(fake.envelopes.length, 1);
     const expected = await sequentialWithFailed(
@@ -1446,6 +1445,156 @@ describe('GetEnhancements', () => {
       failed,
     );
     expectEnvelopeFailure(result, expected, 6);
+  });
+
+  // A probe the decision never reaches decides nothing — a credential
+  // refusal included: the sequential version never sends it.
+  it('a 401 on a probe the decision never reaches: the class answers, as the sequential version', async () => {
+    const model = {
+      answers: { ...CLASS_ZCLE.answers, 'meta:prog:ZCLE': UNAUTHORIZED },
+    };
+    const args = {
+      objects: [
+        { object_name: 'ZCLE', object_type: 'unknown' },
+        { object_name: 'ZPROGE', object_type: 'unknown' },
+      ],
+    };
+    const { a, b, batched } = await bothWays(
+      handleGetEnhancements,
+      args,
+      model,
+    );
+    assert.ok(phasesOf(batched)[0]?.includes('meta:prog:ZCLE'));
+    assert.equal(textOf(a), textOf(b));
+    const [cle, proge] = payloadOf(a);
+    assertMatchObject(cle, { object_name: 'ZCLE', object_type: 'class' });
+    assertMatchObject(proge, { object_name: 'ZPROGE', object_type: 'program' });
+  });
+
+  for (const order of [
+    ['ZPROGE', 'ZCLE'],
+    ['ZCLE', 'ZPROGE'],
+  ]) {
+    it(
+      format(
+        'a 401 on a probe the sequential version sends ends the list as it ends it: %j',
+        order,
+      ),
+      async () => {
+        const model = {
+          answers: { ...CLASS_ZCLE.answers, 'meta:prog:ZPROGE': UNAUTHORIZED },
+        };
+        const args = {
+          objects: order.map((name) => ({
+            object_name: name,
+            object_type: 'unknown',
+          })),
+        };
+        const { a, b } = await bothWays(handleGetEnhancements, args, model);
+        assert.equal(textOf(a), textOf(b));
+        assertMatchObject(payloadOf(a), {
+          status: 401,
+          step: 'read program metadata',
+        });
+      },
+    );
+  }
+
+  it('an outer 404 once the endpoint is served is the envelope’s failure, not every probe missing', async () => {
+    const fake = system({}, () => {
+      throw statusError(404, 'Not Found');
+    });
+    const context = contextOn(fake);
+    // The destination's first envelope answered: the endpoint is served.
+    context.batchAvailability?.noteOuterStatus(200);
+    const result = await withinTurns(
+      handleGetEnhancements(context, {
+        objects: [
+          { object_name: 'ZPROGE', object_type: 'unknown' },
+          { object_name: 'ZCLE', object_type: 'unknown' },
+        ],
+      }),
+      TURNS,
+    );
+    assert.equal(fake.envelopes.length, 1);
+    for (const entry of payloadOf(result)) {
+      // Each probe is reported refused — the envelope's failure, its
+      // request the envelope's — never read as "not that kind".
+      const failures = entry.error?.failures ?? [];
+      assert.equal(failures.length, 3);
+      for (const failure of failures) {
+        assertMatchObject(failure, { request: ENVELOPE_REQUEST });
+      }
+    }
+  });
+
+  it('two spellings of one object are one object: no envelope', async () => {
+    const { a, b, batched, sequential } = await bothWays(
+      handleGetEnhancements,
+      {
+        objects: [
+          { object_name: 'ZPROGE', object_type: 'unknown' },
+          { object_name: 'zproge', object_type: 'UNKNOWN' },
+        ],
+      },
+    );
+    assert.equal(textOf(a), textOf(b));
+    assert.equal(batched.envelopes.length, 0);
+    assert.deepStrictEqual(directsOf(batched), directsOf(sequential));
+  });
+
+  it('a phase left with one object sends its reads as single requests', async () => {
+    const { a, b, batched } = await bothWays(handleGetEnhancements, {
+      objects: [
+        { object_name: 'ZPROGE', object_type: 'unknown' },
+        { object_name: 'ZNONE', object_type: 'unknown' },
+      ],
+    });
+    assert.equal(textOf(a), textOf(b));
+    // The probes of both, together; then ZPROGE's elements alone.
+    assert.equal(batched.envelopes.length, 1);
+    assert.deepStrictEqual(directsOf(batched), ['elements:prog:ZPROGE']);
+  });
+
+  it("include_nested: an object's includes root is read only after its enhancements answered, in the next envelope", async () => {
+    const args = {
+      objects: [
+        { object_name: 'ZPROGE', object_type: 'PROG/P' },
+        { object_name: 'ZPROGF', object_type: 'PROG/P' },
+      ],
+      include_nested: true,
+    };
+    const { a, b, batched } = await bothWays(handleGetEnhancements, args);
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(phasesOf(batched).slice(0, 2), [
+      ['elements:prog:ZPROGE', 'elements:prog:ZPROGF'],
+      ['ns:PROG/P:ZPROGE:', 'ns:PROG/P:ZPROGF:'],
+    ]);
+  });
+
+  it('include_nested: a refused enhancements read stops that object before its includes root, as the sequential version', async () => {
+    const model = {
+      answers: {
+        'elements:prog:ZPROGE': {
+          status: 403,
+          statusText: 'Forbidden',
+          body: '',
+        },
+        'ns:PROG/P:ZPROGE:': UNAUTHORIZED,
+      },
+    };
+    const args = {
+      objects: [
+        { object_name: 'ZPROGE', object_type: 'PROG/P' },
+        { object_name: 'ZPROGF', object_type: 'PROG/P' },
+      ],
+      include_nested: true,
+    };
+    const { a, b } = await bothWays(handleGetEnhancements, args, model);
+    assert.equal(textOf(a), textOf(b));
+    const [proge, progf] = payloadOf(a);
+    assertMatchObject(proge, { object_name: 'ZPROGE', error: { status: 403 } });
+    assert.equal(progf.error, undefined);
   });
 
   it(`a phase of more than ${READS_PER_ENVELOPE} reads goes in consecutive envelopes of at most ${READS_PER_ENVELOPE}`, async () => {

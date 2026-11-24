@@ -34,7 +34,7 @@ export const underLock: Note = new Note(
 /** HandlerLock's lock: the state handle a lock with a lock handle answers. */
 export const lockAnswersStateHandle: Note = new Note(
   minted,
-  'Over Streamable HTTP a lock that gives a non-empty lock_handle gives a state_handle too: send it as the state_handle argument of every later call under the lock (or in the x-mcp-state-handle header).',
+  'Over Streamable HTTP a lock that gives a non-empty lock_handle gives a state_handle too: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).',
 );
 
 /** HandlerLock's unlock: it runs under the state handle the lock gave. */

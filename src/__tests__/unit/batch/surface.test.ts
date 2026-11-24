@@ -264,7 +264,7 @@ describe('the batch tools on the surface', () => {
             byName
               .get('HandlerLock')
               ?.includes(
-                'action is unlock and object_type is PACKAGE and the connection is HTTP',
+                'action is unlock and object_type is PACKAGE and lock_handle is given and the connection is HTTP',
               ),
           );
           assert.ok(

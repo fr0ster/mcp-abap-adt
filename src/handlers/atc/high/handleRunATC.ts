@@ -1,5 +1,9 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type IAtcStartedRun,
+  type IAtcWaitingRun,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   AtcClassIncludeKind,
   AtcObjectType,
@@ -8,12 +12,13 @@ import type {
 import * as z from 'zod';
 import {
   ATC_OBJECT_TYPES,
-  type AtcKindOn,
   type ProjectionVariant,
 } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { variantOf } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import { ATC_RUN, runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 import { succeededWith } from '../../../lib/strategies/sequence';
@@ -61,22 +66,18 @@ export const TOOL_DEFINITION = {
   name: 'RunATC',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: `[read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: ${ATC_OBJECT_TYPES[variant].map(typeWords).join(', ')}. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.`,
+    description: toolDescription(
+      runParts({
+        tag: 'read-only',
+        purpose: purpose(
+          'Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist.',
+        ),
+        result: ATC_RUN,
+      }),
+    ),
     inputSchema: runAtcSchema(variant),
   })),
 } as const;
-
-/** How the description names one kind: with what it needs beside its name. */
-function typeWords(kind: AtcKindOn<ProjectionVariant>): string {
-  switch (kind) {
-    case 'function_include':
-      return "function_include (with function_group, the include's function group)";
-    case 'class_include':
-      return 'class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class)';
-    default:
-      return kind;
-  }
-}
 
 /** RunATC's input on `variant`: its object types are the variant's. */
 function runAtcSchema(variant: ProjectionVariant) {
@@ -255,24 +256,34 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
         run: run.getResult().value,
       });
     },
-    ({ checkVariant, worklistId, run }) => ({
-      success: true,
-      check_variant: checkVariant,
-      // Always: the findings live here, and `GetATCFindings` reads them by
-      // this id whether the run waited or not.
-      worklist_id: worklistId,
-      waited: run.waited,
-      ...(run.waited
-        ? // `FINDING_STATS` verbatim — a comma-separated triple the client
-          // deliberately does not name, since only two of its three positions
-          // have ever been seen non-zero.
-          { finding_stats: run.findingStats }
-        : { run_id: run.runId }),
-      objects: target.objects.map(objectAnswered),
-    }),
+    ({ checkVariant, worklistId, run }) =>
+      atcRunAnswer(checkVariant, worklistId, run, target.objects),
   );
 }
 
+/** What a run answers: the variant, the worklist, a waited run's counts or a started run's id, the objects. */
+export function atcRunAnswer(
+  checkVariant: string,
+  worklistId: string,
+  run: IAtcStartedRun | IAtcWaitingRun,
+  objects: readonly IAtcObjectRef[],
+) {
+  return {
+    success: true,
+    check_variant: checkVariant,
+    // Always: the findings live here, and `GetATCFindings` reads them by
+    // this id whether the run waited or not.
+    worklist_id: worklistId,
+    waited: run.waited,
+    ...(run.waited
+      ? // `FINDING_STATS` verbatim — a comma-separated triple the client
+        // deliberately does not name, since only two of its three positions
+        // have ever been seen non-zero.
+        { finding_stats: run.findingStats }
+      : { run_id: run.runId }),
+    objects: objects.map(objectAnswered),
+  };
+}
 /**
  * One argument object, its kind checked at the boundary, as the client's
  * `IAtcObjectRef`, or the words refusing it. Each kind carries what its URI needs: a function include its group, a
@@ -324,7 +335,14 @@ function toObjectRef(
 }
 
 /** An object as the answer names it, in the schema's words. */
-function objectAnswered(ref: IAtcObjectRef) {
+interface AtcObjectAnswered {
+  name: string;
+  type: AtcObjectType;
+  function_group?: string;
+  include_kind?: AtcClassIncludeKind;
+}
+
+function objectAnswered(ref: IAtcObjectRef): AtcObjectAnswered {
   switch (ref.objectType) {
     case 'function_include':
       return {

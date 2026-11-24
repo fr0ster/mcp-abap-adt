@@ -7,6 +7,14 @@
  * added to an answer and not named here does not compile.
  */
 
+import type { atcRunStatusAnswer } from '../../handlers/atc/high/handleGetATCRunStatus';
+import type { atcResultListAnswer } from '../../handlers/atc/high/handleListATCResults';
+import type { atcRunAnswer } from '../../handlers/atc/high/handleRunATC';
+import type { scheduledTraceAnswer } from '../../handlers/system/high/handleRuntimeCreateProfilerTraceParameters';
+import type { programRunAnswer } from '../../handlers/system/high/handleRuntimeRunProgram';
+import type { traceSummaryAnswer } from '../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
+import type { DumpAnswer } from '../../handlers/system/readonly/handleRuntimeGetDumpById';
+import type { traceDataAnswer } from '../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';
 import type {
   runOutcomeAnswer,
   runOutcomeWithStatus,
@@ -14,10 +22,16 @@ import type {
 } from '../../handlers/unit_test/shared/pollRun';
 import type { projectSync } from '../../handlers/unit_test/shared/runSync';
 import type { projectRun } from '../../handlers/unit_test/shared/runTests';
+import type { TerseClassRun } from '../strategies/runProjections';
 import type { XmlRead } from '../xml/tree';
 import type { Note } from './notes';
 import { type Purpose, purpose } from './purpose';
-import { type ResultShape, resultReturns, resultShape } from './returns';
+import {
+  listOf,
+  type ResultShape,
+  resultReturns,
+  resultShape,
+} from './returns';
 import type { DescriptionParts, DescriptionTag } from './toolDescription';
 
 /**
@@ -83,6 +97,100 @@ export const UNIT_TEST_STATUS = resultShape<ReturnType<typeof runStatusAnswer>>(
     run_status: "SAP's progress status of the run",
   },
 );
+
+/** What an ATC run answers. */
+export const ATC_RUN = resultShape<
+  Informative<ReturnType<typeof atcRunAnswer>>
+>({
+  check_variant: 'the check variant it ran',
+  worklist_id: 'the worklist holding its findings',
+  waited: 'whether the call waited for the checks to end',
+  finding_stats: 'the finding counts of a run waited for',
+  run_id: 'the id of a started run to read its status by',
+  objects: listOf('for each object checked', {
+    name: 'its name',
+    type: 'its type',
+    function_group: 'the function group of a function include',
+    include_kind: 'the include of a class include',
+  }),
+});
+
+/** What a read of an ATC run's status answers. */
+export const ATC_RUN_STATUS = resultShape<
+  Informative<ReturnType<typeof atcRunStatusAnswer>>
+>({
+  run_id: "the run's id",
+  status: "SAP's status of the run",
+  is_finished: 'whether the run has ended',
+  worklist_id: 'the worklist holding its findings',
+  result_id: 'the id of its result',
+});
+
+/** What the list of ATC results answers. */
+export const ATC_RESULTS = resultShape<
+  Informative<ReturnType<typeof atcResultListAnswer>>
+>({
+  result_count: 'how many results the system holds',
+  results: listOf('for each result, newest first', {
+    display_id: 'its display id',
+    title: 'its title',
+    check_variant: 'its check variant',
+    run_series: 'its run series',
+    created_at: 'when it was created',
+    by_priority: 'its finding counts per priority',
+    failures: 'its failure count',
+  }),
+});
+
+/** What a class run answers. */
+export const CLASS_RUN = resultShape<Informative<TerseClassRun>>({
+  class_name: 'the class that ran',
+  output: 'its console output',
+  profile: 'the profiler and trace ids of a profiled run',
+});
+
+/** What a program run answers. */
+export const PROGRAM_RUN = resultShape<
+  Informative<ReturnType<typeof programRunAnswer>>
+>({
+  program_name: 'the report that ran',
+  output: 'its output',
+  profile: 'the profiler id of a profiled run',
+});
+
+/** What a scheduled profiler trace answers. */
+export const TRACE_SCHEDULED = resultShape<
+  Informative<ReturnType<typeof scheduledTraceAnswer>>
+>({
+  profiler_id: 'the profiler id a profiled run names',
+});
+
+/** What a trace analysis answers. */
+export const TRACE_SUMMARY = resultShape<
+  Informative<ReturnType<typeof traceSummaryAnswer<unknown>>>
+>({
+  trace_id_or_uri: 'the trace',
+  view: 'the view read',
+  summary: "the view's record count and its top records by time",
+  payload: "the view's data as the profiler read it",
+});
+
+/** What a trace read answers. */
+export const TRACE_DATA = resultShape<
+  Informative<ReturnType<typeof traceDataAnswer>>
+>({
+  view: 'the view read',
+  trace_id_or_uri: 'the trace',
+  payload: "the view's data as the profiler read it",
+});
+
+/** What a dump read answers. */
+export const DUMP = resultShape<Informative<DumpAnswer>>({
+  dump_id: "the dump's id",
+  view: 'the view read',
+  summary: 'the summary of where and why its program terminated',
+  payload: 'the dump as SAP gave it',
+});
 
 /** A run or a read: its purpose, its answer, its tag and notes. */
 export interface RunTool {

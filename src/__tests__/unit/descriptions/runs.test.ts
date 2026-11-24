@@ -6,8 +6,15 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { resultReturns, toolDescription } from '../../../lib/description';
 import {
+  purpose,
+  resultReturns,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  CLASS_RUN,
+  PROGRAM_RUN,
+  runParts,
   UNIT_TEST_RESULT,
   UNIT_TEST_RUN,
   UNIT_TEST_RUN_OR_SYNC,
@@ -65,7 +72,29 @@ describe('the unit-test read factory', () => {
   });
 });
 
-describe('the unit-test shapes', () => {
+describe('the run factory', () => {
+  it('a class run and a report run: the purpose, then the answer', () => {
+    assert.equal(
+      toolDescription(
+        runParts({
+          purpose: purpose('Runs an ABAP class.'),
+          result: CLASS_RUN,
+        }),
+      ),
+      'Runs an ABAP class. The class that ran, its console output and the profiler and trace ids of a profiled run.',
+    );
+    assert.equal(
+      toolDescription(
+        runParts({
+          tag: 'read-only',
+          purpose: purpose('Runs an ABAP report.'),
+          result: PROGRAM_RUN,
+        }),
+      ),
+      '[read-only] Runs an ABAP report. The report that ran, its output and the profiler id of a profiled run.',
+    );
+  });
+
   it('every shape keeps the fact rules', () => {
     for (const shape of [
       UNIT_TEST_RUN,
@@ -73,6 +102,8 @@ describe('the unit-test shapes', () => {
       UNIT_TEST_RESULT,
       UNIT_TEST_STATUS,
       UNIT_TEST_STATUS_AND_RESULT,
+      CLASS_RUN,
+      PROGRAM_RUN,
     ]) {
       for (const fact of resultReturns(shape)) {
         assert.deepStrictEqual(factFaults(fact.text), [], fact.text);

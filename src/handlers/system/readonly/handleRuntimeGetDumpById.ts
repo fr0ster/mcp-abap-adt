@@ -3,6 +3,8 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { XMLParser } from 'fast-xml-parser';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { purpose, toolDescription } from '../../../lib/description';
+import { DUMP, runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { JsonValue } from '../../../lib/json';
 import { afterLast, digitsAfter } from '../../../lib/plainText';
@@ -22,8 +24,15 @@ import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 export const TOOL_DEFINITION = {
   name: 'RuntimeGetDumpById',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.',
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads an ABAP runtime dump by its id, with a summary of where and why its program terminated.',
+      ),
+      result: DUMP,
+    }),
+  ),
   inputSchema: z.object({
     dump_id: z
       .string()
@@ -173,13 +182,7 @@ export async function handleRuntimeGetDumpById(
     () => dumps.getById(dumpId, { analyse: analyseException, view }),
     (raw) => {
       const parsedPayload = parseRuntimePayloadToJson(raw);
-      const result: {
-        success: true;
-        dump_id: string;
-        view: typeof view;
-        summary?: DumpSummary;
-        payload?: JsonValue;
-      } = {
+      const result: DumpAnswer = {
         success: true,
         dump_id: dumpId,
         view,
@@ -199,4 +202,13 @@ export async function handleRuntimeGetDumpById(
       return result;
     },
   );
+}
+
+/** What a dump read answers: its id, the view, its summary and the parsed dump, as asked. */
+export interface DumpAnswer {
+  success: true;
+  dump_id: string;
+  view: 'default' | 'summary' | 'formatted';
+  summary?: DumpSummary;
+  payload?: JsonValue;
 }

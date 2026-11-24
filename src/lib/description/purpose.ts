@@ -120,6 +120,31 @@ const SAME_OBJECT: Readonly<Record<string, string>> = {
 };
 
 /**
+ * The code of `phrase` ending at `end`: an include of a function group (its
+ * clause names one: `an include of an ABAP function group`) is the group's
+ * include, `FUGR/I`, of main type FUGR; any other `code`.
+ */
+function codeIn(
+  text: string,
+  phrase: string,
+  end: number,
+  code: AdtMainType,
+): AdtMainType {
+  if (phrase !== 'include') return code;
+  const rest = text.slice(end);
+  const clause = rest.slice(
+    0,
+    Math.min(
+      ...[',', '.', ':'].map((stop) => {
+        const at = rest.indexOf(stop);
+        return at < 0 ? rest.length : at;
+      }),
+    ),
+  );
+  return clause.includes('function group') ? 'FUGR' : code;
+}
+
+/**
  * `text` with each object's type code after its first naming as a noun: the
  * longest noun first, a shorter noun never inside a longer one, each object
  * once.
@@ -136,7 +161,7 @@ export function withTypeCodes(text: string): string {
         ([start, stop]) => at < stop && at + phrase.length > start,
       );
       if (end >= 0 && !inside) {
-        taken.push([at, end, code]);
+        taken.push([at, end, codeIn(text, phrase, end, code)]);
         coded.add(object);
         break;
       }

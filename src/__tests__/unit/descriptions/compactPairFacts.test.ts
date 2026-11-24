@@ -7,12 +7,15 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { TOOL_DEFINITION as GetObjectDraft } from '../../../handlers/common/readonly/handleGetObjectDraft';
+import { TOOL_DEFINITION as GetFunctionInclude } from '../../../handlers/function_include/readonly/handleGetFunctionInclude';
+import { TOOL_DEFINITION as GetInclude } from '../../../handlers/include/readonly/handleGetInclude';
 import { NARROWINGS } from '../../../lib/access/narrowing';
 import {
   compactDeleteDescription,
   compactDeletionCheckDescription,
   compactGetDescription,
 } from '../../../lib/compact/compactDescriptions';
+import { withTypeCodes } from '../../../lib/description/purpose';
 import { listedJson } from '../../helpers/listedJson';
 
 const DRAFT_PAIR =
@@ -57,6 +60,23 @@ describe('the compact pairs say what each route does', () => {
       GetObjectDraft.variants.cloud.description.includes('program'),
       false,
       GetObjectDraft.variants.cloud.description,
+    );
+  });
+
+  it("an include of a function group is coded by the group's main type, FUGR; a program's include PROG", () => {
+    assert.equal(
+      withTypeCodes('Reads an include of an ABAP function group.'),
+      'Reads an include (FUGR) of an ABAP function group (FUGR).',
+    );
+    assert.equal(
+      withTypeCodes('Creates an include in an existing ABAP function group.'),
+      'Creates an include (FUGR) in an existing ABAP function group (FUGR).',
+    );
+    assert.ok(GetFunctionInclude.description.includes('an include (FUGR)'));
+    assert.ok(GetInclude.description.includes('ABAP include (PROG)'));
+    assert.equal(
+      withTypeCodes('Reads every include of a program or include.'),
+      'Reads every include (PROG) of a program (PROG) or include.',
     );
   });
 });

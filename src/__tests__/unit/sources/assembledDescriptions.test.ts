@@ -90,6 +90,10 @@ function descriptionsIn(node: ts.Node): ts.Expression[] {
       found.push(child.initializer);
       return;
     }
+    // The input schema's fields are the tool's parameters: one named
+    // `description` (a package's, say) is a parameter, not the description.
+    if (ts.isPropertyAssignment(child) && propertyName(child) === 'inputSchema')
+      return;
     // A nested tool's own definition (a schema field's `describe`) is not
     // this one's description: zod descriptions are calls, never properties.
     ts.forEachChild(child, visit);
@@ -194,6 +198,23 @@ describe('every tool description is assembled, or its tool still listed as not y
         each.assembled,
       ]),
       [['ToolY', false]],
+    );
+  });
+
+  it('reads no input field named description as the description', () => {
+    const file = 'field.ts';
+    const source = ts.createSourceFile(
+      file,
+      "export const T = { name: 'ToolZ', description: toolDescription(parts), inputSchema: { description: z.string() } };",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    assert.deepStrictEqual(
+      definitionsOfSource(file, source).map((each) => [
+        each.name,
+        each.assembled,
+      ]),
+      [['ToolZ', true]],
     );
   });
 

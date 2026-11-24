@@ -1,9 +1,7 @@
 /**
  * Plan step 10.6: every tool's description is assembled — the `description`
  * of every tool definition is a `toolDescription(…)` call, never a string
- * literal, a template or a concatenation — except for a tool still listed in
- * `NOT_YET_ASSEMBLED`, which is refused once it is assembled, so the list
- * only shrinks. One rule: the description is a call of `toolDescription`
+ * literal, a template or a concatenation. One rule: the description is a call of `toolDescription`
  * itself (its parts made by any helper: `toolDescription(runParts(…))`), or
  * of a factory exported from `src/lib/description/` whose every `return` is
  * such a call (`createTool`, `checkTool`, …); anything else is written whole.
@@ -15,10 +13,6 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import ts from 'typescript';
 import { globSync } from '../../helpers/platform';
-import {
-  NOT_YET_ASSEMBLED,
-  NOT_YET_ASSEMBLED_MOST,
-} from '../descriptions/notYetAssembled';
 
 /** The files that define tools: the handlers, and the compact sets' handlers. */
 const DEFINING = [
@@ -244,15 +238,8 @@ function definitionsOfSource(file: string, source: ts.SourceFile): Defined[] {
   return defined;
 }
 
-describe('every tool description is assembled, or its tool still listed as not yet', () => {
+describe('every tool description is assembled', () => {
   const defined = DEFINING.flatMap(definitionsOf);
-
-  it('the not-yet list only shrinks: no longer than its committed most', () => {
-    assert.ok(
-      NOT_YET_ASSEMBLED.size <= NOT_YET_ASSEMBLED_MOST,
-      `${NOT_YET_ASSEMBLED.size} listed, at most ${NOT_YET_ASSEMBLED_MOST}`,
-    );
-  });
 
   it("reads a computed ['description'] key as the description", () => {
     const file = 'computed.ts';
@@ -382,17 +369,10 @@ describe('every tool description is assembled, or its tool still listed as not y
     assert.ok(defined.length > 200, String(defined.length));
   });
 
-  it('each description is a toolDescription call, unless its tool is listed; a listed tool is not assembled', () => {
-    const faults: string[] = [];
-    for (const each of defined) {
-      const listed = NOT_YET_ASSEMBLED.has(each.name);
-      if (!each.assembled && !listed) {
-        faults.push(`${each.file} ${each.name}: written whole (${each.made})`);
-      }
-      if (each.assembled && listed) {
-        faults.push(`${each.file} ${each.name}: assembled, still listed`);
-      }
-    }
+  it('each description is a toolDescription call', () => {
+    const faults = defined
+      .filter((each) => !each.assembled)
+      .map((each) => `${each.file} ${each.name}: written whole (${each.made})`);
     assert.deepStrictEqual(faults, []);
   });
 });

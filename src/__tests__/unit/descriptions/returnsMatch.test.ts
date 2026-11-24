@@ -1,7 +1,7 @@
 /**
  * Plan step 10.5: a tool's description and its output, tied
- * (`returnsMatch.ts`). The writer tools are tied as each moves (group (2) of
- * step 10.7); until then each is listed in `NOT_YET_ASSEMBLED`.
+ * (`returnsMatch.ts`): every writer tool is tied, or left out of the tie in
+ * `UNTIED` with its reason.
  */
 
 import assert from 'node:assert/strict';
@@ -197,7 +197,6 @@ import {
   stagingEveryList,
 } from '../../helpers/abapGitSap';
 import { corpusBody } from '../../helpers/adtCorpus';
-import { NOT_YET_ASSEMBLED, WRITER_TOOLS } from './notYetAssembled';
 import { type ReturnsTie, type TieSample, tieFaults } from './returnsMatch';
 
 /** Each tied tool's description, as its definition holds it. */
@@ -1498,6 +1497,51 @@ describe('a tool description tied to what its writers write', () => {
  * descriptions are checked by the final vector measurement against their
  * output instead. Each with its reason.
  */
+/**
+ * The tools written by the listing writers (plan steps 9.3–9.7): their
+ * Returns is generated from their schemas and tied to their goldens
+ * (`returnsMatch.test.ts`) once assembled — group (2) of the migration.
+ */
+export const WRITER_TOOLS: readonly string[] = [
+  'GetPackageContents',
+  'GetPackageTree',
+  'GetObjectsList',
+  'GetObjectsByType',
+  'ListFunctionModules',
+  'ListFunctionGroupIncludes',
+  'GetIncludesList',
+  'GetStructuresList',
+  'GetEnhancements',
+  'SearchSource',
+  'SearchObject',
+  'DescribeByList',
+  'GetWhereUsed',
+  'GetMainPrograms',
+  'GetAdtTypes',
+  'GetTransport',
+  'ReadTransportObjects',
+  'ListTransports',
+  'ReadTransportActionLog',
+  'RuntimeListFeeds',
+  'RuntimeListSystemMessages',
+  'RuntimeGetGatewayErrorLog',
+  'RuntimeListProfilerTraceFiles',
+  'GetATCFindings',
+  'GetATCResult',
+  'GetInactiveObjects',
+  'GetObjectVersions',
+  'GetObjectOutline',
+  'GetObjectStructure',
+  'GetTransaction',
+  'GetPackage',
+  'ListAbapGitRepos',
+  'CheckAbapGitExternalRepo',
+  'GetAbapGitBranchInfo',
+  'GetAbapGitModifiedObjects',
+  'GetAbapGitStaging',
+  'GetAbapGitErrorLog',
+];
+
 const UNTIED: Readonly<Record<string, string>> = {
   GetStructuresList:
     'its sections write a mark line from each item, and the sections schema records no labels',
@@ -1509,29 +1553,15 @@ const UNTIED: Readonly<Record<string, string>> = {
     'left out with the other three by the owner; its heads are written from the reading as head lines, and it has no fixture set of its own',
 };
 
-describe('every writer tool is tied, or still listed as not yet assembled', () => {
+describe('every writer tool is tied, or left out of the tie with its reason', () => {
   for (const tool of WRITER_TOOLS) {
     it(tool, () => {
-      if (UNTIED[tool] !== undefined) {
-        assert.ok(
-          !NOT_YET_ASSEMBLED.has(tool),
-          `${tool} is left out of the tie and still listed`,
-        );
-        assert.ok(TIED[tool] === undefined, `${tool} is tied and left out`);
-        return;
-      }
       const tied = TIED[tool];
-      if (tied === undefined) {
-        assert.ok(
-          NOT_YET_ASSEMBLED.has(tool),
-          `${tool} is neither tied nor listed`,
-        );
+      if (UNTIED[tool] !== undefined) {
+        assert.ok(tied === undefined, `${tool} is tied and left out`);
         return;
       }
-      assert.ok(
-        !NOT_YET_ASSEMBLED.has(tool),
-        `${tool} is tied and still listed`,
-      );
+      assert.ok(tied !== undefined, `${tool} is neither tied nor left out`);
       assert.deepStrictEqual(tieFaults(tied()), []);
     });
   }

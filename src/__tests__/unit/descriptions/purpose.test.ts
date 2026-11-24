@@ -2,8 +2,8 @@
  * Plan step 10.4: a tool's description is assembled — its purpose (the
  * function, the main part), then the facts of what it gives back, then its
  * notes — and every purpose and every fact keeps to the rules of
- * `descriptionRules.ts`. Every tool every binary serves is either assembled
- * or still listed in `NOT_YET_ASSEMBLED`, never both.
+ * `descriptionRules.ts`. Every tool every binary serves — the full, the
+ * read-only and the compact sets, on every transport — is assembled.
  */
 
 import assert from 'node:assert/strict';
@@ -30,8 +30,14 @@ import {
   shapesOf,
 } from '../../../lib/detail';
 import { LEVEL_SENTENCES, levelWords } from '../../../lib/strategies/detail';
+import { BINARIES } from '../../../lib/toolSet';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
-import { type Listing, listBinaries } from '../../helpers/servedTools';
+import {
+  KINDS,
+  type Listing,
+  listBinaries,
+  TRANSPORTS,
+} from '../../helpers/servedTools';
 import {
   detailFaults,
   FORM_MARKERS,
@@ -41,7 +47,6 @@ import {
   purposeFaults,
   TAGS,
 } from './descriptionRules';
-import { NOT_YET_ASSEMBLED } from './notYetAssembled';
 
 /** A member of a listed schema (outside the type system), or none. */
 function memberOf(value: unknown, key: string): unknown {
@@ -107,15 +112,6 @@ describe('the purpose rules', () => {
 describe('the notes and the tags', () => {
   it('the long-running note says no word of form', () => {
     assert.deepStrictEqual(noteFaults(longRunning.text, 'long'), []);
-  });
-
-  it("every tool's batch note says no word of form but `batch`", () => {
-    const faults = [...NOT_YET_ASSEMBLED].flatMap((tool) =>
-      noteFaults(batchable(tool).text, 'batch').map(
-        (fault) => `${tool}: ${fault}`,
-      ),
-    );
-    assert.deepStrictEqual([...new Set(faults)], []);
   });
 
   it('the shared detail text names the levels and no other word of form', () => {
@@ -368,7 +364,7 @@ describe('the batch sentence of an assembled description is its note', () => {
   });
 });
 
-describe('every served tool is assembled, or still listed as not yet', () => {
+describe('every served tool is assembled', () => {
   let standIn: AdtStandIn;
   const listings: Listing[] = [];
   let savedSystemType: string | undefined;
@@ -389,8 +385,21 @@ describe('every served tool is assembled, or still listed as not yet', () => {
     mock.restoreAll();
   });
 
-  it('serves tools at all, so the check is not vacuous', () => {
-    assert.ok(listings.some((listing) => listing.tools.length > 10));
+  it('reads every binary of the full, read-only and compact sets, each serving tools', () => {
+    for (const kind of KINDS) {
+      for (const transport of TRANSPORTS) {
+        const bin = BINARIES[transport][kind].bin;
+        for (const systemType of ['onprem', 'cloud'] as const) {
+          const listing = listings.find(
+            (each) => each.bin === bin && each.systemType === systemType,
+          );
+          assert.ok(
+            listing !== undefined && listing.tools.length > 0,
+            `${bin} on ${systemType}`,
+          );
+        }
+      }
+    }
   });
 
   it("every tool's detail parameter holds the shared text over its levels, and no word of form but the level names", () => {
@@ -440,17 +449,15 @@ describe('every served tool is assembled, or still listed as not yet', () => {
     assert.deepStrictEqual([...new Set(faults)], []);
   });
 
-  it('each served tool is assembled or listed, never both; each assembled one keeps the rules', () => {
+  it('each served tool is assembled, and keeps the rules', () => {
     const faults: string[] = [];
     for (const listing of listings) {
       for (const tool of listing.tools) {
         const parts = partsOfDescription(tool.description ?? '');
-        const listed = NOT_YET_ASSEMBLED.has(tool.name);
         if (parts === undefined) {
-          if (!listed) faults.push(`${tool.name}: written whole, not listed`);
+          faults.push(`${tool.name}: written whole`);
           continue;
         }
-        if (listed) faults.push(`${tool.name}: assembled, still listed`);
         // Served exactly as assembled: nothing appended at registration.
         if (toolDescription(parts) !== tool.description) {
           faults.push(`${tool.name}: served text is not its assembled text`);

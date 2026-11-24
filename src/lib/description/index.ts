@@ -4,6 +4,15 @@
  * the shared notes. See `toolDescription`.
  */
 
+export {
+  activateTool,
+  checkTool,
+  createTool,
+  deleteTool,
+  type KindTool,
+  updateTool,
+  validateTool,
+} from './kinds';
 export { batchable, longRunning, type Note } from './notes';
 export { type Purpose, purpose } from './purpose';
 export * as results from './results';

@@ -30,11 +30,11 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Shows what changed between the system and the remote branch of a linked repository, to choose what a push commits.',
+      'Gets the abapGit staging of a linked repository: what changed, to choose what a push commits.',
     ),
     returns: returnsOf({
       heads: STAGING_HEADS,
-      shapes: [shapesOf(STAGING_TERSE), shapesOf(STAGING_MEDIUM)],
+      shapes: [shapesOf(STAGING_TERSE)],
     }),
   }),
   inputSchema: z.object({

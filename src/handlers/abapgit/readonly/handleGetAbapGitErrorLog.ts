@@ -33,11 +33,11 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Shows how the last pull or push of a linked repository went, object by object, by the key of its run log.',
+      'Gets the error log of the last abapGit pull or push of a repository, object by object.',
     ),
     returns: returnsOf({
       heads: [],
-      shapes: [shapesOf(RUN_LOG_TERSE), shapesOf(RUN_LOG_MEDIUM)],
+      shapes: [shapesOf(RUN_LOG_TERSE)],
     }),
   }),
   inputSchema: z.object({

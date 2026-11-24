@@ -36,11 +36,11 @@ export const TOOL_DEFINITION = {
   available_in: ['cloud'] as const,
   description: toolDescription({
     purpose: purpose(
-      'Reads one branch of a remote git repository for the package it would be linked to, SAP linking and unlinking it to find out.',
+      'Gets the abapGit branch information of a remote repository for the package it would be linked to.',
     ),
     returns: returnsOf({
       heads: ACCESS_MODE_HEADS,
-      shapes: [shapesOf(BRANCH_INFO_TERSE), shapesOf(BRANCH_INFO_MEDIUM)],
+      shapes: [shapesOf(BRANCH_INFO_TERSE)],
     }),
   }),
   inputSchema: z.object({

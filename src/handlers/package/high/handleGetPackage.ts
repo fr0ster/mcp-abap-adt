@@ -38,15 +38,15 @@ type SubPackage = ReturnType<typeof packageDetails>['sub_packages'][number];
 
 /** The package's facts a terse answer writes as heads, each by its noun. */
 export const PACKAGE_HEADS = [
-  headShape('package', "the package's name"),
-  headShape('description', 'its description'),
-  headShape('package_type', 'its type'),
-  headShape('super_package', 'its super package'),
-  headShape('software_component', 'its software component'),
-  headShape('application_component', 'its application component'),
-  headShape('transport_layer', 'its transport layer'),
-  headShape('language_version', 'its ABAP language version'),
-  headShape('responsible', 'who is responsible for it'),
+  headShape('package', 'name'),
+  headShape('description', 'description'),
+  headShape('package_type', 'type'),
+  headShape('super_package', 'super package'),
+  headShape('software_component', 'software component'),
+  headShape('application_component', 'application component'),
+  headShape('transport_layer', 'transport layer'),
+  headShape('language_version', 'language version'),
+  headShape('responsible', 'person responsible'),
 ];
 
 /** The package's subpackages at terse. */
@@ -113,13 +113,13 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: toolDescription({
     tag: 'read-only',
-    purpose: purpose(
-      'Reads an ABAP package: its settings and its subpackages, at the version asked.',
-    ),
+    purpose: purpose('Reads an ABAP package at the version asked.'),
     returns: returnsOf({
+      of: 'its',
       heads: PACKAGE_HEADS,
-      shapes: [shapesOf(PACKAGE_TERSE), jsonShapesOf(PACKAGE_MEDIUM)],
+      shapes: [shapesOf(PACKAGE_TERSE)],
     }),
+    inline: true,
   }),
   inputSchema: z.object({
     package_name: requiredText('package_name is required').describe(

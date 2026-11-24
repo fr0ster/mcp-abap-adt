@@ -37,11 +37,11 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Shows what a pull of a linked repository would change in the system, before it runs.',
+      'Gets the objects a pull of an abapGit repository would modify in the system, before it runs.',
     ),
     returns: returnsOf({
       heads: [],
-      shapes: [shapesOf(MODIFIED_TERSE), shapesOf(MODIFIED_MEDIUM)],
+      shapes: [shapesOf(MODIFIED_TERSE)],
     }),
   }),
   inputSchema: z.object({

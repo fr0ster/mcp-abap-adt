@@ -32,11 +32,11 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Checks what a remote git repository offers before it is linked, as the system reaches it.',
+      'Checks an external git repository for abapGit before it is linked: its access and its branches.',
     ),
     returns: returnsOf({
       heads: ACCESS_MODE_HEADS,
-      shapes: [shapesOf(EXTERNAL_REPO_TERSE), shapesOf(EXTERNAL_REPO_MEDIUM)],
+      shapes: [shapesOf(EXTERNAL_REPO_TERSE)],
     }),
   }),
   inputSchema: z.object({ url: URL_FIELD, ...ABAPGIT_DETAIL_SHAPE }),

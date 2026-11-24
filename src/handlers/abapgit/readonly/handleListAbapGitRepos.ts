@@ -28,11 +28,11 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Finds the abapGit repositories linked in the system, or only the one linked to a package or with a key.',
+      'Lists the abapGit repositories linked in the system, or the one with a key or of one package.',
     ),
     returns: returnsOf({
       heads: [],
-      shapes: [shapesOf(REPOS_TERSE), shapesOf(REPOS_MEDIUM)],
+      shapes: [shapesOf(REPOS_TERSE)],
     }),
   }),
   inputSchema: z.object({

@@ -99,8 +99,8 @@ function mismatch(
     code: FUNCTION_GROUP_MISMATCH,
     message:
       stated === undefined
-        ? `The metadata of function module ${module} names no function group, so function group ${group} cannot be confirmed to hold it; nothing else was sent.`
-        : `Function module ${module} is in function group ${stated}, not in ${group}; nothing else was sent.`,
+        ? `The metadata of function module ${module} names no function group, so function group ${group} cannot be confirmed to hold it; only function module metadata was read; nothing else was sent.`
+        : `Function module ${module} is in function group ${stated}, not in ${group}; only function module metadata was read; nothing else was sent.`,
   };
 }
 

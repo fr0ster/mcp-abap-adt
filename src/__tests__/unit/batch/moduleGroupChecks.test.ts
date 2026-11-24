@@ -228,6 +228,13 @@ describe('function module group checks of several references (checkModuleReferen
     assert.deepStrictEqual(a, b);
     assert.equal(Object(a).code, 'FUNCTION_GROUP_MISMATCH');
     assert.ok(String(Object(a).message).includes('ZOTHER'));
+    // What was sent: the modules' metadata reads — in one envelope, every
+    // module's — and nothing else.
+    assert.ok(
+      String(Object(a).message).endsWith(
+        'only function module metadata was read; nothing else was sent.',
+      ),
+    );
   });
 
   it('several failures: the first in the references’ order is the answer, as the sequential version', async () => {

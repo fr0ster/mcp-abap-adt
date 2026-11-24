@@ -320,9 +320,10 @@ are single requests.
 - **`GetObjectsList`.** One parent (`parent_name`, or `objects` naming one) is walked as single
   requests; several parents' node structures go in envelopes, level by level.
 - **`GetObjectInfo`: the structure first, the descriptions second.** The structure comes back
-  first, each node structure sent as its own request — node structures cross-talk inside an
-  envelope — so `include_descriptions: false` (the default) answers the structure alone and reads
-  nothing more. With `include_descriptions: true` the server then runs the metadata phase itself:
+  first, each node structure sent as its own request whatever `include_descriptions` says — node
+  structures cross-talk inside an envelope. `include_descriptions: false` (the default) reads no
+  object metadata; the enrichment (`enrich`, on by default) still runs its searches, one per node,
+  in an envelope. With `include_descriptions: true` the server also runs the metadata phase itself:
   every leaf's metadata, in envelopes (metadata reads do not cross-talk), and each leaf's
   description is its metadata's. The sequential version reads the same metadata, one request
   each, so both paths answer from one source. A leaf whose metadata read SAP refused — a `401`
@@ -332,10 +333,13 @@ are single requests.
   targets' rounds go in envelopes.
 - **At most 300 reads per envelope** (`READS_PER_ENVELOPE`, `src/lib/batch/phases.ts`): more
   independent reads go in consecutive envelopes of balanced size (`chunksOf`: 301 reads are 151 and
-  150, never 300 and 1), each judged as it answers, none sent after one that met a credential
-  refusal. Every phase splits so: the group checks, `GetEnhancements`, the level walks
-  (`batchReader`: the package walks, `GetObjectsList`, `GetObjectInfo`) and `SearchSource`'s source
-  reads. SAP's own limit is not measured.
+  150, never 300 and 1), each judged as it answers. Where a credential refusal ends the call — the
+  group checks, `GetEnhancements`, the level walks — no envelope is sent after the one that met it;
+  `GetObjectInfo`'s metadata phase is the exception: a leaf's refused metadata read, a `401`
+  included, is that leaf's (no description) and the phase goes on with the next envelope. Every
+  phase splits so: the group checks, `GetEnhancements`, the metadata phase, the level walks
+  (`batchReader`: the package walks, `GetObjectsList`, `GetObjectInfo`'s enrichment searches) and
+  `SearchSource`'s source reads. SAP's own limit is not measured.
 - **Descriptions are never taken from a batched node structure.** Inside an envelope a node
   structure part can carry another part's `DESCRIPTION` (measured, 2026-10-18). The package
   listings with `include_descriptions: true` send each node structure as its own request and take
@@ -343,7 +347,8 @@ are single requests.
   `GetObjectsList` answers no description at all (type, name, technical name, URI), whatever
   `with_short_descriptions` says.
 - **Single requests over RFC go one at a time.** Where a tool reads single requests several at a
-  time — the package listings and `GetObjectInfo` with `include_descriptions: true` (8 at once),
+  time — the package listings with `include_descriptions: true` and `GetObjectInfo`'s structure,
+  whatever its options (8 at once),
   `SearchSource` without a communication batch — an RFC connection gets one at a time
   (`readsInFlight`, `src/lib/connectionKind.ts`), a batch connection or another view over it
   included: an RFC connection is one ABAP session, and reads sent to it in parallel were lost

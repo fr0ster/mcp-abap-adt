@@ -18,7 +18,7 @@ describe('a function module run covers its function group', () => {
   it('RunFunctionModuleUnitTest says so for its default runner', () => {
     assert.ok(
       RunFunctionModuleUnitTest.description.includes(
-        'Runs the ABAP Unit tests of the function group holding a function module',
+        'Runs the ABAP Unit tests of the function group (FUGR) holding a function module (FUGR)',
       ),
       RunFunctionModuleUnitTest.description,
     );

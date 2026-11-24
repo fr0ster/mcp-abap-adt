@@ -150,7 +150,7 @@ describe('the description', () => {
   it('starts with what it reads, marked read-only', () => {
     assert.equal(
       TOOL_DEFINITION.description.startsWith(
-        '[read-only] Searches the source code of packages for text, ',
+        '[read-only] Searches the source code of packages (DEVC) for text, ',
       ),
       true,
     );

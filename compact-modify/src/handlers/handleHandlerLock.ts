@@ -1,13 +1,17 @@
-import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
+import type {
+  CompactObjectType,
+  HeldLockAnswer,
+} from '@mcp-abap-adt/lib/compact-shared';
 import {
   acceptedOf,
   byVariant,
   COMPACT_LOCK,
   COMPACT_LOCK_KINDS,
-  compactLockDescription,
+  compactLockParts,
   compactLockSchemaFor,
   subResourceRefusal,
   supported,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { lockObjectAnswering } from '@mcp-abap-adt/lib/handlers/write';
@@ -18,7 +22,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerLock',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactLockDescription(variant),
+    description: toolDescription(compactLockParts(variant)),
     inputSchema: compactLockSchemaFor(COMPACT_LOCK[variant]),
     members: COMPACT_LOCK[variant],
   })),
@@ -64,7 +68,7 @@ export async function handleHandlerLock(
     context,
     { object_name: args.object_name, object_type: COMPACT_LOCK_KINDS[member] },
     'HandlerLock',
-    (lockHandle) =>
+    (lockHandle): HeldLockAnswer =>
       lockHandle !== '' && context.state !== undefined
         ? { lock_handle: lockHandle, state_handle: context.state.handle }
         : { lock_handle: lockHandle },

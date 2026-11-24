@@ -1,10 +1,13 @@
-import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
+import type {
+  CompactObjectType,
+  NotUnlockedAnswer,
+} from '@mcp-abap-adt/lib/compact-shared';
 import {
   acceptedOf,
   byVariant,
   COMPACT_LOCK_KINDS,
   COMPACT_UNLOCK,
-  compactUnlockDescription,
+  compactUnlockParts,
   compactUnlockSchemaFor,
   LOCK_WENT_WITH_SESSION_WORDS,
   lockHeldHere,
@@ -12,6 +15,7 @@ import {
   spentBy,
   subResourceRefusal,
   supported,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { unlockObject } from '@mcp-abap-adt/lib/handlers/write';
@@ -22,11 +26,16 @@ export const TOOL_DEFINITION = {
   name: 'HandlerUnlock',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactUnlockDescription(variant),
+    description: toolDescription(compactUnlockParts(variant)),
     inputSchema: compactUnlockSchemaFor(COMPACT_UNLOCK[variant]),
     members: COMPACT_UNLOCK[variant],
   })),
 } as const;
+
+/** An unlock that released nothing, and why. */
+function notUnlocked(reason: string): NotUnlockedAnswer {
+  return { unlocked: false, reason };
+}
 
 type HandlerUnlockArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
@@ -52,11 +61,11 @@ export async function handleHandlerUnlock(
       content: [
         {
           type: 'text' as const,
-          text: JSON.stringify({
-            unlocked: false,
-            reason:
+          text: JSON.stringify(
+            notUnlocked(
               'Nothing to unlock: the service binding holds no lock handle.',
-          }),
+            ),
+          ),
         },
       ],
     };
@@ -87,10 +96,7 @@ export async function handleHandlerUnlock(
       content: [
         {
           type: 'text' as const,
-          text: JSON.stringify({
-            unlocked: false,
-            reason: LOCK_WENT_WITH_SESSION_WORDS,
-          }),
+          text: JSON.stringify(notUnlocked(LOCK_WENT_WITH_SESSION_WORDS)),
         },
       ],
     };

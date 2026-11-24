@@ -37,7 +37,8 @@ export const SESSION_CLOSED = resultShape<ReturnType<typeof closedSession>>({
 /** What the start of recording calls to send together answers. */
 export const CALLS_RECORDING = resultShape<BatchBegun>({
   batch: 'that recording is on',
-  state_handle: 'the state handle every recorded call carries',
+  state_handle:
+    'the state handle: send it as the state_handle argument of every call (or in the x-mcp-state-handle header)',
 });
 
 /** What the list of leftover sessions answers. */

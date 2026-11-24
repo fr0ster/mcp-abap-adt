@@ -44,6 +44,7 @@ import {
   TOOL_DEFINITION as HandlerGet,
   handleHandlerGet,
 } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
+import { updateToken } from '../../../lib/compact/compactDescriptions';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { readOnlyToolNames } from '../../../lib/toolSet';
@@ -432,9 +433,15 @@ describe('the compact descriptions of the sub-resources', () => {
     assert.match(words, /TABLE_SETTINGS source \(the technical settings/);
   });
 
-  it('HandlerUpdate states the requests of the settings and of the text parts', () => {
+  it('HandlerUpdate names the settings and the text parts it writes, with their arguments', () => {
     const words = HandlerUpdate.variants.onprem.description;
-    assert.match(words, /two requests/);
-    assert.match(words, /whole list, one request each/);
+    for (const member of [
+      'TABLE_SETTINGS',
+      'PROGRAM_TEXT_ELEMENTS',
+      'FUNCTION_GROUP_TEXT_ELEMENTS',
+      'CLASS_TEXT_ELEMENTS',
+    ] as const) {
+      assert.ok(words.includes(updateToken(member)), member);
+    }
   });
 });

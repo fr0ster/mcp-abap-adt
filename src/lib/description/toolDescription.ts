@@ -49,9 +49,9 @@ export class Members {
     void this.#members;
   }
 
-  /** `object_type: A(a*), B(b*).` */
+  /** `object_type required: A(a*), B(b*).` */
   get text(): string {
-    return `${this.of}: ${this.tokens.join(', ')}.`;
+    return `${this.of} required: ${this.tokens.join(', ')}.`;
   }
 }
 

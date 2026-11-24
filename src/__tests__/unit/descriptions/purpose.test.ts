@@ -285,7 +285,7 @@ describe('the description builder', () => {
     });
     assert.equal(
       text,
-      'Reads a package or a class. part contents: reads the objects a package holds: for each object: its type and its name; the objects SAP could not load are named. part source: reads the source of a class. object_type: PACKAGE(package_name*), CLASS.',
+      'Reads a package or a class. part contents: reads the objects a package holds: for each object: its type and its name; the objects SAP could not load are named. part source: reads the source of a class. object_type required: PACKAGE(package_name*), CLASS.',
     );
   });
 

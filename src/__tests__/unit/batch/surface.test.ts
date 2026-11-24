@@ -73,7 +73,7 @@ const isCompact = (kind: ToolSetKind) =>
 const PURPOSE_WORDS =
   "Records the calls of the tools that allow it and sends them to SAP together, then reads each call's answer by its number.";
 const BEGIN_WORDS =
-  'starts recording the calls of the tools that allow it, each under the next number, to send them together: that recording is on and the state handle every recorded call carries.';
+  'starts recording the calls of the tools that allow it, each under the next number, to send them together: that recording is on and the state handle: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).';
 const END_WORDS =
   "sends the recorded calls to SAP together, with the credentials in force, and splits SAP's answer by call: how many calls were recorded, how many were sent and how many parts SAP's answer held.";
 const ANSWERS_WORDS =

@@ -66,6 +66,32 @@ export const WRITTEN_UNDER_LOCK = resultShape<LockedWriteAnswer>({
   cleanup: 'a lock left held when its release failed',
 });
 
+/** What a lock held by a server instance answers: its handle, and the instance's. */
+export interface HeldLockAnswer {
+  readonly lock_handle: string;
+  readonly state_handle?: string | undefined;
+}
+
+/** What a lock held by a server instance answers. */
+export const HELD_LOCK = resultShape<HeldLockAnswer>({
+  lock_handle: 'the lock handle its write, delete and unlock take',
+  state_handle:
+    'the state handle of the instance that holds it: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header)',
+});
+
+/** An unlock that released nothing: the lock went with its session, or there was none. */
+export interface NotUnlockedAnswer {
+  readonly unlocked: false;
+  readonly reason: string;
+}
+
+/** What an unlock answers. */
+export const UNLOCKED = resultShape<WriteAnswer | NotUnlockedAnswer>({
+  result: 'whether SAP took the change',
+  unlocked: 'that the lock was already released',
+  reason: 'why',
+});
+
 /** What a deletion answers. */
 export const DELETED = resultShape<DeletionAnswer>({
   deleted: 'whether SAP deleted the object',

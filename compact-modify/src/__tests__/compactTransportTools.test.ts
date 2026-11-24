@@ -182,11 +182,10 @@ describe('the compact transport sort and move tools', () => {
     assert.equal(compactAnswer.isError, false);
   });
 
-  it('name no other tool in their descriptions: the re-read is the task objects, object_type TRANSPORT', () => {
+  it('name no other tool in their descriptions', () => {
     for (const tool of [CompactSort, CompactMove]) {
       assert.ok(!tool.description.includes('ReadTransportObjects'));
       assert.ok(!tool.description.includes('HandlerGet'));
-      assert.ok(tool.description.includes('(object_type TRANSPORT)'));
     }
   });
 

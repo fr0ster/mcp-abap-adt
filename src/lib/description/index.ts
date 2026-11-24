@@ -19,7 +19,7 @@ export {
   updateTool,
   validateTool,
 } from './kinds';
-export { batchable, longRunning, type Note } from './notes';
+export { batchable, longRunning, type Note, underLock } from './notes';
 export { type Purpose, purpose } from './purpose';
 export { type ReaderParts, readerParts } from './readers';
 export * as results from './results';

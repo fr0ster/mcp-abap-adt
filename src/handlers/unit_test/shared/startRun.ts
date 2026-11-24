@@ -54,7 +54,7 @@ export function startedRunAnswer(runId: string) {
 /** What `HandlerUnitTestRun` does, and what its run answers. */
 export const START_RUN_PARTS = runParts({
   purpose: purpose(
-    "Runs the ABAP Unit tests of chosen test classes, of an object or of a package, giving the run's id at once or the finished result of the test classes.",
+    "Runs the ABAP Unit tests of chosen test classes, of a repository object or of a package, giving the run's id at once or the finished result of the test classes.",
   ),
   result: UNIT_TEST_STARTED,
 });

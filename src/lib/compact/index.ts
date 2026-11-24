@@ -33,6 +33,10 @@ export {
   valueFrom,
   valueParts,
 } from '../description/index.js';
+export type {
+  HeldLockAnswer,
+  NotUnlockedAnswer,
+} from '../description/results.js';
 export { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes.js';
 export type { ReadVersion } from '../handlers/readVersion.js';
 export { isJsonObject, type JsonValue, jsonAt } from '../json.js';

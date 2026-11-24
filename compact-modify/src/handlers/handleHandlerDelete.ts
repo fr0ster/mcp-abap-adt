@@ -2,8 +2,9 @@ import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
   byVariant,
   COMPACT_DELETE,
-  compactDeleteDescription,
+  compactDeleteParts,
   compactDeleteSchemaFor,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import type * as z from 'zod';
@@ -13,7 +14,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerDelete',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactDeleteDescription(variant),
+    description: toolDescription(compactDeleteParts(variant)),
     inputSchema: compactDeleteSchemaFor(COMPACT_DELETE[variant]),
     members: COMPACT_DELETE[variant],
   })),

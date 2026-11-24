@@ -23,11 +23,22 @@ import {
 import { parentedCodesOf } from '../adtTypeCode';
 import {
   type DescriptionParts,
+  membersTaken,
   purpose,
   resultReturns,
   toolDescription,
+  underLock,
 } from '../description/index';
+import {
+  DELETED,
+  HELD_LOCK,
+  PUBLISHED,
+  UNLOCKED,
+  WRITTEN,
+  WRITTEN_UNDER_LOCK,
+} from '../description/results';
 import { CLASS_RUN, PROGRAM_RUN } from '../description/runs';
+import { TRANSPORT_CREATED } from '../description/sessions';
 import { draftPartWords, HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import { withLongToolAdvice } from '../longTools';
 import {
@@ -84,12 +95,30 @@ export function createToken(member: CreateMember): string {
   return CREATE_TOKENS[member];
 }
 
+/** HandlerCreate's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactCreateParts(
+  variant: ProjectionVariant,
+  members: readonly CreateMember[] = COMPACT_CREATE[variant],
+): DescriptionParts {
+  const transport = members.includes('TRANSPORT');
+  return {
+    purpose: purpose(
+      `Creates the ABAP repository object of the type object_type names, inactive${when(transport, ', or a transport')}.`,
+    ),
+    returns: [
+      ...resultReturns(WRITTEN),
+      ...(transport ? resultReturns(TRANSPORT_CREATED, 'for TRANSPORT:') : []),
+    ],
+    members: membersTaken('object_type', members.map(createToken)),
+  };
+}
+
 /** HandlerCreate's description on `variant`, naming `members` (default: all the variant's). */
 export function compactCreateDescription(
   variant: ProjectionVariant,
   members: readonly CreateMember[] = COMPACT_CREATE[variant],
 ): string {
-  return `Creates the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …): sends the create request for its type with the given parameters, and answers SAP's result. The object is created inactive. object_type required: ${named(members, createToken)}. Optional for every type: description, transport_request.`;
+  return toolDescription(compactCreateParts(variant, members));
 }
 
 type ReadMember = (typeof COMPACT_READ.onprem)[number];
@@ -254,48 +283,32 @@ export function updateToken(member: UpdateMember): string {
   return UPDATE_TOKENS[member];
 }
 
+/** HandlerUpdate's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactUpdateParts(
+  variant: ProjectionVariant,
+  members: readonly UpdateMember[] = COMPACT_UPDATE[variant],
+): DescriptionParts {
+  return {
+    purpose: purpose(
+      'Writes the whole content of the ABAP repository object of the type object_type names, under the lock its lock handle names.',
+    ),
+    returns: [
+      ...resultReturns(WRITTEN_UNDER_LOCK),
+      ...(members.includes('SERVICE_BINDING')
+        ? resultReturns(PUBLISHED, 'for SERVICE_BINDING:')
+        : []),
+    ],
+    members: membersTaken('object_type', members.map(updateToken)),
+    notes: [underLock],
+  };
+}
+
 /** HandlerUpdate's description on `variant`, naming `members` (default: all the variant's). */
 export function compactUpdateDescription(
   variant: ProjectionVariant,
   members: readonly UpdateMember[] = COMPACT_UPDATE[variant],
 ): string {
-  const left = leftOf(COMPACT_UPDATE[variant], members);
-  const served: readonly string[] = members;
-  const serves = (member: string) => served.includes(member);
-  const metadata = [
-    ...[
-      'PACKAGE',
-      'DOMAIN',
-      'DATA_ELEMENT',
-      'FUNCTION_GROUP',
-      'TABLE_TYPE',
-    ].filter(serves),
-    ...(serves('INCLUDE') ? ['INCLUDE with part metadata'] : []),
-  ];
-  const subResources = [
-    'TABLE_SETTINGS',
-    'PROGRAM_TEXT_ELEMENTS',
-    'FUNCTION_GROUP_TEXT_ELEMENTS',
-    'CLASS_TEXT_ELEMENTS',
-  ].filter(serves);
-  const texts = [
-    'PROGRAM_TEXT_ELEMENTS',
-    'FUNCTION_GROUP_TEXT_ELEMENTS',
-    'CLASS_TEXT_ELEMENTS',
-  ].filter(serves);
-  const classIncludes = left.of<UpdateMember>([
-    'LOCAL_TEST_CLASS',
-    'LOCAL_TYPES',
-    'LOCAL_DEFINITIONS',
-    'LOCAL_MACROS',
-    'UNIT_TEST',
-    'CDS_UNIT_TEST',
-    'BEHAVIOR_IMPLEMENTATION',
-  ]);
-  const parted = serves('INCLUDE')
-    ? ' part is taken by INCLUDE alone: source (when absent) writes its source, metadata its metadata document.'
-    : '';
-  return `Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the write of its type under lock_handle, the lock handle of the object, one request${when(subResources.length > 0, ` (${listed(subResources)}: as their sentences below say)`)}, and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: ${named(members, updateToken)}.${when(metadata.length > 0, ` For ${listed(metadata)}, source_code is the whole metadata document, sent as given.`)}${parted}${classIncludes.length > 0 ? ` For ${listed(classIncludes)}, lock_handle is the class's lock handle.` : ''}${when(serves('TABLE_SETTINGS'), ' For TABLE_SETTINGS, lock_handle is the lock handle of TABLE_SETTINGS; the settings document is read and written back with each setting given, at least one, over the stored one, every other setting keeping its stored value: two requests; is_writable_by_amdp is taken on the cloud.')}${when(texts.length > 0, ` For ${listed(texts)}, lock_handle is the lock handle of the same object_type; each of symbols, selections and headings given, at least one, is written as its whole list, one request each.`)}${when(left.has('SERVICE_BINDING'), ' For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding.')} transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.`;
+  return toolDescription(compactUpdateParts(variant, members));
 }
 
 type DeleteMember = (typeof COMPACT_DELETE.onprem)[number];
@@ -339,23 +352,26 @@ export function deleteToken(member: DeleteMember): string {
   return DELETE_TOKENS[member];
 }
 
-/** The sentence on the class includes a delete writes empty, for those left. */
-function emptiedIncludes(left: Left): string {
-  const locals = left.of<DeleteMember>([
+/** HandlerDelete's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactDeleteParts(
+  variant: ProjectionVariant,
+  members: readonly DeleteMember[] = COMPACT_DELETE[variant],
+): DescriptionParts {
+  const includes = leftOf(COMPACT_DELETE[variant], members).of<DeleteMember>([
     'LOCAL_TEST_CLASS',
     'LOCAL_TYPES',
     'LOCAL_DEFINITIONS',
     'LOCAL_MACROS',
+    'UNIT_TEST',
   ]);
-  const parts = [
-    ...(locals.length > 0
-      ? [`${listed(locals)} (the class's local includes)`]
-      : []),
-    ...(left.has('UNIT_TEST') ? ['UNIT_TEST (its test classes include)'] : []),
-  ];
-  return parts.length === 0
-    ? ''
-    : ` For ${parts.join(' and ')} the include is written empty under lock_handle, the class's lock handle.`;
+  return {
+    purpose: purpose(
+      `Deletes the ABAP repository object of the type object_type names${when(includes.length > 0, ", or empties a class include under the class's lock")}.`,
+    ),
+    returns: resultReturns(DELETED),
+    members: membersTaken('object_type', members.map(deleteToken)),
+    notes: [underLock],
+  };
 }
 
 /** HandlerDelete's description on `variant`, naming `members` (default: all the variant's). */
@@ -363,8 +379,7 @@ export function compactDeleteDescription(
   variant: ProjectionVariant,
   members: readonly DeleteMember[] = COMPACT_DELETE[variant],
 ): string {
-  const left = leftOf(COMPACT_DELETE[variant], members);
-  return `Deletes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …): sends the deletion request for its type, and answers SAP's result. object_type required: ${named(members, deleteToken)}.${when(left.has('CDS_UNIT_TEST'), ' CDS_UNIT_TEST deletes its test class.')}${emptiedIncludes(left)} transport_request is sent with the request. Over Streamable HTTP an include write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); it is sent only under a lock the instance it reaches holds.`;
+  return toolDescription(compactDeleteParts(variant, members));
 }
 
 /** `M(rest)` for a member of a lifecycle list, unless `special` names it otherwise. */
@@ -387,13 +402,26 @@ export function lockToken(member: LockMember): string {
   );
 }
 
+/** HandlerLock's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactLockParts(
+  variant: ProjectionVariant,
+  members: readonly LockMember[] = COMPACT_LOCK[variant],
+): DescriptionParts {
+  return {
+    purpose: purpose(
+      'Locks the ABAP repository object of the type object_type names on the server instance that then holds the lock for its write, delete and unlock.',
+    ),
+    returns: resultReturns(HELD_LOCK),
+    members: membersTaken('object_type', members.map(lockToken)),
+  };
+}
+
 /** HandlerLock's description on `variant`, naming `members` (default: all the variant's). */
 export function compactLockDescription(
   variant: ProjectionVariant,
   members: readonly LockMember[] = COMPACT_LOCK[variant],
 ): string {
-  const left = leftOf(COMPACT_LOCK[variant], members);
-  return `Lock operation. object_type required: ${named(members, lockToken)}. Answers the lock_handle and the state_handle of the server instance that holds the lock${when(left.has('SERVICE_BINDING'), '; a SERVICE_BINDING open in an editing session answers an empty lock_handle, under which its publication runs')}. A write, a delete or an unlock under the lock_handle runs on the instance that holds it. Over Streamable HTTP send it as the state_handle argument of every call under this lock, the write and the unlock (or in the x-mcp-state-handle header).`;
+  return toolDescription(compactLockParts(variant, members));
 }
 
 type UnlockMember = (typeof COMPACT_UNLOCK.onprem)[number];
@@ -403,13 +431,27 @@ export function unlockToken(member: UnlockMember): string {
   return objectNamed<UnlockMember>(member, {}, 'object_name*, lock_handle*');
 }
 
+/** HandlerUnlock's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactUnlockParts(
+  variant: ProjectionVariant,
+  members: readonly UnlockMember[] = COMPACT_UNLOCK[variant],
+): DescriptionParts {
+  return {
+    purpose: purpose(
+      'Releases the lock this server instance holds on the ABAP repository object of the type object_type names, under its lock handle.',
+    ),
+    returns: resultReturns(UNLOCKED),
+    members: membersTaken('object_type', members.map(unlockToken)),
+    notes: [underLock],
+  };
+}
+
 /** HandlerUnlock's description on `variant`, naming `members` (default: all the variant's). */
 export function compactUnlockDescription(
   variant: ProjectionVariant,
   members: readonly UnlockMember[] = COMPACT_UNLOCK[variant],
 ): string {
-  const left = leftOf(COMPACT_UNLOCK[variant], members);
-  return `Unlock operation. object_type required: ${named(members, unlockToken)}${when(left.has('SERVICE_BINDING'), '; an empty lock_handle of a SERVICE_BINDING answers that the binding is already unlocked')}. The lock_handle is one a lock of this server instance answered; the unlock ends the instance's hold on the lock. Over Streamable HTTP the unlock takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).`;
+  return toolDescription(compactUnlockParts(variant, members));
 }
 
 type ValidateMember = (typeof COMPACT_VALIDATE.onprem)[number];

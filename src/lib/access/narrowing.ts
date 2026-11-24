@@ -19,7 +19,6 @@ import {
   COMPACT_LOCK,
   COMPACT_PROFILE,
   COMPACT_READ,
-  COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
   type ProjectionVariant,
@@ -44,7 +43,6 @@ import {
   compactGetDescription,
   compactLockDescription,
   compactProfileRunDescription,
-  compactUnlockDescription,
   compactUpdateDescription,
   compactValidateDescription,
 } from '../compact/compactDescriptions';
@@ -58,7 +56,6 @@ import {
   compactGetSchemaFor,
   compactLockSchemaFor,
   compactProfileRunSchemaFor,
-  compactUnlockSchemaFor,
   compactUpdateSchemaFor,
   compactValidateSchemaFor,
   handlerGetDataDefinition,
@@ -223,18 +220,6 @@ const NARROWING_LIST: readonly Narrowing[] = [
       return {
         description: compactLockDescription(variant, members),
         inputSchema: compactLockSchemaFor(members),
-        members,
-      };
-    },
-  },
-  {
-    tool: 'HandlerUnlock',
-    values: (variant) => COMPACT_UNLOCK[variant],
-    definition(variant, values) {
-      const members = keptOf(COMPACT_UNLOCK[variant], values);
-      return {
-        description: compactUnlockDescription(variant, members),
-        inputSchema: compactUnlockSchemaFor(members),
         members,
       };
     },

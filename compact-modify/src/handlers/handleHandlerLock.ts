@@ -17,6 +17,7 @@ import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { lockObjectAnswering } from '@mcp-abap-adt/lib/handlers/write';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 import type * as z from 'zod';
+import { unlockAction } from './unlockAction';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerLock',
@@ -34,10 +35,30 @@ export const LOCKS_NOT_KEPT_WORDS =
 
 type HandlerLockArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/** The words of an unlock asked with no lock handle. */
+export const UNLOCK_NEEDS_HANDLE_WORDS =
+  'lock_handle is required for action unlock: the handle the lock gave; nothing was sent';
+
+/** `action: 'lock'` (the default) locks the object; `action: 'unlock'` releases its lock. */
 export async function handleHandlerLock(
   context: HandlerContext,
   args: HandlerLockArgs,
 ) {
+  if (args.action === 'unlock') {
+    if (args.lock_handle === undefined) {
+      return return_error(new Error(UNLOCK_NEEDS_HANDLE_WORDS));
+    }
+    return unlockAction(context, {
+      object_type: args.object_type,
+      object_name: args.object_name,
+      lock_handle: args.lock_handle,
+    });
+  }
+  return lockAction(context, args);
+}
+
+/** The lock of the object, kept as the instance's state. */
+async function lockAction(context: HandlerContext, args: HandlerLockArgs) {
   // The boundary of object_type: one of the declared variant's members
   // (`COMPACT_LOCK`); past it, the kind is typed (`COMPACT_LOCK_KINDS`).
   const variant = variantOf(context.connection);

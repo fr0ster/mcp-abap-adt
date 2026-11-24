@@ -19,7 +19,6 @@ import {
   COMPACT_LOCK,
   COMPACT_PROFILE,
   COMPACT_READ,
-  COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
   type ProjectionVariant,
@@ -1825,6 +1824,17 @@ export const compactDeletionCheckSchema = compactDeletionCheckSchemaFor(
 );
 
 const LOCK_PROPERTIES = {
+  action: z
+    .enum(['lock', 'unlock'])
+    .default('lock')
+    .optional()
+    .describe(
+      'lock (default): lock the object for editing; unlock: release the lock lock_handle names.',
+    ),
+  lock_handle: z
+    .string()
+    .optional()
+    .describe('unlock: the lock handle the lock gave.'),
   super_package: z
     .string()
     .optional()
@@ -1836,12 +1846,15 @@ const LOCK_PROPERTIES = {
 /** A member of `HandlerLock`'s `object_type`. */
 type LockMember = (typeof COMPACT_LOCK.onprem)[number];
 
-/** What `HandlerLock` takes: the object's type and name; a package also its super package. */
+/**
+ * What `HandlerLock` takes: the action, the object's type and name, the lock
+ * handle an unlock releases; a package also its super package.
+ */
 export const COMPACT_LOCK_TAKES = takesOf<
   keyof ReturnType<typeof lifecycleObjectSchema> | keyof typeof LOCK_PROPERTIES,
   LockMember
 >()({
-  every: ['object_type', 'object_name'],
+  every: ['action', 'object_type', 'object_name', 'lock_handle'],
   members: { PACKAGE: ['super_package'] },
 });
 
@@ -1860,39 +1873,6 @@ export function compactLockSchemaFor<const M extends readonly LockMember[]>(
 }
 
 export const compactLockSchema = compactLockSchemaFor(COMPACT_LOCK.onprem);
-
-const UNLOCK_PROPERTIES = {
-  lock_handle: z.string().optional().describe('Lock handle returned by lock.'),
-};
-
-/** A member of `HandlerUnlock`'s `object_type`. */
-type UnlockMember = (typeof COMPACT_UNLOCK.onprem)[number];
-
-/** What `HandlerUnlock` takes: the object's type, name and lock handle, on every call. */
-export const COMPACT_UNLOCK_TAKES = takesOf<
-  | keyof ReturnType<typeof lifecycleObjectSchema>
-  | keyof typeof UNLOCK_PROPERTIES,
-  UnlockMember
->()({ every: ['object_type', 'object_name', 'lock_handle'], members: {} });
-
-export function compactUnlockSchemaFor<const M extends readonly UnlockMember[]>(
-  members: M,
-) {
-  const properties = {
-    ...lifecycleObjectSchema(members),
-    ...UNLOCK_PROPERTIES,
-  } as const;
-  return z.object({
-    ...offered(properties, COMPACT_UNLOCK_TAKES, members),
-    object_type: requiredField(properties.object_type),
-    object_name: requiredField(properties.object_name),
-    lock_handle: requiredField(properties.lock_handle),
-  });
-}
-
-export const compactUnlockSchema = compactUnlockSchemaFor(
-  COMPACT_UNLOCK.onprem,
-);
 
 const CHECK_RUN_PROPERTIES = {
   version: z

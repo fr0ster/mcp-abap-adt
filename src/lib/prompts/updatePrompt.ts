@@ -121,9 +121,7 @@ export function updatePrompt(source: PromptSource): AbapPrompt | undefined {
     (row) => {
       const read = readOf(row);
       const readTool = read === undefined ? [] : [read.tool.definition.name];
-      return row.family === 'compact'
-        ? [...readTool, 'HandlerLock', 'HandlerUnlock']
-        : readTool;
+      return row.family === 'compact' ? [...readTool, 'HandlerLock'] : readTool;
     },
   );
 }

@@ -13,7 +13,6 @@ import {
   COMPACT_LOCK,
   COMPACT_PROFILE,
   COMPACT_READ,
-  COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
   type ProjectionVariant,
@@ -26,6 +25,7 @@ import {
   toolDescription,
   typesPurpose,
   underLock,
+  valueParts,
 } from '../description/index';
 import type { CompactObjectType } from './compactObjectTypes';
 import { either, leftOf, when } from './memberTexts';
@@ -360,7 +360,7 @@ function objectNamed<M extends string>(
 
 type LockMember = (typeof COMPACT_LOCK.onprem)[number];
 
-/** A HandlerLock member with the arguments it takes, as the description names it. */
+/** A HandlerLock member with the arguments it takes, as the member table names it. */
 export function lockToken(member: LockMember): string {
   return objectNamed<LockMember>(
     member,
@@ -369,6 +369,20 @@ export function lockToken(member: LockMember): string {
   );
 }
 
+/** HandlerLock's two actions, each by its function. */
+const LOCK_ACTIONS = [
+  valueParts('lock', {
+    purpose: purpose(
+      'Locks the object for its update and delete on the server instance that then holds the lock.',
+    ),
+  }),
+  valueParts('unlock', {
+    purpose: purpose(
+      'Unlocks the object, releasing the lock this server instance holds.',
+    ),
+  }),
+] as const;
+
 /** HandlerLock's parts on `variant`, naming `members` (default: all the variant's). */
 export function compactLockParts(
   variant: ProjectionVariant,
@@ -376,11 +390,12 @@ export function compactLockParts(
 ): DescriptionParts {
   return {
     purpose: typesPurpose(
-      'Locks an ABAP ',
+      'Locks or unlocks an ABAP ',
       typeWords(members),
-      ' for its update, delete and unlock on the server instance that holds the lock.',
+      ' for editing.',
     ),
-    notes: [stateHandleAnswered],
+    values: { of: 'action', each: LOCK_ACTIONS },
+    notes: [stateHandleAnswered, underLock],
   };
 }
 
@@ -390,36 +405,6 @@ export function compactLockDescription(
   members: readonly LockMember[] = COMPACT_LOCK[variant],
 ): string {
   return toolDescription(compactLockParts(variant, members));
-}
-
-type UnlockMember = (typeof COMPACT_UNLOCK.onprem)[number];
-
-/** A HandlerUnlock member with the arguments it takes, as the description names it. */
-export function unlockToken(member: UnlockMember): string {
-  return objectNamed<UnlockMember>(member, {}, 'object_name*, lock_handle*');
-}
-
-/** HandlerUnlock's parts on `variant`, naming `members` (default: all the variant's). */
-export function compactUnlockParts(
-  variant: ProjectionVariant,
-  members: readonly UnlockMember[] = COMPACT_UNLOCK[variant],
-): DescriptionParts {
-  return {
-    purpose: typesPurpose(
-      'Unlocks an ABAP ',
-      typeWords(members),
-      ', releasing the lock this server instance holds.',
-    ),
-    notes: [underLock],
-  };
-}
-
-/** HandlerUnlock's description on `variant`, naming `members` (default: all the variant's). */
-export function compactUnlockDescription(
-  variant: ProjectionVariant,
-  members: readonly UnlockMember[] = COMPACT_UNLOCK[variant],
-): string {
-  return toolDescription(compactUnlockParts(variant, members));
 }
 
 type ValidateMember = (typeof COMPACT_VALIDATE.onprem)[number];
@@ -629,7 +614,6 @@ export const OBJECT_TYPE_TOOLS = [
   'HandlerUpdate',
   'HandlerDelete',
   'HandlerLock',
-  'HandlerUnlock',
   'HandlerValidate',
   'HandlerCheckRun',
   'HandlerDeletionCheck',
@@ -658,7 +642,6 @@ export function memberTokens(
     HandlerUpdate: () => COMPACT_UPDATE[variant].map(updateToken),
     HandlerDelete: () => COMPACT_DELETE[variant].map(deleteToken),
     HandlerLock: () => COMPACT_LOCK[variant].map(lockToken),
-    HandlerUnlock: () => COMPACT_UNLOCK[variant].map(unlockToken),
     HandlerValidate: () => COMPACT_VALIDATE[variant].map(validateToken),
     HandlerCheckRun: () => COMPACT_CHECK[variant].map(checkToken),
     HandlerDeletionCheck: () =>

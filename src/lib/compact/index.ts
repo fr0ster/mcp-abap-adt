@@ -102,8 +102,6 @@ export {
   compactUnitTestResultSchema,
   compactUnitTestRunSchema,
   compactUnitTestStatusSchema,
-  compactUnlockSchema,
-  compactUnlockSchemaFor,
   compactUpdateSchema,
   compactUpdateSchemaFor,
   compactValidateSchema,

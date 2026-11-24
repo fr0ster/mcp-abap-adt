@@ -118,8 +118,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "PACKAGE",
             "object_name": "PKG_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -351,8 +352,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "DOMAIN",
             "object_name": "DOM_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -616,8 +618,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "DATA_ELEMENT",
             "object_name": "DTEL_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -908,8 +911,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "TABLE",
             "object_name": "TAB_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -1070,7 +1074,7 @@
           }
         }
       ],
-      "note": "HandlerCreate STRUCTURE sends the create alone; the fields reach the structure through a later write (HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock).",
+      "note": "HandlerCreate STRUCTURE sends the create alone; the fields reach the structure through a later write (HandlerLock, HandlerUpdate with the lock_handle, HandlerLock with action unlock).",
       "low_requests": [
         {
           "method": "POST",
@@ -1155,8 +1159,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "STRUCTURE",
             "object_name": "STRU_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -1402,8 +1407,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "DDL",
             "object_name": "DDL_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -1658,8 +1664,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "CLASS",
             "object_name": "CLAS_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -1908,8 +1915,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "PROGRAM",
             "object_name": "PROG_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -2153,8 +2161,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "INTERFACE",
             "object_name": "INTF_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -2400,8 +2409,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "FUNCTION_GROUP",
             "object_name": "FUGR_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -2613,8 +2623,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "FUNCTION_MODULE",
             "object_name": "FUGR_A|FM_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -2905,8 +2916,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "BEHAVIOR_DEFINITION",
             "object_name": "BDEF_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -3085,8 +3097,9 @@
           }
         },
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "BEHAVIOR_IMPLEMENTATION",
             "object_name": "BIMP_A",
             "lock_handle": "B92E65858E83454C783181344F429D4BFD8E395D"
@@ -3302,8 +3315,9 @@
       },
       "compact": [
         {
-          "tool": "HandlerUnlock",
+          "tool": "HandlerLock",
           "args": {
+            "action": "unlock",
             "object_type": "METADATA_EXTENSION",
             "object_name": "DDLX_A",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
@@ -3571,15 +3585,10 @@
         "preselection": [
           {
             "facet": "package",
-            "values": [
-              "PKG_TARGET"
-            ]
+            "values": ["PKG_TARGET"]
           }
         ],
-        "facet_order": [
-          "package",
-          "type"
-        ],
+        "facet_order": ["package", "type"],
         "with_versions": false,
         "ignore_short_descriptions": false
       },
@@ -3592,15 +3601,10 @@
             "preselection": [
               {
                 "facet": "package",
-                "values": [
-                  "PKG_TARGET"
-                ]
+                "values": ["PKG_TARGET"]
               }
             ],
-            "facet_order": [
-              "package",
-              "type"
-            ],
+            "facet_order": ["package", "type"],
             "with_versions": false,
             "ignore_short_descriptions": false
           }

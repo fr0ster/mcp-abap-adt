@@ -2,54 +2,46 @@ import type {
   CompactObjectType,
   NotUnlockedAnswer,
 } from '@mcp-abap-adt/lib/compact-shared';
+/**
+ * `HandlerLock` with `action: 'unlock'`: the release of a lock this server
+ * instance holds, under its lock handle — one UNLOCK request, or none where
+ * there is nothing to release.
+ */
 import {
   acceptedOf,
-  byVariant,
+  COMPACT_LOCK,
   COMPACT_LOCK_KINDS,
-  COMPACT_UNLOCK,
-  compactUnlockParts,
-  compactUnlockSchemaFor,
   LOCK_WENT_WITH_SESSION_WORDS,
   lockHeldHere,
   lockNotHeldWords,
   spentBy,
   subResourceRefusal,
   supported,
-  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { unlockObject } from '@mcp-abap-adt/lib/handlers/write';
 import { return_error } from '@mcp-abap-adt/lib/utils';
-import type * as z from 'zod';
-
-export const TOOL_DEFINITION = {
-  name: 'HandlerUnlock',
-  available_in: ['onprem', 'cloud'] as const,
-  ...byVariant((variant) => ({
-    description: toolDescription(compactUnlockParts(variant)),
-    inputSchema: compactUnlockSchemaFor(COMPACT_UNLOCK[variant]),
-    members: COMPACT_UNLOCK[variant],
-  })),
-} as const;
 
 /** An unlock that released nothing, and why. */
 function notUnlocked(reason: string): NotUnlockedAnswer {
   return { unlocked: false, reason };
 }
 
-type HandlerUnlockArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+/** What an unlock takes: the object, and the handle its lock gave. */
+export interface UnlockArgs {
+  readonly object_type: string;
+  readonly object_name: string;
+  readonly lock_handle: string;
+}
 
-export async function handleHandlerUnlock(
-  context: HandlerContext,
-  args: HandlerUnlockArgs,
-) {
+export async function unlockAction(context: HandlerContext, args: UnlockArgs) {
   // The boundary of object_type: one of the declared variant's members
-  // (`COMPACT_UNLOCK`); past it, the kind is typed (`COMPACT_LOCK_KINDS`).
+  // (`COMPACT_LOCK`); past it, the kind is typed (`COMPACT_LOCK_KINDS`).
   const variant = variantOf(context.connection);
-  const member = acceptedOf(args.object_type, COMPACT_UNLOCK[variant]);
+  const member = acceptedOf(args.object_type, COMPACT_LOCK[variant]);
   if (member === undefined) {
     throw new Error(
-      `Unlock is not supported for object_type: ${args.object_type}. ${supported(COMPACT_UNLOCK[variant])}`,
+      `Unlock is not supported for object_type: ${args.object_type}. ${supported(COMPACT_LOCK[variant])}`,
     );
   }
 

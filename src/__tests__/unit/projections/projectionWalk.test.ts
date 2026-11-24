@@ -39,9 +39,9 @@ import {
 import {
   TOOL_DEFINITION as HandlerLock,
   handleHandlerLock,
+  handleHandlerLock as lockOrUnlock,
 } from '../../../../compact-modify/src/handlers/handleHandlerLock';
 import { handleHandlerProfileRun } from '../../../../compact-modify/src/handlers/handleHandlerProfileRun';
-import { handleHandlerUnlock } from '../../../../compact-modify/src/handlers/handleHandlerUnlock';
 import {
   TOOL_DEFINITION as HandlerUpdate,
   handleHandlerUpdate,
@@ -116,6 +116,12 @@ import {
   type RecordedRequest,
   recordingConnection,
 } from '../../helpers/recordingConnection';
+
+/** An unlock, as the merged HandlerLock takes it: `action: 'unlock'`. */
+const handleHandlerUnlock = (
+  context: Parameters<typeof lockOrUnlock>[0],
+  args: Omit<Parameters<typeof lockOrUnlock>[1], 'action'>,
+) => lockOrUnlock(context, { ...args, action: 'unlock' });
 
 const TABLES: { readonly [V in ProjectionVariant]: AdtApiTable<string> } = {
   onprem: ADT_TYPES_ONPREM,

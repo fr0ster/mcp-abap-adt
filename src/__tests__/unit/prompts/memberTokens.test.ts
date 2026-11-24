@@ -25,7 +25,6 @@ import {
   lockToken,
   memberTokens,
   readToken,
-  unlockToken,
   updateToken,
 } from '../../../lib/compact/compactDescriptions';
 
@@ -61,11 +60,6 @@ const TOOLS: readonly ToolTokens[] = [
     tool: 'HandlerLock',
     description: (v) => memberTokens('HandlerLock', v),
     tokens: (v) => COMPACT_LOCK[v].map(lockToken),
-  },
-  {
-    tool: 'HandlerUnlock',
-    description: (v) => memberTokens('HandlerUnlock', v),
-    tokens: (v) => COMPACT_UNLOCK[v].map(unlockToken),
   },
   {
     tool: 'HandlerCheckRun',
@@ -107,7 +101,6 @@ describe('a token names its member with the arguments it takes', () => {
     );
     assert.equal(lockToken('CLASS'), 'CLASS(object_name*)');
     assert.equal(lockToken('PACKAGE'), 'PACKAGE(object_name*, super_package)');
-    assert.equal(unlockToken('CLASS'), 'CLASS(object_name*, lock_handle*)');
     assert.equal(checkToken('CLASS'), 'CLASS(object_name*)');
     assert.equal(readToken('CLASS'), 'CLASS(class_name*)');
     assert.equal(activateToken('CLASS'), 'CLASS');

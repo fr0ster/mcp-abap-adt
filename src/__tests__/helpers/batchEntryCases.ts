@@ -531,12 +531,18 @@ const COMPACT: BatchEntryCase[] = [
     connection: 'http',
   },
   ...LOCKED_TYPES.map(([object_type, object_name]) => ({
-    tool: 'HandlerUnlock',
-    args: { object_type, object_name, lock_handle: LOCK_HANDLE },
+    tool: 'HandlerLock',
+    args: {
+      action: 'unlock',
+      object_type,
+      object_name,
+      lock_handle: LOCK_HANDLE,
+    },
   })),
   {
-    tool: 'HandlerUnlock',
+    tool: 'HandlerLock',
     args: {
+      action: 'unlock',
       object_type: 'PACKAGE',
       object_name: 'PKG_A',
       lock_handle: LOCK_HANDLE,

@@ -80,7 +80,7 @@ describe('compact /update function_module: each tool its own form', () => {
     const unlock = steps[3];
     assert.ok(lock && unlock);
     assert.equal(lock.tool, 'HandlerLock');
-    assert.equal(unlock.tool, 'HandlerUnlock');
+    assert.equal(unlock.tool, 'HandlerLock');
     for (const step of [lock, unlock]) {
       const sent = userArguments(step);
       assert.equal(sent.object_name, 'ZFG|ZFM');

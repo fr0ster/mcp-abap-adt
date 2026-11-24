@@ -277,7 +277,6 @@ describe('a cloud system with a basic credential', () => {
       'HandlerUpdate',
       'HandlerActivate',
       'HandlerLock',
-      'HandlerUnlock',
       'HandlerValidate',
       'HandlerDelete',
     ]) {

@@ -46,7 +46,6 @@ import {
   COMPACT_LOCK_TAKES,
   COMPACT_PROFILE_TAKES,
   COMPACT_READ_TAKES,
-  COMPACT_UNLOCK_TAKES,
   COMPACT_UPDATE_TAKES,
   COMPACT_VALIDATE_TAKES,
 } from '../../../lib/compact/compactSchemas';
@@ -69,7 +68,6 @@ const TOOLS: Readonly<
   HandlerUpdate: { takes: COMPACT_UPDATE_TAKES, members: COMPACT_UPDATE },
   HandlerDelete: { takes: COMPACT_DELETE_TAKES, members: COMPACT_DELETE },
   HandlerLock: { takes: COMPACT_LOCK_TAKES, members: COMPACT_LOCK },
-  HandlerUnlock: { takes: COMPACT_UNLOCK_TAKES, members: COMPACT_UNLOCK },
   HandlerValidate: { takes: COMPACT_VALIDATE_TAKES, members: COMPACT_VALIDATE },
   HandlerCheckRun: { takes: COMPACT_CHECK_TAKES, members: COMPACT_CHECK },
   HandlerDeletionCheck: {

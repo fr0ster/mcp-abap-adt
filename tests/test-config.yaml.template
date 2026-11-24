@@ -1911,7 +1911,7 @@ access:
 
 # Batch mode (src/__tests__/integration/batch/communicationBatch.test.ts):
 # the compact server started over stdio; reads, then HandlerCreate, HandlerLock,
-# HandlerUpdate, HandlerUnlock and HandlerActivate of three objects, each phase
+# HandlerUpdate, HandlerLock unlock and HandlerActivate of three objects, each phase
 # one batch; the objects deleted at the end (HandlerDeletionCheck, HandlerDelete).
 # They go into environment.default_package / default_transport unless named here.
 # The names must be free: a name that reads is refused before anything is created.

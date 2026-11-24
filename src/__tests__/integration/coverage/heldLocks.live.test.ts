@@ -171,7 +171,10 @@ liveSuite(['onprem', 'cloud'], 'held locks', () => {
       );
       expectNotHeld(
         'HandlerUnlock foreign',
-        await livePrepare('HandlerUnlock', unlockArgs(FOREIGN)),
+        await livePrepare('HandlerLock', {
+          action: 'unlock',
+          ...unlockArgs(FOREIGN),
+        }),
       );
       assertEquals(await markers(), []);
 
@@ -200,12 +203,18 @@ liveSuite(['onprem', 'cloud'], 'held locks', () => {
     } finally {
       succeeded(
         'HandlerUnlock own',
-        await livePrepare('HandlerUnlock', unlockArgs(handle)),
+        await livePrepare('HandlerLock', {
+          action: 'unlock',
+          ...unlockArgs(handle),
+        }),
       );
     }
     expectNotHeld(
       'HandlerUnlock own again',
-      await livePrepare('HandlerUnlock', unlockArgs(handle)),
+      await livePrepare('HandlerLock', {
+        action: 'unlock',
+        ...unlockArgs(handle),
+      }),
     );
   });
 });

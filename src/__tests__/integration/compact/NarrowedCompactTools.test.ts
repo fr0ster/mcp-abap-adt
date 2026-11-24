@@ -189,7 +189,8 @@ liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
           source_code: 'x',
           lock_handle: 'NONE',
         });
-        await refusedAtParse('HandlerUnlock', {
+        await refusedAtParse('HandlerLock', {
+          action: 'unlock',
           object_type: 'INTERFACE',
           object_name: 'ZIF_MCP_SHARED',
           lock_handle: 'NONE',
@@ -243,7 +244,8 @@ liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
           } finally {
             succeeded(
               'HandlerUnlock CLASS',
-              await livePrepare('HandlerUnlock', {
+              await livePrepare('HandlerLock', {
+                action: 'unlock',
                 object_type: 'CLASS',
                 object_name: written,
                 lock_handle: handle,

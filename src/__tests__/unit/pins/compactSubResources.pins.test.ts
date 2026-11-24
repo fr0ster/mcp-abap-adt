@@ -238,10 +238,11 @@ describe('onprem', () => {
       ],
     },
     {
-      tool: 'HandlerUnlock',
+      tool: 'HandlerLock',
       variant: 'onprem',
       stand: 'recording',
       args: {
+        action: 'unlock',
         object_type: 'TABLE_SETTINGS',
         object_name: 'ZMCP_PIN_TS',
         lock_handle: HANDLE,
@@ -257,10 +258,11 @@ describe('onprem', () => {
       ],
     },
     {
-      tool: 'HandlerUnlock',
+      tool: 'HandlerLock',
       variant: 'onprem',
       stand: 'recording',
       args: {
+        action: 'unlock',
         object_type: 'PROGRAM_TEXT_ELEMENTS',
         object_name: 'ZMCP_PIN_TP',
         lock_handle: HANDLE,
@@ -276,10 +278,11 @@ describe('onprem', () => {
       ],
     },
     {
-      tool: 'HandlerUnlock',
+      tool: 'HandlerLock',
       variant: 'onprem',
       stand: 'recording',
       args: {
+        action: 'unlock',
         object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
         object_name: 'ZMCP_PIN_TG',
         lock_handle: HANDLE,
@@ -295,10 +298,11 @@ describe('onprem', () => {
       ],
     },
     {
-      tool: 'HandlerUnlock',
+      tool: 'HandlerLock',
       variant: 'onprem',
       stand: 'recording',
       args: {
+        action: 'unlock',
         object_type: 'CLASS_TEXT_ELEMENTS',
         object_name: 'ZCL_MCP_PIN_TC',
         lock_handle: HANDLE,
@@ -613,10 +617,11 @@ describe('cloud', () => {
       ],
     },
     {
-      tool: 'HandlerUnlock',
+      tool: 'HandlerLock',
       variant: 'cloud',
       stand: 'recording',
       args: {
+        action: 'unlock',
         object_type: 'TABLE_SETTINGS',
         object_name: 'ZMCP_PIN_TS',
         lock_handle: HANDLE,
@@ -634,10 +639,11 @@ describe('cloud', () => {
     {
       // The cloud offers no lock of a program's text elements (T11): the
       // member is refused at the boundary, nothing sent.
-      tool: 'HandlerUnlock',
+      tool: 'HandlerLock',
       variant: 'cloud',
       stand: 'recording',
       args: {
+        action: 'unlock',
         object_type: 'PROGRAM_TEXT_ELEMENTS',
         object_name: 'ZMCP_PIN_TP',
         lock_handle: HANDLE,
@@ -646,10 +652,11 @@ describe('cloud', () => {
       expected: 'nothing-sent',
     },
     {
-      tool: 'HandlerUnlock',
+      tool: 'HandlerLock',
       variant: 'cloud',
       stand: 'recording',
       args: {
+        action: 'unlock',
         object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
         object_name: 'ZMCP_PIN_TG',
         lock_handle: HANDLE,
@@ -665,10 +672,11 @@ describe('cloud', () => {
       ],
     },
     {
-      tool: 'HandlerUnlock',
+      tool: 'HandlerLock',
       variant: 'cloud',
       stand: 'recording',
       args: {
+        action: 'unlock',
         object_type: 'CLASS_TEXT_ELEMENTS',
         object_name: 'ZCL_MCP_PIN_TC',
         lock_handle: HANDLE,

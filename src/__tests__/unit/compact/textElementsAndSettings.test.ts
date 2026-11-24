@@ -31,11 +31,8 @@ import {
 import {
   TOOL_DEFINITION as HandlerLock,
   handleHandlerLock,
+  handleHandlerLock as lockOrUnlock,
 } from '../../../../compact-modify/src/handlers/handleHandlerLock';
-import {
-  TOOL_DEFINITION as HandlerUnlock,
-  handleHandlerUnlock,
-} from '../../../../compact-modify/src/handlers/handleHandlerUnlock';
 import {
   TOOL_DEFINITION as HandlerUpdate,
   handleHandlerUpdate,
@@ -60,6 +57,12 @@ import {
   SETTINGS_ETAG,
   settingsDocument,
 } from '../tableSettings/settingsStandIn';
+
+/** An unlock, as the merged HandlerLock takes it: `action: 'unlock'`. */
+const handleHandlerUnlock = (
+  context: Parameters<typeof lockOrUnlock>[0],
+  args: Omit<Parameters<typeof lockOrUnlock>[1], 'action'>,
+) => lockOrUnlock(context, { ...args, action: 'unlock' });
 
 const RUN_ID = 'RUN0001';
 const ACTIVATED =
@@ -339,9 +342,9 @@ describe("HandlerUpdate: the sub-resources under the caller's lock", () => {
   });
 });
 
-describe('HandlerLock and HandlerUnlock: the sub-resources', () => {
+describe('HandlerLock, lock and unlock: the sub-resources', () => {
   it("offers a program's text elements on premise and not on the cloud, as HandlerUpdate", () => {
-    for (const definition of [HandlerLock, HandlerUnlock]) {
+    for (const definition of [HandlerLock]) {
       assert.ok(
         (definition.variants.onprem.members ?? []).includes(
           'PROGRAM_TEXT_ELEMENTS',

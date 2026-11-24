@@ -188,8 +188,13 @@ it('lock batch, write batch, unlock batch: the handles held for the instance, ev
   await batch(
     locked.stateHandle,
     OBJECTS.map((name, i) => [
-      'HandlerUnlock',
-      { object_type: 'CLASS', object_name: name, lock_handle: handles[i] },
+      'HandlerLock',
+      {
+        action: 'unlock',
+        object_type: 'CLASS',
+        object_name: name,
+        lock_handle: handles[i],
+      },
     ]),
   );
 

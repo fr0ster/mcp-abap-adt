@@ -25,11 +25,8 @@ import {
 import {
   TOOL_DEFINITION as HandlerLock,
   handleHandlerLock,
+  handleHandlerLock as lockOrUnlock,
 } from '../../../../compact-modify/src/handlers/handleHandlerLock';
-import {
-  TOOL_DEFINITION as HandlerUnlock,
-  handleHandlerUnlock,
-} from '../../../../compact-modify/src/handlers/handleHandlerUnlock';
 import {
   TOOL_DEFINITION as HandlerUpdate,
   handleHandlerUpdate,
@@ -505,19 +502,20 @@ const CASES: readonly Case[] = VARIANTS.flatMap((variant) => [
   // Through the tool's entry, as the model's call: a value outside its
   // schema's members is refused there, before the handler.
   ...family(
-    'HandlerUnlock.object_type',
+    'HandlerLock unlock.object_type',
     variant,
     (context, value) =>
-      defineTool(HandlerUnlock, handleHandlerUnlock).call(context, {
+      defineTool(HandlerLock, lockOrUnlock).call(context, {
+        action: 'unlock',
         object_type: value,
         object_name: 'ZA',
         lock_handle: 'LOCKHANDLE',
       }),
     {
       valid: 'CLASS',
-      lower: schemaRefused('HandlerUnlock'),
-      name: ['CLAS/OC', schemaRefused('HandlerUnlock')],
-      wrong: ['TRANSPORT', schemaRefused('HandlerUnlock')],
+      lower: schemaRefused('HandlerLock'),
+      name: ['CLAS/OC', schemaRefused('HandlerLock')],
+      wrong: ['TRANSPORT', schemaRefused('HandlerLock')],
     },
   ),
   // Through the tool's entry, as the model's call: a value outside its

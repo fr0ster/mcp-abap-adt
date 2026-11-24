@@ -123,7 +123,6 @@ const PROJECTED: ReadonlyArray<readonly [string, string]> = [
   ['HandlerDeletionCheck', 'object_type'],
   ['HandlerGet', 'object_type'],
   ['HandlerLock', 'object_type'],
-  ['HandlerUnlock', 'object_type'],
   ['HandlerUpdate', 'object_type'],
   ['HandlerValidate', 'object_type'],
   ['HandlerProfileRun', 'target_type'],

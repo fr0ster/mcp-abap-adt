@@ -27,7 +27,6 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import { format, isDeepStrictEqual } from 'node:util';
 import {
   compactLockSchema,
-  compactUnlockSchema,
   compactUpdateSchema,
   memberTokens,
 } from '@mcp-abap-adt/lib/compact-shared';
@@ -47,15 +46,18 @@ import { compactWriteRouterMap } from '../handlers/compactWriteRoutes';
 import {
   TOOL_DEFINITION as HandlerLock,
   handleHandlerLock,
+  handleHandlerLock as lockOrUnlock,
 } from '../handlers/handleHandlerLock';
-import {
-  TOOL_DEFINITION as HandlerUnlock,
-  handleHandlerUnlock,
-} from '../handlers/handleHandlerUnlock';
 import {
   handleHandlerUpdate,
   TOOL_DEFINITION,
 } from '../handlers/handleHandlerUpdate';
+
+/** An unlock, as the merged HandlerLock takes it: `action: 'unlock'`. */
+const handleHandlerUnlock = (
+  context: Parameters<typeof lockOrUnlock>[0],
+  args: Omit<Parameters<typeof lockOrUnlock>[1], 'action'>,
+) => lockOrUnlock(context, { ...args, action: 'unlock' });
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -754,7 +756,7 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
   withSystemContext();
 
   it('their schemas name the service types', () => {
-    for (const schema of [compactLockSchema, compactUnlockSchema]) {
+    for (const schema of [compactLockSchema]) {
       const named = jsonAt(listedJson(schema), 'object_type').enum;
       assert.ok(Array.isArray(named));
       for (const type of ['SERVICE_DEFINITION', 'SERVICE_BINDING']) {
@@ -796,11 +798,7 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
 
   for (const [_tool, variants] of [
     ['HandlerLock', HandlerLock.variants],
-    ['HandlerUnlock', HandlerUnlock.variants],
-  ] satisfies [
-    string,
-    typeof HandlerLock.variants | typeof HandlerUnlock.variants,
-  ][]) {
+  ] satisfies [string, typeof HandlerLock.variants][]) {
     it(
       format(
         '%s locks a table type on both variants, an include on premise only',

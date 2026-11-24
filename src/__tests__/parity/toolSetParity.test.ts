@@ -799,7 +799,6 @@ const COMPACT_RW = [
   'HandlerTransportCreate',
   'HandlerTransportMoveObjects',
   'HandlerTransportSortAndCompress',
-  'HandlerUnlock',
   'HandlerUpdate',
 ];
 const COMPACT_DEBUG = [

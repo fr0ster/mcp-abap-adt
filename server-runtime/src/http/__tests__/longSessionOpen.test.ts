@@ -120,7 +120,8 @@ it('SessionOpen carrying the handle of an instance holding a lock answers that h
   assert.equal(handleOf(opened.text), stateHandle);
   assert.equal(poolSize(), 1);
 
-  const unlocked = await s.call('HandlerUnlock', {
+  const unlocked = await s.call('HandlerLock', {
+    action: 'unlock',
     ...LOCK,
     lock_handle: lockHandle,
     state_handle: stateHandle,

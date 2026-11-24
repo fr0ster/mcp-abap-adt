@@ -626,8 +626,9 @@ const CASES: readonly GroupCase[] = [
   },
   {
     label: 'HandlerUnlock',
-    tool: 'HandlerUnlock',
+    tool: 'HandlerLock',
     args: {
+      action: 'unlock',
       object_type: 'FUNCTION_MODULE',
       object_name: 'ZPIN_FG|ZPIN_FM',
       lock_handle: 'H',

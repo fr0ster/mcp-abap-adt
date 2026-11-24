@@ -91,7 +91,10 @@ function transportablePackage(): string {
 async function tasksOf(request: string): Promise<string[]> {
   const read = succeeded(
     `GetTransport ${request}`,
-    await livePrepare('GetTransport', { transport_number: request }),
+    await livePrepare('GetTransport', {
+      transport_number: request,
+      detail: 'medium',
+    }),
   );
   const tasks = member(payloadOf(read), 'tasks');
   return Array.isArray(tasks)
@@ -140,7 +143,10 @@ async function configuredTarget(): Promise<string> {
   if (configured === undefined) return '';
   const read = succeeded(
     'GetTransport of the configured request',
-    await livePrepare('GetTransport', { transport_number: configured }),
+    await livePrepare('GetTransport', {
+      transport_number: configured,
+      detail: 'medium',
+    }),
   );
   const kept = member(member(payloadOf(read), 'transport'), 'target_system');
   const target = typeof kept === 'string' ? kept.trim() : '';
@@ -173,15 +179,24 @@ async function ownRequest(
   created: LiveAnswer,
 ): Promise<OwnRequest> {
   await reconcileRequestCreate(plan, created);
+  // The terse answer states the numbers, and a task_type_error only when
+  // the task could not be typed as asked (S, Development/Correction).
   const answered = payloadOf(created);
-  assert.equal(member(answered, 'success'), true);
-  // The task SAP created with the request, typed Development/Correction.
-  assert.equal(member(answered, 'task_type'), 'S');
+  assert.equal(
+    typeof member(answered, 'transport_number'),
+    'string',
+    created.text,
+  );
+  assert.notEqual(member(answered, 'transport_number'), '', created.text);
+  assert.equal(member(answered, 'task_type_error'), undefined, created.text);
   const request = member(answered, 'transport_number');
   if (typeof request !== 'string') throw new Error('no request number');
   const read = succeeded(
     `GetTransport ${request}`,
-    await livePrepare('GetTransport', { transport_number: request }),
+    await livePrepare('GetTransport', {
+      transport_number: request,
+      detail: 'medium',
+    }),
   );
   assert.equal(
     member(member(payloadOf(read), 'transport'), 'description'),
@@ -331,6 +346,8 @@ liveSuite(['onprem'], 'Compact transport create with a typed task', () => {
       transport_type: 'workbench',
       target_system: target,
       task_type: 'R',
+      // The task type read below: the JSON of detail medium.
+      detail: 'medium',
     });
     await reconcileRequestCreate(plan, created);
     const answered = payloadOf(created);
@@ -344,7 +361,10 @@ liveSuite(['onprem'], 'Compact transport create with a typed task', () => {
     // Repair (measured on premise).
     const read = succeeded(
       `GetTransport ${request}`,
-      await livePrepare('GetTransport', { transport_number: request }),
+      await livePrepare('GetTransport', {
+        transport_number: request,
+        detail: 'medium',
+      }),
     );
     const tasks = member(payloadOf(read), 'tasks');
     const listed = Array.isArray(tasks) ? tasks : [];

@@ -23,8 +23,11 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: toolDescription({
       tag: 'read-only',
+      // A program is read on premise only (`DRAFT_TYPES`).
       purpose: purpose(
-        'Reads whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose.',
+        variant === 'onprem'
+          ? 'Reads whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose.'
+          : 'Reads whether an ABAP class, interface, function module, CDS view, table or other development object holds an unactivated change, and whose.',
       ),
     }),
     inputSchema: objectDraftSchema(variant),

@@ -1,10 +1,12 @@
 /**
- * Each compact pair says what its route does (Codex review of PR #378):
- * the words of a member, part or action are checked against the handler
- * that serves it, one case per finding.
+ * Each compact pair, and each description the review named, says what its
+ * route does (Codex review of PR #378): the words of a member, part or
+ * action are checked against the handler that serves it, one case per
+ * finding.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { TOOL_DEFINITION as GetObjectDraft } from '../../../handlers/common/readonly/handleGetObjectDraft';
 import { NARROWINGS } from '../../../lib/access/narrowing';
 import {
   compactDeleteDescription,
@@ -47,5 +49,14 @@ describe('the compact pairs say what each route does', () => {
     assert.equal(packageOnly.description.includes(DRAFT_PAIR), false);
     const withClass = get.definition('onprem', ['PACKAGE', 'CLASS'], undefined);
     assert.ok(withClass.description.includes(DRAFT_PAIR));
+  });
+
+  it('GetObjectDraft names a program only where it reads one: on premise', () => {
+    assert.ok(GetObjectDraft.variants.onprem.description.includes('program'));
+    assert.equal(
+      GetObjectDraft.variants.cloud.description.includes('program'),
+      false,
+      GetObjectDraft.variants.cloud.description,
+    );
   });
 });

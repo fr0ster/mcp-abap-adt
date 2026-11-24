@@ -198,3 +198,134 @@ export function returnsOf(source: {
     );
   });
 }
+
+// ---------------------------------------------------------------------------
+// The facts of a typed result (plan step 10.6): a tool not on the writers
+// states what its answer type holds, each member by its domain noun.
+// ---------------------------------------------------------------------------
+
+/** Every member of a result type, over each variant of a union. */
+type MemberOf<T> = T extends unknown ? keyof T : never;
+
+/** A member's value, over every variant that holds it. */
+type ValueOf<T, K extends PropertyKey> = T extends unknown
+  ? K extends keyof T
+    ? T[K]
+    : never
+  : never;
+
+/** What a member is stated by: a list of objects by its own nouns, any other value by a noun. */
+type NounOf<V> =
+  NonNullable<V> extends readonly (infer E)[]
+    ? E extends object
+      ? ListNouns<E>
+      : string
+    : string;
+
+/**
+ * The domain noun of every member of the result type `T`: each member named,
+ * none more — a member added to the type and not here does not compile. A
+ * list of objects is stated by {@link listOf}: its subject and its element's
+ * nouns.
+ */
+export type ResultNouns<T> = {
+  readonly [K in MemberOf<T>]-?: NounOf<ValueOf<T, K>>;
+};
+
+/** A list member of a result, by its words: its subject, its element's nouns, its own lists. */
+export class ListFacts {
+  constructor(
+    token: typeof minted,
+    readonly about: string,
+    readonly own: readonly string[],
+    readonly lists: readonly ListFacts[],
+  ) {
+    void token;
+  }
+}
+
+/** A list member of a result whose element is `E`: made by {@link listOf}. */
+export class ListNouns<E> extends ListFacts {
+  /** Ties the nouns to their element type: phantom, never set. */
+  declare private readonly element?: (element: E) => E;
+}
+
+/** The nouns of a member record: its own, and its lists'. */
+function nounsOf<N extends { readonly [K in keyof N]: string | ListFacts }>(
+  nouns: N,
+): {
+  own: string[];
+  lists: ListFacts[];
+} {
+  const own: string[] = [];
+  const lists: ListFacts[] = [];
+  for (const key in nouns) {
+    const noun: string | ListFacts = nouns[key];
+    if (typeof noun === 'string') own.push(noun);
+    else lists.push(noun);
+  }
+  return { own, lists };
+}
+
+/** A list member: `about` its subject (`for each message`), its element's nouns. */
+export function listOf<E>(about: string, nouns: ResultNouns<E>): ListNouns<E> {
+  const { own, lists } = nounsOf(nouns);
+  return new ListNouns<E>(minted, about, own, lists);
+}
+
+/** What a typed result holds, by its members' nouns: made by {@link resultShape}. */
+export class ResultShape {
+  constructor(
+    token: typeof minted,
+    readonly own: readonly string[],
+    readonly lists: readonly ListFacts[],
+  ) {
+    void token;
+  }
+}
+
+/** The shape of the result type `T`, every member by its domain noun. */
+export function resultShape<T>(nouns: ResultNouns<T>): ResultShape {
+  const { own, lists } = nounsOf(nouns);
+  return new ResultShape(minted, own, lists);
+}
+
+/** One fact per list, its subject before its element's nouns; then its own lists. */
+function listFacts(list: ListFacts): ReturnsFact[] {
+  return [
+    fact(sentence(`${list.about}: ${joined(list.own)}`)),
+    ...list.lists.flatMap(listFacts),
+  ];
+}
+
+/**
+ * The facts of a typed result: its own members' nouns as one sentence
+ * (after `of`, when given), then one sentence per list.
+ */
+export function resultReturns(
+  shape: ResultShape,
+  of?: string | undefined,
+): ReturnsFact[] {
+  return [
+    ...(shape.own.length === 0
+      ? []
+      : [
+          fact(
+            sentence(
+              of === undefined
+                ? joined(shape.own)
+                : `${of} ${joined(shape.own)}`,
+            ),
+          ),
+        ]),
+    ...shape.lists.flatMap(listFacts),
+  ];
+}
+
+/**
+ * The one fact of a tool whose answer is SAP's data as it came, without a
+ * result type of ours (plan step 10.6, "No typed result").
+ */
+export function untypedReturns(): ReturnsFact[] {
+  return [fact("SAP's data as it came.")];
+}

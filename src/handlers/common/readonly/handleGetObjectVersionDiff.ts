@@ -22,6 +22,12 @@ import {
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import {
+  type DescriptionParts,
+  membersOf,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { both } from '../../../lib/strategies/sequence';
 import { atStep, carryingFailure } from '../../../lib/strategies/step';
@@ -128,12 +134,35 @@ export async function buildVersionDiff(
   return diffSources(contentUriFrom, contentUriTo, rawFrom, rawTo);
 }
 
+/**
+ * A version diff tool's description parts: two versions of `object` compared,
+ * then the facts of {@link VersionDiffResult} — shared by this tool and
+ * every per-type `Get<Type>VersionDiff`.
+ */
+export function versionDiffParts(object: string): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: purpose(
+      `Compares two versions of ${object}, taken from its version history.`,
+    ),
+    returns: membersOf<VersionDiffResult>({
+      nouns: {
+        diff: { clause: 'the changes between their sources' },
+        identical: { clause: 'whether they are identical' },
+        notes: { clause: 'which source came back empty' },
+      },
+    }),
+    inline: true,
+  };
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectVersionDiff',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description:
-      "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
+    description: toolDescription(
+      versionDiffParts('a class, program, CDS view or other source object'),
+    ),
     inputSchema: objectVersionDiffSchema(variant),
   })),
 } as const;

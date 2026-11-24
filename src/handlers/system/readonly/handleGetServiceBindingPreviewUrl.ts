@@ -49,6 +49,7 @@ import {
   requestThrownEntry,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { membersOf, purpose, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { withoutTrailing } from '../../../lib/plainText';
@@ -72,8 +73,10 @@ import {
 } from '../../../lib/strategies/sequence';
 import {
   associationsOf,
+  type CategoryServiceUrls,
   categoryServiceUrlsOf,
   exposedEntitiesOf,
+  type ServiceBindingFacts,
   serviceBindingFactsOf,
 } from '../../../lib/strategies/serviceBindingFacts';
 import { atStep, withStep } from '../../../lib/strategies/step';
@@ -144,6 +147,32 @@ export type LiveState =
       live_failure?: FailureEntry;
     };
 
+/** What the tool answers: the binding's facts, its URLs and the service's live state. */
+export type PreviewUrlAnswer = LiveState & {
+  success: true;
+  service_binding_name: string;
+  published: ServiceBindingFacts['published'];
+  protocol: ServiceBindingFacts['protocol'];
+  service: ServiceBindingFacts['service'];
+  service_definition: ServiceBindingFacts['serviceDefinition'];
+  version: ServiceBindingFacts['version'];
+  entity_sets: string[];
+  binding_category: ServiceBindingFacts['category'];
+  client: string | undefined;
+  language: string | undefined;
+  associations: string[];
+  origin?: 'unknown';
+  service_url: string;
+  service_url_source: 'composed' | 'system';
+  metadata_url: string;
+  annotation_url: CategoryServiceUrls['annotationUrl'];
+  preview_url: string | undefined;
+  preview_descriptor: string | undefined;
+  missing: string[] | undefined;
+  note: string | undefined;
+  system_information_failure: FailureEntry | undefined;
+};
+
 /** The live state of a `$metadata` answer SAP gave with `status` and `body`. */
 export function liveStateOf(
   status: number | undefined,
@@ -161,8 +190,42 @@ export function liveStateOf(
 export const TOOL_DEFINITION = {
   name: 'GetServiceBindingPreviewUrl',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. For a published binding it also reads the $metadata of the service once and answers live: true when the service answers 200, or live: false with the status (live_status) and the words (live_text) SAP answered — on ABAP Cloud a publication is a background job of SAP, and the service answers 403, blocked by UCON, until that job ends. A Web API binding answers the service URLs alone. Over RFC, the URLs are answered as their paths and query, to prefix with the HTTP origin of the system.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Builds the Fiori preview URL of a published OData service binding, with its service and $metadata URLs.',
+    ),
+    returns: membersOf<PreviewUrlAnswer>({
+      nouns: {
+        success: null,
+        service_binding_name: null,
+        published: { clause: 'whether it is published' },
+        live: "service's live state",
+        protocol: 'OData protocol',
+        service: 'service',
+        service_definition: 'service definition',
+        version: 'service version',
+        entity_sets: 'entity sets',
+        binding_category: 'binding category',
+        client: 'client',
+        language: 'logon language',
+        associations: 'associations',
+        origin: { clause: "whether the system's HTTP origin is known" },
+        service_url: 'service URL',
+        service_url_source: 'service URL source',
+        metadata_url: '$metadata URL',
+        annotation_url: 'annotation URL',
+        preview_url: 'preview URL',
+        preview_descriptor: 'preview descriptor',
+        missing: { clause: 'what the preview URL still needs' },
+        note: 'notes',
+        system_information_failure: {
+          clause: "the failure of reading the system's client and language",
+        },
+      },
+    }),
+    inline: true,
+  }),
   inputSchema: z.object({
     service_binding_name: requiredText(
       'service_binding_name is required',
@@ -442,7 +505,13 @@ export async function handleGetServiceBindingPreviewUrl(
           });
         },
       ),
-    ({ facts, exposed, associations, category, live }: Found) => {
+    ({
+      facts,
+      exposed,
+      associations,
+      category,
+      live,
+    }: Found): PreviewUrlAnswer => {
       const entitySet = args.entity_set ?? exposed[0]?.entitySet;
       const navigation = args.navigation ?? associations[0];
       const target =

@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { readerParts, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -13,8 +14,13 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 export const TOOL_DEFINITION = {
   name: 'GetDomain',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.',
+  description: toolDescription(
+    readerParts({
+      object: 'an ABAP domain',
+      holding:
+        'its data type, length, output format, value table, fixed values, package and description',
+    }),
+  ),
   inputSchema: z.object({
     domain_name: requiredText('domain_name is required').describe(
       'Domain name.',

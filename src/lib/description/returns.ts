@@ -194,3 +194,89 @@ export function returnsOf(source: {
     );
   });
 }
+
+/**
+ * The fixed fact of a tool whose answer is SAP's data with no typed reading
+ * of ours (plan step 10.6, "No typed result"): stated until the answer is
+ * typed, in place of free words.
+ */
+export const sapData: ReturnsFact = fact("SAP's data as it came.");
+
+/** The element type of a list member, `never` for any other. */
+type ElementOf<V> = NonNullable<V> extends readonly (infer I)[] ? I : never;
+
+/**
+ * How one member of a typed result is stated: its domain noun (`'data
+ * class'`, joined under `its`), a whole clause (`{ clause: 'whether it is
+ * published' }`), the nouns of each item of a list member, or `null` for a
+ * member that tells nothing of its own (`success`, the name the call gave).
+ */
+export type MemberNoun<V> =
+  | string
+  | null
+  | { readonly clause: string }
+  | ([ElementOf<V>] extends [never]
+      ? never
+      : ElementOf<V> extends object
+        ? EachNouns<ElementOf<V>>
+        : never);
+
+/**
+ * A noun for every member of a reader's typed result `T`, keyed on its
+ * members: a member the type gains and the nouns lack does not compile.
+ */
+export type MemberNouns<T> = {
+  readonly [K in keyof T]-?: MemberNoun<T[K]>;
+};
+
+/** The nouns of each item of a list: what one item is (`BAdI definition`), and its members'. */
+export interface EachNouns<I> {
+  readonly each: string;
+  readonly nouns: MemberNouns<I>;
+}
+
+/** One sentence of an item's members, then one per list member, nested lists after their own. */
+function membersStated<T>(
+  each: string | undefined,
+  nouns: MemberNouns<T>,
+): string[] {
+  const plain: string[] = [];
+  const clauses: string[] = [];
+  const lists: string[] = [];
+  for (const key in nouns) {
+    const noun: MemberNoun<T[typeof key]> = nouns[key];
+    if (noun === null) continue;
+    if (typeof noun === 'string') plain.push(noun);
+    else if ('clause' in noun) clauses.push(noun.clause);
+    else lists.push(...membersStated(noun.each, noun.nouns));
+  }
+  const told = [
+    ...plain.map((noun, i) => (i === 0 ? `its ${noun}` : noun)),
+    ...clauses,
+  ];
+  const own =
+    told.length === 0
+      ? []
+      : [
+          each === undefined
+            ? joined(told)
+            : `for each ${each}: ${joined(told)}`,
+        ];
+  return [...own, ...lists];
+}
+
+/**
+ * The facts of a reader's typed result, each member by its domain noun
+ * (plan step 10.6, metadata readers): one sentence of the item's own
+ * members (`its data class, size category and buffering`), then one per
+ * list member (`for each BAdI definition: its name and short text`). With
+ * `each`, the item is itself one of several (`for each object: …`).
+ */
+export function membersOf<T>(source: {
+  readonly each?: string | undefined;
+  readonly nouns: MemberNouns<T>;
+}): ReturnsFact[] {
+  return membersStated(source.each, source.nouns).map((text) =>
+    fact(sentence(text)),
+  );
+}

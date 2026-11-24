@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { purpose, sapData, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * GetVirtualFolders Handler - Low-level handler for virtual folders
@@ -30,8 +31,13 @@ import { ourUtils } from '../../../lib/strategies/resultSets';
 export const TOOL_DEFINITION = {
   name: 'GetVirtualFoldersLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Retrieve hierarchical virtual folder contents from ADT information system. Used for browsing ABAP objects by package, group, type, etc.',
+  description: toolDescription({
+    tag: 'low-level',
+    purpose: purpose(
+      'Reads the virtual folders that group ABAP repository objects by package, group, type and other facets, for a name pattern.',
+    ),
+    returns: [sapData],
+  }),
   inputSchema: z.object({
     object_search_pattern: z
       .string()

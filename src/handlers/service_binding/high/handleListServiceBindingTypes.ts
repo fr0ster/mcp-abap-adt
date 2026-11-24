@@ -2,6 +2,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, sapData, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourServiceBindingReads } from '../../../lib/strategies/resultSets';
@@ -13,8 +14,13 @@ import {
 export const TOOL_DEFINITION = {
   name: 'ListServiceBindingTypes',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Lists the available service binding types (for example ODataV2/ODataV4) from the ADT Business Services endpoint, in the response_format given.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Lists the service binding types the system offers, such as OData V2 and OData V4, in the format asked.',
+    ),
+    returns: [sapData],
+  }),
   inputSchema: z.object({
     response_format: z
       .enum(['xml', 'json', 'plain'])

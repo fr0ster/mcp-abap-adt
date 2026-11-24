@@ -22,6 +22,7 @@ import type {
 } from '../../../lib/adtProjections';
 import type { McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { toolDescription } from '../../../lib/description';
 import type {
   HandlerContext,
   SapEnvironment,
@@ -30,7 +31,10 @@ import type {
 } from '../../../lib/handlers/interfaces';
 import { asError } from '../../../lib/thrownValue';
 import { return_error, return_response } from '../../../lib/utils';
-import { buildVersionDiff } from '../readonly/handleGetObjectVersionDiff';
+import {
+  buildVersionDiff,
+  versionDiffParts,
+} from '../readonly/handleGetObjectVersionDiff';
 import {
   readVersionSource,
   readVersions,
@@ -290,7 +294,7 @@ function buildVersionDiffTool(
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}VersionDiff`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
-    description: `[read-only] Compares the two ${row.label} versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.${row.note ? ` ${row.note}` : ''}`,
+    description: toolDescription(versionDiffParts(`the same ${row.label}`)),
     inputSchema: z.object({
       content_uri_from: z
         .string()

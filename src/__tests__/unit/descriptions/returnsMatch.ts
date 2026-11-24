@@ -29,6 +29,8 @@ export interface ReturnsTie {
   readonly terse: readonly ListShape[];
   readonly medium?: readonly ListShape[] | undefined;
   readonly heads: readonly HeadShape[];
+  /** Whose facts the heads tell, as the description states them (`returnsOf`'s `of`). */
+  readonly of?: string | undefined;
   readonly returns: readonly ReturnsFact[];
   readonly samples: readonly TieSample[];
 }
@@ -148,10 +150,10 @@ export function tieFaults(tie: ReturnsTie): string[] {
     faults.push('a fact stated twice');
   }
   const generated = new Set(
-    returnsOf({
-      heads: tie.heads,
-      shapes: [tie.terse, tie.medium ?? []],
-    }).map((each) => each.text),
+    // The terse lists alone are stated: what only medium adds is not.
+    returnsOf({ heads: tie.heads, of: tie.of, shapes: [tie.terse] }).map(
+      (each) => each.text,
+    ),
   );
   for (const fact of facts) {
     if (!generated.has(fact)) faults.push(`an extra fact: "${fact}"`);
@@ -160,9 +162,14 @@ export function tieFaults(tie: ReturnsTie): string[] {
     if (!facts.has(fact)) faults.push(`a fact left out: "${fact}"`);
   }
   const text = [...facts].join(' ').toLowerCase();
+  // A subject merged with others reads `for each a and each b`: `for each b`
+  // is then stated as `each b`.
+  const stated = (noun: string): boolean =>
+    text.includes(noun) ||
+    (noun.startsWith('for each ') && text.includes(noun.slice('for '.length)));
   const named = (noun: string | undefined, what: string) => {
     if (noun === undefined) faults.push(`${what} is written without its noun`);
-    else if (!text.includes(noun.toLowerCase())) {
+    else if (!stated(noun.toLowerCase())) {
       faults.push(
         `${what} is written, its noun "${noun}" is not in the Returns`,
       );

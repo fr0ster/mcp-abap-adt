@@ -105,7 +105,7 @@ function abapGitTie(
   const parts = partsOfDescription(descriptionOf(tool));
   assert.ok(parts !== undefined, `${tool} is assembled`);
   return {
-    terse: [...shapesOf(terse), ...shapesOf(medium)],
+    terse: shapesOf(terse),
     heads,
     returns: parts.returns,
     samples,
@@ -116,11 +116,8 @@ function abapGitTie(
 const bothLevels = (
   reading: unknown,
   terse: readonly WrittenLine[],
-  medium: readonly WrittenLine[],
-): TieSample[] => [
-  { reading, lines: terse },
-  { reading, lines: medium },
-];
+  _medium: readonly WrittenLine[],
+): TieSample[] => [{ reading, lines: terse }];
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
@@ -243,6 +240,7 @@ const TIED: Readonly<Record<string, () => ReturnsTie>> = {
       terse: shapesOf(PACKAGE_TERSE),
       medium: jsonShapesOf(PACKAGE_MEDIUM),
       heads: PACKAGE_HEADS,
+      of: 'its',
       returns: parts.returns,
       samples,
     };

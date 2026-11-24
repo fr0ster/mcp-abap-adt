@@ -130,6 +130,14 @@ function listStated(shape: ListShape, seen: Set<object>): Stated[] {
   }
 }
 
+/** Several subjects as one: `for each a and each b` when they share `for each`. */
+function subjects(abouts: readonly string[]): string {
+  const each = 'for each ';
+  return abouts.length > 1 && abouts.every((about) => about.startsWith(each))
+    ? `${each}${joined(abouts.map((about, i) => (i === 0 ? about.slice(each.length) : `each ${about.slice(each.length)}`)))}`
+    : joined(abouts);
+}
+
 /**
  * The facts a tool's schemas give: its heads' (each a domain noun), then
  * each list's, in the order of its schemas (`shapesOf`, `jsonShapesOf`) —
@@ -138,11 +146,24 @@ function listStated(shape: ListShape, seen: Set<object>): Stated[] {
  */
 export function returnsOf(source: {
   readonly heads?: readonly HeadShape[] | undefined;
+  /**
+   * Whose facts the heads tell (`the package's`): the heads are then one
+   * sentence, their nouns joined under it (the item itself, compact).
+   */
+  readonly of?: string | undefined;
   readonly shapes: readonly (readonly ListShape[])[];
 }): ReturnsFact[] {
   const seen = new Set<ListShape>();
   const all: Stated[] = [
-    ...(source.heads ?? []).map((head) => stated(head.about)),
+    ...(source.of === undefined
+      ? (source.heads ?? []).map((head) => stated(head.about))
+      : source.heads === undefined || source.heads.length === 0
+        ? []
+        : [
+            stated(
+              `${source.of} ${joined(source.heads.map((head) => head.about))}`,
+            ),
+          ]),
     ...source.shapes.flat().flatMap((shape) => {
       if (seen.has(shape)) return [];
       seen.add(shape);
@@ -155,7 +176,19 @@ export function returnsOf(source: {
     for (const noun of each.nouns) if (!nouns.includes(noun)) nouns.push(noun);
     merged.set(each.about, nouns);
   }
-  return [...merged].map(([about, nouns]) =>
-    fact(sentence(nouns.length === 0 ? about : `${about}: ${joined(nouns)}`)),
-  );
+  // Subjects stating the same nouns are one sentence (no sentence repeats):
+  // `for each staged file and each ignored file: …`.
+  const bySame = new Map<string, { abouts: string[]; nouns: string[] }>();
+  for (const [about, nouns] of merged) {
+    const key = nouns.length === 0 ? `\u0000${about}` : nouns.join('\u0000');
+    const entry = bySame.get(key) ?? { abouts: [], nouns };
+    entry.abouts.push(about);
+    bySame.set(key, entry);
+  }
+  return [...bySame.values()].map(({ abouts, nouns }) => {
+    const about = subjects(abouts);
+    return fact(
+      sentence(nouns.length === 0 ? about : `${about}: ${joined(nouns)}`),
+    );
+  });
 }

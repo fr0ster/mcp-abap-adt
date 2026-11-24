@@ -20,6 +20,7 @@ import {
 } from '../../../lib/description';
 import {
   about,
+  headShape,
   marks,
   type RowSchemas,
   rows,
@@ -193,6 +194,48 @@ describe('the description builder', () => {
     );
     // A tag written into the purpose is refused there: it comes from the flag.
     assert.ok(purposeFaults('[read-only] Reads a class.').includes('says "["'));
+  });
+
+  it('states lists of the same facts once, and the heads of `of` as one sentence', () => {
+    const twin: RowSchemas<Reading> = {
+      objects: schemas.objects,
+      gone: about(
+        'for each object left',
+        rows('gone', {
+          columns: [
+            { name: 'type', means: 'its type', cell: (o: string) => o },
+            { name: 'name', means: 'its name', cell: (o: string) => o },
+          ],
+          header: 'always',
+        }),
+      ),
+    };
+    assert.deepStrictEqual(
+      returnsOf({
+        of: 'its',
+        heads: [headShape('package', 'name'), headShape('type', 'type')],
+        shapes: [shapesOf(twin)],
+      }).map((each) => each.text),
+      [
+        'Its name and type.',
+        'For each object and each object left: its type and its name.',
+      ],
+    );
+  });
+
+  it('continues the purpose with the facts when inline', () => {
+    assert.equal(
+      toolDescription({
+        purpose: purpose('Reads a package.'),
+        returns: returnsOf({
+          of: 'its',
+          heads: [headShape('package', 'name')],
+          shapes: [shapesOf(schemas)],
+        }),
+        inline: true,
+      }),
+      'Reads a package: its name; for each object: its type and its name; the objects SAP could not load are named.',
+    );
   });
 
   it('generates facts free of every form marker', () => {

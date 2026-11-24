@@ -94,7 +94,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'CreateMessageClass',
   'CreateMessageClassMessage',
   'CreateMetadataExtension',
-  'CreatePackage',
   'CreateProgram',
   'CreateProgramUnitTest',
   'CreateServiceBinding',
@@ -119,7 +118,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'DebugListWatchpoints',
   'DebugSetBreakpoints',
   'DebugSetSettings',
-  'DebugSetStackPosition',
   'DebugSetVariable',
   'DebugStartListener',
   'DebugStep',
@@ -202,7 +200,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetLocalTestClass',
   'GetLocalTypes',
   'GetMainPrograms',
-  'GetMessageClass',
   'GetMessageClassMessage',
   'GetMetadataExtension',
   'GetMetadataExtensionVersionDiff',
@@ -335,7 +332,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'SessionOpen',
   'SortAndCompressTransportTask',
   'SwitchAbapGitBranch',
-  'UnlinkAbapGitRepo',
   'UnlockObjectLow',
   'UpdateBehaviorDefinition',
   'UpdateBehaviorDefinitionLow',
@@ -390,7 +386,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 377;
+export const NOT_YET_ASSEMBLED_MOST = 373;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

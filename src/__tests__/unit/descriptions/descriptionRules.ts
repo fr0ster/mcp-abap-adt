@@ -168,4 +168,8 @@ export function detailFaults(text: string): string[] {
 }
 
 /** The tags a description may open with, rendered. */
-export const TAGS: readonly string[] = ['[read-only]', '[low-level]'];
+export const TAGS: readonly string[] = [
+  '[read-only]',
+  '[low-level]',
+  '[debug]',
+];

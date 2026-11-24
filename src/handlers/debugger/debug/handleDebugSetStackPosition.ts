@@ -7,14 +7,20 @@ import {
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { terseStop } from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugSetStackPosition',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[debug] Selects the stack frame variables are read in; execution goes on from the same point. Needs a stopped debuggee.',
+  description: toolDescription({
+    tag: 'debug',
+    purpose: purpose(
+      'Selects the stack frame of a stopped debuggee whose variables are then shown, execution going on from the same point.',
+    ),
+    returns: [],
+  }),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     position: z

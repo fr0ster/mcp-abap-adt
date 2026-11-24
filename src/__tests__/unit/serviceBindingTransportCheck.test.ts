@@ -225,10 +225,15 @@ describe("HandlerServiceBindingValidate states package_name, the binding's packa
         "The answer is the verdict of SAP's transport check for the binding's name and package",
       ),
     );
+    // Assembled (plan step 10.6): the purpose names the check, the facts
+    // its verdict.
     assert.ok(
       ValidateServiceBinding_Tool.description.includes(
-        "The answer is the verdict of SAP's transport check for the binding's name and package",
+        "by SAP's transport check of its name and package",
       ),
+    );
+    assert.ok(
+      ValidateServiceBinding_Tool.description.includes('Whether SAP admits it'),
     );
     assert.ok(
       compactValidateDescription('onprem').includes(

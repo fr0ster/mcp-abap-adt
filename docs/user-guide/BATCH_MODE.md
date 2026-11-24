@@ -316,8 +316,21 @@ object stay single requests: a tool that reads one object, or probes one name fo
   probes).
 - **At most 300 reads per envelope** (`READS_PER_ENVELOPE`, `src/lib/batch/phases.ts`), as for
   `SearchSource`'s source reads: more independent reads go in consecutive envelopes, each judged
-  as it answers. The same bound splits every phase of `GetEnhancements`. SAP's own limit is not
-  measured.
+  as it answers. The same bound splits every phase of `GetEnhancements` and `GetObjectInfo`'s
+  leaf metadata phase (`include_descriptions`), which sent every leaf in one envelope; no envelope
+  is sent after one that met a credential refusal. SAP's own limit is not measured.
+- **Descriptions are never taken from a batched node structure.** Inside an envelope a node
+  structure part can carry another part's `DESCRIPTION` (measured, 2026-10-18). The package
+  listings with `include_descriptions: true` read their node structures as single requests;
+  `GetObjectInfo` takes each leaf's description from its metadata; `GetObjectsList` answers no
+  description at all (type, name, technical name, URI), whatever `with_short_descriptions` says,
+  so its batched node structures reach no description.
+- **Single requests over RFC go one at a time.** Where a tool reads single requests several at a
+  time — the package listings with `include_descriptions: true` (8 at once), `SearchSource` without
+  a communication batch — an RFC connection gets one at a time (`readsInFlight`,
+  `src/lib/connectionKind.ts`): an RFC connection is one ABAP session, and reads sent to it in
+  parallel were lost without an error (measured on premise, 2026-09-26, `SearchSource`). The
+  package listings over RFC are unit-tested only.
 - **An envelope that fails as a whole** is every read's failure in it: the answer is the one the
   sequential reads give with those reads failed, each naming the envelope's request. A credential
   refusal ends the call as it came. A destination with no communication batch reads one after

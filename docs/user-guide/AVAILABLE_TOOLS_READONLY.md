@@ -174,7 +174,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getabapgitstaging-read-only-abapgit"></a>
 #### GetAbapGitStaging (Read-Only / Abapgit)
-**Description:** [read-only] Gets the abapGit staging of a linked repository: what changed, to choose what a push commits. The author and the committer SAP proposes. For each changed file left unstaged, each staged file and each ignored file: its object's type, its object's name, its object's package, its file name, its state in the system and its state in the remote. An object with several files is named once for each of its files.
+**Description:** [read-only] Gets the abapGit staging of a linked repository: what changed, to choose what a push commits. The author and the committer SAP proposes. For each changed file left unstaged, each staged file and each ignored file: its object's type, its object's name, its object's package, its file name, its state in the system and its state in the remote.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitStaging.ts`
 
@@ -259,7 +259,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getatcfindings-read-only-atc"></a>
 #### GetATCFindings (Read-Only / Atc)
-**Description:** [read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position (location and line), the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the worklist gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. The worklist ID. How many objects the run covered. How many findings there are. What an empty worklist means, while the run is still filling it. How many findings each priority has. For each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
@@ -287,7 +287,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getatcresult-read-only-atc"></a>
 #### GetATCResult (Read-Only / Atc)
-**Description:** [read-only] Reads the stored ATC result named by display_id. Answers the result's title, check_variant and created_at, how many objects it covered, the counts per priority and each finding with the object, the source position (location and line), the priority, which check ran and what it said. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the result gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. The result ID. Its title. Its check variant. When it was created. How many objects it covered. How many findings there are. How many findings each priority has. For each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCResult.ts`
 
@@ -399,7 +399,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
-**Description:** [read-only] Lists the version history of the class, program, interface, function module, table, structure, table type, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, the transport request that produced it when available, and the opaque content_uri that names the version's source (by default as TSV rows; with detail medium or full, the title and the transport description too).
+**Description:** [read-only] Lists the version history of an ABAP class, program, interface, function module, table, structure, CDS view or other versioned object. The object's type and name. For each version: its ID, its author, when it was saved, the transport that produced it and the URI of its source.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
@@ -769,7 +769,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getpackagecontents-read-only-package"></a>
 #### GetPackageContents (Read-Only / Package)
-**Description:** [read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes; with include_descriptions, as single requests, several at a time. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists the objects of one or more ABAP packages, with the objects of their subpackages when asked. For each object of the package or a subpackage, under its own package: its type, its name, its technical name where it differs, its URI when SAP lists it nameless and its description, with descriptions asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/package/readonly/handleGetPackageContents.ts`
 
@@ -824,7 +824,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
-**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system's object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.). Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Finds ABAP repository objects by name or name pattern, of any type or of one: classes, programs, tables, interfaces and every other kind. For each object found: its name, its type, its description and its package. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
@@ -839,7 +839,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectslist-read-only-search"></a>
 #### GetObjectsList (Read-Only / Search)
-**Description:** [read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope, for the identities of the objects. By default (detail terse) TSV of identifier rows: type, name, tech_name, uri. With detail medium or full the description of each object is read from its own metadata in a second ADT batch envelope, where its type has a metadata endpoint. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists every object inside an ABAP program, function group, class, package or other composite object, down to its nested includes and subcomponents: the parent's type and name and number of objects; for each object inside it: its type, its name, its technical name where it differs and its URI when SAP lists it nameless. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsList.ts`
 
@@ -856,7 +856,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectsbytype-read-only-search"></a>
 #### GetObjectsByType (Read-Only / Search)
-**Description:** [read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type. Answers TSV under `# parent`, `# node_id` and `# count` lines: a row per object, its type, name, the technical name where it differs from the name and, for an object listed by its uri alone, that uri — with with_short_descriptions, its description too; each node SAP marks as unloaded is a `#` line of its own, and each child node of the type node a `# child_node` line naming its type and node id.
+**Description:** [read-only] Lists the objects of one type, such as classes, tables, programs or interfaces, in an ABAP package or other composite object: the parent's type and name, node ID and number of objects; for each object of the type: its type, its name, its technical name where it differs, its URI when SAP lists it nameless and its short description, by default; the nodes SAP left unloaded are named; the nodes below it are named by their type and node ID.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 
@@ -965,7 +965,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettypeinfo-read-only-system"></a>
 #### GetTypeInfo (Read-Only / System)
-**Description:** [read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key. Each type is read from the working area: its inactive version where one exists.
+**Description:** [read-only] Reads the DDIC definition of a type name: each data element, domain, structure or table type of that name, its inactive version where one exists.
 
 **Source:** `src/handlers/system/readonly/handleGetTypeInfo.ts`
 
@@ -977,7 +977,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettransaction-read-only-system"></a>
 #### GetTransaction (Read-Only / System)
-**Description:** [read-only] Reads the properties of the ABAP transaction (t-code) named by transaction_name in one request. Answers the transaction under `object` (name, text, type, package) and its facets under `properties`, in the order the system gives them — the application component chain, the package chain, type, owner, language, creation and the others the system names — each entry with its facet, name, displayName and text.
+**Description:** [read-only] Reads the properties of an ABAP transaction code: the transaction's name, text and package; for each property, such as its application component, package, type, owner or language: its facet, its name and its text.
 
 **Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
 
@@ -989,7 +989,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimelistprofilertracefiles-read-only-system"></a>
 #### RuntimeListProfilerTraceFiles (Read-Only / System)
-**Description:** [read-only] [runtime] List ABAP profiler trace files available in ADT runtime. Returns each trace: by default as TSV (id, recordedAt, objectName, state, runtime); with detail medium or full every field (user, expiresAt, system, client, host, size and the runtime split).
+**Description:** [read-only] Lists the ABAP profiler traces recorded in the system: how many there are; for each trace: its ID, when it was recorded, the object it traced, its state and its runtime.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
 
@@ -1068,7 +1068,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimelistsystemmessages-read-only-system"></a>
 #### RuntimeListSystemMessages (Read-Only / System)
-**Description:** [read-only] [runtime] List SM02 system messages. By default (detail terse) TSV under a # count line: id, createdOn, author, title per message; with detail medium or full each message as SAP writes it: id, messageId, title, text, createdOn, updated, createdBy and author; raw the feed as ADT sent it.
+**Description:** [read-only] Lists the system messages of the SAP system, the ones SM02 shows, optionally by one author: how many there are; for each system message: its ID, when it was created, its author and its title.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
 
@@ -1083,7 +1083,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimegetgatewayerrorlog-read-only-system"></a>
 #### RuntimeGetGatewayErrorLog (Read-Only / System)
-**Description:** [read-only] [runtime] Lists the SAP Gateway error log (/IWFND/ERROR_LOG), or reads one error's detail. The list answers each error's opid and detail_kind (what its detail is read by), dateTime, type, shortText and username: by default as TSV rows; with detail medium or full every field (id, kind, transactionId, package, applicationComponent, userId, client, requestKind, detailUri). With opid and detail_kind, the error's detail under error: the list's fields of the error, then serviceInfo, errorContext, sourceCode and callStack. With detail raw the document as ADT sent it: the Atom feed for the list, the HTML for a detail.
+**Description:** [read-only] Lists the errors of the SAP Gateway error log, the one /IWFND/ERROR_LOG shows, or reads the detail of one error: how many there are; for each error: its operation ID, the kind of its detail, when it happened, its type, its short text and the user it happened to.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
 
@@ -1101,7 +1101,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Finds where an ABAP class, function module, table or other repository object is used: every object that uses, calls or references it. How many references SAP counts. For each object that uses it, under its package: its type, its name, its URI when SAP lists it nameless and how it uses the object, where SAP tells it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
@@ -1139,7 +1139,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getinactiveobjects-read-only-system"></a>
 #### GetInactiveObjects (Read-Only / System)
-**Description:** [read-only] Get a list of inactive ABAP objects — modified and pending activation. Shows classes, tables, CDS views, and other objects awaiting activation: by default (detail terse) TSV rows of type, name and owner; with detail medium the same as JSON; full the parse; raw the document.
+**Description:** [read-only] Lists the inactive ABAP objects of the system: classes, tables, CDS views and other objects changed and awaiting activation: how many there are; for each inactive object: its type, its name and the object it belongs to, such as a function group.
 
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
 
@@ -1150,7 +1150,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getadttypes-read-only-system"></a>
 #### GetAdtTypes (Read-Only / System)
-**Description:** [read-only] Retrieve all valid ADT object types (CLAS, TABL, PROG, DEVC, FUGR, INTF, DDLS, DTEL, DOMA, SRVD, SRVB, BDEF, DDLX, etc.) or validate a specific type name.
+**Description:** [read-only] Lists the repository object types the ABAP system knows, by their type codes: how many there are; for each object type: its code and its description.
 
 **Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
 
@@ -1162,7 +1162,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectstructure-read-only-system"></a>
 #### GetObjectStructure (Read-Only / System)
-**Description:** [read-only] Returns the ADT structure of the repository object named by objecttype and objectname as a compact JSON tree.
+**Description:** [read-only] Reads the structure of an ABAP repository object, such as a CDS view: its parts and their parts, down to the last level. Each part of the object, such as an element, an association or an annotation, is named by its type and its name or description, at its depth.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
 
@@ -1175,7 +1175,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectoutline-read-only-system"></a>
 #### GetObjectOutline (Read-Only / System)
-**Description:** [read-only] Lists the components of the ABAP object named by object_type and object_name — types, attributes, methods, events, local classes, forms, includes or modules — with their kind, visibility and level, and the source positions SAP's object structure states for each: the include each link points into and, for a class or an interface, its start and end line and column (lines from 1, columns from 0, the end exclusive), the lines a ranged source read (start_line, end_line) answers. Returns the components as a tree.
+**Description:** [read-only] Lists the components of an ABAP class, interface, program or function group, with where each one is defined in its source. The object's type and name. The include its components are defined in. For each component, such as a type, attribute, method, event, local class, form or module, at its depth: its name, its kind, its visibility, where its definition starts and the include it is defined in, where that differs.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectOutline.ts`
 
@@ -1185,7 +1185,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `PROG/P`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, PROG/P, FUGR/F (class, interface, program, function group).
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
-**On ABAP Cloud (`cloud`):** [read-only] Lists the components of the ABAP object named by object_type and object_name — types, attributes, methods, events, local classes, forms, includes or modules — with their kind, visibility and level, and the source positions SAP's object structure states for each: the include each link points into and, for a class or an interface, its start and end line and column (lines from 1, columns from 0, the end exclusive), the lines a ranged source read (start_line, end_line) answers. Returns the components as a tree.
+**On ABAP Cloud (`cloud`):** [read-only] Lists the components of an ABAP class, interface, program or function group, with where each one is defined in its source. The object's type and name. The include its components are defined in. For each component, such as a type, attribute, method, event, local class, form or module, at its depth: its name, its kind, its visibility, where its definition starts and the include it is defined in, where that differs.
 
 **Parameters (`cloud`):**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
@@ -1197,7 +1197,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectnodefromcache-read-only-system"></a>
 #### GetObjectNodeFromCache (Read-Only / System)
-**Description:** [read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present, reading the active version of the object it names.
+**Description:** [read-only] Reads one repository object the last objects listing named, by its type, name and technical name, with the content at its URI in the active version.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectNodeFromCache.ts`
 
@@ -1210,7 +1210,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="describebylist-read-only-system"></a>
 #### DescribeByList (Read-Only / System)
-**Description:** [read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object's type is optional: a name of the system's object types list (e.g. CLAS, DTAB, STRU) or an ADT type code (e.g. PROG/P, PROG/I, FUGR/F, FUGR/FF, CLAS/OC, INTF/OI), either case, or a name standing for a code, in lower case (e.g. class, table, structure; view is a CDS view, while VIEW is the dictionary views); an object of any other type is searched by its name alone. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Describes several ABAP repository objects named in one call, each by its name and, when known, its type. For each object found: its name, its type, its description and its package. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
 
@@ -1223,7 +1223,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getpackagetree-read-only-system"></a>
 #### GetPackageTree (Read-Only / System)
-**Description:** [read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level. For each subpackage and object below it, at its depth: its type, its name, its technical name when SAP lists it nameless, its URI when SAP lists it nameless and its description, with descriptions asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
@@ -1257,7 +1257,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="searchsource-read-only-system"></a>
 #### SearchSource (Read-Only / System)
-**Description:** [read-only] Search ABAP source text inside one or more packages: programs, program includes, function groups (function modules and includes), classes (main source and the four local includes), interfaces, CDS data definitions, behavior definitions, metadata extensions and service definitions. Each source is read at the call's `version` (default active). `packages` takes exact package names and masks (Z*, /NS/Z?); in a mask `*` (zero or more characters) and `?` (one character) are the wildcards, and `+`, `_`, `%` and `#` are characters of the name; a mask is resolved by the repository quick search to every package it matches. `object_types` and `object_filter` select the scan targets of the resolved packages (`PROG` selects programs and program includes, `FUGR` function groups with their modules and includes); every target is read in one run, unless `max_hits` is reached. A line matches when it contains `query` (and `query2`, when given), case-insensitively, and a line containing an `exclude` entry is dropped; `exclude_comments` skips col-1 `*` and full-line `"` comment lines. `max_hits_per_object` limits the hits of each object only when given; each module and each include of a function group is an object of its own, and a program include is one object however many function groups list it (its hits answered and counted once, from the first listing in the scan order). `max_hits` limits the hits of the whole answer, counted in the scan order after `max_hits_per_object`: reached, the scan stops reading, and `truncated.by_max_hits` is true when anything was left. `answer` sets what each hit is answered as: `lines` with the line only (the default at detail terse), `snippets` with line and snippet (the default at medium and full), `objects` one entry per object and include with its number of hits. The answer lists each hit (`results`: package, object type, object name, include, line, snippet). The `object_type` of a hit names its kind of source: `PROG` a program, `PROG/I` a program include (`object_name` the include name), `CLAS` a class with `include` the class name for its main source or `definitions`, `implementations`, `macros`, `testclasses` for its local includes, `INTF`, `DDLS`, `BDEF`, `DDLX` and `SRVD` the object source; a hit in a function module is `FUGR/FF` (`object_name` the module) and a hit in an include addressed under its function group is `FUGR/I` (`object_name` the include), each with `function_group_name`, the group, in place of `include`; an include a function group lists among the program includes is `PROG/I`; `scanned.objects` counts the objects read, `scanned.sources` the sources read (each once) and `scanned.objects_with_hits` the objects with a hit; `truncated.by_object_cap` is true when an object had more hits than `max_hits_per_object`. At a stop the counters report what was done until it; where the reads go in batches, `scanned.sources` counts the sources of the last batch read, those read past the stop included. A source, an object or a package SAP refuses is skipped, and a type node or subpackage SAP refuses is skipped with everything under it; a read that fails before SAP answers ends the call as an error. Sources are read in ADT batch envelopes where the system offers them, each source once per call. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Searches the ABAP source code of one or more packages for a text: programs, includes, function groups, classes, interfaces and CDS sources. How many objects and sources were searched, and how many objects matched. Which limit stopped the search, when one did. The package parts SAP left unloaded are named, each by its package and type. The nameless objects SAP lists, left unsearched, are named by what tells them apart. For each match, under its object named by package, type and name: its include, its position in the source and the source code that matched, when snippets are asked. With objects asked, for each object it matched in, named by package, type and name: its include and how many matches it has. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleSearchSource.ts`
 
@@ -1382,7 +1382,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listtransports-read-only-transport"></a>
 #### ListTransports (Read-Only / Transport)
-**Description:** [read-only] List the transport requests of a user: the workbench, customizing and transport-of-copies requests the user owns or holds a task in, as SAP selects them. Returns each request's number, description, type, status, owner and target. Modifiable requests by default; with modifiable_only false, released requests too, from SAP's default window of the last 14 days. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists a user's transports, workbench, customizing and transport-of-copies alike, that the user owns or holds a task in: how many there are; for each transport: its number, its type, its status, its owner, its target system and its description. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/transport/readonly/handleListTransports.ts`
 
@@ -1398,7 +1398,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="readtransportobjects-read-only-transport"></a>
 #### ReadTransportObjects (Read-Only / Transport)
-**Description:** [read-only] Lists the objects the transport request or task named by transport_number holds, each with its `position`, which a removal of the entry names. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.
+**Description:** [read-only] Lists the objects a transport or one of its tasks holds, each with the position a removal names: the transport number and number of objects; for each object, under its task and its program ID: its type, its name and its position, which a removal names; the objects SAP lists nameless or untyped are named by what they carry.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
 
@@ -1412,7 +1412,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="readtransportactionlog-read-only-transport"></a>
 #### ReadTransportActionLog (Read-Only / Transport)
-**Description:** [read-only] Reads the action log of the transport request named by transport_number: one entry per lifecycle event — created, object added, object deleted, owner changed. It confirms that an object entry was taken out of the request, since a removal answers by echoing what it was asked.
+**Description:** [read-only] Reads the action log of a transport or task: every event of its life, its objects added and taken out among them: the transport number and number of events; for each event, such as created, object added, object deleted or owner changed: its text.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
 

@@ -357,7 +357,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** [read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position (location and line), the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the worklist gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. The worklist ID. How many objects the run covered. How many findings there are. What an empty worklist means, while the run is still filling it. How many findings each priority has. For each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
@@ -370,7 +370,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getatcresult-high-level-atc"></a>
 #### GetATCResult (High-Level / Atc)
-**Description:** [read-only] Reads the stored ATC result named by display_id. Answers the result's title, check_variant and created_at, how many objects it covered, the counts per priority and each finding with the object, the source position (location and line), the priority, which check ran and what it said. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the result gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. The result ID. Its title. Its check variant. When it was created. How many objects it covered. How many findings there are. How many findings each priority has. For each finding: its object, its object's type, the part of the source it is in, its position in that source, its offset at that position, its priority, the check that found it and what the check says. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCResult.ts`
 
@@ -703,7 +703,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocaltestclass-high-level-class"></a>
 #### DeleteLocalTestClass (High-Level / Class)
-**Description:** Clears the local test classes include of the ABAP class named by class_name. The include is cleared under the class lock; with activate_on_delete the class is activated.
+**Description:** Clears the local test classes of an ABAP class, activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
 
@@ -2051,7 +2051,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateinterface-high-level-interface"></a>
 #### UpdateInterface (High-Level / Interface)
-**Description:** Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.
+**Description:** Writes new source code into an existing ABAP interface, activating it when asked.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
 
@@ -2221,7 +2221,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkpackage-high-level-package"></a>
 #### CheckPackage (High-Level / Package)
-**Description:** [read-only] Runs a syntax check on the ABAP package named by package_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP package, with SAP's errors, warnings and messages.
 
 **Source:** `src/handlers/package/high/handleCheckPackage.ts`
 
@@ -2713,7 +2713,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
-**Description:** [read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level. For each subpackage and object below it, at its depth: its type, its name, its technical name when SAP lists it nameless, its URI when SAP lists it nameless and its description, with descriptions asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
@@ -2894,7 +2894,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatetable-high-level-table"></a>
 #### UpdateTable (High-Level / Table)
-**Description:** Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.
+**Description:** Writes new DDL source code into an existing ABAP database table, activating it when asked.
 
 **Source:** `src/handlers/table/high/handleUpdateTable.ts`
 
@@ -3261,7 +3261,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletecdsunittest-high-level-unit-test"></a>
 #### DeleteCdsUnitTest (High-Level / Unit Test)
-**Description:** Deletes the CDS view test class named by class_name, with the ABAP Unit test classes it holds.
+**Description:** Deletes a CDS view test class, with the ABAP Unit test classes it holds.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
 

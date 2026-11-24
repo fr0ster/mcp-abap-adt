@@ -1,11 +1,20 @@
 import * as z from 'zod';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
+import { LEFTOVER_LOGGED_OFF } from '../../../lib/description/sessions';
 import { answerLeftoverLogoff } from '../../../lib/leftoverSessions/answers';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'LogoffLeftoverSession',
-  description:
-    '[session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, credential-free. The session record is deleted afterwards.',
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        'Logs off a leftover SAP session by its handle, releasing every lock it holds and deleting its record.',
+      ),
+      result: LEFTOVER_LOGGED_OFF,
+    }),
+  ),
   inputSchema: z.object({
     handle: z
       .string()

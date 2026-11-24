@@ -239,6 +239,8 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
      checked where it was first met.
    DescribeByList's terse still reads SearchObject's terse text back into cells, any cell past
    the four columns kept as an `# extra` line; it is named here for the owner's decision.
+   (Owner: DescribeByList moves onto SearchObject's typed reading in step 10's group (2), and
+   this limit is struck then.)
 
    9.10 **Gate and review.** The gate runs detached until `DONE fail=0`. Then push, then Codex,
    which gets this step's text as its scope.
@@ -387,6 +389,33 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    AVAILABLE_TOOLS and the compact docs), the listed-schemas fixtures
    (`tests/fixtures/tools/listed-schemas.json`, `rebuilt-descriptions.json`) and the goldens
    through their writers, and names the regenerated files in its commit.
+
+   10.7a **Order by the measurement** (owner, after the bge-m3 calibration). The tools the
+   calibration flags (own rank > 1 or nd ≤ 0.62 among every served description) go first: group
+   (2)'s writer tools, then the rest of the flagged list, then the unflagged tools in the order of
+   10.7. `UpdateFunctionInclude`, a hub every flagged tool is confused with, is among them. A
+   tool whose description outranks a moved one on that tool's queries (10.7c) moves with it:
+   with `GetPackage` in group (2), `CreatePackage`, `GetMessageClass`, `DebugSetStackPosition`
+   and `UnlinkAbapGitRepo`, each its function in one purpose sentence, no concept explained and
+   "package" only where the package is the function. After each group the docs are regenerated
+   and the calibration rerun; the PR lists per tool the old and the new description, rank and nd,
+   and its query ranks. The aim is own rank 1 and nd > 0.62, a true sibling named, no keyword
+   stuffing; a tool that cannot reach it truthfully is named for the owner.
+
+   10.7b **Compact facts** (owner). The item's own facts are one sentence (`returnsOf`'s `of`:
+   "its name, description, type, …"); a list's facts are one sentence ("for each subpackage: its
+   name and its description"); no sentence repeats. Only the terse columns are stated: a member
+   only medium writes is not, and the tie (10.5) compares against terse. With `inline`, the facts
+   continue the purpose after a colon as one sentence: "Reads an ABAP package at the version
+   asked: its name, description, …; for each subpackage: its name and its description."
+
+   10.7c **Readiness by queries** (owner). Each moved tool has 3–5 typical queries, in Ukrainian
+   and English (`src/__tests__/unit/descriptions/descriptionQueries.json`). A description is
+   ready when, embedded with bge-m3 over every served description, its tool ranks first on each
+   query; a query that lands first on a true sibling is named for the owner, and an accepted one
+   is recorded under `siblings`. The name ↔ description rank of 10.8a becomes a secondary check.
+   `descriptionQueries.test.ts` runs it locally through the Ollama helper (skipped with its
+   reason when bge-m3 is not served) and in the `meaning-vectors` CI job (`MEANING_REQUIRED`).
 
    10.8 **Retrieval stays as good.** Tool selection does not read the description alone: the
    search texts (`tools/tool-search.json`: keywords and semantic sentences) are unchanged by this

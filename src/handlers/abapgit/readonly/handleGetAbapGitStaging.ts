@@ -16,15 +16,27 @@ import {
 import {
   ABAPGIT_DETAIL_SHAPE,
   STAGING_ANSWERS,
+  STAGING_HEADS,
+  STAGING_MEDIUM,
+  STAGING_TERSE,
 } from '../../../lib/abapGit/formats';
-import { answerAt, listAnswerAt } from '../../../lib/detail';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { answerAt, listAnswerAt, shapesOf } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
 export const TOOL_DEFINITION = {
   name: 'GetAbapGitStaging',
-  description:
-    '[read-only] Reads what changed between the system and the remote branch of the repository, to choose what a push commits. Answers facts only: the unstaged, staged and ignored objects, each with its files and their local and remote state, and the author and committer this system proposes. With detail "medium" every field of the objects a push takes is listed.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Shows what changed between the system and the remote branch of a linked repository, to choose what a push commits.',
+    ),
+    returns: returnsOf({
+      heads: STAGING_HEADS,
+      shapes: [shapesOf(STAGING_TERSE), shapesOf(STAGING_MEDIUM)],
+    }),
+  }),
   inputSchema: z.object({
     repository_key: REPOSITORY_KEY_FIELD,
     ...ABAPGIT_DETAIL_SHAPE,

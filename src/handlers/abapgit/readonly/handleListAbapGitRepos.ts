@@ -15,15 +15,26 @@ import {
   ABAPGIT_DETAIL_SHAPE,
   filteredRepos,
   REPOS_ANSWERS,
+  REPOS_MEDIUM,
+  REPOS_TERSE,
 } from '../../../lib/abapGit/formats';
-import { answerAt, listAnswerAt } from '../../../lib/detail';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { answerAt, listAnswerAt, shapesOf } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
 export const TOOL_DEFINITION = {
   name: 'ListAbapGitRepos',
-  description:
-    "[read-only] Lists the abapGit repositories linked in the system, optionally only the one of package_name or of repository_key. Answers facts only: each repository's key, package, branch and remote URL, and on cloud its run state — the status of its last pull or push (blank initial, R running, S, W, E or A ended), the status text and the key of its run log.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Finds the abapGit repositories linked in the system, or only the one linked to a package or with a key.',
+    ),
+    returns: returnsOf({
+      heads: [],
+      shapes: [shapesOf(REPOS_TERSE), shapesOf(REPOS_MEDIUM)],
+    }),
+  }),
   inputSchema: z.object({
     package_name: z
       .string()

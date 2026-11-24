@@ -31,8 +31,10 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
 import {
+  about,
   type Column,
   entries,
+  headShape,
   jsonText,
   type ListAnswerTable,
   omitted,
@@ -94,12 +96,48 @@ export function filteredRepos(
 
 /** A repository's identifying columns. */
 const REPO_COLUMNS: Column<IAbapGitRepoFacts>[] = [
-  { name: 'key', cell: (repo) => repo.key },
-  { name: 'package', cell: (repo) => repo.package },
-  { name: 'branch_name', cell: (repo) => repo.branchName },
-  { name: 'url', cell: (repo) => repo.url },
-  { name: 'run_status', cell: (repo) => repo.runStatus ?? '' },
+  { name: 'key', means: 'its key', cell: (repo) => repo.key },
+  { name: 'package', means: 'its package', cell: (repo) => repo.package },
+  { name: 'branch_name', means: 'its branch', cell: (repo) => repo.branchName },
+  { name: 'url', means: 'its remote URL', cell: (repo) => repo.url },
+  {
+    name: 'run_status',
+    means:
+      'the state of its last pull or push on the cloud (blank initial, R running, S, W, E or A ended)',
+    cell: (repo) => repo.runStatus ?? '',
+  },
 ];
+
+/** R1 at terse: each repository by its identifying columns. */
+export const REPOS_TERSE: RowSchemas<IAbapGitReposFacts> = {
+  repos: about(
+    'for each repository linked',
+    rows('repos', { columns: REPO_COLUMNS, header: 'always' }),
+  ),
+};
+
+/** R1 at medium: each repository with its run's text and log. */
+export const REPOS_MEDIUM: RowSchemas<IAbapGitReposFacts> = {
+  repos: about(
+    'for each repository linked',
+    rows('repos', {
+      columns: [
+        ...REPO_COLUMNS,
+        {
+          name: 'status_text',
+          means: 'the text of its last run',
+          cell: (repo) => repo.statusText ?? '',
+        },
+        {
+          name: 'app_log_key',
+          means: 'the key of its run log',
+          cell: (repo) => repo.appLogKey ?? '',
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
 
 /** R1, the repository list: every repository a row, by the listing writer. */
 export const REPOS_ANSWERS: ListAnswerTable<
@@ -107,28 +145,9 @@ export const REPOS_ANSWERS: ListAnswerTable<
   string
 > = table({
   terse: (value) =>
-    writeListing({
-      heads: [],
-      reading: value.facts,
-      lists: {
-        repos: rows('repos', { columns: REPO_COLUMNS, header: 'always' }),
-      },
-    }),
+    writeListing({ heads: [], reading: value.facts, lists: REPOS_TERSE }),
   medium: (value) =>
-    writeListing({
-      heads: [],
-      reading: value.facts,
-      lists: {
-        repos: rows('repos', {
-          columns: [
-            ...REPO_COLUMNS,
-            { name: 'status_text', cell: (repo) => repo.statusText ?? '' },
-            { name: 'app_log_key', cell: (repo) => repo.appLogKey ?? '' },
-          ],
-          header: 'always',
-        }),
-      },
-    }),
+    writeListing({ heads: [], reading: value.facts, lists: REPOS_MEDIUM }),
   full: facts,
 });
 
@@ -143,6 +162,68 @@ const accessMode = (value: { readonly accessMode: string }) => [
   { head: 'access_mode', value: value.accessMode },
 ];
 
+/** The heads R13 and R14 write: the repository's access mode. */
+export const ACCESS_MODE_HEADS = [
+  headShape(
+    'access_mode',
+    'whether the remote repository is public or private',
+  ),
+];
+
+/** R13 at terse: each branch by its name and whether it is the head. */
+export const EXTERNAL_REPO_TERSE: RowSchemas<IAbapGitExternalRepoFacts> = {
+  branches: about(
+    'for each branch of the remote repository',
+    rows('branches', {
+      columns: [
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (branch: Branch) => branch.name,
+        },
+        {
+          name: 'is_head',
+          means: 'whether it is the head',
+          cell: (branch: Branch) => yesNo(branch.isHead),
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** R13 at medium: each branch with its type and commit. */
+export const EXTERNAL_REPO_MEDIUM: RowSchemas<IAbapGitExternalRepoFacts> = {
+  branches: about(
+    'for each branch of the remote repository',
+    rows('branches', {
+      columns: [
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (branch: Branch) => branch.name,
+        },
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (branch: Branch) => branch.type,
+        },
+        {
+          name: 'is_head',
+          means: 'whether it is the head',
+          cell: (branch: Branch) => yesNo(branch.isHead),
+        },
+        {
+          name: 'sha1',
+          means: 'its commit',
+          cell: (branch: Branch) => branch.sha1,
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
 /** R13, an external repository's branches: each a row, under its access mode. */
 export const EXTERNAL_REPO_ANSWERS: ListAnswerTable<
   IAbapGitFactsResponse<IAbapGitExternalRepoFacts>,
@@ -152,34 +233,75 @@ export const EXTERNAL_REPO_ANSWERS: ListAnswerTable<
     writeListing({
       heads: accessMode(value.facts),
       reading: value.facts,
-      lists: {
-        branches: rows('branches', {
-          columns: [
-            { name: 'name', cell: (branch: Branch) => branch.name },
-            { name: 'is_head', cell: (branch: Branch) => yesNo(branch.isHead) },
-          ],
-          header: 'always',
-        }),
-      },
+      lists: EXTERNAL_REPO_TERSE,
     }),
   medium: (value) =>
     writeListing({
       heads: accessMode(value.facts),
       reading: value.facts,
-      lists: {
-        branches: rows('branches', {
-          columns: [
-            { name: 'name', cell: (branch: Branch) => branch.name },
-            { name: 'type', cell: (branch: Branch) => branch.type },
-            { name: 'is_head', cell: (branch: Branch) => yesNo(branch.isHead) },
-            { name: 'sha1', cell: (branch: Branch) => branch.sha1 },
-          ],
-          header: 'always',
-        }),
-      },
+      lists: EXTERNAL_REPO_MEDIUM,
     }),
   full: facts,
 });
+
+/** R14 at terse: the branch by its name and folder logic. */
+export const BRANCH_INFO_TERSE: RowSchemas<IAbapGitBranchInfoFacts> = {
+  branches: about(
+    'for the branch',
+    rows('branches', {
+      columns: [
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (branch: InfoBranch) => branch.name,
+        },
+        {
+          name: 'folder_logic',
+          means: 'how its folders map to packages',
+          cell: (branch: InfoBranch) => branch.folderLogic,
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** R14 at medium: the branch with its type, head and commit. */
+export const BRANCH_INFO_MEDIUM: RowSchemas<IAbapGitBranchInfoFacts> = {
+  branches: about(
+    'for the branch',
+    rows('branches', {
+      columns: [
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (branch: InfoBranch) => branch.name,
+        },
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (branch: InfoBranch) => branch.type,
+        },
+        {
+          name: 'is_head',
+          means: 'whether it is the head',
+          cell: (branch: InfoBranch) => yesNo(branch.isHead),
+        },
+        {
+          name: 'sha1',
+          means: 'its commit',
+          cell: (branch: InfoBranch) => branch.sha1,
+        },
+        {
+          name: 'folder_logic',
+          means: 'how its folders map to packages',
+          cell: (branch: InfoBranch) => branch.folderLogic,
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
 
 /** R14, one branch with its folder logic, under its access mode. */
 export const BRANCH_INFO_ANSWERS: ListAnswerTable<
@@ -190,41 +312,13 @@ export const BRANCH_INFO_ANSWERS: ListAnswerTable<
     writeListing({
       heads: accessMode(value.facts),
       reading: value.facts,
-      lists: {
-        branches: rows('branches', {
-          columns: [
-            { name: 'name', cell: (branch: InfoBranch) => branch.name },
-            {
-              name: 'folder_logic',
-              cell: (branch: InfoBranch) => branch.folderLogic,
-            },
-          ],
-          header: 'always',
-        }),
-      },
+      lists: BRANCH_INFO_TERSE,
     }),
   medium: (value) =>
     writeListing({
       heads: accessMode(value.facts),
       reading: value.facts,
-      lists: {
-        branches: rows('branches', {
-          columns: [
-            { name: 'name', cell: (branch: InfoBranch) => branch.name },
-            { name: 'type', cell: (branch: InfoBranch) => branch.type },
-            {
-              name: 'is_head',
-              cell: (branch: InfoBranch) => yesNo(branch.isHead),
-            },
-            { name: 'sha1', cell: (branch: InfoBranch) => branch.sha1 },
-            {
-              name: 'folder_logic',
-              cell: (branch: InfoBranch) => branch.folderLogic,
-            },
-          ],
-          header: 'always',
-        }),
-      },
+      lists: BRANCH_INFO_MEDIUM,
     }),
   full: facts,
 });
@@ -232,27 +326,54 @@ export const BRANCH_INFO_ANSWERS: ListAnswerTable<
 /** R6's two lists, each under its `# list` line, every object a row of `columns`. */
 function modifiedSchemas(
   columns: Column<IAbapGitModifiedObject>[],
+  besides: string,
 ): RowSchemas<IAbapGitModifiedObjectsFacts> {
   return {
-    overwriteObjects: rows('overwriteObjects', {
-      heading: { head: 'list', value: 'overwrite' },
-      columns,
-      header: 'when-rows',
-    }),
-    packageWarningObjects: rows('packageWarningObjects', {
-      heading: { head: 'list', value: 'package_warning' },
-      columns,
-      header: 'when-rows',
-    }),
+    overwriteObjects: about(
+      `for each object a pull would overwrite${besides}`,
+      rows('overwriteObjects', {
+        heading: { head: 'list', value: 'overwrite' },
+        columns,
+        header: 'when-rows',
+      }),
+    ),
+    packageWarningObjects: about(
+      `for each object a pull would move to another package${besides}`,
+      rows('packageWarningObjects', {
+        heading: { head: 'list', value: 'package_warning' },
+        columns,
+        header: 'when-rows',
+      }),
+    ),
   };
 }
 
 /** A modified object's identifying columns. */
 const MODIFIED_COLUMNS: Column<IAbapGitModifiedObject>[] = [
-  { name: 'type', cell: (object) => object.type },
-  { name: 'name', cell: (object) => object.name },
-  { name: 'package_name', cell: (object) => object.packageName },
+  { name: 'type', means: 'its type', cell: (object) => object.type },
+  { name: 'name', means: 'its name', cell: (object) => object.name },
+  {
+    name: 'package_name',
+    means: 'its package',
+    cell: (object) => object.packageName,
+  },
 ];
+
+/** R6 at terse and at medium. */
+export const MODIFIED_TERSE = modifiedSchemas(MODIFIED_COLUMNS, '');
+export const MODIFIED_MEDIUM = modifiedSchemas(
+  [
+    ...MODIFIED_COLUMNS,
+    {
+      name: 'action',
+      means:
+        'what the pull would do to it (1 add, 2 update, 3 overwrite, 4 delete, 5 delete and re-create, 6 package move)',
+      cell: (object) => String(object.action),
+    },
+    { name: 'uri', means: 'its address', cell: (object) => object.uri },
+  ],
+  '',
+);
 
 /** R6, what a pull would overwrite. */
 export const MODIFIED_OBJECTS_ANSWERS: ListAnswerTable<
@@ -260,21 +381,9 @@ export const MODIFIED_OBJECTS_ANSWERS: ListAnswerTable<
   string
 > = table({
   terse: (value) =>
-    writeListing({
-      heads: [],
-      reading: value.facts,
-      lists: modifiedSchemas(MODIFIED_COLUMNS),
-    }),
+    writeListing({ heads: [], reading: value.facts, lists: MODIFIED_TERSE }),
   medium: (value) =>
-    writeListing({
-      heads: [],
-      reading: value.facts,
-      lists: modifiedSchemas([
-        ...MODIFIED_COLUMNS,
-        { name: 'action', cell: (object) => String(object.action) },
-        { name: 'uri', cell: (object) => object.uri },
-      ]),
-    }),
+    writeListing({ heads: [], reading: value.facts, lists: MODIFIED_MEDIUM }),
   full: facts,
 });
 
@@ -288,7 +397,7 @@ interface StagedRow {
 }
 
 /** R9's three lists, each every object once per file — an object without files once. */
-interface StagingRows {
+export interface StagingRows {
   readonly unstaged: readonly StagedRow[];
   readonly staged: readonly StagedRow[];
   readonly ignored: readonly StagedRow[];
@@ -304,34 +413,40 @@ function stagedRows(objects: readonly IAbapGitStagedObject[]): StagedRow[] {
 }
 
 /** The staging's rows: every object of every list, every file of it. */
-const stagingRows = (value: IAbapGitStagingFacts): StagingRows => ({
+export const stagingRows = (value: IAbapGitStagingFacts): StagingRows => ({
   unstaged: stagedRows(value.unstaged),
   staged: stagedRows(value.staged),
   ignored: stagedRows(value.ignored),
 });
 
 /** R9's three lists, each under its `# list` line: every row of `columns`. */
-function stagingSchemas(columns: Column<StagedRow>[]): RowSchemas<StagingRows> {
-  const list = <K extends keyof StagingRows>(key: K) =>
-    rows(key, {
-      heading: { head: 'list', value: key },
-      columns,
-      header: 'when-rows',
-      lists: {
-        // The object's files are the rows themselves: one row per file
-        // (`stagedRows`), its file columns.
-        object: within<IAbapGitStagedObject, 'object'>('object', {
-          files: omitted<StagedFile, 'files'>(
-            'files',
-            'each file of the object is a row of its own, by its file columns',
-          ),
-        }),
-      },
-    });
+function stagingSchemas(
+  columns: Column<StagedRow>[],
+  besides: string,
+): RowSchemas<StagingRows> {
+  const list = <K extends keyof StagingRows>(key: K, noun: string) =>
+    about(
+      `${noun}${besides}`,
+      rows(key, {
+        heading: { head: 'list', value: key },
+        columns,
+        header: 'when-rows',
+        lists: {
+          // The object's files are the rows themselves: one row per file
+          // (`stagedRows`), its file columns.
+          object: within<IAbapGitStagedObject, 'object'>('object', {
+            files: omitted<StagedFile, 'files'>(
+              'files',
+              'an object with several files is named once for each of its files',
+            ),
+          }),
+        },
+      }),
+    );
   return {
-    unstaged: list('unstaged'),
-    staged: list('staged'),
-    ignored: list('ignored'),
+    unstaged: list('unstaged', 'for each changed file not staged'),
+    staged: list('staged', 'for each staged file'),
+    ignored: list('ignored', 'for each ignored file'),
   };
 }
 
@@ -347,13 +462,66 @@ const people = (value: IAbapGitStagingFacts) => [
   },
 ];
 
+/** The heads R9 writes: SAP's proposed author and committer. */
+export const STAGING_HEADS = [
+  headShape('author', 'the author SAP proposes'),
+  headShape('committer', 'the committer SAP proposes'),
+];
+
 /** A staged row's identifying columns. */
 const STAGED_COLUMNS: Column<StagedRow>[] = [
-  { name: 'type', cell: (row) => row.object.type },
-  { name: 'name', cell: (row) => row.object.name },
-  { name: 'package_name', cell: (row) => row.object.packageName },
-  { name: 'file', cell: (row) => row.file?.name ?? '' },
+  { name: 'type', means: "its object's type", cell: (row) => row.object.type },
+  { name: 'name', means: "its object's name", cell: (row) => row.object.name },
+  {
+    name: 'package_name',
+    means: "its object's package",
+    cell: (row) => row.object.packageName,
+  },
+  { name: 'file', means: 'its file name', cell: (row) => row.file?.name ?? '' },
 ];
+
+/** The state columns of a staged row. */
+const STATE_COLUMNS: Column<StagedRow>[] = [
+  {
+    name: 'local_state',
+    means: 'its state in the system',
+    cell: (row) => row.file?.localState ?? '',
+  },
+  {
+    name: 'remote_state',
+    means: 'its state in the remote',
+    cell: (row) => row.file?.remoteState ?? '',
+  },
+];
+
+/** R9 at terse and at medium. */
+export const STAGING_TERSE = stagingSchemas(
+  [...STAGED_COLUMNS, ...STATE_COLUMNS],
+  '',
+);
+export const STAGING_MEDIUM = stagingSchemas(
+  [
+    {
+      name: 'wbkey',
+      means: "its object's workbench key",
+      cell: (row) => row.object.wbkey,
+    },
+    {
+      name: 'version',
+      means: "its object's version",
+      cell: (row) => row.object.version,
+    },
+    {
+      name: 'uri',
+      means: "its object's address",
+      cell: (row) => row.object.uri,
+    },
+    ...STAGED_COLUMNS,
+    { name: 'path', means: 'its folder', cell: (row) => row.file?.path ?? '' },
+    ...STATE_COLUMNS,
+  ],
+  '',
+);
 
 /** R9, the staging: SAP's proposed author and committer, then what changed. */
 export const STAGING_ANSWERS: ListAnswerTable<
@@ -364,25 +532,13 @@ export const STAGING_ANSWERS: ListAnswerTable<
     writeListing({
       heads: people(value.facts),
       reading: stagingRows(value.facts),
-      lists: stagingSchemas([
-        ...STAGED_COLUMNS,
-        { name: 'local_state', cell: (row) => row.file?.localState ?? '' },
-        { name: 'remote_state', cell: (row) => row.file?.remoteState ?? '' },
-      ]),
+      lists: STAGING_TERSE,
     }),
   medium: (value) =>
     writeListing({
       heads: people(value.facts),
       reading: stagingRows(value.facts),
-      lists: stagingSchemas([
-        { name: 'wbkey', cell: (row) => row.object.wbkey },
-        { name: 'version', cell: (row) => row.object.version },
-        { name: 'uri', cell: (row) => row.object.uri },
-        ...STAGED_COLUMNS,
-        { name: 'path', cell: (row) => row.file?.path ?? '' },
-        { name: 'local_state', cell: (row) => row.file?.localState ?? '' },
-        { name: 'remote_state', cell: (row) => row.file?.remoteState ?? '' },
-      ]),
+      lists: STAGING_MEDIUM,
     }),
   full: facts,
 });
@@ -390,49 +546,63 @@ export const STAGING_ANSWERS: ListAnswerTable<
 /** A run log's object. */
 type LoggedObject = IAbapGitObjectsFacts['objects'][number];
 
+/** A logged object's identifying columns. */
+const LOGGED_COLUMNS: Column<LoggedObject>[] = [
+  { name: 'type', means: 'its type', cell: (object) => object.type },
+  { name: 'name', means: 'its name', cell: (object) => object.name },
+];
+
+/** The column of a logged object's verdict. */
+const MESSAGE_TYPE: Column<LoggedObject> = {
+  name: 'message_type',
+  means: "the severity of SAP's message for it (S, I, W, E or A)",
+  cell: (object) => object.messageType,
+};
+
+/** R8 at terse: each object by type, name and the severity of its result. */
+export const RUN_LOG_TERSE: RowSchemas<IAbapGitObjectsFacts> = {
+  objects: about(
+    'for each object the run handled',
+    rows('objects', {
+      columns: [...LOGGED_COLUMNS, MESSAGE_TYPE],
+      header: 'always',
+    }),
+  ),
+};
+
+/** R8 at medium: each object with its package and status. */
+export const RUN_LOG_MEDIUM: RowSchemas<IAbapGitObjectsFacts> = {
+  objects: about(
+    'for each object the run handled',
+    rows('objects', {
+      columns: [
+        ...LOGGED_COLUMNS,
+        {
+          name: 'package',
+          means: 'its package',
+          cell: (object) => object.package,
+        },
+        {
+          name: 'status',
+          means: 'its status',
+          cell: (object) => object.status,
+        },
+        MESSAGE_TYPE,
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
 /** R8, a run's log: each object's result a row. */
 export const RUN_LOG_ANSWERS: ListAnswerTable<
   IAbapGitFactsResponse<IAbapGitObjectsFacts>,
   string
 > = table({
   terse: (value) =>
-    writeListing({
-      heads: [],
-      reading: value.facts,
-      lists: {
-        objects: rows('objects', {
-          columns: [
-            { name: 'type', cell: (object: LoggedObject) => object.type },
-            { name: 'name', cell: (object: LoggedObject) => object.name },
-            {
-              name: 'message_type',
-              cell: (object: LoggedObject) => object.messageType,
-            },
-          ],
-          header: 'always',
-        }),
-      },
-    }),
+    writeListing({ heads: [], reading: value.facts, lists: RUN_LOG_TERSE }),
   medium: (value) =>
-    writeListing({
-      heads: [],
-      reading: value.facts,
-      lists: {
-        objects: rows('objects', {
-          columns: [
-            { name: 'type', cell: (object: LoggedObject) => object.type },
-            { name: 'name', cell: (object: LoggedObject) => object.name },
-            { name: 'package', cell: (object: LoggedObject) => object.package },
-            { name: 'status', cell: (object: LoggedObject) => object.status },
-            {
-              name: 'message_type',
-              cell: (object: LoggedObject) => object.messageType,
-            },
-          ],
-          header: 'always',
-        }),
-      },
-    }),
+    writeListing({ heads: [], reading: value.facts, lists: RUN_LOG_MEDIUM }),
   full: facts,
 });
 

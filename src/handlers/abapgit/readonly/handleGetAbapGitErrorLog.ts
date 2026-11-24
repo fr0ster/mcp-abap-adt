@@ -19,16 +19,27 @@ import {
 import {
   ABAPGIT_DETAIL_SHAPE,
   RUN_LOG_ANSWERS,
+  RUN_LOG_MEDIUM,
+  RUN_LOG_TERSE,
 } from '../../../lib/abapGit/formats';
-import { answerAt, listAnswerAt } from '../../../lib/detail';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { answerAt, listAnswerAt, shapesOf } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
 export const TOOL_DEFINITION = {
   name: 'GetAbapGitErrorLog',
   available_in: ['cloud'] as const,
-  description:
-    "[read-only] Reads the log of the repository's last pull or push, by the run log key the repository list answers for it. Answers facts only: each object of the run with its type, name, package, status and SAP's message type (S, I, W, E or A).",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Shows how the last pull or push of a linked repository went, object by object, by the key of its run log.',
+    ),
+    returns: returnsOf({
+      heads: [],
+      shapes: [shapesOf(RUN_LOG_TERSE), shapesOf(RUN_LOG_MEDIUM)],
+    }),
+  }),
   inputSchema: z.object({
     repository_key: REPOSITORY_KEY_FIELD,
     app_log_key: APP_LOG_KEY_FIELD,

@@ -6,10 +6,40 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { type ReturnsFact, returnsOf } from '../../../lib/description';
+import { abapGitFacts } from '@mcp-abap-adt/adt-strategies';
+import { TOOL_DEFINITION as BRANCH_INFO } from '../../../handlers/abapgit/high/handleGetAbapGitBranchInfo';
+import { TOOL_DEFINITION as EXTERNAL_REPO } from '../../../handlers/abapgit/readonly/handleCheckAbapGitExternalRepo';
+import { TOOL_DEFINITION as ERROR_LOG } from '../../../handlers/abapgit/readonly/handleGetAbapGitErrorLog';
+import { TOOL_DEFINITION as MODIFIED } from '../../../handlers/abapgit/readonly/handleGetAbapGitModifiedObjects';
+import { TOOL_DEFINITION as STAGING } from '../../../handlers/abapgit/readonly/handleGetAbapGitStaging';
+import { TOOL_DEFINITION as REPOS } from '../../../handlers/abapgit/readonly/handleListAbapGitRepos';
+import {
+  ACCESS_MODE_HEADS,
+  BRANCH_INFO_MEDIUM,
+  BRANCH_INFO_TERSE,
+  EXTERNAL_REPO_MEDIUM,
+  EXTERNAL_REPO_TERSE,
+  MODIFIED_MEDIUM,
+  MODIFIED_TERSE,
+  REPOS_MEDIUM,
+  REPOS_TERSE,
+  RUN_LOG_MEDIUM,
+  RUN_LOG_TERSE,
+  STAGING_HEADS,
+  STAGING_MEDIUM,
+  STAGING_TERSE,
+  stagingRows,
+} from '../../../lib/abapGit/formats';
+import {
+  partsOfDescription,
+  type ReturnsFact,
+  returnsOf,
+} from '../../../lib/description';
 import {
   about,
   entries,
+  type Head,
+  type HeadShape,
   headShape,
   type JsonSchemas,
   jsonShapesOf,
@@ -18,14 +48,184 @@ import {
   type RowSchemas,
   rows,
   shapesOf,
+  type Line as WrittenLine,
   writeJson,
   writtenLines,
 } from '../../../lib/detail';
+import {
+  externalRepo,
+  modifiedObjects,
+  objectResults,
+  reposDocument,
+  stagingEveryList,
+} from '../../helpers/abapGitSap';
 import { NOT_YET_ASSEMBLED, WRITER_TOOLS } from './notYetAssembled';
-import { type ReturnsTie, tieFaults } from './returnsMatch';
+import { type ReturnsTie, type TieSample, tieFaults } from './returnsMatch';
 
-/** The writer tools tied so far, by name (group (2) fills this). */
-const TIED: Readonly<Record<string, () => ReturnsTie>> = {};
+/** Each tied tool's description, as its definition holds it. */
+const DESCRIPTIONS: Readonly<Record<string, string>> = {
+  ListAbapGitRepos: REPOS.description,
+  CheckAbapGitExternalRepo: EXTERNAL_REPO.description,
+  GetAbapGitBranchInfo: BRANCH_INFO.description,
+  GetAbapGitModifiedObjects: MODIFIED.description,
+  GetAbapGitStaging: STAGING.description,
+  GetAbapGitErrorLog: ERROR_LOG.description,
+};
+const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
+
+/** An answer of SAP, as the abapGit reducers take it. */
+const answered = (data: string) => ({
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  data,
+});
+
+/**
+ * An abapGit read's tie: its terse and medium lists (both written as rows),
+ * its heads, its served Returns, and its fixture's lines at both levels.
+ */
+function abapGitTie(
+  tool: string,
+  heads: readonly HeadShape[],
+  terse: Parameters<typeof shapesOf>[0],
+  medium: Parameters<typeof shapesOf>[0],
+  samples: readonly TieSample[],
+): ReturnsTie {
+  const parts = partsOfDescription(descriptionOf(tool));
+  assert.ok(parts !== undefined, `${tool} is assembled`);
+  return {
+    terse: [...shapesOf(terse), ...shapesOf(medium)],
+    heads,
+    returns: parts.returns,
+    samples,
+  };
+}
+
+/** Both levels' lines of one reading, each written by its schemas. */
+const bothLevels = (
+  reading: unknown,
+  terse: readonly WrittenLine[],
+  medium: readonly WrittenLine[],
+): TieSample[] => [
+  { reading, lines: terse },
+  { reading, lines: medium },
+];
+
+/** The writer tools tied so far, by name. */
+const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  ListAbapGitRepos: () =>
+    abapGitTie(
+      'ListAbapGitRepos',
+      [],
+      REPOS_TERSE,
+      REPOS_MEDIUM,
+      (() => {
+        const reading = abapGitFacts.reposFacts(answered(reposDocument)).facts;
+        const heads: Head[] = [];
+        return bothLevels(
+          reading,
+          writtenLines({ heads, reading, lists: REPOS_TERSE }),
+          writtenLines({ heads, reading, lists: REPOS_MEDIUM }),
+        );
+      })(),
+    ),
+  CheckAbapGitExternalRepo: () => {
+    const facts = abapGitFacts.externalRepoFacts(
+      answered(externalRepo()),
+    ).facts;
+    return abapGitTie(
+      'CheckAbapGitExternalRepo',
+      ACCESS_MODE_HEADS,
+      EXTERNAL_REPO_TERSE,
+      EXTERNAL_REPO_MEDIUM,
+      (() => {
+        const reading = facts;
+        const heads = [{ head: 'access_mode', value: facts.accessMode }];
+        return bothLevels(
+          reading,
+          writtenLines({ heads, reading, lists: EXTERNAL_REPO_TERSE }),
+          writtenLines({ heads, reading, lists: EXTERNAL_REPO_MEDIUM }),
+        );
+      })(),
+    );
+  },
+  GetAbapGitBranchInfo: () => {
+    const facts = abapGitFacts.branchInfo(
+      answered(externalRepo({ folderLogic: true })),
+    ).facts;
+    return abapGitTie(
+      'GetAbapGitBranchInfo',
+      ACCESS_MODE_HEADS,
+      BRANCH_INFO_TERSE,
+      BRANCH_INFO_MEDIUM,
+      (() => {
+        const reading = facts;
+        const heads = [{ head: 'access_mode', value: facts.accessMode }];
+        return bothLevels(
+          reading,
+          writtenLines({ heads, reading, lists: BRANCH_INFO_TERSE }),
+          writtenLines({ heads, reading, lists: BRANCH_INFO_MEDIUM }),
+        );
+      })(),
+    );
+  },
+  GetAbapGitModifiedObjects: () =>
+    abapGitTie(
+      'GetAbapGitModifiedObjects',
+      [],
+      MODIFIED_TERSE,
+      MODIFIED_MEDIUM,
+      (() => {
+        const reading = abapGitFacts.modifiedObjects(
+          answered(modifiedObjects),
+        ).facts;
+        const heads: Head[] = [];
+        return bothLevels(
+          reading,
+          writtenLines({ heads, reading, lists: MODIFIED_TERSE }),
+          writtenLines({ heads, reading, lists: MODIFIED_MEDIUM }),
+        );
+      })(),
+    ),
+  GetAbapGitStaging: () =>
+    abapGitTie(
+      'GetAbapGitStaging',
+      STAGING_HEADS,
+      STAGING_TERSE,
+      STAGING_MEDIUM,
+      (() => {
+        const reading = stagingRows(
+          abapGitFacts.staging(answered(stagingEveryList)).facts,
+        );
+        const heads: Head[] = [
+          { head: 'author', value: 'Ada' },
+          { head: 'committer', value: 'Carl' },
+        ];
+        return bothLevels(
+          reading,
+          writtenLines({ heads, reading, lists: STAGING_TERSE }),
+          writtenLines({ heads, reading, lists: STAGING_MEDIUM }),
+        );
+      })(),
+    ),
+  GetAbapGitErrorLog: () =>
+    abapGitTie(
+      'GetAbapGitErrorLog',
+      [],
+      RUN_LOG_TERSE,
+      RUN_LOG_MEDIUM,
+      (() => {
+        const reading = abapGitFacts.runLog(answered(objectResults)).facts;
+        const heads: Head[] = [];
+        return bothLevels(
+          reading,
+          writtenLines({ heads, reading, lists: RUN_LOG_TERSE }),
+          writtenLines({ heads, reading, lists: RUN_LOG_MEDIUM }),
+        );
+      })(),
+    ),
+};
 
 type Item = { readonly name: string; readonly type: string };
 type Line =
@@ -96,12 +296,12 @@ const sampleOf = (value: Reading, lists: RowSchemas<Reading> = terse) => ({
   }),
 });
 const tie = (overrides: Partial<ReturnsTie> = {}): ReturnsTie => ({
-  terse: shapesOf<Reading>(terse),
-  medium: jsonShapesOf<Reading>(medium),
+  terse: shapesOf(terse),
+  medium: jsonShapesOf(medium),
   heads: [head],
   returns: returnsOf({
     heads: [head],
-    shapes: [shapesOf<Reading>(terse), jsonShapesOf<Reading>(medium)],
+    shapes: [shapesOf(terse), jsonShapesOf(medium)],
   }),
   samples: [
     {
@@ -158,7 +358,7 @@ describe('a tool description tied to what its writers write', () => {
   });
 
   it('fails on a written header its schemas do not declare', () => {
-    const faults = tieFaults(tie({ terse: shapesOf<Reading>(terse).slice(1) }));
+    const faults = tieFaults(tie({ terse: shapesOf(terse).slice(1) }));
     assert.ok(
       faults.includes('an undeclared header: "type\tname"'),
       faults.join('\n'),
@@ -188,7 +388,7 @@ describe('a tool description tied to what its writers write', () => {
     };
     const faults = tieFaults(
       tie({
-        terse: shapesOf<Reading>(bare),
+        terse: shapesOf(bare),
         samples: [sampleOf(reading, bare)],
       }),
     );
@@ -216,7 +416,7 @@ describe('a tool description tied to what its writers write', () => {
     };
     const faults = tieFaults(
       tie({
-        terse: shapesOf<Reading>(bare),
+        terse: shapesOf(bare),
         samples: [sampleOf(reading, bare)],
       }),
     );
@@ -227,7 +427,7 @@ describe('a tool description tied to what its writers write', () => {
   });
 
   it('a headerless kind row with its noun is stated in the Returns', () => {
-    const facts = returnsOf({ shapes: [shapesOf<Reading>(terse)] }).map(
+    const facts = returnsOf({ shapes: [shapesOf(terse)] }).map(
       (each) => each.text,
     );
     assert.ok(

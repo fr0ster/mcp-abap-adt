@@ -242,3 +242,15 @@ export function answerText(result: {
 }): string {
   return result.content.map((item) => item.text ?? '').join('');
 }
+
+// The staging with every list filled: a staged object with two files and an
+// ignored one with none (Codex, group 1 review).
+export const stagingEveryList = staging
+  .replace(
+    '<abapgitstaging:staged_objects/>',
+    '<abapgitstaging:staged_objects><abapgitstaging:abapgitobject abapgitstaging:wbkey="PROGZSTAGED" abapgitstaging:version="active" adtcore:uri="/sap/bc/adt/programs/programs/zstaged" adtcore:type="PROG/P" adtcore:name="ZSTAGED" adtcore:packageName="ZPKG"><abapgitstaging:abapgitfile abapgitstaging:name="zstaged.prog.abap" abapgitstaging:path="/src/" abapgitstaging:localState="M" abapgitstaging:remoteState=""/><abapgitstaging:abapgitfile abapgitstaging:name="zstaged.prog.xml" abapgitstaging:path="/src/" abapgitstaging:localState="A" abapgitstaging:remoteState="D"/></abapgitstaging:abapgitobject></abapgitstaging:staged_objects>',
+  )
+  .replace(
+    '<abapgitstaging:ignored_objects/>',
+    '<abapgitstaging:ignored_objects><abapgitstaging:abapgitobject abapgitstaging:wbkey="DEVCZIGNORED" abapgitstaging:version="active" adtcore:uri="/sap/bc/adt/packages/zignored" adtcore:type="DEVC/K" adtcore:name="ZIGNORED" adtcore:packageName="ZPKG"/></abapgitstaging:ignored_objects>',
+  );

@@ -17,16 +17,28 @@ import {
 } from '../../../lib/abapGit/client';
 import {
   ABAPGIT_DETAIL_SHAPE,
+  ACCESS_MODE_HEADS,
   EXTERNAL_REPO_ANSWERS,
+  EXTERNAL_REPO_MEDIUM,
+  EXTERNAL_REPO_TERSE,
 } from '../../../lib/abapGit/formats';
-import { answerAt, listAnswerAt } from '../../../lib/detail';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { answerAt, listAnswerAt, shapesOf } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
 export const TOOL_DEFINITION = {
   name: 'CheckAbapGitExternalRepo',
-  description:
-    '[read-only] Reads what the remote repository at url offers before it is linked, as the system reaches it. Answers facts only: its access mode (public or private) and its branches, each with its name, type, whether it is the head and its commit hash.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Checks what a remote git repository offers before it is linked, as the system reaches it.',
+    ),
+    returns: returnsOf({
+      heads: ACCESS_MODE_HEADS,
+      shapes: [shapesOf(EXTERNAL_REPO_TERSE), shapesOf(EXTERNAL_REPO_MEDIUM)],
+    }),
+  }),
   inputSchema: z.object({ url: URL_FIELD, ...ABAPGIT_DETAIL_SHAPE }),
 } as const;
 

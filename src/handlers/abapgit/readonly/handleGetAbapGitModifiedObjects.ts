@@ -22,17 +22,28 @@ import {
 } from '../../../lib/abapGit/client';
 import {
   ABAPGIT_DETAIL_SHAPE,
+  MODIFIED_MEDIUM,
   MODIFIED_OBJECTS_ANSWERS,
+  MODIFIED_TERSE,
 } from '../../../lib/abapGit/formats';
-import { answerAt, listAnswerAt } from '../../../lib/detail';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
+import { answerAt, listAnswerAt, shapesOf } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
 export const TOOL_DEFINITION = {
   name: 'GetAbapGitModifiedObjects',
   available_in: ['cloud'] as const,
-  description:
-    "[read-only] Reads what a pull of the repository would change in the system: every changed object (changed in the remote, in the system or in both, added or deleted on either side), the repository's own package left out, and as package warnings the objects whose package in the system differs from the package their path maps to. Answers facts only: each object with its type, name, package, URI and SAP's action: 1 add, 2 update (changed only in the remote), 3 overwrite (changed in the system), 4 delete, 5 delete and re-create, 6 package move; SAP leaves a package warning with action 5 out of every selection.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Shows what a pull of a linked repository would change in the system, before it runs.',
+    ),
+    returns: returnsOf({
+      heads: [],
+      shapes: [shapesOf(MODIFIED_TERSE), shapesOf(MODIFIED_MEDIUM)],
+    }),
+  }),
   inputSchema: z.object({
     repository_key: REPOSITORY_KEY_FIELD,
     ...ABAPGIT_DETAIL_SHAPE,

@@ -294,8 +294,9 @@ Time of each batch end, in milliseconds (the last run on each; recording a call 
 
 A tool that reads the same kind of thing about several objects sends those reads in one envelope
 when no read needs another's answer; a read that does goes in a later envelope. Reads about one
-object stay single requests: a tool that reads one object, or probes one name for several types
-(`GetTypeInfo`), sends no envelope for it.
+object go as single requests, never in an envelope: in the tools below, one object — or a list
+naming one — is read as the sequential version reads it, and `GetTypeInfo`'s probes of one name
+are single requests.
 
 - **Function module group checks.** A group activation (`ActivateObjects`, `HandlerActivate` with
   `objects`) and `GetWhereUsed` with several `GROUP|FM` targets check, before anything else, that
@@ -304,37 +305,45 @@ object stay single requests: a tool that reads one object, or probes one name fo
   another: the first failure in the references' order. A module that does not exist is its own
   `404` part beside the other modules' `200`s, answered as SAP's `404` with its key, as before.
   Every module of an envelope is read, also after a failure in it; no later envelope is sent after
-  one. One module is its one request.
-- **`GetEnhancements` probes.** An object of no known `object_type` is probed as a class, a
-  program and an include, by their metadata. With `objects`, every probe of every such object
-  goes in one envelope (before: up to three, one probe per object each), and each object's kind
-  is decided over those answers as the sequential version decides it: a `404` means not that kind,
-  and a probe the decision does not reach (the program probe of a class) is in nobody's answer.
-  One object — `object_name`, or `objects` naming one — sends no envelope at all: its probes, its
-  enhancements and, with `include_nested`, its includes go as single requests, in the order and with
-  the answer of the sequential version (before, they went in envelopes, one part each for the
-  probes).
-- **At most 300 reads per envelope** (`READS_PER_ENVELOPE`, `src/lib/batch/phases.ts`), as for
-  `SearchSource`'s source reads: more independent reads go in consecutive envelopes, each judged
-  as it answers. The same bound splits every phase of `GetEnhancements` and `GetObjectInfo`'s
-  leaf metadata phase (`include_descriptions`), which sent every leaf in one envelope; no envelope
-  is sent after one that met a credential refusal. SAP's own limit is not measured.
+  one, and the refusal says so ("only function module metadata was read"). One module is its one
+  request.
+- **`GetEnhancements`.** An object of no known `object_type` is probed as a class, a program and an
+  include, by their metadata. With `objects` naming two or more objects (two spellings of one name
+  and type are one), every probe of every such object goes in one envelope, and each object's kind
+  is decided over those answers as the sequential version decides it: a `404` part means not that
+  kind; a probe the decision does not reach (the program probe of a class) decides nothing, a
+  `401` there included; a `401` on a probe the decision reaches ends the list there, as the
+  sequential version ends it. Then every object's enhancements; with `include_nested`, an object's
+  includes root only after its enhancements answered, in the next envelope. A phase left with one
+  object's reads sends them as single requests. One object — `object_name`, or `objects` naming
+  one — sends no envelope at all.
+- **`GetObjectsList`.** One parent (`parent_name`, or `objects` naming one) is walked as single
+  requests; several parents' node structures go in envelopes, level by level.
+- **At most 300 reads per envelope** (`READS_PER_ENVELOPE`, `src/lib/batch/phases.ts`): more
+  independent reads go in consecutive envelopes of balanced size (`chunksOf`: 301 reads are 151 and
+  150, never 300 and 1), each judged as it answers, none sent after one that met a credential
+  refusal. Every phase splits so: the group checks, `GetEnhancements`, the level walks
+  (`batchReader`: the package walks, `GetObjectsList`, `GetObjectInfo`) and `SearchSource`'s source
+  reads. SAP's own limit is not measured.
 - **Descriptions are never taken from a batched node structure.** Inside an envelope a node
   structure part can carry another part's `DESCRIPTION` (measured, 2026-10-18). The package
-  listings with `include_descriptions: true` read their node structures as single requests;
-  `GetObjectInfo` takes each leaf's description from its metadata; `GetObjectsList` answers no
-  description at all (type, name, technical name, URI), whatever `with_short_descriptions` says,
-  so its batched node structures reach no description.
+  listings and `GetObjectInfo` with `include_descriptions: true` send each node structure as its
+  own request and take each object's description from it, on every destination — the description
+  the sequential version reads; no object's metadata is read for it. `GetObjectsList` answers no
+  description at all (type, name, technical name, URI), whatever `with_short_descriptions` says.
 - **Single requests over RFC go one at a time.** Where a tool reads single requests several at a
-  time — the package listings with `include_descriptions: true` (8 at once), `SearchSource` without
-  a communication batch — an RFC connection gets one at a time (`readsInFlight`,
-  `src/lib/connectionKind.ts`): an RFC connection is one ABAP session, and reads sent to it in
-  parallel were lost without an error (measured on premise, 2026-09-26, `SearchSource`). The
-  package listings over RFC are unit-tested only.
+  time — the package listings and `GetObjectInfo` with `include_descriptions: true` (8 at once),
+  `SearchSource` without a communication batch — an RFC connection gets one at a time
+  (`readsInFlight`, `src/lib/connectionKind.ts`), a batch connection or another view over it
+  included: an RFC connection is one ABAP session, and reads sent to it in parallel were lost
+  without an error (measured on premise, 2026-09-26, `SearchSource`). The others over RFC are
+  unit-tested only.
 - **An envelope that fails as a whole** is every read's failure in it: the answer is the one the
-  sequential reads give with those reads failed, each naming the envelope's request. A credential
-  refusal ends the call as it came. A destination with no communication batch reads one after
-  another, as before.
+  sequential reads give with those reads failed, each naming the envelope's request. An envelope
+  whose own request answered `404` once the endpoint is known served is such a failure, never each
+  part's "not found" (`GetEnhancements` reports its probes refused, not the object missing). A
+  credential refusal ends the call as it came. A destination with no communication batch reads one
+  after another, as before.
 
 A part's `404` beside other parts' `200`s is that part's answer: measured (see "The phases,
 measured" above, and adt-clients' `docs/usage/BATCH.md`). The function module metadata reads and

@@ -2061,7 +2061,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletelocaltestclass-high-level-class"></a>
 #### DeleteLocalTestClass (High-Level / Class)
-**Description:** Clears the local test classes of an ABAP class, activating the class when asked.
+**Description:** Clears the local test classes of an ABAP class, activating the class when asked. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
 
@@ -3409,7 +3409,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateinterface-high-level-interface"></a>
 #### UpdateInterface (High-Level / Interface)
-**Description:** Writes new source code into an existing ABAP interface, activating it when asked.
+**Description:** Updates the source code of an existing ABAP interface, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
 
@@ -3579,7 +3579,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkpackage-high-level-package"></a>
 #### CheckPackage (High-Level / Package)
-**Description:** [read-only] Checks the syntax of an ABAP package, with SAP's errors, warnings and messages.
+**Description:** [read-only] Checks the syntax of an ABAP package. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
 
 **Source:** `src/handlers/package/high/handleCheckPackage.ts`
 
@@ -4252,7 +4252,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatetable-high-level-table"></a>
 #### UpdateTable (High-Level / Table)
-**Description:** Writes new DDL source code into an existing ABAP database table, activating it when asked.
+**Description:** Updates the DDL source of an existing ABAP database table, activating it when asked, recorded in the transport given. Whether SAP took the change and a lock left held when its release failed.
 
 **Source:** `src/handlers/table/high/handleUpdateTable.ts`
 
@@ -4619,7 +4619,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletecdsunittest-high-level-unit-test"></a>
 #### DeleteCdsUnitTest (High-Level / Unit Test)
-**Description:** Deletes a CDS view test class, with the ABAP Unit test classes it holds.
+**Description:** Deletes a CDS view test class, with the ABAP Unit test classes it holds. Whether SAP deleted the object, its name and SAP's message about it.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
 

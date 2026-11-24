@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { purpose, toolDescription } from '../../../lib/description';
 
 /**
  * GetTypeInfo: every DDIC kind a type name is (#321).
@@ -51,8 +52,13 @@ import {
 export const TOOL_DEFINITION = {
   name: 'GetTypeInfo',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key. Each type is read from the working area: its inactive version where one exists.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the DDIC definition of a type name: each data element, domain, structure or table type of that name, its inactive version where one exists.',
+    ),
+    returns: [],
+  }),
   inputSchema: z.object({
     type_name: z.string().describe('Name of the ABAP type'),
     include_structure_fallback: z

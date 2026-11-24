@@ -6,8 +6,6 @@
 export {
   assembledParts,
   compactOf,
-  valueFrom,
-  valueParts,
 } from './compact';
 export {
   activateTool,
@@ -26,7 +24,12 @@ export {
   stateHandleAnswered,
   underLock,
 } from './notes';
-export { type Purpose, purpose, typesPurpose } from './purpose';
+export {
+  type Purpose,
+  pairsPurpose,
+  purpose,
+  withArticle,
+} from './purpose';
 export { type ReaderParts, readerParts } from './readers';
 export {
   type SourceReader,
@@ -39,6 +42,4 @@ export {
   type DescriptionTag,
   partsOfDescription,
   toolDescription,
-  type ValueParts,
-  type ValuesParts,
 } from './toolDescription';

@@ -25,19 +25,20 @@ export function purpose(text: string): Purpose {
   return { [minted]: true, text };
 }
 
+/** `word` with its article: `a class`, `an include`. */
+export function withArticle(word: string): string {
+  return `${'aeiou'.includes(word.charAt(0).toLowerCase()) ? 'an' : 'a'} ${word}`;
+}
+
 /**
- * A purpose naming the object types a compact tool works on, in words —
- * `before`, the types joined with `or`, then `after`: `Updates an ABAP class,
- * program or table, under its lock.`
+ * A compact tool's purpose built from its action and object pairs, one per
+ * object type, action or part its schema takes (owner): `Locks or unlocks a
+ * class, locks or unlocks a program, … for editing.` — the pairs joined,
+ * the first capitalised, then `after`. The pairs are generated from the
+ * schema, so the length rule counts them as one word.
  */
-export function typesPurpose(
-  before: string,
-  types: readonly string[],
-  after: string,
-): Purpose {
-  const named =
-    types.length <= 1
-      ? types.join('')
-      : `${types.slice(0, -1).join(', ')} or ${types[types.length - 1]}`;
-  return { [minted]: true, text: `${before}${named}${after}`, types: named };
+export function pairsPurpose(pairs: readonly string[], after = '.'): Purpose {
+  const joined = pairs.join(', ');
+  const text = `${joined.charAt(0).toUpperCase()}${joined.slice(1)}${after}`;
+  return { [minted]: true, text, types: joined };
 }

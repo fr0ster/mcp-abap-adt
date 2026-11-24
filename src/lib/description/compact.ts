@@ -5,12 +5,10 @@
  * assembled parts — its purpose and its facts — so the two cannot drift.
  */
 
-import type { Purpose } from './purpose';
 import {
   type DescriptionParts,
   partsOfDescription,
   toolDescription,
-  type ValueParts,
 } from './toolDescription';
 
 /**
@@ -26,19 +24,6 @@ export function assembledParts(description: string): DescriptionParts {
     );
   }
   return parts;
-}
-
-/** A value by its function: what it does. */
-export function valueParts(
-  value: string,
-  parts: { readonly purpose: Purpose },
-): ValueParts {
-  return { value, purpose: parts.purpose };
-}
-
-/** A value that does what the full tool described by `description` does. */
-export function valueFrom(value: string, description: string): ValueParts {
-  return valueParts(value, assembledParts(description));
 }
 
 /**

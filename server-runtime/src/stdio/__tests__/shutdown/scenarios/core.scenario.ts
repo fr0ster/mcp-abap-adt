@@ -124,9 +124,10 @@ async function main(): Promise<void> {
   const run = cases[process.argv[2] ?? ''];
   if (run === undefined) throw new Error('no such case');
   const facts = await run();
-  // Exits once the line is written: a pipe write is asynchronous on macOS,
-  // and an exit at once could cut the record short.
-  process.stdout.write(`${JSON.stringify(facts)}\n`, () => process.exit(0));
+  // The process ends by itself once the line is flushed, never through
+  // process.exit(): see `report()` in plainNodeRecorder.ts.
+  process.exitCode = 0;
+  process.stdout.write(`${JSON.stringify(facts)}\n`);
 }
 
 main().catch((error: unknown) => {

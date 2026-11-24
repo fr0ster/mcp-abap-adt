@@ -31,6 +31,18 @@ export const underLock: Note = new Note(
   "Over Streamable HTTP it runs under the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).",
 );
 
+/** HandlerLock's lock: the state handle a lock with a lock handle answers. */
+export const lockAnswersStateHandle: Note = new Note(
+  minted,
+  'Over Streamable HTTP a lock that gives a non-empty lock_handle gives a state_handle too: send it as the state_handle argument of every later call under the lock (or in the x-mcp-state-handle header).',
+);
+
+/** HandlerLock's unlock: it runs under the state handle the lock gave. */
+export const unlockUnderLock: Note = new Note(
+  minted,
+  'Over Streamable HTTP an unlock runs under the state_handle the lock gave: send it as the state_handle argument (or in the x-mcp-state-handle header).',
+);
+
 /** A tool that answers a state handle every later call of its state carries. */
 export const stateHandleAnswered: Note = new Note(
   minted,

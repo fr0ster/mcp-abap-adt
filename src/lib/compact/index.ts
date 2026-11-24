@@ -119,6 +119,7 @@ export {
   SYSTEM_ACTION_TOOLS,
   SYSTEM_ACTIONS,
   type SystemAction,
+  UNLOCK_NEEDS_HANDLE_WORDS,
 } from './compactSchemas.js';
 export { handlerDebugBatchDefinition } from './debug/handleHandlerDebugBatch.js';
 export { handlerDebugBreakpointsDefinition } from './debug/handleHandlerDebugBreakpoints.js';

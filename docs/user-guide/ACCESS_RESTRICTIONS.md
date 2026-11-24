@@ -52,7 +52,7 @@ does not see it and cannot call it. No call checks a deny list.
 |---|---|
 | `Tool` | the tool (`DeleteClass`) |
 | `Prefix*` | every tool whose name starts with `Prefix` (`Delete*`) |
-| `Tool.value` | one value of a compact tool's dispatching argument: `object_type` (HandlerActivate, HandlerCheckRun, HandlerCreate, HandlerDelete, HandlerDeletionCheck, HandlerGet, HandlerLock (with `action` too), HandlerUpdate, HandlerValidate), `target_type` (HandlerProfileRun), `action` (HandlerAbapGit, HandlerAbapGitGet, HandlerBatch, HandlerDebugBatch, HandlerSession, HandlerSystem), `operation` (HandlerDebugSession, HandlerDebugStep, HandlerDebugBreakpoints, HandlerDebugMaintain); and `HandlerGetData.sql`, the `sql_query` mode |
+| `Tool.value` | one value of a compact tool's dispatching argument: `object_type` (HandlerActivate, HandlerCheckRun, HandlerCreate, HandlerDelete, HandlerDeletionCheck, HandlerGet, HandlerLock (and its `action`: `HandlerLock.lock`, `HandlerLock.unlock`), HandlerUpdate, HandlerValidate), `target_type` (HandlerProfileRun), `action` (HandlerAbapGit, HandlerAbapGitGet, HandlerBatch, HandlerDebugBatch, HandlerSession, HandlerSystem), `operation` (HandlerDebugSession, HandlerDebugStep, HandlerDebugBreakpoints, HandlerDebugMaintain); and `HandlerGetData.sql`, the `sql_query` mode |
 | `Tool.CODE` | on HandlerActivate and HandlerGet, an ADT type code as the ADT tables write it (`HandlerActivate.CLAS/OC`, `HandlerGet.DDLS/DF`) |
 | `Tool.prefix*` | every value (and, on HandlerActivate and HandlerGet, every code) starting with `prefix` (`HandlerDebugSession.get*`; `HandlerActivate.CLAS*` names `CLASS` and `CLAS/OC`) |
 
@@ -73,6 +73,14 @@ does not see it and cannot call it. No call checks a deny list.
   entry. A tool with every name denied but codes left (HandlerActivate, HandlerGet's address
   parts) loses `object_type`; a variant with nothing left drops out of the tool's
   `available_in`.
+- **HandlerLock is narrowed by `action` too.** `HandlerLock.unlock` removes the unlock from the
+  `action` enum, the description and the schema (`lock_handle` goes with it); `HandlerLock.lock`
+  leaves `action: unlock` required. Both together leave HandlerLock out. `HandlerLock.<TYPE>`
+  removes the type from both actions.
+- **The 23.x `HandlerUnlock` entries never fail open.** `HandlerUnlock` and a prefix naming it
+  (`HandlerUn*`) deny HandlerLock's action unlock; a value entry on it (`HandlerUnlock.CLASS`)
+  stops the start, naming `HandlerLock.unlock` and `HandlerLock.<TYPE>`: an unlock of one type
+  alone is not a setting.
 - **Denying `Activate*` closes only the activation tools**, not the `activate` argument of a
   write (`UpdateClass` with `activate: true`).
 - An entry that matches nothing in this binary is ignored and named in the start line.

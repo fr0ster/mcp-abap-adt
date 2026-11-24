@@ -1824,9 +1824,17 @@ export const compactDeletionCheckSchema = compactDeletionCheckSchemaFor(
   COMPACT_DELETION_CHECK.onprem,
 );
 
+/** HandlerLock's actions: a deny entry may close either (`HandlerLock.unlock`). */
+export const LOCK_ACTIONS = ['lock', 'unlock'] as const;
+type LockAction = (typeof LOCK_ACTIONS)[number];
+
+/** The words of an unlock asked with no lock handle. */
+export const UNLOCK_NEEDS_HANDLE_WORDS =
+  'lock_handle is required for action unlock: the handle the lock gave; nothing was sent';
+
 const LOCK_PROPERTIES = {
   action: z
-    .enum(['lock', 'unlock'])
+    .enum(LOCK_ACTIONS)
     .default('lock')
     .optional()
     .describe(
@@ -1859,9 +1867,8 @@ export const COMPACT_LOCK_TAKES = takesOf<
   members: { PACKAGE: ['super_package'] },
 });
 
-export function compactLockSchemaFor<const M extends readonly LockMember[]>(
-  members: M,
-) {
+/** HandlerLock's fields for `members`, before its rule. */
+function lockObject<const M extends readonly LockMember[]>(members: M) {
   const properties = {
     ...lifecycleObjectSchema(members),
     ...LOCK_PROPERTIES,
@@ -1870,6 +1877,70 @@ export function compactLockSchemaFor<const M extends readonly LockMember[]>(
     ...offered(properties, COMPACT_LOCK_TAKES, members),
     object_type: requiredField(properties.object_type),
     object_name: requiredField(properties.object_name),
+  });
+}
+
+/** An unlock names the lock it releases: without lock_handle it is refused. */
+function unlockNamesItsLock(
+  value: {
+    readonly action?: LockAction | undefined;
+    readonly lock_handle?: string | undefined;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (
+    value.action === 'unlock' &&
+    (value.lock_handle === undefined || value.lock_handle.trim() === '')
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['lock_handle'],
+      message: UNLOCK_NEEDS_HANDLE_WORDS,
+    });
+  }
+}
+
+/**
+ * What `HandlerLock` takes for `members`: lock (the default) the object, or
+ * unlock it under the lock_handle the lock gave — required for an unlock,
+ * refused without it before anything is sent.
+ */
+export function compactLockSchemaFor<const M extends readonly LockMember[]>(
+  members: M,
+) {
+  return lockObject(members).superRefine(unlockNamesItsLock);
+}
+
+/**
+ * HandlerLock's schema with `actions` left by a deny list: the lock alone
+ * takes no lock_handle; the unlock alone states its action and requires its
+ * lock_handle.
+ */
+export function compactLockSchemaOf(
+  members: readonly LockMember[],
+  actions: readonly LockAction[],
+): z.ZodObject {
+  if (actions.includes('lock') && actions.includes('unlock')) {
+    return compactLockSchemaFor(members);
+  }
+  if (actions.includes('lock')) {
+    return lockObject(members)
+      .omit({ lock_handle: true })
+      .extend({
+        action: z
+          .enum(['lock'])
+          .default('lock')
+          .optional()
+          .describe('lock (default): lock the object for editing.'),
+      });
+  }
+  return lockObject(members).extend({
+    action: z
+      .enum(['unlock'])
+      .describe('unlock: release the lock lock_handle names.'),
+    lock_handle: requiredText(UNLOCK_NEEDS_HANDLE_WORDS).describe(
+      'unlock: the lock handle the lock gave.',
+    ),
   });
 }
 

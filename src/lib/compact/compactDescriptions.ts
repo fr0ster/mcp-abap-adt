@@ -19,14 +19,16 @@ import {
 } from '../adtProjections';
 import {
   type DescriptionParts,
+  lockAnswersStateHandle,
   longRunning,
   pairsPurpose,
-  stateHandleAnswered,
   toolDescription,
   underLock,
+  unlockUnderLock,
   withArticle,
 } from '../description/index';
 import type { CompactObjectType } from './compactObjectTypes';
+import { LOCK_ACTIONS } from './compactSchemas';
 import { leftOf } from './memberTexts';
 
 /** Each member as the description names it, with the arguments it takes. */
@@ -405,26 +407,39 @@ export function lockToken(member: LockMember): string {
   );
 }
 
-/** HandlerLock's parts on `variant`, naming `members` (default: all the variant's). */
+/** HandlerLock's actions, as its schema states them. */
+type LockAction = (typeof LOCK_ACTIONS)[number];
+
+/**
+ * HandlerLock's parts on `variant`, naming `members` and `actions` (default:
+ * all the variant's, both actions): each action's verb and its own note on
+ * the state handle.
+ */
 export function compactLockParts(
   variant: ProjectionVariant,
   members: readonly LockMember[] = COMPACT_LOCK[variant],
+  actions: readonly LockAction[] = LOCK_ACTIONS,
 ): DescriptionParts {
+  const locks = actions.includes('lock');
+  const unlocks = actions.includes('unlock');
+  const verb =
+    locks && unlocks ? 'locks or unlocks' : locks ? 'locks' : 'unlocks';
   return {
-    purpose: pairsPurpose(
-      pairsOf('locks or unlocks', members),
-      ' for editing.',
-    ),
-    notes: [stateHandleAnswered, underLock],
+    purpose: pairsPurpose(pairsOf(verb, members), ' for editing.'),
+    notes: [
+      ...(locks ? [lockAnswersStateHandle] : []),
+      ...(unlocks ? [unlockUnderLock] : []),
+    ],
   };
 }
 
-/** HandlerLock's description on `variant`, naming `members` (default: all the variant's). */
+/** HandlerLock's description on `variant`, naming `members` and `actions` (default: all). */
 export function compactLockDescription(
   variant: ProjectionVariant,
   members: readonly LockMember[] = COMPACT_LOCK[variant],
+  actions: readonly LockAction[] = LOCK_ACTIONS,
 ): string {
-  return toolDescription(compactLockParts(variant, members));
+  return toolDescription(compactLockParts(variant, members, actions));
 }
 
 type ValidateMember = (typeof COMPACT_VALIDATE.onprem)[number];

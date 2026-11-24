@@ -19,10 +19,12 @@ export {
 } from './kinds';
 export {
   batchable,
+  lockAnswersStateHandle,
   longRunning,
   type Note,
   stateHandleAnswered,
   underLock,
+  unlockUnderLock,
 } from './notes';
 export {
   type Purpose,

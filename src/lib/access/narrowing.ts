@@ -54,12 +54,13 @@ import {
   compactDeleteSchemaFor,
   compactDeletionCheckSchemaFor,
   compactGetSchemaFor,
-  compactLockSchemaFor,
+  compactLockSchemaOf,
   compactProfileRunSchemaFor,
   compactUpdateSchemaFor,
   compactValidateSchemaFor,
   handlerGetDataDefinition,
   handlerSystemDefinitionFor,
+  LOCK_ACTIONS,
   SYSTEM_ACTIONS,
 } from '../compact/compactSchemas';
 import {
@@ -97,13 +98,21 @@ export interface Narrowing {
   /** The ADT codes its code arguments take on `variant`, where it has any. */
   codes?(variant: ProjectionVariant): readonly string[];
   /**
-   * Its definition on `variant` with `values` left, and `codes` left when a
-   * code was removed (`undefined`: the code arguments as they are).
+   * Its `action` values, where a deny entry narrows them beside the
+   * dispatching argument (HandlerLock's lock and unlock): with none left the
+   * tool is left out.
+   */
+  readonly actions?: readonly string[];
+  /**
+   * Its definition on `variant` with `values` left, `codes` left when a
+   * code was removed (`undefined`: the code arguments as they are), and
+   * `actions` left where it has them (`undefined`: every action).
    */
   definition(
     variant: ProjectionVariant,
     values: readonly string[],
     codes: readonly string[] | undefined,
+    actions?: readonly string[] | undefined,
   ): VariantToolDefinition;
 }
 
@@ -215,11 +224,13 @@ const NARROWING_LIST: readonly Narrowing[] = [
   {
     tool: 'HandlerLock',
     values: (variant) => COMPACT_LOCK[variant],
-    definition(variant, values) {
+    actions: LOCK_ACTIONS,
+    definition(variant, values, _codes, actions) {
       const members = keptOf(COMPACT_LOCK[variant], values);
+      const left = keptOf(LOCK_ACTIONS, actions ?? LOCK_ACTIONS);
       return {
-        description: compactLockDescription(variant, members),
-        inputSchema: compactLockSchemaFor(members),
+        description: compactLockDescription(variant, members, left),
+        inputSchema: compactLockSchemaOf(members, left),
         members,
       };
     },

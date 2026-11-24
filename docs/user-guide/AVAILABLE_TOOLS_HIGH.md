@@ -247,7 +247,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getabapgitbranchinfo-high-level-abapgit"></a>
 #### GetAbapGitBranchInfo (High-Level / Abapgit)
-**Description:** Reads the abapGit branch information of a remote repository for the package it would be linked to.
+**Description:** Reads the abapGit branch information of a remote repository for the package (DEVC) it would be linked to.
 
 **Source:** `src/handlers/abapgit/high/handleGetAbapGitBranchInfo.ts`
 
@@ -261,7 +261,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="linkabapgitrepo-high-level-abapgit"></a>
 #### LinkAbapGitRepo (High-Level / Abapgit)
-**Description:** Links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport.
+**Description:** Links an ABAP package (DEVC) to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport.
 
 **Source:** `src/handlers/abapgit/high/handleLinkAbapGitRepo.ts`
 
@@ -272,7 +272,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `transport_request` (string, optional) - The transport request that records the objects written.
 - `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
 
-**On ABAP Cloud (`cloud`):** Links an ABAP package to a remote abapGit repository on a branch, mapping its folders to subpackages as asked.
+**On ABAP Cloud (`cloud`):** Links an ABAP package (DEVC) to a remote abapGit repository on a branch, mapping its folders to subpackages as asked.
 
 **Parameters (`cloud`):**
 - `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
@@ -409,7 +409,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist.
+**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages (DEVC), recording their findings in a new worklist.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
@@ -426,7 +426,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatebehaviordefinition-high-level-behavior-definition"></a>
 #### ActivateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Activates a RAP behavior definition, so its inactive version is in force.
+**Description:** Activates a RAP behavior definition (BDEF), so its inactive version is in force.
 
 **Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
 
@@ -440,7 +440,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkbehaviordefinition-high-level-behavior-definition"></a>
 #### CheckBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Checks the syntax of a RAP behavior definition.
+**Description:** [read-only] Checks the syntax of a RAP behavior definition (BDEF).
 
 **Source:** `src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts`
 
@@ -454,7 +454,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Creates a managed, unmanaged, abstract or projection RAP behavior definition for a root entity, recorded in the transport given.
+**Description:** Creates a managed, unmanaged, abstract or projection RAP behavior definition (BDEF) for a root entity, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
 
@@ -475,7 +475,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletebehaviordefinition-high-level-behavior-definition"></a>
 #### DeleteBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Deletes a RAP behavior definition, recorded in the transport given.
+**Description:** Deletes a RAP behavior definition (BDEF), recorded in the transport given.
 
 **Source:** `src/handlers/behavior_definition/high/handleDeleteBehaviorDefinition.ts`
 
@@ -490,7 +490,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinition-high-level-behavior-definition"></a>
 #### GetBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Reads the current source code of a RAP behavior definition, or its metadata.
+**Description:** [read-only] Reads the current source code of a RAP behavior definition (BDEF), or its metadata.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
@@ -507,7 +507,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatebehaviordefinition-high-level-behavior-definition"></a>
 #### UpdateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Updates the source code of an existing RAP behavior definition, activating it when asked, recorded in the transport given.
+**Description:** Updates the source code of an existing RAP behavior definition (BDEF), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`
 
@@ -527,7 +527,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Creates the RAP behavior implementation class of a behavior definition, with its description, recorded in the transport given.
+**Description:** Creates the RAP behavior implementation class (CLAS) of a behavior definition (BDEF), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
@@ -545,7 +545,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletebehaviorimplementation-high-level-behavior-implementation"></a>
 #### DeleteBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Deletes a RAP behavior implementation class, recorded in the transport given.
+**Description:** Deletes a RAP behavior implementation class (CLAS), recorded in the transport given.
 
 **Source:** `src/handlers/behavior_implementation/high/handleDeleteBehaviorImplementation.ts`
 
@@ -560,7 +560,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviorimplementation-high-level-behavior-implementation"></a>
 #### GetBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** [read-only] Reads the current source code of a RAP behavior implementation class, or its metadata.
+**Description:** [read-only] Reads the current source code of a RAP behavior implementation class (CLAS), or its metadata.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
@@ -577,7 +577,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatebehaviorimplementation-high-level-behavior-implementation"></a>
 #### UpdateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Updates the implementations of an existing RAP behavior implementation class, activating it when asked, recorded in the transport given.
+**Description:** Updates the implementations of an existing RAP behavior implementation class (CLAS), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_implementation/high/handleUpdateBehaviorImplementation.ts`
 
@@ -598,7 +598,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateclass-high-level-class"></a>
 #### ActivateClass (High-Level / Class)
-**Description:** Activates an ABAP class, so its inactive version is in force.
+**Description:** Activates an ABAP class (CLAS), so its inactive version is in force.
 
 **Source:** `src/handlers/class/low/handleActivateClass.ts`
 
@@ -612,7 +612,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkclass-high-level-class"></a>
 #### CheckClass (High-Level / Class)
-**Description:** [read-only] Checks the syntax of an ABAP class as stored or as the source given.
+**Description:** [read-only] Checks the syntax of an ABAP class (CLAS) as stored or as the source given.
 
 **Source:** `src/handlers/class/high/handleCheckClass.ts`
 
@@ -627,7 +627,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Creates an ABAP class, with its description, its superclass and its FINAL and CREATE PROTECTED settings, recorded in the transport given.
+**Description:** Creates an ABAP class (CLAS), with its description, its superclass and its FINAL and CREATE PROTECTED settings, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -648,7 +648,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteclass-high-level-class"></a>
 #### DeleteClass (High-Level / Class)
-**Description:** Deletes an ABAP class, recorded in the transport given.
+**Description:** Deletes an ABAP class (CLAS), recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleDeleteClass.ts`
 
@@ -663,7 +663,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocaldefinitions-high-level-class"></a>
 #### DeleteLocalDefinitions (High-Level / Class)
-**Description:** Deletes the local definitions of an ABAP class, activating the class when asked.
+**Description:** Deletes the local definitions of an ABAP class (CLAS), activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalDefinitions.ts`
 
@@ -679,7 +679,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocalmacros-high-level-class"></a>
 #### DeleteLocalMacros (High-Level / Class)
-**Description:** Deletes the local macros of an ABAP class, activating the class when asked.
+**Description:** Deletes the local macros of an ABAP class (CLAS), activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalMacros.ts`
 
@@ -695,7 +695,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocaltestclass-high-level-class"></a>
 #### DeleteLocalTestClass (High-Level / Class)
-**Description:** Deletes the local test classes of an ABAP class, activating the class when asked.
+**Description:** Deletes the local test classes of an ABAP class (CLAS), activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
 
@@ -711,7 +711,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletelocaltypes-high-level-class"></a>
 #### DeleteLocalTypes (High-Level / Class)
-**Description:** Deletes the local types of an ABAP class, activating the class when asked.
+**Description:** Deletes the local types of an ABAP class (CLAS), activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTypes.ts`
 
@@ -727,7 +727,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclass-high-level-class"></a>
 #### GetClass (High-Level / Class)
-**Description:** [read-only] Reads the current source code of an ABAP class, or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -744,7 +744,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocaldefinitions-high-level-class"></a>
 #### GetLocalDefinitions (High-Level / Class)
-**Description:** [read-only] Reads the local definitions of an ABAP class.
+**Description:** [read-only] Reads the local definitions of an ABAP class (CLAS).
 
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
 
@@ -760,7 +760,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocalmacros-high-level-class"></a>
 #### GetLocalMacros (High-Level / Class)
-**Description:** [read-only] Reads the local macros of an ABAP class.
+**Description:** [read-only] Reads the local macros of an ABAP class (CLAS).
 
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
 
@@ -776,7 +776,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
-**Description:** [read-only] Reads the local test classes of an ABAP class.
+**Description:** [read-only] Reads the local test classes of an ABAP class (CLAS).
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
@@ -792,7 +792,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocaltypes-high-level-class"></a>
 #### GetLocalTypes (High-Level / Class)
-**Description:** [read-only] Reads the local types and implementations of an ABAP class.
+**Description:** [read-only] Reads the local types and implementations of an ABAP class (CLAS).
 
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
 
@@ -808,7 +808,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateclass-high-level-class"></a>
 #### UpdateClass (High-Level / Class)
-**Description:** Updates the source code of an existing ABAP class, activating it when asked, recorded in the transport given.
+**Description:** Updates the source code of an existing ABAP class (CLAS), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateClass.ts`
 
@@ -825,7 +825,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatelocaldefinitions-high-level-class"></a>
 #### UpdateLocalDefinitions (High-Level / Class)
-**Description:** Updates the local definitions of an existing ABAP class, activating the class when asked, recorded in the transport given.
+**Description:** Updates the local definitions of an existing ABAP class (CLAS), activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalDefinitions.ts`
 
@@ -842,7 +842,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatelocalmacros-high-level-class"></a>
 #### UpdateLocalMacros (High-Level / Class)
-**Description:** Updates the local macros of an existing ABAP class, activating the class when asked, recorded in the transport given.
+**Description:** Updates the local macros of an existing ABAP class (CLAS), activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalMacros.ts`
 
@@ -859,7 +859,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatelocaltestclass-high-level-class"></a>
 #### UpdateLocalTestClass (High-Level / Class)
-**Description:** Updates the local test classes of an existing ABAP class, activating the class when asked, recorded in the transport given.
+**Description:** Updates the local test classes of an existing ABAP class (CLAS), activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
@@ -876,7 +876,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatelocaltypes-high-level-class"></a>
 #### UpdateLocalTypes (High-Level / Class)
-**Description:** Updates the local types of an existing ABAP class, activating the class when asked, recorded in the transport given.
+**Description:** Updates the local types of an existing ABAP class (CLAS), activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTypes.ts`
 
@@ -896,7 +896,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateobjects-high-level-common"></a>
 #### ActivateObjects (High-Level / Common)
-**Description:** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once.
+**Description:** Activates several ABAP repository objects of any type together in one activation, such as domains (DOMA), data elements (DTEL) and tables (TABL) at once.
 
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
@@ -905,7 +905,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, PROG/P, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, program, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes; any other call is a group activation.
 
-**On ABAP Cloud (`cloud`):** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once.
+**On ABAP Cloud (`cloud`):** Activates several ABAP repository objects of any type together in one activation, such as domains (DOMA), data elements (DTEL) and tables (TABL) at once.
 
 **Parameters (`cloud`):**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
@@ -916,7 +916,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinitionversiondiff-high-level-common"></a>
 #### GetBehaviorDefinitionVersionDiff (High-Level / Common)
-**Description:** [read-only] Reads two versions of the same RAP behavior definition from its version history and compares them.
+**Description:** [read-only] Reads two versions of the same RAP behavior definition (BDEF) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -928,7 +928,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinitionversions-high-level-common"></a>
 #### GetBehaviorDefinitionVersions (High-Level / Common)
-**Description:** [read-only] Reads the version history of a RAP behavior definition.
+**Description:** [read-only] Reads the version history of a RAP behavior definition (BDEF).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -939,7 +939,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinitionversionsource-high-level-common"></a>
 #### GetBehaviorDefinitionVersionSource (High-Level / Common)
-**Description:** [read-only] Reads an older version of a RAP behavior definition's source from its version history.
+**Description:** [read-only] Reads an older version of the source code of a RAP behavior definition (BDEF) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -950,7 +950,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclassversiondiff-high-level-common"></a>
 #### GetClassVersionDiff (High-Level / Common)
-**Description:** [read-only] Reads two versions of the same ABAP class from its version history and compares them.
+**Description:** [read-only] Reads two versions of the same ABAP class (CLAS) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -962,7 +962,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclassversions-high-level-common"></a>
 #### GetClassVersions (High-Level / Common)
-**Description:** [read-only] Reads the version history of an ABAP class.
+**Description:** [read-only] Reads the version history of an ABAP class (CLAS).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -973,7 +973,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclassversionsource-high-level-common"></a>
 #### GetClassVersionSource (High-Level / Common)
-**Description:** [read-only] Reads an older version of an ABAP class's source from its version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP class (CLAS) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -984,41 +984,41 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getddlversiondiff-high-level-common"></a>
 #### GetDdlVersionDiff (High-Level / Common)
-**Description:** [read-only] Reads two versions of the same CDS view (DDL source) from its version history and compares them.
+**Description:** [read-only] Reads two versions of the same CDS view (DDLS) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the CDS view (DDL source)'s version history.
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the CDS view (DDL source)'s version history.
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the CDS view's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the CDS view's version history.
 
 ---
 
 <a id="getddlversions-high-level-common"></a>
 #### GetDdlVersions (High-Level / Common)
-**Description:** [read-only] Reads the version history of a CDS view (DDL source).
+**Description:** [read-only] Reads the version history of a CDS view (DDLS).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - CDS view (DDL source) name.
+- `ddl_name` (string, required) - CDS view name.
 
 ---
 
 <a id="getddlversionsource-high-level-common"></a>
 #### GetDdlVersionSource (High-Level / Common)
-**Description:** [read-only] Reads an older version of the source of a CDS view (DDL source) from its version history.
+**Description:** [read-only] Reads an older version of the source code of a CDS view (DDLS) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri of a version, from the CDS view (DDL source)'s version history.
+- `content_uri` (string, required) - Opaque content_uri of a version, from the CDS view's version history.
 
 ---
 
 <a id="getfunctionmoduleversiondiff-high-level-common"></a>
 #### GetFunctionModuleVersionDiff (High-Level / Common)
-**Description:** [read-only] Reads two versions of the same ABAP function module from its version history and compares them.
+**Description:** [read-only] Reads two versions of the same ABAP function module (FUGR) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1030,7 +1030,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctionmoduleversions-high-level-common"></a>
 #### GetFunctionModuleVersions (High-Level / Common)
-**Description:** [read-only] Reads the version history of an ABAP function module.
+**Description:** [read-only] Reads the version history of an ABAP function module (FUGR).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1042,7 +1042,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctionmoduleversionsource-high-level-common"></a>
 #### GetFunctionModuleVersionSource (High-Level / Common)
-**Description:** [read-only] Reads an older version of an ABAP function module's source from its version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP function module (FUGR) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1053,7 +1053,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterfaceversiondiff-high-level-common"></a>
 #### GetInterfaceVersionDiff (High-Level / Common)
-**Description:** [read-only] Reads two versions of the same ABAP interface from its version history and compares them.
+**Description:** [read-only] Reads two versions of the same ABAP interface (INTF) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1065,7 +1065,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterfaceversions-high-level-common"></a>
 #### GetInterfaceVersions (High-Level / Common)
-**Description:** [read-only] Reads the version history of an ABAP interface.
+**Description:** [read-only] Reads the version history of an ABAP interface (INTF).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1076,7 +1076,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterfaceversionsource-high-level-common"></a>
 #### GetInterfaceVersionSource (High-Level / Common)
-**Description:** [read-only] Reads an older version of an ABAP interface's source from its version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP interface (INTF) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1087,7 +1087,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextensionversiondiff-high-level-common"></a>
 #### GetMetadataExtensionVersionDiff (High-Level / Common)
-**Description:** [read-only] Reads two versions of the same CDS metadata extension from its version history and compares them.
+**Description:** [read-only] Reads two versions of the same CDS metadata extension (DDLX) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1099,7 +1099,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextensionversions-high-level-common"></a>
 #### GetMetadataExtensionVersions (High-Level / Common)
-**Description:** [read-only] Reads the version history of a CDS metadata extension.
+**Description:** [read-only] Reads the version history of a CDS metadata extension (DDLX).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1110,7 +1110,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextensionversionsource-high-level-common"></a>
 #### GetMetadataExtensionVersionSource (High-Level / Common)
-**Description:** [read-only] Reads an older version of a CDS metadata extension's source from its version history.
+**Description:** [read-only] Reads an older version of the source code of a CDS metadata extension (DDLX) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1121,7 +1121,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogramversiondiff-high-level-common"></a>
 #### GetProgramVersionDiff (High-Level / Common)
-**Description:** [read-only] Reads two versions of the same ABAP program from its version history and compares them.
+**Description:** [read-only] Reads two versions of the same ABAP program (PROG) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1133,7 +1133,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogramversions-high-level-common"></a>
 #### GetProgramVersions (High-Level / Common)
-**Description:** [read-only] Reads the version history of an ABAP program, on ABAP Cloud one of SAP's standard programs.
+**Description:** [read-only] Reads the version history of an ABAP program (PROG), on ABAP Cloud one of SAP's standard programs.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1144,7 +1144,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogramversionsource-high-level-common"></a>
 #### GetProgramVersionSource (High-Level / Common)
-**Description:** [read-only] Reads an older version of the source of an ABAP program, on ABAP Cloud one of SAP's standard programs from its version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP program (PROG), on ABAP Cloud one of SAP's standard programs from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1155,7 +1155,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getstructureversiondiff-high-level-common"></a>
 #### GetStructureVersionDiff (High-Level / Common)
-**Description:** [read-only] Reads two versions of the same ABAP structure from its version history and compares them.
+**Description:** [read-only] Reads two versions of the same ABAP structure (TABL) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1167,7 +1167,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getstructureversions-high-level-common"></a>
 #### GetStructureVersions (High-Level / Common)
-**Description:** [read-only] Reads the version history of an ABAP structure.
+**Description:** [read-only] Reads the version history of an ABAP structure (TABL).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1178,7 +1178,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getstructureversionsource-high-level-common"></a>
 #### GetStructureVersionSource (High-Level / Common)
-**Description:** [read-only] Reads an older version of an ABAP structure's source from its version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP structure (TABL) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1189,7 +1189,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettabletypeversions-high-level-common"></a>
 #### GetTableTypeVersions (High-Level / Common)
-**Description:** [read-only] Reads the version history of an ABAP table type.
+**Description:** [read-only] Reads the version history of an ABAP table type (TTYP).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1200,7 +1200,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettableversiondiff-high-level-common"></a>
 #### GetTableVersionDiff (High-Level / Common)
-**Description:** [read-only] Reads two versions of the same ABAP table from its version history and compares them.
+**Description:** [read-only] Reads two versions of the same ABAP table (TABL) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1212,7 +1212,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettableversions-high-level-common"></a>
 #### GetTableVersions (High-Level / Common)
-**Description:** [read-only] Reads the version history of an ABAP table.
+**Description:** [read-only] Reads the version history of an ABAP table (TABL).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1223,7 +1223,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettableversionsource-high-level-common"></a>
 #### GetTableVersionSource (High-Level / Common)
-**Description:** [read-only] Reads an older version of an ABAP table's source from its version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP table (TABL) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1237,7 +1237,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatedataelement-high-level-data-element"></a>
 #### ActivateDataElement (High-Level / Data Element)
-**Description:** Activates an ABAP data element, so its inactive version is in force.
+**Description:** Activates an ABAP data element (DTEL), so its inactive version is in force.
 
 **Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
 
@@ -1251,7 +1251,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkdataelement-high-level-data-element"></a>
 #### CheckDataElement (High-Level / Data Element)
-**Description:** [read-only] Checks the syntax of an ABAP data element.
+**Description:** [read-only] Checks the syntax of an ABAP data element (DTEL).
 
 **Source:** `src/handlers/data_element/high/handleCheckDataElement.ts`
 
@@ -1265,7 +1265,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createdataelement-high-level-data-element"></a>
 #### CreateDataElement (High-Level / Data Element)
-**Description:** Creates an ABAP data element, typed by a domain, a built-in type or a reference, with its labels and search help, recorded in the transport given.
+**Description:** Creates an ABAP data element (DTEL), typed by a domain (DOMA), a built-in type or a reference, with its labels and search help, recorded in the transport given.
 
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
 
@@ -1295,7 +1295,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletedataelement-high-level-data-element"></a>
 #### DeleteDataElement (High-Level / Data Element)
-**Description:** Deletes an ABAP data element, recorded in the transport given.
+**Description:** Deletes an ABAP data element (DTEL), recorded in the transport given.
 
 **Source:** `src/handlers/data_element/high/handleDeleteDataElement.ts`
 
@@ -1310,7 +1310,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getdataelement-high-level-data-element"></a>
 #### GetDataElement (High-Level / Data Element)
-**Description:** [read-only] Reads an ABAP data element at the version asked, with its domain or built-in type, its labels, search help, package and description.
+**Description:** [read-only] Reads an ABAP data element (DTEL) at the version asked, with its domain (DOMA) or built-in type, its labels, search help, package (DEVC) and description.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -1324,7 +1324,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatedataelement-high-level-data-element"></a>
 #### UpdateDataElement (High-Level / Data Element)
-**Description:** Updates the type, labels, search help and SET/GET parameter of an existing ABAP data element, replacing them whole and activating it when asked.
+**Description:** Updates the type, labels, search help and SET/GET parameter of an existing ABAP data element (DTEL), replacing them whole and activating it when asked.
 
 **Source:** `src/handlers/data_element/high/handleUpdateDataElement.ts`
 
@@ -1357,7 +1357,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateddl-high-level-ddl"></a>
 #### ActivateDdl (High-Level / Ddl)
-**Description:** Activates a CDS view, so its inactive version is in force.
+**Description:** Activates a CDS view (DDLS), so its inactive version is in force.
 
 **Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
 
@@ -1371,7 +1371,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkddl-high-level-ddl"></a>
 #### CheckDdl (High-Level / Ddl)
-**Description:** [read-only] Checks the syntax of a CDS view as stored or as the source given.
+**Description:** [read-only] Checks the syntax of a CDS view (DDLS) as stored or as the source given.
 
 **Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
 
@@ -1386,7 +1386,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Creates a CDS view or classic DDL view, with its description, recorded in the transport given.
+**Description:** Creates a CDS view (DDLS) or classic DDL view, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
@@ -1404,7 +1404,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteddl-high-level-ddl"></a>
 #### DeleteDdl (High-Level / Ddl)
-**Description:** Deletes a CDS view or classic DDL view, recorded in the transport given.
+**Description:** Deletes a CDS view (DDLS) or classic DDL view, recorded in the transport given.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
@@ -1419,7 +1419,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getddl-high-level-ddl"></a>
 #### GetDdl (High-Level / Ddl)
-**Description:** [read-only] Reads the current source code of a CDS view or classic DDL view, or its metadata.
+**Description:** [read-only] Reads the current source code of a CDS view (DDLS) or classic DDL view, or its metadata.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
@@ -1436,7 +1436,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateddl-high-level-ddl"></a>
 #### UpdateDdl (High-Level / Ddl)
-**Description:** Updates the DDL source of an existing CDS view or classic DDL view, activating it when asked, recorded in the transport given.
+**Description:** Updates the DDL source of an existing CDS view (DDLS) or classic DDL view, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
 
@@ -1456,7 +1456,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatemetadataextension-high-level-ddlx"></a>
 #### ActivateMetadataExtension (High-Level / Ddlx)
-**Description:** Activates a CDS metadata extension, so its inactive version is in force.
+**Description:** Activates a CDS metadata extension (DDLX), so its inactive version is in force.
 
 **Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
 
@@ -1470,7 +1470,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkmetadataextension-high-level-ddlx"></a>
 #### CheckMetadataExtension (High-Level / Ddlx)
-**Description:** [read-only] Checks the syntax of a CDS metadata extension.
+**Description:** [read-only] Checks the syntax of a CDS metadata extension (DDLX).
 
 **Source:** `src/handlers/ddlx/high/handleCheckMetadataExtension.ts`
 
@@ -1484,7 +1484,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
-**Description:** Creates a CDS metadata extension, with its description, activating it when asked, recorded in the transport given.
+**Description:** Creates a CDS metadata extension (DDLX), with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
 
@@ -1503,7 +1503,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatemetadataextension-high-level-ddlx"></a>
 #### UpdateMetadataExtension (High-Level / Ddlx)
-**Description:** Updates the source code of an existing CDS metadata extension, activating it when asked, recorded in the transport given.
+**Description:** Updates the source code of an existing CDS metadata extension (DDLX), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`
 
@@ -1523,7 +1523,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatedomain-high-level-domain"></a>
 #### ActivateDomain (High-Level / Domain)
-**Description:** Activates an ABAP domain, so its inactive version is in force.
+**Description:** Activates an ABAP domain (DOMA), so its inactive version is in force.
 
 **Source:** `src/handlers/domain/low/handleActivateDomain.ts`
 
@@ -1537,7 +1537,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkdomain-high-level-domain"></a>
 #### CheckDomain (High-Level / Domain)
-**Description:** [read-only] Checks the syntax of an ABAP domain.
+**Description:** [read-only] Checks the syntax of an ABAP domain (DOMA).
 
 **Source:** `src/handlers/domain/high/handleCheckDomain.ts`
 
@@ -1551,7 +1551,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createdomain-high-level-domain"></a>
 #### CreateDomain (High-Level / Domain)
-**Description:** Creates an ABAP domain, with its data type, length, decimals, conversion exit, value table and fixed values, recorded in the transport given.
+**Description:** Creates an ABAP domain (DOMA), with its data type, length, decimals, conversion exit, value table and fixed values, recorded in the transport given.
 
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
 
@@ -1578,7 +1578,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletedomain-high-level-domain"></a>
 #### DeleteDomain (High-Level / Domain)
-**Description:** Deletes an ABAP domain, recorded in the transport given.
+**Description:** Deletes an ABAP domain (DOMA), recorded in the transport given.
 
 **Source:** `src/handlers/domain/high/handleDeleteDomain.ts`
 
@@ -1593,7 +1593,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getdomain-high-level-domain"></a>
 #### GetDomain (High-Level / Domain)
-**Description:** [read-only] Reads an ABAP domain at the version asked, with its data type, length, output format, value table, fixed values, package and description.
+**Description:** [read-only] Reads an ABAP domain (DOMA) at the version asked, with its data type, length, output format, value table, fixed values, package (DEVC) and description.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -1607,7 +1607,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatedomain-high-level-domain"></a>
 #### UpdateDomain (High-Level / Domain)
-**Description:** Updates the data type, length, decimals, conversion exit, value table and fixed values of an existing ABAP domain, replacing them whole.
+**Description:** Updates the data type, length, decimals, conversion exit, value table and fixed values of an existing ABAP domain (DOMA), replacing them whole.
 
 **Source:** `src/handlers/domain/high/handleUpdateDomain.ts`
 
@@ -1636,7 +1636,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatefunctiongroup-high-level-function"></a>
 #### ActivateFunctionGroup (High-Level / Function)
-**Description:** Activates an ABAP function group, so its inactive version is in force.
+**Description:** Activates an ABAP function group (FUGR), so its inactive version is in force.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionGroup.ts`
 
@@ -1650,7 +1650,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatefunctionmodule-high-level-function"></a>
 #### ActivateFunctionModule (High-Level / Function)
-**Description:** Activates an ABAP function module of a function group, so its inactive version is in force.
+**Description:** Activates an ABAP function module (FUGR) of a function group (FUGR), so its inactive version is in force.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
 
@@ -1665,7 +1665,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkfunctiongroup-high-level-function"></a>
 #### CheckFunctionGroup (High-Level / Function)
-**Description:** [read-only] Checks the syntax of an ABAP function group.
+**Description:** [read-only] Checks the syntax of an ABAP function group (FUGR).
 
 **Source:** `src/handlers/function/high/handleCheckFunctionGroup.ts`
 
@@ -1679,7 +1679,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkfunctionmodule-high-level-function"></a>
 #### CheckFunctionModule (High-Level / Function)
-**Description:** [read-only] Checks the syntax of an ABAP function module of a function group.
+**Description:** [read-only] Checks the syntax of an ABAP function module (FUGR) of a function group (FUGR).
 
 **Source:** `src/handlers/function/high/handleCheckFunctionModule.ts`
 
@@ -1694,7 +1694,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
-**Description:** Creates an ABAP function group, with its description, activating it when asked, recorded in the transport given.
+**Description:** Creates an ABAP function group (FUGR), with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionGroup.ts`
 
@@ -1713,7 +1713,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createfunctionmodule-high-level-function"></a>
 #### CreateFunctionModule (High-Level / Function)
-**Description:** Creates an ABAP function module in an existing function group, with its description, recorded in the transport given.
+**Description:** Creates an ABAP function module (FUGR) in an existing function group (FUGR), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionModule.ts`
 
@@ -1730,7 +1730,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
-**Description:** Updates the description of an existing ABAP function group, recorded in the transport given.
+**Description:** Updates the description of an existing ABAP function group (FUGR), recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 
@@ -1746,7 +1746,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatefunctionmodule-high-level-function"></a>
 #### UpdateFunctionModule (High-Level / Function)
-**Description:** Updates the source code of an existing ABAP function module in its function group, activating it when asked, recorded in the transport given.
+**Description:** Updates the source code of an existing ABAP function module (FUGR) in its function group (FUGR), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionModule.ts`
 
@@ -1767,7 +1767,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletefunctiongroup-high-level-function-group"></a>
 #### DeleteFunctionGroup (High-Level / Function Group)
-**Description:** Deletes an ABAP function group, recorded in the transport given.
+**Description:** Deletes an ABAP function group (FUGR), recorded in the transport given.
 
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
 
@@ -1782,7 +1782,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctiongroup-high-level-function-group"></a>
 #### GetFunctionGroup (High-Level / Function Group)
-**Description:** [read-only] Reads an ABAP function group at the version asked, with its package, description and contents.
+**Description:** [read-only] Reads an ABAP function group (FUGR) at the version asked, with its package (DEVC), description and contents.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
@@ -1799,7 +1799,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createfunctioninclude-high-level-function-include"></a>
 #### CreateFunctionInclude (High-Level / Function Include)
-**Description:** Creates an include in an existing ABAP function group, with its description, recorded in the transport given.
+**Description:** Creates an include (PROG) in an existing ABAP function group (FUGR), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
 
@@ -1814,7 +1814,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletefunctioninclude-high-level-function-include"></a>
 #### DeleteFunctionInclude (High-Level / Function Include)
-**Description:** Deletes an include of an ABAP function group, recorded in the transport given.
+**Description:** Deletes an include (PROG) of an ABAP function group (FUGR), recorded in the transport given.
 
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
@@ -1828,7 +1828,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatefunctioninclude-high-level-function-include"></a>
 #### UpdateFunctionInclude (High-Level / Function Include)
-**Description:** Updates the source code of an existing include of an ABAP function group, activating it when asked.
+**Description:** Updates the source code of an existing include (PROG) of an ABAP function group (FUGR), activating it when asked.
 
 **Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
 
@@ -1847,7 +1847,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletefunctionmodule-high-level-function-module"></a>
 #### DeleteFunctionModule (High-Level / Function Module)
-**Description:** Deletes an ABAP function module, recorded in the transport given.
+**Description:** Deletes an ABAP function module (FUGR), recorded in the transport given.
 
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
@@ -1863,7 +1863,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** [read-only] Reads the current source code of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP function module (FUGR), BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -1884,7 +1884,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateinclude-high-level-include"></a>
 #### ActivateInclude (High-Level / Include)
-**Description:** Activates an ABAP include, so its inactive version is in force.
+**Description:** Activates an ABAP include (PROG), so its inactive version is in force.
 
 **Source:** `src/handlers/include/low/handleActivateInclude.ts`
 
@@ -1898,7 +1898,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createinclude-high-level-include"></a>
 #### CreateInclude (High-Level / Include)
-**Description:** Creates an ABAP include, with its description and the comment header SAP writes into it, recorded in the transport given.
+**Description:** Creates an ABAP include (PROG), with its description and the comment header SAP writes into it, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleCreateInclude.ts`
 
@@ -1916,7 +1916,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteinclude-high-level-include"></a>
 #### DeleteInclude (High-Level / Include)
-**Description:** Deletes an ABAP include, recorded in the transport given.
+**Description:** Deletes an ABAP include (PROG), recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleDeleteInclude.ts`
 
@@ -1931,7 +1931,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateinclude-high-level-include"></a>
 #### UpdateInclude (High-Level / Include)
-**Description:** Updates the source code of an existing ABAP include, activating it when asked, recorded in the transport given.
+**Description:** Updates the source code of an existing ABAP include (PROG), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleUpdateInclude.ts`
 
@@ -1948,7 +1948,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateincludemetadata-high-level-include"></a>
 #### UpdateIncludeMetadata (High-Level / Include)
-**Description:** Updates the stored metadata of an existing ABAP include, replacing it whole, recorded in the transport given.
+**Description:** Updates the stored metadata of an existing ABAP include (PROG), replacing it whole, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleUpdateIncludeMetadata.ts`
 
@@ -1965,7 +1965,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateinterface-high-level-interface"></a>
 #### ActivateInterface (High-Level / Interface)
-**Description:** Activates an ABAP interface, so its inactive version is in force.
+**Description:** Activates an ABAP interface (INTF), so its inactive version is in force.
 
 **Source:** `src/handlers/interface/low/handleActivateInterface.ts`
 
@@ -1979,7 +1979,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkinterface-high-level-interface"></a>
 #### CheckInterface (High-Level / Interface)
-**Description:** [read-only] Checks the syntax of an ABAP interface.
+**Description:** [read-only] Checks the syntax of an ABAP interface (INTF).
 
 **Source:** `src/handlers/interface/high/handleCheckInterface.ts`
 
@@ -1993,7 +1993,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
-**Description:** Creates an ABAP interface, with its description, recorded in the transport given.
+**Description:** Creates an ABAP interface (INTF), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
 
@@ -2011,7 +2011,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteinterface-high-level-interface"></a>
 #### DeleteInterface (High-Level / Interface)
-**Description:** Deletes an ABAP interface, recorded in the transport given.
+**Description:** Deletes an ABAP interface (INTF), recorded in the transport given.
 
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
 
@@ -2026,7 +2026,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterface-high-level-interface"></a>
 #### GetInterface (High-Level / Interface)
-**Description:** [read-only] Reads the current source code of an ABAP interface, or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP interface (INTF), or its metadata.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
@@ -2043,7 +2043,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateinterface-high-level-interface"></a>
 #### UpdateInterface (High-Level / Interface)
-**Description:** Updates the source code of an existing ABAP interface, activating it when asked, recorded in the transport given.
+**Description:** Updates the source code of an existing ABAP interface (INTF), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
 
@@ -2063,7 +2063,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createmessageclass-high-level-message-class"></a>
 #### CreateMessageClass (High-Level / Message Class)
-**Description:** Creates an ABAP message class (T100), with its description, recorded in the transport given.
+**Description:** Creates an ABAP message class (MSAG), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
 
@@ -2079,7 +2079,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createmessageclassmessage-high-level-message-class"></a>
 #### CreateMessageClassMessage (High-Level / Message Class)
-**Description:** Creates a message in an existing ABAP message class (T100), with its number, text and self-explanatory flag, recorded in the transport given.
+**Description:** Creates a message in an existing ABAP message class (MSAG), with its number, text and self-explanatory flag, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClassMessage.ts`
 
@@ -2095,7 +2095,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletemessageclass-high-level-message-class"></a>
 #### DeleteMessageClass (High-Level / Message Class)
-**Description:** Deletes an ABAP message class (T100) with all its messages, recorded in the transport given.
+**Description:** Deletes an ABAP message class (MSAG) with all its messages, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
 
@@ -2108,7 +2108,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletemessageclassmessage-high-level-message-class"></a>
 #### DeleteMessageClassMessage (High-Level / Message Class)
-**Description:** Deletes one message, by its number, from an ABAP message class (T100), keeping the class and its other messages.
+**Description:** Deletes one message, by its number, from an ABAP message class (MSAG), keeping the class (CLAS) and its other messages.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClassMessage.ts`
 
@@ -2121,7 +2121,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmessageclass-high-level-message-class"></a>
 #### GetMessageClass (High-Level / Message Class)
-**Description:** [read-only] Reads an ABAP message class: its messages with their numbers and texts, and its master language.
+**Description:** [read-only] Reads an ABAP message class (MSAG): its messages with their numbers and texts, and its master language.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
@@ -2132,7 +2132,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** [read-only] Reads one message of an ABAP message class at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time.
+**Description:** [read-only] Reads one message of an ABAP message class (MSAG) at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -2145,7 +2145,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatemessageclass-high-level-message-class"></a>
 #### UpdateMessageClass (High-Level / Message Class)
-**Description:** Updates the description of an existing ABAP message class (T100), recorded in the transport given.
+**Description:** Updates the description of an existing ABAP message class (MSAG), recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClass.ts`
 
@@ -2159,7 +2159,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatemessageclassmessage-high-level-message-class"></a>
 #### UpdateMessageClassMessage (High-Level / Message Class)
-**Description:** Updates the text and flags of a message in an ABAP message class (T100), creating the message when the class lacks it, recorded in the transport given.
+**Description:** Updates the text and flags of a message in an ABAP message class (MSAG), creating the message when the class (CLAS) lacks it, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClassMessage.ts`
 
@@ -2178,7 +2178,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletemetadataextension-high-level-metadata-extension"></a>
 #### DeleteMetadataExtension (High-Level / Metadata Extension)
-**Description:** Deletes a CDS metadata extension, recorded in the transport given.
+**Description:** Deletes a CDS metadata extension (DDLX), recorded in the transport given.
 
 **Source:** `src/handlers/metadata_extension/high/handleDeleteMetadataExtension.ts`
 
@@ -2193,7 +2193,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextension-high-level-metadata-extension"></a>
 #### GetMetadataExtension (High-Level / Metadata Extension)
-**Description:** [read-only] Reads the current source code of a CDS metadata extension, or its metadata.
+**Description:** [read-only] Reads the current source code of a CDS metadata extension (DDLX), or its metadata.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
@@ -2213,7 +2213,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkpackage-high-level-package"></a>
 #### CheckPackage (High-Level / Package)
-**Description:** [read-only] Checks the syntax of an ABAP package.
+**Description:** [read-only] Checks the syntax of an ABAP package (DEVC).
 
 **Source:** `src/handlers/package/high/handleCheckPackage.ts`
 
@@ -2227,7 +2227,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createpackage-high-level-package"></a>
 #### CreatePackage (High-Level / Package)
-**Description:** Creates a new ABAP package under a super package, with its type, software component, transport layer and description.
+**Description:** Creates a new ABAP package (DEVC) under a super package, with its type, software component, transport layer and description.
 
 **Source:** `src/handlers/package/high/handleCreatePackage.ts`
 
@@ -2250,7 +2250,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletepackage-high-level-package"></a>
 #### DeletePackage (High-Level / Package)
-**Description:** Deletes an ABAP package, recorded in the transport given.
+**Description:** Deletes an ABAP package (DEVC), recorded in the transport given.
 
 **Source:** `src/handlers/package/high/handleDeletePackage.ts`
 
@@ -2266,7 +2266,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** [read-only] Reads an ABAP package at the version asked.
+**Description:** [read-only] Reads an ABAP package (DEVC) at the version asked.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -2281,7 +2281,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatepackage-high-level-package"></a>
 #### UpdatePackage (High-Level / Package)
-**Description:** Updates the description of an existing ABAP package, recorded in the transport given.
+**Description:** Updates the description of an existing ABAP package (DEVC), recorded in the transport given.
 
 **Source:** `src/handlers/package/high/handleUpdatePackage.ts`
 
@@ -2300,7 +2300,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateprogram-high-level-program"></a>
 #### ActivateProgram (High-Level / Program)
-**Description:** Activates an ABAP program (report), so its inactive version is in force.
+**Description:** Activates an ABAP program (report (PROG)), so its inactive version is in force.
 
 **Source:** `src/handlers/program/low/handleActivateProgram.ts`
 
@@ -2314,7 +2314,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkprogram-high-level-program"></a>
 #### CheckProgram (High-Level / Program)
-**Description:** [read-only] Checks the syntax of an ABAP program (report).
+**Description:** [read-only] Checks the syntax of an ABAP program (PROG) or report.
 
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
@@ -2328,7 +2328,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
-**Description:** Creates an executable ABAP program (report), with its description and application area, recorded in the transport given.
+**Description:** Creates an executable ABAP program (PROG) or report, with its description and application area, recorded in the transport given.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
@@ -2347,7 +2347,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteprogram-high-level-program"></a>
 #### DeleteProgram (High-Level / Program)
-**Description:** Deletes an ABAP program (report), recorded in the transport given.
+**Description:** Deletes an ABAP program (PROG) or report, recorded in the transport given.
 
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
 
@@ -2362,7 +2362,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** [read-only] Reads the current source code of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP program (PROG) or report, on ABAP Cloud one of SAP's standard programs, or its metadata.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -2379,7 +2379,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateprogram-high-level-program"></a>
 #### UpdateProgram (High-Level / Program)
-**Description:** Updates the source code of an existing ABAP program (report), activating it when asked, recorded in the transport given.
+**Description:** Updates the source code of an existing ABAP program (PROG) or report, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/program/high/handleUpdateProgram.ts`
 
@@ -2399,7 +2399,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateservicebinding-high-level-service-binding"></a>
 #### ActivateServiceBinding (High-Level / Service Binding)
-**Description:** Activates an OData service binding, so its inactive version is in force.
+**Description:** Activates an OData service binding (SRVB), so its inactive version is in force.
 
 **Source:** `src/handlers/service_binding/low/handleActivateServiceBinding.ts`
 
@@ -2413,7 +2413,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
-**Description:** Creates an OData V2 or V4 service binding, UI or Web API, for a service definition, with its service name and version.
+**Description:** Creates an OData V2 or V4 service binding (SRVB), UI or Web API, for a service definition (SRVD), with its service name and version.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
@@ -2437,7 +2437,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteservicebinding-high-level-service-binding"></a>
 #### DeleteServiceBinding (High-Level / Service Binding)
-**Description:** Deletes an OData service binding, recorded in the transport given.
+**Description:** Deletes an OData service binding (SRVB), recorded in the transport given.
 
 **Source:** `src/handlers/service_binding/high/handleDeleteServiceBinding.ts`
 
@@ -2453,7 +2453,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getservicebinding-high-level-service-binding"></a>
 #### GetServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Reads an OData service binding at its active version, with its binding definition, or its package, person responsible and description, in the format asked.
+**Description:** [read-only] Reads an OData service binding (SRVB) at its active version, with its binding definition, or its package (DEVC), person responsible and description, in the format asked.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
@@ -2468,7 +2468,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="listservicebindingtypes-high-level-service-binding"></a>
 #### ListServiceBindingTypes (High-Level / Service Binding)
-**Description:** [read-only] Lists the service binding types the system offers, such as OData V2 and OData V4, in the format asked.
+**Description:** [read-only] Lists the service binding (SRVB) types the system offers, such as OData V2 and OData V4, in the format asked.
 
 **Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
 
@@ -2479,7 +2479,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateservicebinding-high-level-service-binding"></a>
 #### UpdateServiceBinding (High-Level / Service Binding)
-**Description:** Updates the publication state of an existing OData service binding, publishing or unpublishing its service.
+**Description:** Updates the publication state of an existing OData service binding (SRVB), publishing or unpublishing its service.
 
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
 
@@ -2498,7 +2498,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="validateservicebinding-high-level-service-binding"></a>
 #### ValidateServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Validates a new OData service binding for a service definition, in the package and version given, by SAP's transport check of its name and package.
+**Description:** [read-only] Validates a new OData service binding (SRVB) for a service definition (SRVD), in the package (DEVC) and version given, by SAP's transport check of its name and package.
 
 **Source:** `src/handlers/service_binding/high/handleValidateServiceBinding.ts`
 
@@ -2517,7 +2517,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateservicedefinition-high-level-service-definition"></a>
 #### ActivateServiceDefinition (High-Level / Service Definition)
-**Description:** Activates a service definition, so its inactive version is in force.
+**Description:** Activates a service definition (SRVD), so its inactive version is in force.
 
 **Source:** `src/handlers/service_definition/low/handleActivateServiceDefinition.ts`
 
@@ -2531,7 +2531,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
-**Description:** Creates a service definition exposing CDS views as an OData service, with its source code when given, activating it when asked.
+**Description:** Creates a service definition (SRVD) exposing CDS views (DDLS) as an OData service, with its source code when given, activating it when asked.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
 
@@ -2551,7 +2551,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteservicedefinition-high-level-service-definition"></a>
 #### DeleteServiceDefinition (High-Level / Service Definition)
-**Description:** Deletes a service definition, recorded in the transport given.
+**Description:** Deletes a service definition (SRVD), recorded in the transport given.
 
 **Source:** `src/handlers/service_definition/high/handleDeleteServiceDefinition.ts`
 
@@ -2566,7 +2566,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getservicedefinition-high-level-service-definition"></a>
 #### GetServiceDefinition (High-Level / Service Definition)
-**Description:** [read-only] Reads the current source code of a service definition, or its metadata.
+**Description:** [read-only] Reads the current source code of a service definition (SRVD), or its metadata.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
@@ -2583,7 +2583,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateservicedefinition-high-level-service-definition"></a>
 #### UpdateServiceDefinition (High-Level / Service Definition)
-**Description:** Updates the source code of an existing service definition, activating it when asked, recorded in the transport given.
+**Description:** Updates the source code of an existing service definition (SRVD), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/service_definition/high/handleUpdateServiceDefinition.ts`
 
@@ -2603,7 +2603,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatestructure-high-level-structure"></a>
 #### ActivateStructure (High-Level / Structure)
-**Description:** Activates an ABAP structure, so its inactive version is in force.
+**Description:** Activates an ABAP structure (TABL), so its inactive version is in force.
 
 **Source:** `src/handlers/structure/low/handleActivateStructure.ts`
 
@@ -2617,7 +2617,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkstructure-high-level-structure"></a>
 #### CheckStructure (High-Level / Structure)
-**Description:** [read-only] Checks the syntax of an ABAP structure as stored or as the source given.
+**Description:** [read-only] Checks the syntax of an ABAP structure (TABL) as stored or as the source given.
 
 **Source:** `src/handlers/structure/high/handleCheckStructure.ts`
 
@@ -2632,7 +2632,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createstructure-high-level-structure"></a>
 #### CreateStructure (High-Level / Structure)
-**Description:** Creates an ABAP structure, with its description, activating it when asked, recorded in the transport given.
+**Description:** Creates an ABAP structure (TABL), with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/structure/high/handleCreateStructure.ts`
 
@@ -2653,7 +2653,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletestructure-high-level-structure"></a>
 #### DeleteStructure (High-Level / Structure)
-**Description:** Deletes an ABAP structure, recorded in the transport given.
+**Description:** Deletes an ABAP structure (TABL), recorded in the transport given.
 
 **Source:** `src/handlers/structure/high/handleDeleteStructure.ts`
 
@@ -2668,7 +2668,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getstructure-high-level-structure"></a>
 #### GetStructure (High-Level / Structure)
-**Description:** [read-only] Reads an ABAP structure at the version asked, with its definition source, or its package, person responsible and description.
+**Description:** [read-only] Reads an ABAP structure (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
@@ -2685,7 +2685,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatestructure-high-level-structure"></a>
 #### UpdateStructure (High-Level / Structure)
-**Description:** Updates the DDL source of an existing ABAP structure, which defines its components, activating it when asked, recorded in the transport given.
+**Description:** Updates the DDL source of an existing ABAP structure (TABL), which defines its components, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/structure/high/handleUpdateStructure.ts`
 
@@ -2705,7 +2705,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
-**Description:** [read-only] Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the whole hierarchy of one or more ABAP packages (DEVC): each package with its subpackages and their objects, down to the last level. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
@@ -2723,7 +2723,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimecreateprofilertraceparameters-high-level-system"></a>
 #### RuntimeCreateProfilerTraceParameters (High-Level / System)
-**Description:** Creates the parameters of an ABAP profiler trace, scheduling it for a later profiled run of a class or a report.
+**Description:** Creates the parameters of an ABAP profiler trace, scheduling it for a later profiled run of a class (CLAS) or a report (PROG).
 
 **Source:** `src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts`
 
@@ -2747,7 +2747,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimerunclass-high-level-system"></a>
 #### RuntimeRunClass (High-Level / System)
-**Description:** Runs an ABAP class implementing if_oo_adt_classrun and gives its console output, under the ABAP profiler when asked.
+**Description:** Runs an ABAP class (CLAS) implementing if_oo_adt_classrun and gives its console output, under the ABAP profiler when asked.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunClass.ts`
 
@@ -2777,7 +2777,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimerunprogram-high-level-system"></a>
 #### RuntimeRunProgram (High-Level / System)
-**Description:** Runs an ABAP report and gives its output, under the ABAP profiler when asked.
+**Description:** Runs an ABAP report (PROG) and gives its output, under the ABAP profiler when asked.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunProgram.ts`
 
@@ -2807,7 +2807,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatetable-high-level-table"></a>
 #### ActivateTable (High-Level / Table)
-**Description:** Activates an ABAP database table, so its inactive version is in force.
+**Description:** Activates an ABAP database table (TABL), so its inactive version is in force.
 
 **Source:** `src/handlers/table/low/handleActivateTable.ts`
 
@@ -2821,7 +2821,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checktable-high-level-table"></a>
 #### CheckTable (High-Level / Table)
-**Description:** [read-only] Checks the syntax of an ABAP database table as stored or as the source given.
+**Description:** [read-only] Checks the syntax of an ABAP database table (TABL) as stored or as the source given.
 
 **Source:** `src/handlers/table/high/handleCheckTable.ts`
 
@@ -2836,7 +2836,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
-**Description:** Creates an ABAP database table by its name, recorded in the transport given.
+**Description:** Creates an ABAP database table (TABL) by its name, recorded in the transport given.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
@@ -2854,7 +2854,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletetable-high-level-table"></a>
 #### DeleteTable (High-Level / Table)
-**Description:** Deletes an ABAP database table, recorded in the transport given.
+**Description:** Deletes an ABAP database table (TABL), recorded in the transport given.
 
 **Source:** `src/handlers/table/high/handleDeleteTable.ts`
 
@@ -2869,7 +2869,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettable-high-level-table"></a>
 #### GetTable (High-Level / Table)
-**Description:** [read-only] Reads an ABAP database table at the version asked, with its definition source, or its package, person responsible and description.
+**Description:** [read-only] Reads an ABAP database table (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
@@ -2886,7 +2886,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatetable-high-level-table"></a>
 #### UpdateTable (High-Level / Table)
-**Description:** Updates the DDL source of an existing ABAP database table, which defines its key, components and delivery class, activating it when asked.
+**Description:** Updates the DDL source of an existing ABAP database table (TABL), which defines its key, components and delivery class, activating it when asked.
 
 **Source:** `src/handlers/table/high/handleUpdateTable.ts`
 
@@ -2903,7 +2903,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatetablesettings-high-level-table"></a>
 #### UpdateTableSettings (High-Level / Table)
-**Description:** Updates the technical settings of an existing ABAP database table, its data class, size category, buffering and logging, each given over the stored one.
+**Description:** Updates the technical settings of an existing ABAP database table (TABL), its data class, size category, buffering and logging, each given over the stored one.
 
 **Source:** `src/handlers/table/high/handleUpdateTableSettings.ts`
 
@@ -2921,7 +2921,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `translation` (string, optional) - Translation value; the translation flags keep their stored values.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if the table is local or already in a transport request.
 
-**On ABAP Cloud (`cloud`):** Updates the technical settings of an existing ABAP database table, its data class, size category, buffering and logging, each given over the stored one.
+**On ABAP Cloud (`cloud`):** Updates the technical settings of an existing ABAP database table (TABL), its data class, size category, buffering and logging, each given over the stored one.
 
 **Parameters (`cloud`):**
 - `activate` (boolean, required) - true activates the table after the settings are written; false leaves them inactive.
@@ -2945,7 +2945,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatetabletype-high-level-table-type"></a>
 #### ActivateTableType (High-Level / Table Type)
-**Description:** Activates an ABAP table type, so its inactive version is in force.
+**Description:** Activates an ABAP table type (TTYP), so its inactive version is in force.
 
 **Source:** `src/handlers/table_type/low/handleActivateTableType.ts`
 
@@ -2959,7 +2959,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checktabletype-high-level-table-type"></a>
 #### CheckTableType (High-Level / Table Type)
-**Description:** [read-only] Checks an ABAP table type for errors and warnings.
+**Description:** [read-only] Checks an ABAP table type (TTYP) for errors and warnings.
 
 **Source:** `src/handlers/table_type/high/handleCheckTableType.ts`
 
@@ -2973,7 +2973,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtabletype-high-level-table-type"></a>
 #### CreateTableType (High-Level / Table Type)
-**Description:** Creates an ABAP table type, with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given.
+**Description:** Creates an ABAP table type (TTYP), with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/table_type/high/handleCreateTableType.ts`
 
@@ -2999,7 +2999,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletetabletype-high-level-table-type"></a>
 #### DeleteTableType (High-Level / Table Type)
-**Description:** Deletes an ABAP table type, recorded in the transport given.
+**Description:** Deletes an ABAP table type (TTYP), recorded in the transport given.
 
 **Source:** `src/handlers/table_type/high/handleDeleteTableType.ts`
 
@@ -3014,7 +3014,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettabletype-high-level-table-type"></a>
 #### GetTableType (High-Level / Table Type)
-**Description:** [read-only] Reads an ABAP table type at the version asked, with its element type, access, key, package and description.
+**Description:** [read-only] Reads an ABAP table type (TTYP) at the version asked, with its element type, access, key, package (DEVC) and description.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
@@ -3028,7 +3028,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatetabletype-high-level-table-type"></a>
 #### UpdateTableType (High-Level / Table Type)
-**Description:** Updates the definition of an existing ABAP table type: its description, the type it holds, its access type and primary key, activating it when asked.
+**Description:** Updates the definition of an existing ABAP table type (TTYP): its description, the type it holds, its access type and primary key, activating it when asked.
 
 **Source:** `src/handlers/table_type/high/handleUpdateTableType.ts`
 
@@ -3056,7 +3056,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatetextelements-high-level-text-elements"></a>
 #### UpdateTextElements (High-Level / Text Elements)
-**Description:** Updates the text elements of an existing ABAP program, function group or class, each part given replacing its stored one, activating the object when asked.
+**Description:** Updates the text elements of an existing ABAP program (PROG), function group (FUGR) or class (CLAS), each part given replacing its stored one, activating the object when asked.
 
 **Source:** `src/handlers/text_elements/high/handleUpdateTextElements.ts`
 
@@ -3070,7 +3070,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `symbols` (array, optional) - The text symbols: the whole list; symbols left out are deleted.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if the object is local or already in a transport request.
 
-**On ABAP Cloud (`cloud`):** Updates the text elements of an existing ABAP program, function group or class, each part given replacing its stored one, activating the object when asked.
+**On ABAP Cloud (`cloud`):** Updates the text elements of an existing ABAP program (PROG), function group (FUGR) or class (CLAS), each part given replacing its stored one, activating the object when asked.
 
 **Parameters (`cloud`):**
 - `activate` (boolean, required) - true activates the object together with its text elements after the write; false leaves them inactive.
@@ -3191,7 +3191,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Creates an ABAP Unit test class for a CDS view, from the test class source given, once the view supports CDS test doubles.
+**Description:** Creates an ABAP Unit test class for a CDS view (DDLS), from the test class source given, once the view supports CDS test doubles.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
@@ -3209,7 +3209,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createfunctiongroupunittest-high-level-unit-test"></a>
 #### CreateFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of an ABAP function group from the test class source given, in a test include activated with the group.
+**Description:** Creates the ABAP Unit test classes of an ABAP function group (FUGR) from the test class source given, in a test include activated with the group.
 
 **Source:** `src/handlers/unit_test/high/handleCreateFunctionGroupUnitTest.ts`
 
@@ -3223,7 +3223,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createprogramunittest-high-level-unit-test"></a>
 #### CreateProgramUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of an ABAP report from the test class source given, in a test include of the report, and activates the report.
+**Description:** Creates the ABAP Unit test classes of an ABAP report (PROG) from the test class source given, in a test include of the report, and activates the report.
 
 **Source:** `src/handlers/unit_test/high/handleCreateProgramUnitTest.ts`
 
@@ -3237,7 +3237,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of an ABAP class from the test class source given, as its local test classes, and activates the class.
+**Description:** Creates the ABAP Unit test classes of an ABAP class (CLAS) from the test class source given, as its local test classes, and activates the class.
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
@@ -3253,7 +3253,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletecdsunittest-high-level-unit-test"></a>
 #### DeleteCdsUnitTest (High-Level / Unit Test)
-**Description:** Deletes a CDS view test class, with the ABAP Unit test classes it holds.
+**Description:** Deletes a CDS view (DDLS) test class, with the ABAP Unit test classes it holds.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
 
@@ -3268,7 +3268,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deleteunittest-high-level-unit-test"></a>
 #### DeleteUnitTest (High-Level / Unit Test)
-**Description:** Deletes the ABAP Unit test classes of an ABAP class, keeping the class.
+**Description:** Deletes the ABAP Unit test classes of an ABAP class (CLAS), keeping the class.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteUnitTest.ts`
 
@@ -3299,7 +3299,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runabapunit-high-level-unit-test"></a>
 #### RunAbapUnit (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of a class, report, function group, function module's group, CDS view, package, waiting for the result or giving the run's id at once.
+**Description:** Runs the ABAP Unit tests of a class (CLAS), report (PROG), function group (FUGR), function module's group, CDS view (DDLS), package (DEVC), waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
 
@@ -3317,7 +3317,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runcdsunittest-high-level-unit-test"></a>
 #### RunCdsUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of a CDS view test class, waiting for the result or giving the run's id at once.
+**Description:** Runs the ABAP Unit tests of a CDS view (DDLS) test class, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
 
@@ -3330,7 +3330,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Runs every ABAP Unit test of a function group, waiting for the result or giving the run's id at once.
+**Description:** Runs every ABAP Unit test of a function group (FUGR), waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
@@ -3347,7 +3347,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the function group holding a function module, waiting for the result or giving the run's id at once.
+**Description:** Runs the ABAP Unit tests of the function group (FUGR) holding a function module (FUGR), waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
@@ -3365,7 +3365,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of an ABAP report, waiting for the result or giving the run's id at once.
+**Description:** Runs the ABAP Unit tests of an ABAP report (PROG), waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
@@ -3382,7 +3382,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of an ABAP class, waiting for the result or giving the run's id at once.
+**Description:** Runs the ABAP Unit tests of an ABAP class (CLAS), waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
@@ -3399,7 +3399,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** Updates the ABAP Unit test classes of a CDS view test class from the test class source given, activating it, recorded in the transport given.
+**Description:** Updates the ABAP Unit test classes of a CDS view (DDLS) test class from the test class source given, activating it, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
@@ -3415,7 +3415,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatefunctiongroupunittest-high-level-unit-test"></a>
 #### UpdateFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Updates the ABAP Unit test classes of an ABAP function group from the test class source given, activating the group, recorded in the transport given.
+**Description:** Updates the ABAP Unit test classes of an ABAP function group (FUGR) from the test class source given, activating the group, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateFunctionGroupUnitTest.ts`
 
@@ -3429,7 +3429,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateprogramunittest-high-level-unit-test"></a>
 #### UpdateProgramUnitTest (High-Level / Unit Test)
-**Description:** Updates the ABAP Unit test classes of an ABAP report from the test class source given, activating the report, recorded in the transport given.
+**Description:** Updates the ABAP Unit test classes of an ABAP report (PROG) from the test class source given, activating the report, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateProgramUnitTest.ts`
 
@@ -3443,7 +3443,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updateunittest-high-level-unit-test"></a>
 #### UpdateUnitTest (High-Level / Unit Test)
-**Description:** Updates the ABAP Unit test classes of an ABAP class from the test class source given, activating the class, recorded in the transport given.
+**Description:** Updates the ABAP Unit test classes of an ABAP class (CLAS) from the test class source given, activating the class, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateUnitTest.ts`
 

@@ -395,7 +395,7 @@
     "HandlerDumpView": "dump_id*, view, state_handle",
     "HandlerGet": "background, object_type, part, detail, package_name, package_names, max_results, include_descriptions, class_name, interface_name, program_name, include_name, domain_name, data_element_name, table_name, structure_name, table_type_name, ddl_name, function_module_name, function_group_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name, service_definition_name, service_binding_name, transport_number, run_id, with_long_polling, response_format, version, object_adt_type, object_name, node_id, with_short_descriptions, object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions, state_handle",
     "HandlerGetData": "background, object_name, sql_query, max_rows, state_handle",
-    "HandlerLock": "object_type*, object_name*, super_package, state_handle",
+    "HandlerLock": "object_type*, object_name*, action, lock_handle, super_package, state_handle",
     "HandlerProfileList": "detail, state_handle",
     "HandlerProfileRun": "target_type*, class_name, program_name, profiler_id, background, state_handle",
     "HandlerProfileSchedule": "description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing, state_handle",
@@ -410,7 +410,6 @@
     "HandlerUnitTestResult": "run_id*, with_navigation_uris, format, detail, state_handle",
     "HandlerUnitTestRun": "tests, target, runner, title, context, scope, risk_level, duration, state_handle",
     "HandlerUnitTestStatus": "run_id*, with_long_polling, state_handle",
-    "HandlerUnlock": "object_type*, object_name*, lock_handle*, state_handle",
     "HandlerUpdate": "object_type*, lock_handle*, transport_request, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, source_code, part, ddl_source, table_name, structure_name, data_element_name, interface_name, include_name, table_type_name, service_definition_name, service_binding_name, service_name, service_version, name, ddl_code, implementation_code, test_class_source, test_class_code, local_types_code, definitions_code, macros_code, binding_variant, desired_publication_state, data_class, size_category, buffering, storage_type, sharing_type, load_unit, translation, logging_enabled, is_writable_by_amdp, symbols, selections, headings, state_handle",
     "HandlerValidate": "object_type*, object_name*, package_name, super_package, superclass, description, behavior_definition, root_entity, implementation_type, service_definition_name, service_binding_version, state_handle"
   },

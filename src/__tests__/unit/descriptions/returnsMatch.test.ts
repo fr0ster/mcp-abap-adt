@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { returnsOf } from '../../../lib/description';
+import { type ReturnsFact, returnsOf } from '../../../lib/description';
 import {
   about,
   entries,
@@ -125,10 +125,27 @@ describe('a tool description tied to what its writers write', () => {
         f.startsWith('a fact left out'),
       ),
     );
+    const other = returnsOf({
+      heads: [headShape('other', 'something else')],
+      shapes: [],
+    });
     assert.ok(
-      tieFaults(
-        tie({ returns: [...tie().returns, ...rest.slice(0, 0), first] }),
-      ).length === 0,
+      tieFaults(tie({ returns: [...tie().returns, ...other] })).some((f) =>
+        f.startsWith('an extra fact'),
+      ),
+    );
+    // @ts-expect-error a fact is nominal: no spread of one is a fact.
+    const forged: ReturnsFact = { ...first, text: 'Forged.' };
+    void forged;
+  });
+
+  it('fails on a fact stated twice', () => {
+    const [first] = tie().returns;
+    assert.ok(first !== undefined);
+    assert.ok(
+      tieFaults(tie({ returns: [...tie().returns, first] })).includes(
+        'a fact stated twice',
+      ),
     );
   });
 
@@ -181,6 +198,44 @@ describe('a tool description tied to what its writers write', () => {
     );
   });
 
+  it('fails on a headerless kind row without the noun of its column', () => {
+    const bare: RowSchemas<Reading> = {
+      ...terse,
+      lines: about(
+        'for each line kind',
+        kinds<Line, 'lines', 'kind'>('lines', 'kind', {
+          row: {
+            row: {
+              columns: [{ name: 'line', cell: (l: Line) => l.name }],
+              header: 'none',
+            },
+          },
+          gone: { mark: 'gone_line', words: (l: Line) => [l.name] },
+        }),
+      ),
+    };
+    const faults = tieFaults(
+      tie({
+        terse: shapesOf<Reading>(bare),
+        samples: [sampleOf(reading, bare)],
+      }),
+    );
+    assert.ok(
+      faults.includes('the column "line" of the kind "row" has no noun'),
+      faults.join('\n'),
+    );
+  });
+
+  it('a headerless kind row with its noun is stated in the Returns', () => {
+    const facts = returnsOf({ shapes: [shapesOf<Reading>(terse)] }).map(
+      (each) => each.text,
+    );
+    assert.ok(
+      facts.includes('For each line kind: its line.'),
+      facts.join('\n'),
+    );
+  });
+
   it('fails on a medium list under an undeclared name', () => {
     const faults = tieFaults(
       tie({
@@ -191,6 +246,29 @@ describe('a tool description tied to what its writers write', () => {
     );
     assert.ok(
       faults.includes('the medium list "stray" is under no declared name'),
+      faults.join('\n'),
+    );
+  });
+
+  it('fails on an array nested under no declared path, and on a declared medium list no fixture reaches', () => {
+    const faults = tieFaults(
+      tie({
+        samples: [
+          {
+            ...sampleOf(reading),
+            medium: { objects: [{ name: 'ZCL', stray: [1] }], lines: [] },
+          },
+        ],
+      }),
+    );
+    assert.ok(
+      faults.includes(
+        'the medium list "objects[].stray" is under no declared name',
+      ),
+      faults.join('\n'),
+    );
+    assert.ok(
+      faults.includes('no fixture reaches the medium list "gone"'),
       faults.join('\n'),
     );
   });

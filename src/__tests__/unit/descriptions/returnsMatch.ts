@@ -40,6 +40,7 @@ function allShapes(shapes: readonly ListShape[]): ListShape[] {
     if (seen.has(shape)) return;
     seen.add(shape);
     if ('lists' in shape) for (const child of shape.lists()) walk(child);
+    if (shape.kind === 'parts') for (const child of shape.nested()) walk(child);
     if (shape.kind === 'kinds') {
       for (const kind of shape.kinds) {
         if ('lists' in kind) for (const child of kind.lists()) walk(child);
@@ -79,6 +80,10 @@ function reached(shapes: readonly ListShape[], reading: unknown): Set<string> {
             for (const child of spec.lists()) visit(child, item, depth + 1);
           }
         }
+      } else if (shape.kind === 'parts') {
+        const value =
+          shape.member === undefined ? item : memberOf(item, shape.member);
+        for (const child of shape.nested()) visit(child, value, depth + 1);
       } else if ('lists' in shape) {
         for (const child of shape.lists()) visit(child, item, depth + 1);
       }
@@ -88,14 +93,47 @@ function reached(shapes: readonly ListShape[], reading: unknown): Set<string> {
   return found;
 }
 
-/** Every array-valued member name of a JSON answer, at any depth. */
-function arrayMembers(value: unknown, out = new Set<string>()): Set<string> {
+/**
+ * Where every array of a JSON answer sits, as a path: `objects` at the root,
+ * `objects[].children` inside each entry, `tree.children` inside a member.
+ */
+function arrayPaths(
+  value: unknown,
+  at = '',
+  out = new Set<string>(),
+): Set<string> {
   if (Array.isArray(value)) {
-    for (const item of value) arrayMembers(item, out);
+    for (const item of value) arrayPaths(item, `${at}[]`, out);
   } else if (typeof value === 'object' && value !== null) {
     for (const [key, member] of Object.entries(value)) {
-      if (Array.isArray(member)) out.add(key);
-      arrayMembers(member, out);
+      const path = at === '' ? key : `${at}.${key}`;
+      if (Array.isArray(member)) out.add(path);
+      arrayPaths(member, path, out);
+    }
+  }
+  return out;
+}
+
+/** The paths the medium schemas declare, each with its shape. */
+function declaredPaths(
+  shapes: readonly ListShape[],
+  at = '',
+  out = new Map<string, ListShape>(),
+  seen = new Set<ListShape>(),
+): Map<string, ListShape> {
+  for (const shape of shapes) {
+    if (!('as' in shape)) continue;
+    const path = at === '' ? shape.as : `${at}.${shape.as}`;
+    if (shape.kind !== 'member') out.set(path, shape);
+    if (seen.has(shape)) continue;
+    seen.add(shape);
+    if ('lists' in shape) {
+      declaredPaths(
+        shape.lists(),
+        shape.kind === 'member' ? path : `${path}[]`,
+        out,
+        seen,
+      );
     }
   }
   return out;
@@ -105,8 +143,10 @@ function arrayMembers(value: unknown, out = new Set<string>()): Set<string> {
 export function tieFaults(tie: ReturnsTie): string[] {
   const faults: string[] = [];
   const terse = allShapes(tie.terse);
-  const medium = allShapes(tie.medium ?? []);
   const facts = new Set(tie.returns.map((each) => each.text));
+  if (facts.size !== tie.returns.length) {
+    faults.push('a fact stated twice');
+  }
   const generated = new Set(
     returnsOf({
       heads: tie.heads,
@@ -157,6 +197,7 @@ export function tieFaults(tie: ReturnsTie): string[] {
     }
   }
   const reach = new Set<string>();
+  const mediumReach = new Set<string>();
   for (const sample of tie.samples) {
     for (const line of sample.lines) {
       lineFaults(line, headers, heads, marks, named, faults);
@@ -165,22 +206,47 @@ export function tieFaults(tie: ReturnsTie): string[] {
       reach.add(each);
     }
     if (sample.medium !== undefined) {
-      const declared = new Set(
-        medium.map((shape) => ('as' in shape ? shape.as : shape.list)),
-      );
-      for (const name of arrayMembers(sample.medium)) {
-        if (!declared.has(name)) {
-          faults.push(`the medium list "${name}" is under no declared name`);
-        }
-      }
-      for (const shape of medium) {
-        if ('as' in shape && arrayMembers(sample.medium).has(shape.as)) {
-          named(shape.about, `the medium list "${shape.as}"`);
+      const declared = declaredPaths(tie.medium ?? []);
+      for (const path of arrayPaths(sample.medium)) {
+        const shape = declared.get(path);
+        if (shape === undefined) {
+          faults.push(`the medium list "${path}" is under no declared name`);
+        } else {
+          named(shape.about, `the medium list "${path}"`);
+          mediumReach.add(path);
         }
       }
     }
   }
+  // Every column of every row a fixture reaches has its noun, a headerless
+  // kind row's too (no header line shows its columns).
   for (const shape of terse) {
+    if (!reach.has(shape.list)) continue;
+    if (shape.kind === 'rows' || shape.kind === 'node') {
+      shape.columns.forEach((column, i) => {
+        if (shape.means[i] === undefined) {
+          faults.push(`the column "${column}" has no noun`);
+        }
+      });
+    }
+    if (shape.kind === 'kinds') {
+      for (const kind of shape.kinds) {
+        if (!('row' in kind) || !reach.has(`${shape.list}/${kind.kind}`)) {
+          continue;
+        }
+        kind.row.forEach((column, i) => {
+          if (kind.means[i] === undefined) {
+            faults.push(
+              `the column "${column}" of the kind "${kind.kind}" has no noun`,
+            );
+          }
+        });
+      }
+    }
+  }
+  for (const shape of terse) {
+    // A part's tree root has no list of its own: its part reaches it.
+    if (shape.list === '') continue;
     if (!reach.has(shape.list)) {
       faults.push(`no fixture reaches the list "${shape.list}"`);
     }
@@ -191,6 +257,14 @@ export function tieFaults(tie: ReturnsTie): string[] {
             `no fixture reaches the kind "${shape.list}/${kind.kind}"`,
           );
         }
+      }
+    }
+  }
+  // Every declared medium list reached by some fixture's medium answer.
+  if (tie.samples.some((sample) => sample.medium !== undefined)) {
+    for (const path of declaredPaths(tie.medium ?? []).keys()) {
+      if (!mediumReach.has(path)) {
+        faults.push(`no fixture reaches the medium list "${path}"`);
       }
     }
   }

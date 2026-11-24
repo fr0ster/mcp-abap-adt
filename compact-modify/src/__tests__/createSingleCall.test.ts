@@ -58,10 +58,7 @@ import { setSystemContext } from '../../../src/__tests__/helpers/processSystemCo
 import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
 import { resetSystemContextCache } from '../../../src/lib/systemContext';
 import { compactWriteRouterMap } from '../handlers/compactWriteRoutes';
-import {
-  handleHandlerCreate,
-  TOOL_DEFINITION,
-} from '../handlers/handleHandlerCreate';
+import { handleHandlerCreate } from '../handlers/handleHandlerCreate';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.

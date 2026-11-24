@@ -16,10 +16,7 @@ import {
   handleGetTransport,
   handleReadTransportObjects,
 } from '@mcp-abap-adt/lib/handlers/read';
-import {
-  assertMatchObject,
-  assertRejects,
-} from '../../../src/__tests__/helpers/assertions';
+import { assertRejects } from '../../../src/__tests__/helpers/assertions';
 import { listedJson } from '../../../src/__tests__/helpers/listedJson';
 import {
   PARENT,

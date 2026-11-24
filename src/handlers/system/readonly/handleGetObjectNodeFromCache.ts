@@ -1,9 +1,15 @@
 import * as z from 'zod';
+import { purpose, toolDescription } from '../../../lib/description';
 export const TOOL_DEFINITION = {
   name: 'GetObjectNodeFromCache',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present, reading the active version of the object it names.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads one repository object the last objects listing named, by its type, name and technical name, with the content at its URI in the active version.',
+    ),
+    returns: [],
+  }),
   inputSchema: z.object({
     object_type: z.string().describe('[read-only] Object type'),
     object_name: z.string().describe('[read-only] Object name'),

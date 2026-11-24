@@ -30,7 +30,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     tag: 'low-level',
-    object: 'the DDL source of an existing ABAP database table',
+    object:
+      'the DDL source of an existing ABAP database table, which defines its key, components and delivery class',
     how: ', under a lock the caller holds',
   }),
   inputSchema: z.object({

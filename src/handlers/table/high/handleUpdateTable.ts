@@ -48,9 +48,9 @@ export const TOOL_DEFINITION = {
   name: 'UpdateTable',
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
-    object: 'the DDL source of an existing ABAP database table',
+    object:
+      'the DDL source of an existing ABAP database table, which defines its key, components and delivery class',
     how: ', activating it when asked',
-    transported: true,
   }),
   inputSchema: z.object({
     table_name: z.string().describe('Table name. Table must already exist.'),

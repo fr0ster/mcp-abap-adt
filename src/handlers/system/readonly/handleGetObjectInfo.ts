@@ -6,6 +6,7 @@ import type {
   IAdtFailure,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import type { UtilsApi } from '../../../lib/adtClientContract';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
@@ -37,14 +38,10 @@ import {
   withLongToolAdvice,
 } from '../../../lib/longTools';
 import {
-  type MetadataTarget,
-  metadataKeyOf,
-} from '../../../lib/strategies/metadataReads';
-import {
   batchReader,
+  concurrentReader,
   endsTheCall,
   kindOf,
-  metadataDescriptions,
   type NodeLevel,
   type NodeRequest,
   nodeStructureOn,
@@ -97,7 +94,7 @@ const FIELDS = {
     .default(false)
     .optional()
     .describe(
-      "[read-only] Include each leaf's description. Where the system serves ADT batch, each description is read from the leaf's metadata: one more read per leaf, which on a large tree takes most of the call (default false)",
+      "[read-only] Include each leaf's description, read from the node structure that lists it, each node structure sent as its own request (default false)",
     ),
 };
 
@@ -510,8 +507,9 @@ async function buildTree(
  * tier, (a) the root node structure of every node of the tier, read
  * together; (b) every type folder those roots list, read together; the next
  * tier is the packages found that are walked further, as `buildTree` walks
- * them. Then one phase: the metadata of every leaf, whose
- * `adtcore:description` is the leaf's description. With `enrich`, a last
+ * them; with `include_descriptions`, each node structure is sent alone
+ * instead (`concurrentReader`), every leaf's description its own node
+ * structure's, as the sequential version reads it. With `enrich`, a last
  * phase: one search per node. A root's first
  * refused read is its answer, and nothing more of it is read; a credential
  * failure SAP answered ends the reads.
@@ -527,15 +525,21 @@ async function buildTrees(
   describe: boolean,
   ended: Ended,
 ): Promise<Trees> {
-  const read = batchReader(context, (request: NodeRequest, c) =>
+  const readOne = (request: NodeRequest, c: IAbapConnection) =>
     readNode(
       nodeStructureOn(
         context,
         createAdtClient(c, context.logger).getUtils(ourUtils),
       ),
       request,
-    ),
-  );
+    );
+  // With descriptions, every node structure is sent alone: inside an
+  // envelope a part can carry another part's DESCRIPTION (measured,
+  // 2026-10-18), and alone each carries its own — the description the
+  // sequential version reads.
+  const read = describe
+    ? concurrentReader(context, readOne)
+    : batchReader(context, readOne);
   const failures = new Map<number, IAdtFailure | Thrown>();
   const roots: InfoNode[] = objects.map((o, root) => ({
     root,
@@ -545,38 +549,13 @@ async function buildTrees(
     children: [],
   }));
   const nodes: InfoNode[] = [...roots];
-  /** Every leaf of every tree, with its root and the object it reads. */
-  const leaves: Array<{
-    root: number;
-    leaf: TreeNode;
-    target: MetadataTarget;
-  }> = [];
-  /**
-   * A leaf without the description its part carried: a node structure part
-   * after the first of an envelope can carry another part's `DESCRIPTION`
-   * (measured, 2026-10-18); the leaf's description is its metadata's.
-   */
-  const bareLeaf = (node: InfoNode, o: NodeLevel['objects'][number]) => {
-    const leaf: TreeNode = { OBJECT_TYPE: o.type, OBJECT_NAME: o.name };
-    // A function module or include is read at its group: the node it was
-    // found under.
-    const functionGroup =
-      node.type === 'FUGR/F' ||
-      node.type === 'FUGR/FF' ||
-      node.type === 'FUGR/I'
-        ? node.name
-        : undefined;
-    leaves.push({
-      root: node.root,
-      leaf,
-      target: {
-        type: o.type,
-        name: o.name,
-        ...(functionGroup !== undefined ? { functionGroup } : {}),
-      },
-    });
-    return leaf;
-  };
+  /** A leaf: its description when asked for, from its own node structure. */
+  const bareLeaf = (o: NodeLevel['objects'][number]): TreeNode => ({
+    OBJECT_TYPE: o.type,
+    OBJECT_NAME: o.name,
+    // A description only when asked for: SAP sends some without it.
+    ...(describe && o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
+  });
   const limit = (node: InfoNode) => objects[node.root].maxDepth;
   let ending: IAdtFailure | undefined;
   /** The level a read answered, or undefined once its root failed. */
@@ -616,7 +595,7 @@ async function buildTrees(
     tier.forEach((node, i) => {
       const level = settle(node, rootAnswers[i]);
       if (level === undefined) return;
-      node.children.push(...level.objects.map((o) => bareLeaf(node, o)));
+      node.children.push(...level.objects.map((o) => bareLeaf(o)));
       for (const child of level.childNodes) {
         typeNodes.push({ node, nodeId: child.nodeId });
       }
@@ -657,29 +636,12 @@ async function buildTrees(
           nodes.push(sub);
           next.push(sub);
         } else {
-          node.children.push(bareLeaf(node, o));
+          node.children.push(bareLeaf(o));
         }
       }
     });
     if (ending !== undefined) return { roots, failures, ended: ending };
     tier = next.filter((node) => !failures.has(node.root));
-  }
-
-  // Asked for: every leaf's description from its metadata, in one phase.
-  if (describe) {
-    const described = leaves.filter(({ root }) => !failures.has(root));
-    const { descriptions, refused } = await metadataDescriptions(
-      context,
-      described.map(({ target }) => target),
-    );
-    // A metadata read SAP refused with a credential failure ends the call as
-    // a refused node read does: the method's error, with its step.
-    if (refused !== undefined) return { roots, failures, ended: refused };
-    for (const { leaf, target } of described) {
-      const key = metadataKeyOf(target);
-      const description = key === undefined ? undefined : descriptions.get(key);
-      if (description) leaf.OBJECT_DESCRIPTION = description;
-    }
   }
 
   if (enrich) {

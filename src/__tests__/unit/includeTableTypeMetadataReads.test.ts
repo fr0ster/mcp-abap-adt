@@ -13,7 +13,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../lib/clients';
 import {
-  METADATA_READ_TYPES,
   readIncludeMetadata,
   readTableTypeMetadata,
 } from '../../lib/strategies/metadataReads';
@@ -96,10 +95,5 @@ describe('the shared include and table-type metadata reads', () => {
       '/sap/bc/adt/ddic/tabletypes/zttyp_x?version=active',
     );
     assert.equal(rawOf(response), document);
-  });
-
-  it("neither read joins the package walk's reads", () => {
-    assert.ok(!METADATA_READ_TYPES.includes('PROG/I'));
-    assert.ok(!METADATA_READ_TYPES.includes('TTYP/DA'));
   });
 });

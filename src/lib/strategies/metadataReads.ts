@@ -1,8 +1,8 @@
 /**
  * Each type's metadata read, one function per type: the one request the
- * type's `Get<Type>` handler sends for its metadata, and the read the
- * batched walks send for an object's description (spec §11). Both call the
- * same function, so the two requests cannot drift apart. Each read names its
+ * type's `Get<Type>` handler sends for its metadata, and the one every
+ * other path reading that metadata sends (the function module group
+ * check), so the requests cannot drift apart. Each read names its
  * version: the caller's.
  */
 
@@ -30,16 +30,8 @@ import {
   tableTypeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type {
-  AdtTypeCode,
-  AdtTypeCodeWith,
-  IAdtError,
-  IAdtResponse,
-} from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../adtClientContract';
-import { tableCodeOf } from '../adtTypeCode';
 import type { ReadVersion } from '../handlers/readVersion';
-import type { AdtReading } from './reading';
 import { resultsFor } from './resultSets';
 
 type Client = IServerAdtClient;
@@ -250,139 +242,3 @@ export const readAccessControlMetadata = (
   c
     .getAccessControl(resultsFor(accessControlDocuments))
     .readMetadata(config, at(version));
-
-/**
- * The versions the walks read an object's description at: the request 22.0.x
- * sent, now stated. adt-clients 39 sent `active` for a metadata read without
- * a version of a service definition, a behavior definition, a function group
- * include, a package and an access control, and none for every other type —
- * ADT's working area, so an object that exists only inactive keeps its
- * description.
- */
-const ACTIVE: ReadVersion = 'active';
-const WORKING_AREA: ReadVersion = 'workingArea';
-
-/** An object whose metadata is read. */
-export interface MetadataTarget {
-  type: string;
-  name: string;
-  /** The function group of a function module or a function group include. */
-  functionGroup?: string;
-}
-
-/**
- * One object's metadata read on a client: the document as a verbatim
- * reading answers it (`AdtReading.raw`), or the document itself where the
- * type's read answers it whole (an enhancement spot's).
- */
-export type MetadataRead = (
-  client: Client,
-) => Promise<IAdtResponse<AdtReading<string> | string, IAdtError>>;
-
-type ReadOf = (target: MetadataTarget) => MetadataRead | undefined;
-
-/** A read that needs the group the object was found in. */
-const inGroup =
-  (read: (group: string, t: MetadataTarget) => MetadataRead): ReadOf =>
-  (t) =>
-    t.functionGroup ? read(t.functionGroup, t) : undefined;
-
-/**
- * Each ADT type's metadata read, with what the read takes from the object:
- * its name, and for a function module or include the group it was found in.
- * Each is read at the version 22.0.x read it (`ACTIVE`, `WORKING_AREA`).
- */
-const READS = {
-  'CLAS/OC': (t) => (c) =>
-    readClassMetadata(c, { className: t.name }, WORKING_AREA),
-  'INTF/OI': (t) => (c) =>
-    readInterfaceMetadata(c, { interfaceName: t.name }, WORKING_AREA),
-  'PROG/P': (t) => (c) =>
-    readProgramMetadata(c, { programName: t.name }, WORKING_AREA),
-  'DDLS/DF': (t) => (c) =>
-    readDdlMetadata(c, { ddlName: t.name }, WORKING_AREA),
-  'DDLX/EX': (t) => (c) =>
-    readMetadataExtensionMetadata(c, { name: t.name }, WORKING_AREA),
-  'DOMA/DD': (t) => (c) =>
-    readDomainMetadata(c, { domainName: t.name }, WORKING_AREA),
-  'DTEL/DE': (t) => (c) =>
-    readDataElementMetadata(c, { dataElementName: t.name }, WORKING_AREA),
-  'TABL/DT': (t) => (c) =>
-    readTableMetadata(c, { tableName: t.name }, WORKING_AREA),
-  'TABL/DS': (t) => (c) =>
-    readStructureMetadata(c, { structureName: t.name }, WORKING_AREA),
-  'FUGR/F': (t) => (c) =>
-    readFunctionGroupMetadata(c, { functionGroupName: t.name }, WORKING_AREA),
-  'FUGR/FF': inGroup(
-    (group, t) => (c) =>
-      readFunctionModuleMetadata(
-        c,
-        {
-          functionModuleName: t.name,
-          functionGroupName: group,
-        },
-        WORKING_AREA,
-      ),
-  ),
-  'FUGR/I': inGroup(
-    (group, t) => (c) =>
-      readFunctionIncludeMetadata(
-        c,
-        {
-          functionGroupName: group,
-          includeName: t.name,
-        },
-        ACTIVE,
-      ),
-  ),
-  'SRVD/SRV': (t) => (c) =>
-    readServiceDefinitionMetadata(c, { serviceDefinitionName: t.name }, ACTIVE),
-  'SRVB/SVB': (t) => (c) =>
-    readServiceBindingMetadata(c, { bindingName: t.name }, WORKING_AREA),
-  'BDEF/BDO': (t) => (c) =>
-    readBehaviorDefinitionMetadata(c, { name: t.name }, ACTIVE),
-  'DEVC/K': (t) => (c) =>
-    readPackageMetadata(c, { packageName: t.name }, ACTIVE),
-  'MSAG/N': (t) => (c) =>
-    readMessageClassMetadata(c, { name: t.name }, WORKING_AREA),
-  'ENHS/XSB': (t) => (c) =>
-    readEnhancementSpotMetadata(c, { enhancementName: t.name }, WORKING_AREA),
-  'DCLS/DL': (t) => (c) =>
-    readAccessControlMetadata(c, { accessControlName: t.name }, ACTIVE),
-} satisfies { readonly [C in MetadataCode]?: ReadOf };
-
-/**
- * A code whose metadata a table reads (`readMetadata`), on premise or on
- * ABAP cloud: a key of {@link READS} outside them does not compile.
- */
-type MetadataCode = AdtTypeCodeWith<'onprem' | 'cloud', 'readMetadata'>;
-
-/** {@link READS}, read by any code of the tables. */
-const READ_BY_CODE: Readonly<Partial<Record<AdtTypeCode, ReadOf>>> = READS;
-
-/** The ADT types whose metadata is read. */
-export const METADATA_READ_TYPES: readonly string[] = Object.keys(READS);
-
-/**
- * `target`'s metadata read; `undefined` for a type with none. The type is
- * what SAP answered (a package listing), looked up against the tables.
- */
-export function metadataReadOf(
-  target: MetadataTarget,
-): MetadataRead | undefined {
-  const code = tableCodeOf(target.type);
-  return code === undefined ? undefined : READ_BY_CODE[code]?.(target);
-}
-
-/**
- * The key of `target`'s metadata read — one read per key — or `undefined`
- * when its type has no metadata read here.
- */
-export function metadataKeyOf(target: MetadataTarget): string | undefined {
-  if (metadataReadOf(target) === undefined) return undefined;
-  return [
-    target.type.toUpperCase(),
-    target.name.toUpperCase(),
-    (target.functionGroup ?? '').toUpperCase(),
-  ].join('|');
-}

@@ -1580,84 +1580,52 @@ describe('GetObjectInfo: descriptions', () => {
       include_descriptions: true,
     });
 
-  it("a part carrying another part's DESCRIPTION: the answer is the sequential one", async () => {
+  // Both paths take each description from the node structure that lists
+  // the object, sent alone (as the package listings do): never from a
+  // batched part, which can carry another part's, and never from a second
+  // read the sequential version does not send.
+  it('each node structure sent alone: every object with its own description, the sequential answer', async () => {
     const leaking = leakingSystem();
     const batched = await withinTurns(call(contextOn(leaking as Fake)));
     const sequential = await withinTurns(
       call(contextOn(leakingSystem() as Fake, 'absent')),
     );
-    // The envelopes did carry another part's description.
-    assert.ok(leaking.leaks.count > 0);
+    assert.equal(leaking.leaks.count, 0);
     assert.equal((batched as { isError?: boolean }).isError, false);
     assert.equal(textOf(batched), textOf(sequential));
     assert.ok(textOf(batched).includes('Class A'));
+    assert.ok(textOf(batched).includes('Interface B'));
   });
 
-  it('the metadata phase: one envelope, one GET per object, after the walk', async () => {
+  it('no metadata read, no node structure in an envelope', async () => {
     const fake = system();
     await withinTurns(call(contextOn(fake)));
-    const metadata = fake.envelopes.filter((e) =>
-      partKeys(e).includes('GET /sap/bc/adt/oo/classes/zcl_a'),
-    );
-    assert.equal(metadata.length, 1);
-    const parts = (metadata[0] as SeenEnvelope).parts;
     assert.equal(
-      parts.every((p) => p.method === 'GET'),
-      true,
+      [
+        ...fake.envelopes.flatMap(partKeys),
+        ...fake.directs.map((r) => r.url),
+      ].some((k) => k.includes('/sap/bc/adt/oo/')),
+      false,
     );
-    const keys = partKeys(metadata[0] as SeenEnvelope);
-    assert.equal(new Set(keys).size, keys.length);
-    for (const key of ['GET /sap/bc/adt/oo/classes/zcl_a']) {
-      assert.ok(keys.some((e) => isDeepStrictEqual(e, key)));
-    }
-    // No node structure is read after it.
-    const at = fake.envelopes.indexOf(metadata[0] as SeenEnvelope);
+    // The enrichment's searches stay batched; no node structure is.
     assert.equal(
       fake.envelopes
-        .slice(at + 1)
         .flatMap(partKeys)
         .some((k) => k.includes('|') && !k.startsWith('SEARCH|')),
       false,
     );
+    assert.ok(nodeReads(fake).length > 0);
   });
 
-  it("a metadata part's failure: that object has no description; the call answers", async () => {
-    const fake = system({
-      refuse: { 'GET /sap/bc/adt/oo/classes/zcl_a': 500 },
-    });
-    const result = await withinTurns(call(contextOn(fake)));
-    assert.equal((result as { isError?: boolean }).isError, false);
-    assert.ok(textOf(result).includes('ZCL_A'));
-    assert.ok(!textOf(result).includes('Class A'));
-    assert.ok(textOf(result).includes('Interface B'));
-  });
-
-  it('a 401 SAP answered to a metadata part ends the call as it came', async () => {
-    const fake = system({
-      refuse: { 'GET /sap/bc/adt/oo/classes/zcl_a': 401 },
-    });
-    const result = await withinTurns(call(contextOn(fake)));
-    assert.equal((result as { isError?: boolean }).isError, true);
-    assertMatchObject(payloadOf(result), {
-      status: 401,
-      step: 'read object metadata',
-    });
-  });
-
-  it("the connection's credential refusal of the metadata envelope ends the call as it came", async () => {
-    const fake = envelopeConnection((parts) => {
-      if (
-        parts.some(
-          (p) => keyOf(p.method, p.url) === 'GET /sap/bc/adt/oo/classes/zcl_a',
-        )
-      ) {
-        throw credential();
-      }
-      return envelopeOf(parts.map((p) => answerOf({}, p.method, p.url)));
-    });
-    const result = await withinTurns(call(contextOn(fake as unknown as Fake)));
-    assert.equal((result as { isError?: boolean }).isError, true);
-    assert.equal(payloadOf(result).error, 'authentication_failed');
+  it('a 401 an object’s metadata would answer changes nothing: no metadata is read, the sequential answer', async () => {
+    const model = { refuse: { 'GET /sap/bc/adt/oo/classes/zcl_a': 401 } };
+    const batched = await withinTurns(call(contextOn(system(model))));
+    const sequential = await withinTurns(
+      call(contextOn(system(model), 'absent')),
+    );
+    assert.equal((batched as { isError?: boolean }).isError, false);
+    assert.equal(textOf(batched), textOf(sequential));
+    assert.ok(textOf(batched).includes('Class A'));
   });
 
   it('no communication batch: no metadata read, the descriptions of today', async () => {

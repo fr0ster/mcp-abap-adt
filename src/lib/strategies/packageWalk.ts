@@ -2,7 +2,6 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   AdtTypeCode,
   IAdtError,
-  IAdtFailure,
   IAdtHeaders,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -19,11 +18,7 @@ import {
 } from '../adtHeaders/withAdtHeaders';
 import type { AdtCodes } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
-import {
-  failureEntry,
-  isCredentialFailure,
-  isCredentialPayload,
-} from '../answer';
+import { isCredentialFailure } from '../answer';
 import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
 import {
@@ -32,25 +27,16 @@ import {
   READS_PER_ENVELOPE,
   runPhase,
 } from '../batch/phases';
-import { createAdtClient } from '../clients';
 import { readsInFlight } from '../connectionKind';
 import { bodyTextOf } from '../wireValue';
-import { parseXml, type XmlNode } from '../xml/node';
+import { parseXml } from '../xml/node';
 import {
   childAt as nodeAt,
   child as nodeChild,
-  entries as nodeEntries,
   listOf as nodeList,
   type XmlRead,
 } from '../xml/tree';
-import {
-  type MetadataRead,
-  type MetadataTarget,
-  metadataKeyOf,
-  metadataReadOf,
-} from './metadataReads';
-import type { AdtReading } from './reading';
-import { atStep, carryingFailure } from './step';
+import { carryingFailure } from './step';
 
 /**
  * The one call this walk needs, named structurally.
@@ -902,102 +888,6 @@ export type WalkedItem = {
   techName?: string | undefined;
   uri?: string | undefined;
 };
-
-/** The step of a failed object metadata read. */
-export const METADATA_STEP = 'read object metadata';
-
-/** The `adtcore:description` of a metadata document's root element. */
-export function metadataDescriptionOf(xml: string): string | undefined {
-  let doc: XmlNode | undefined;
-  try {
-    doc = parseXml(parser, xml);
-  } catch {
-    return undefined;
-  }
-  for (const [name, root] of nodeEntries(doc)) {
-    if (name.startsWith('?') || typeof root !== 'object') {
-      continue;
-    }
-    const description = nodeChild(root, 'adtcore:description');
-    return typeof description === 'string'
-      ? description.trim() || undefined
-      : undefined;
-  }
-  return undefined;
-}
-
-/**
- * The document a metadata reading answered: `AdtReading.raw`, or the
- * document itself where the type's read answers it whole.
- */
-function rawOf(value: AdtReading<string> | string): string {
-  return typeof value === 'string' ? value : value.raw;
-}
-
-/** The descriptions a metadata phase read, and the refusal that ended it. */
-export interface MetadataDescriptions {
-  /** Each object's description, by `metadataKeyOf`. */
-  descriptions: Map<string, string | undefined>;
-  /** A metadata read SAP refused with a credential failure, with its step. */
-  refused?: IAdtFailure;
-}
-
-/**
- * The description of every object of `targets`, read in ADT batch
- * envelopes (`runPhase`) of at most `READS_PER_ENVELOPE` reads, one after
- * another; no envelope is sent after one that met a credential refusal.
- * One metadata read per distinct object, the one its
- * type's `Get<Type>` handler sends (`metadataReadOf`), keyed by
- * `metadataKeyOf`. An object of a type with no metadata read, or whose read
- * failed, has no entry. A failure the server's reader answers ends the call,
- * thrown as it came; a read SAP refused with a credential failure is
- * answered as `refused`, the method's error with its step.
- */
-export async function metadataDescriptions(
-  context: HandlerContext,
-  targets: readonly MetadataTarget[],
-): Promise<MetadataDescriptions> {
-  const reads = new Map<string, MetadataRead>();
-  for (const target of targets) {
-    const key = metadataKeyOf(target);
-    const read = metadataReadOf(target);
-    if (key !== undefined && read !== undefined && !reads.has(key)) {
-      reads.set(key, read);
-    }
-  }
-  const descriptions = new Map<string, string | undefined>();
-  let refused: IAdtFailure | undefined;
-  for (const keyed of chunksOf([...reads], READS_PER_ENVELOPE)) {
-    if (refused !== undefined) break;
-    const results = await runPhase(context, keyed, ([, read], connection) =>
-      atStep(METADATA_STEP, read)(createAdtClient(connection, context.logger)),
-    );
-    results.forEach((result, i) => {
-      if (!result.ok) {
-        if (endsTheCall(result.error)) throw result.error;
-        return;
-      }
-      const key = keyed[i]?.[0];
-      const response = result.value;
-      if (response.ok) {
-        if (key !== undefined) {
-          descriptions.set(
-            key,
-            metadataDescriptionOf(rawOf(response.getResult().value)),
-          );
-        }
-        return;
-      }
-      if (
-        refused === undefined &&
-        isCredentialPayload(failureEntry(response.getError(), METADATA_STEP))
-      ) {
-        refused = response;
-      }
-    });
-  }
-  return refused === undefined ? { descriptions } : { descriptions, refused };
-}
 
 /** The flat listing. */
 export function assembleList(

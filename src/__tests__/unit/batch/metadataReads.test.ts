@@ -1,23 +1,14 @@
 /**
  * One metadata read per type, shared by the type's `Get<Type>` handler and
- * the batched walks' metadata phase (`lib/strategies/metadataReads.ts`):
- * - every `handleGet*` handler that reads metadata does it through that
- *   module, or is named here with why it does not;
- * - every type the batch reads has its handler here, and the batch part is
- *   the handler's request whole: method, URL with its query, headers, body;
- *   a type with no `Get<Type>` handler is named with the request its part
- *   sends.
+ * every other path reading that metadata (`lib/strategies/metadataReads.ts`):
+ * every `handleGet*` handler that reads metadata does it through that
+ * module, or is named here with why it does not.
  */
 
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, it } from 'node:test';
-import { format } from 'node:util';
-import type {
-  IAbapRequestOptions,
-  IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetBehaviorDefinition } from '../../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
 import { handleGetClass } from '../../../handlers/class/high/handleGetClass';
 import { handleGetDataElement } from '../../../handlers/data_element/high/handleGetDataElement';
@@ -37,26 +28,11 @@ import { handleGetServiceBinding } from '../../../handlers/service_binding/high/
 import { handleGetServiceDefinition } from '../../../handlers/service_definition/high/handleGetServiceDefinition';
 import { handleGetStructure } from '../../../handlers/structure/high/handleGetStructure';
 import { handleGetTable } from '../../../handlers/table/high/handleGetTable';
-import { createBatchAvailability } from '../../../lib/batch/availability';
-import { READS_PER_ENVELOPE } from '../../../lib/batch/phases';
-import {
-  METADATA_READ_TYPES,
-  type MetadataTarget,
-} from '../../../lib/strategies/metadataReads';
-import { metadataDescriptions } from '../../../lib/strategies/packageWalk';
-import {
-  envelopeConnection,
-  envelopeResponse,
-} from '../../helpers/batchEnvelope';
 import { repositoryRoot } from '../../helpers/repoRoot';
-import { withinTurns } from '../../helpers/withinTurns';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
-
-const DOC =
-  '<?xml version="1.0" encoding="utf-8"?><adtcore:mainObject xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="Placeholder"/>';
 
 const NAME = 'ZOBJ_X';
 const GROUP = 'ZGRP_X';
@@ -169,22 +145,6 @@ const HANDLERS: Record<string, { file: string; call: Handler }> = {
   },
 };
 
-/**
- * Types the batch reads that have no `Get<Type>` handler: the request their
- * part sends (the adt-clients `readMetadata` of the type), measured on
- * premise with the same bytes alone and inside an envelope.
- */
-const WITHOUT_HANDLER: Record<
-  string,
-  { method: string; url: string; accept: string }
-> = {
-  'DCLS/DL': {
-    method: 'GET',
-    url: `/sap/bc/adt/acm/dcl/sources/${NAME.toLowerCase()}?version=active`,
-    accept: 'application/vnd.sap.adt.dclSource+xml',
-  },
-};
-
 /** Handlers that read a type above through the shared read, besides its own. */
 const ALSO_SHARED: Record<string, string> = {
   'system/high/handleGetPackageTree.ts': 'DEVC/K',
@@ -208,44 +168,6 @@ const EXCLUDED: Record<string, string> = {
   'table_type/high/handleGetTableType.ts':
     "a table type's metadata; the package walk does not read table types, so the batch has no read of the type",
 };
-
-/**
- * The version each type's description is read at in the walks: the request
- * 22.0.x sent, now stated. adt-clients 39 sent `active` for a metadata read
- * without a version of a service definition, a behavior definition, a
- * function group include, a package and an access control, and no version
- * for every other type here — ADT's working area.
- */
-const WALK_VERSION: Readonly<Record<string, 'active' | 'workingArea'>> = {
-  'CLAS/OC': 'workingArea',
-  'INTF/OI': 'workingArea',
-  'PROG/P': 'workingArea',
-  'DDLS/DF': 'workingArea',
-  'DDLX/EX': 'workingArea',
-  'DOMA/DD': 'workingArea',
-  'DTEL/DE': 'workingArea',
-  'TABL/DT': 'workingArea',
-  'TABL/DS': 'workingArea',
-  'FUGR/F': 'workingArea',
-  'FUGR/FF': 'workingArea',
-  'FUGR/I': 'active',
-  'SRVD/SRV': 'active',
-  'SRVB/SVB': 'workingArea',
-  'BDEF/BDO': 'active',
-  'DEVC/K': 'active',
-  'MSAG/N': 'workingArea',
-  'ENHS/XSB': 'workingArea',
-  'DCLS/DL': 'active',
-};
-
-/** `url` with its `version` set to `version`, the rest of its query kept. */
-function atVersion(url: string, version: string): string {
-  const at = url.indexOf('?');
-  const path = at < 0 ? url : url.slice(0, at);
-  const query = new URLSearchParams(at < 0 ? '' : url.slice(at + 1));
-  query.set('version', version);
-  return `${path}?${query.toString()}`;
-}
 
 // From the repository root, so the compiled node:test file reads the sources.
 const HANDLERS_DIR = join(repositoryRoot(__dirname), 'src', 'handlers');
@@ -271,65 +193,7 @@ const codeOf = (path: string) =>
     })
     .join('\n');
 
-const lowerHeaders = (headers: Record<string, unknown> | undefined) =>
-  Object.fromEntries(
-    Object.entries(headers ?? {})
-      .filter(([key]) => key.toLowerCase() !== 'content-length')
-      .map(([key, value]) => [key.toLowerCase(), String(value)]),
-  );
-
-const targetOf = (type: string): MetadataTarget => ({
-  type,
-  name: NAME,
-  ...(type === 'FUGR/FF' || type === 'FUGR/I' ? { functionGroup: GROUP } : {}),
-});
-
-/** The request the type's `Get<Type>` handler sends, on a plain connection. */
-/**
- * A direct request's address with its request parameters in the query, as an
- * envelope part carries them (a service binding's version is a parameter).
- */
-function withParams(url: string, params: IAbapRequestOptions['params']) {
-  if (typeof params !== 'object' || params === null) return url;
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) query.append(key, String(value));
-  }
-  const text = query.toString();
-  if (text === '') return url;
-  return `${url}${url.includes('?') ? '&' : '?'}${text}`;
-}
-
-async function handlerRequest(type: string) {
-  const fake = envelopeConnection(
-    () => envelopeResponse([]),
-    async (): Promise<IAdtWireResponse> =>
-      ({
-        status: 200,
-        statusText: 'OK',
-        headers: { 'content-type': 'application/xml' },
-        data: DOC,
-      }) as IAdtWireResponse,
-  );
-  const handler = HANDLERS[type];
-  if (handler === undefined) throw new Error(`no handler for ${type}`);
-  await withinTurns(
-    handler.call({
-      connection: fake.connection,
-      logger: undefined,
-    } as unknown as HandlerContext),
-  );
-  assert.equal(fake.directs.length, 1);
-  const request = fake.directs[0] as IAbapRequestOptions;
-  return {
-    method: request.method,
-    url: withParams(request.url, request.params),
-    headers: lowerHeaders(request.headers),
-    body: request.data === undefined ? '' : String(request.data),
-  };
-}
-
-describe('one metadata read per type, shared by handler and batch', () => {
+describe('one metadata read per type, shared by every path', () => {
   it('every handleGet* metadata read goes through the shared reads, or is named with its reason', () => {
     const reading = getHandlerFiles(HANDLERS_DIR)
       .filter((path) => {
@@ -354,159 +218,5 @@ describe('one metadata read per type, shared by handler and batch', () => {
         /\.read(Object)?Metadata\(/.test(codeOf(join(HANDLERS_DIR, file))),
     );
     assert.deepStrictEqual(direct, []);
-  });
-
-  it('the batch reads exactly the types of those handlers, and the types named without one', () => {
-    assert.deepStrictEqual(
-      [...METADATA_READ_TYPES].sort(),
-      [...Object.keys(HANDLERS), ...Object.keys(WITHOUT_HANDLER)].sort(),
-    );
-  });
-
-  for (const type of Object.keys(WITHOUT_HANDLER)) {
-    it(
-      format("%s: the batch part is the type's metadata request", type),
-      async () => {
-        const expected = WITHOUT_HANDLER[type];
-        const fake = envelopeConnection((parts) =>
-          envelopeResponse(
-            parts.map(() => ({
-              status: 200,
-              statusText: 'OK',
-              headers: { 'content-type': 'application/xml' },
-              body: DOC,
-            })),
-          ),
-        );
-        const context = {
-          connection: fake.connection,
-          logger: undefined,
-          batchAvailability: createBatchAvailability(),
-        } as unknown as HandlerContext;
-        const { descriptions } = await withinTurns(
-          metadataDescriptions(context, [targetOf(type)]),
-        );
-        assert.equal(fake.envelopes.length, 1);
-        const parts = fake.envelopes[0]?.parts ?? [];
-        assert.equal(parts.length, 1);
-        const inner = parts[0];
-        assert.deepStrictEqual(
-          {
-            method: inner?.method,
-            url: inner?.url,
-            accept: lowerHeaders(inner?.headers).accept,
-            body: (inner?.body ?? '').trim(),
-          },
-          { ...expected, body: '' },
-        );
-        assert.deepStrictEqual([...descriptions.values()], ['Placeholder']);
-      },
-    );
-  }
-
-  for (const type of Object.keys(HANDLERS)) {
-    it(
-      format(
-        "%s: the batch part is the handler's request whole, at the version 22.0.x read",
-        type,
-      ),
-      async () => {
-        const direct = await handlerRequest(type);
-        const fake = envelopeConnection((parts) =>
-          envelopeResponse(
-            parts.map(() => ({
-              status: 200,
-              statusText: 'OK',
-              headers: { 'content-type': 'application/xml' },
-              body: DOC,
-            })),
-          ),
-        );
-        const context = {
-          connection: fake.connection,
-          logger: undefined,
-          batchAvailability: createBatchAvailability(),
-        } as unknown as HandlerContext;
-        const { descriptions } = await withinTurns(
-          metadataDescriptions(context, [targetOf(type)]),
-        );
-        assert.equal(fake.envelopes.length, 1);
-        const parts = fake.envelopes[0]?.parts ?? [];
-        assert.equal(parts.length, 1);
-        const inner = parts[0];
-        const version = WALK_VERSION[type] ?? '';
-        assert.deepStrictEqual(
-          {
-            method: inner?.method,
-            url: inner?.url,
-            headers: lowerHeaders(inner?.headers),
-            // The envelope frames an empty body with its line break.
-            body: (inner?.body ?? '').trim(),
-          },
-          { ...direct, url: atVersion(direct.url, version) },
-        );
-        assert.equal(
-          new URLSearchParams(inner?.url.split('?')[1]).get('version'),
-          version,
-        );
-        assert.ok(direct.headers.accept);
-        assert.deepStrictEqual([...descriptions.values()], ['Placeholder']);
-      },
-    );
-  }
-});
-
-describe('the metadata phase is bounded (GetObjectInfo include_descriptions)', () => {
-  const classes = (count: number): MetadataTarget[] =>
-    Array.from({ length: count }, (_, i) => ({
-      type: 'CLAS/OC',
-      name: `ZCL_${i}`,
-    }));
-  const contextOn = (fake: ReturnType<typeof envelopeConnection>) =>
-    ({
-      connection: fake.connection,
-      logger: undefined,
-      batchAvailability: createBatchAvailability(),
-    }) as unknown as HandlerContext;
-
-  it(`more than ${READS_PER_ENVELOPE} objects: consecutive envelopes of at most ${READS_PER_ENVELOPE} reads, every description read`, async () => {
-    const fake = envelopeConnection((parts) =>
-      envelopeResponse(
-        parts.map(() => ({
-          status: 200,
-          statusText: 'OK',
-          headers: { 'content-type': 'application/xml' },
-          body: DOC,
-        })),
-      ),
-    );
-    const { descriptions, refused } = await withinTurns(
-      metadataDescriptions(contextOn(fake), classes(READS_PER_ENVELOPE + 2)),
-      2000,
-    );
-    assert.deepStrictEqual(
-      fake.envelopes.map((e) => e.parts.length),
-      [151, 151],
-    );
-    assert.equal(descriptions.size, READS_PER_ENVELOPE + 2);
-    assert.equal(refused, undefined);
-  });
-
-  it('a credential refusal SAP answered in an envelope: the refusal, and no later envelope', async () => {
-    const fake = envelopeConnection((parts) =>
-      envelopeResponse(
-        parts.map(() => ({
-          status: 401,
-          statusText: 'Unauthorized',
-          body: '',
-        })),
-      ),
-    );
-    const { refused } = await withinTurns(
-      metadataDescriptions(contextOn(fake), classes(READS_PER_ENVELOPE + 2)),
-      2000,
-    );
-    assert.notEqual(refused, undefined);
-    assert.equal(fake.envelopes.length, 1);
   });
 });

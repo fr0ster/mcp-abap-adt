@@ -151,17 +151,23 @@ export function returnsOf(source: {
    * sentence, their nouns joined under it (the item itself, compact).
    */
   readonly of?: string | undefined;
+  /** What follows the heads' nouns in that sentence (`SAP proposes`). */
+  readonly by?: string | undefined;
   readonly shapes: readonly (readonly ListShape[])[];
 }): ReturnsFact[] {
   const seen = new Set<ListShape>();
   const all: Stated[] = [
-    ...(source.of === undefined
+    ...(source.of === undefined && source.by === undefined
       ? (source.heads ?? []).map((head) => stated(head.about))
       : source.heads === undefined || source.heads.length === 0
         ? []
         : [
             stated(
-              `${source.of} ${joined(source.heads.map((head) => head.about))}`,
+              [
+                ...(source.of === undefined ? [] : [source.of]),
+                joined(source.heads.map((head) => head.about)),
+                ...(source.by === undefined ? [] : [source.by]),
+              ].join(' '),
             ),
           ]),
     ...source.shapes.flat().flatMap((shape) => {

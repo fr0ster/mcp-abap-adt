@@ -33,6 +33,7 @@ import {
   RUN_LOG_MEDIUM,
   RUN_LOG_TERSE,
   STAGING_HEADS,
+  STAGING_HEADS_BY,
   STAGING_MEDIUM,
   STAGING_TERSE,
   stagingRows,
@@ -101,12 +102,14 @@ function abapGitTie(
   terse: Parameters<typeof shapesOf>[0],
   medium: Parameters<typeof shapesOf>[0],
   samples: readonly TieSample[],
+  by?: string,
 ): ReturnsTie {
   const parts = partsOfDescription(descriptionOf(tool));
   assert.ok(parts !== undefined, `${tool} is assembled`);
   return {
     terse: shapesOf(terse),
     heads,
+    by,
     returns: parts.returns,
     samples,
   };
@@ -215,6 +218,7 @@ const TIED: Readonly<Record<string, () => ReturnsTie>> = {
           writtenLines({ heads, reading, lists: STAGING_MEDIUM }),
         );
       })(),
+      STAGING_HEADS_BY,
     ),
   GetPackage: () => {
     const parts = partsOfDescription(descriptionOf('GetPackage'));

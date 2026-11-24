@@ -464,9 +464,12 @@ const people = (value: IAbapGitStagingFacts) => [
 
 /** The heads R9 writes: SAP's proposed author and committer. */
 export const STAGING_HEADS = [
-  headShape('author', 'the author SAP proposes'),
-  headShape('committer', 'the committer SAP proposes'),
+  headShape('author', 'the author'),
+  headShape('committer', 'the committer'),
 ];
+
+/** What the staging heads' sentence says after them: SAP proposes both. */
+export const STAGING_HEADS_BY = 'SAP proposes';
 
 /** A staged row's identifying columns. */
 const STAGED_COLUMNS: Column<StagedRow>[] = [

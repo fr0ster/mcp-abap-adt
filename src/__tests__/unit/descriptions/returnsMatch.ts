@@ -31,6 +31,8 @@ export interface ReturnsTie {
   readonly heads: readonly HeadShape[];
   /** Whose facts the heads tell, as the description states them (`returnsOf`'s `of`). */
   readonly of?: string | undefined;
+  /** What follows the heads in that sentence (`returnsOf`'s `by`). */
+  readonly by?: string | undefined;
   readonly returns: readonly ReturnsFact[];
   readonly samples: readonly TieSample[];
 }
@@ -151,9 +153,12 @@ export function tieFaults(tie: ReturnsTie): string[] {
   }
   const generated = new Set(
     // The terse lists alone are stated: what only medium adds is not.
-    returnsOf({ heads: tie.heads, of: tie.of, shapes: [tie.terse] }).map(
-      (each) => each.text,
-    ),
+    returnsOf({
+      heads: tie.heads,
+      of: tie.of,
+      by: tie.by,
+      shapes: [tie.terse],
+    }).map((each) => each.text),
   );
   for (const fact of facts) {
     if (!generated.has(fact)) faults.push(`an extra fact: "${fact}"`);

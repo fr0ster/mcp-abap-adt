@@ -223,6 +223,20 @@ describe('the description builder', () => {
     );
   });
 
+  it('says what follows the heads in their one sentence with `by`', () => {
+    assert.deepStrictEqual(
+      returnsOf({
+        heads: [
+          headShape('author', 'the author'),
+          headShape('committer', 'the committer'),
+        ],
+        by: 'SAP proposes',
+        shapes: [],
+      }).map((each) => each.text),
+      ['The author and the committer SAP proposes.'],
+    );
+  });
+
   it('continues the purpose with the facts when inline', () => {
     assert.equal(
       toolDescription({

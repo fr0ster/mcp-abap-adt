@@ -17,6 +17,7 @@ import {
   ABAPGIT_DETAIL_SHAPE,
   STAGING_ANSWERS,
   STAGING_HEADS,
+  STAGING_HEADS_BY,
   STAGING_MEDIUM,
   STAGING_TERSE,
 } from '../../../lib/abapGit/formats';
@@ -34,6 +35,7 @@ export const TOOL_DEFINITION = {
     ),
     returns: returnsOf({
       heads: STAGING_HEADS,
+      by: STAGING_HEADS_BY,
       shapes: [shapesOf(STAGING_TERSE)],
     }),
   }),

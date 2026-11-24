@@ -426,7 +426,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatebehaviordefinition-high-level-behavior-definition"></a>
 #### ActivateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Activates a RAP behavior definition, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates a RAP behavior definition, so its inactive version is in force.
 
 **Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
 
@@ -440,7 +440,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkbehaviordefinition-high-level-behavior-definition"></a>
 #### CheckBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Checks the syntax of a RAP behavior definition. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of a RAP behavior definition.
 
 **Source:** `src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts`
 
@@ -598,7 +598,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateclass-high-level-class"></a>
 #### ActivateClass (High-Level / Class)
-**Description:** Activates an ABAP class, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP class, so its inactive version is in force.
 
 **Source:** `src/handlers/class/low/handleActivateClass.ts`
 
@@ -612,7 +612,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkclass-high-level-class"></a>
 #### CheckClass (High-Level / Class)
-**Description:** [read-only] Checks the syntax of an ABAP class as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP class as stored or as the source given.
 
 **Source:** `src/handlers/class/high/handleCheckClass.ts`
 
@@ -896,7 +896,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateobjects-high-level-common"></a>
 #### ActivateObjects (High-Level / Common)
-**Description:** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once.
 
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
@@ -905,7 +905,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, PROG/P, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, program, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes; any other call is a group activation.
 
-**On ABAP Cloud (`cloud`):** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**On ABAP Cloud (`cloud`):** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once.
 
 **Parameters (`cloud`):**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
@@ -1237,7 +1237,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatedataelement-high-level-data-element"></a>
 #### ActivateDataElement (High-Level / Data Element)
-**Description:** Activates an ABAP data element, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP data element, so its inactive version is in force.
 
 **Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
 
@@ -1251,7 +1251,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkdataelement-high-level-data-element"></a>
 #### CheckDataElement (High-Level / Data Element)
-**Description:** [read-only] Checks the syntax of an ABAP data element. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP data element.
 
 **Source:** `src/handlers/data_element/high/handleCheckDataElement.ts`
 
@@ -1357,7 +1357,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateddl-high-level-ddl"></a>
 #### ActivateDdl (High-Level / Ddl)
-**Description:** Activates a CDS view, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates a CDS view, so its inactive version is in force.
 
 **Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
 
@@ -1371,7 +1371,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkddl-high-level-ddl"></a>
 #### CheckDdl (High-Level / Ddl)
-**Description:** [read-only] Checks the syntax of a CDS view as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of a CDS view as stored or as the source given.
 
 **Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
 
@@ -1456,7 +1456,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatemetadataextension-high-level-ddlx"></a>
 #### ActivateMetadataExtension (High-Level / Ddlx)
-**Description:** Activates a CDS metadata extension, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates a CDS metadata extension, so its inactive version is in force.
 
 **Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
 
@@ -1470,7 +1470,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkmetadataextension-high-level-ddlx"></a>
 #### CheckMetadataExtension (High-Level / Ddlx)
-**Description:** [read-only] Checks the syntax of a CDS metadata extension. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of a CDS metadata extension.
 
 **Source:** `src/handlers/ddlx/high/handleCheckMetadataExtension.ts`
 
@@ -1523,7 +1523,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatedomain-high-level-domain"></a>
 #### ActivateDomain (High-Level / Domain)
-**Description:** Activates an ABAP domain, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP domain, so its inactive version is in force.
 
 **Source:** `src/handlers/domain/low/handleActivateDomain.ts`
 
@@ -1537,7 +1537,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkdomain-high-level-domain"></a>
 #### CheckDomain (High-Level / Domain)
-**Description:** [read-only] Checks the syntax of an ABAP domain. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP domain.
 
 **Source:** `src/handlers/domain/high/handleCheckDomain.ts`
 
@@ -1636,7 +1636,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatefunctiongroup-high-level-function"></a>
 #### ActivateFunctionGroup (High-Level / Function)
-**Description:** Activates an ABAP function group, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP function group, so its inactive version is in force.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionGroup.ts`
 
@@ -1650,7 +1650,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatefunctionmodule-high-level-function"></a>
 #### ActivateFunctionModule (High-Level / Function)
-**Description:** Activates an ABAP function module of a function group, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP function module of a function group, so its inactive version is in force.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
 
@@ -1665,7 +1665,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkfunctiongroup-high-level-function"></a>
 #### CheckFunctionGroup (High-Level / Function)
-**Description:** [read-only] Checks the syntax of an ABAP function group. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP function group.
 
 **Source:** `src/handlers/function/high/handleCheckFunctionGroup.ts`
 
@@ -1679,7 +1679,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkfunctionmodule-high-level-function"></a>
 #### CheckFunctionModule (High-Level / Function)
-**Description:** [read-only] Checks the syntax of an ABAP function module of a function group. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP function module of a function group.
 
 **Source:** `src/handlers/function/high/handleCheckFunctionModule.ts`
 
@@ -1884,7 +1884,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateinclude-high-level-include"></a>
 #### ActivateInclude (High-Level / Include)
-**Description:** Activates an ABAP include, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP include, so its inactive version is in force.
 
 **Source:** `src/handlers/include/low/handleActivateInclude.ts`
 
@@ -1965,7 +1965,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateinterface-high-level-interface"></a>
 #### ActivateInterface (High-Level / Interface)
-**Description:** Activates an ABAP interface, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP interface, so its inactive version is in force.
 
 **Source:** `src/handlers/interface/low/handleActivateInterface.ts`
 
@@ -1979,7 +1979,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkinterface-high-level-interface"></a>
 #### CheckInterface (High-Level / Interface)
-**Description:** [read-only] Checks the syntax of an ABAP interface. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP interface.
 
 **Source:** `src/handlers/interface/high/handleCheckInterface.ts`
 
@@ -2213,7 +2213,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkpackage-high-level-package"></a>
 #### CheckPackage (High-Level / Package)
-**Description:** [read-only] Checks the syntax of an ABAP package. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP package.
 
 **Source:** `src/handlers/package/high/handleCheckPackage.ts`
 
@@ -2300,7 +2300,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateprogram-high-level-program"></a>
 #### ActivateProgram (High-Level / Program)
-**Description:** Activates an ABAP program (report), so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP program (report), so its inactive version is in force.
 
 **Source:** `src/handlers/program/low/handleActivateProgram.ts`
 
@@ -2314,7 +2314,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkprogram-high-level-program"></a>
 #### CheckProgram (High-Level / Program)
-**Description:** [read-only] Checks the syntax of an ABAP program (report). Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP program (report).
 
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
@@ -2399,7 +2399,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateservicebinding-high-level-service-binding"></a>
 #### ActivateServiceBinding (High-Level / Service Binding)
-**Description:** Activates an OData service binding, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an OData service binding, so its inactive version is in force.
 
 **Source:** `src/handlers/service_binding/low/handleActivateServiceBinding.ts`
 
@@ -2498,7 +2498,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="validateservicebinding-high-level-service-binding"></a>
 #### ValidateServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Validates a new OData service binding for a service definition, in the package and version given, by SAP's transport check of its name and package. Whether SAP admits it and SAP's verdict when it is another. For each message: its severity and its text.
+**Description:** [read-only] Validates a new OData service binding for a service definition, in the package and version given, by SAP's transport check of its name and package.
 
 **Source:** `src/handlers/service_binding/high/handleValidateServiceBinding.ts`
 
@@ -2517,7 +2517,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activateservicedefinition-high-level-service-definition"></a>
 #### ActivateServiceDefinition (High-Level / Service Definition)
-**Description:** Activates a service definition, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates a service definition, so its inactive version is in force.
 
 **Source:** `src/handlers/service_definition/low/handleActivateServiceDefinition.ts`
 
@@ -2603,7 +2603,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatestructure-high-level-structure"></a>
 #### ActivateStructure (High-Level / Structure)
-**Description:** Activates an ABAP structure, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP structure, so its inactive version is in force.
 
 **Source:** `src/handlers/structure/low/handleActivateStructure.ts`
 
@@ -2617,7 +2617,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checkstructure-high-level-structure"></a>
 #### CheckStructure (High-Level / Structure)
-**Description:** [read-only] Checks the syntax of an ABAP structure as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP structure as stored or as the source given.
 
 **Source:** `src/handlers/structure/high/handleCheckStructure.ts`
 
@@ -2807,7 +2807,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatetable-high-level-table"></a>
 #### ActivateTable (High-Level / Table)
-**Description:** Activates an ABAP database table, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP database table, so its inactive version is in force.
 
 **Source:** `src/handlers/table/low/handleActivateTable.ts`
 
@@ -2821,7 +2821,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checktable-high-level-table"></a>
 #### CheckTable (High-Level / Table)
-**Description:** [read-only] Checks the syntax of an ABAP database table as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP database table as stored or as the source given.
 
 **Source:** `src/handlers/table/high/handleCheckTable.ts`
 
@@ -2945,7 +2945,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="activatetabletype-high-level-table-type"></a>
 #### ActivateTableType (High-Level / Table Type)
-**Description:** Activates an ABAP table type, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP table type, so its inactive version is in force.
 
 **Source:** `src/handlers/table_type/low/handleActivateTableType.ts`
 
@@ -2959,7 +2959,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="checktabletype-high-level-table-type"></a>
 #### CheckTableType (High-Level / Table Type)
-**Description:** [read-only] Checks an ABAP table type for errors and warnings. The object checked, whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks an ABAP table type for errors and warnings.
 
 **Source:** `src/handlers/table_type/high/handleCheckTableType.ts`
 

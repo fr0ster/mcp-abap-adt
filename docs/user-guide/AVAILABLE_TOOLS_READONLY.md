@@ -186,7 +186,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="checkabapgitrepo-read-only-abapgit"></a>
 #### CheckAbapGitRepo (Read-Only / Abapgit)
-**Description:** [read-only] Checks that the system reaches an abapGit repository's remote and is let in. SAP's status and whether SAP has done it or accepted it.
+**Description:** [read-only] Checks that the system reaches an abapGit repository's remote and is let in.
 
 **Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitRepo.ts`
 
@@ -665,7 +665,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getmainprograms-read-only-include"></a>
 #### GetMainPrograms (Read-Only / Include)
-**Description:** [read-only] Finds the main programs of an ABAP include: each program that includes it, or the function group it belongs to. The include's name. For each main program: its type, PROG/P for a program or FUGR/F for a function group and its name.
+**Description:** [read-only] Finds the main programs of an ABAP include: each program that includes it, or the function group it belongs to. The include's name. For each main program: whether it is a program or a function group and its name.
 
 **Source:** `src/handlers/include/readonly/handleGetMainPrograms.ts`
 
@@ -1233,7 +1233,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getsqlquery-read-only-system"></a>
 #### GetSqlQuery (Read-Only / System)
-**Description:** [read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Runs an ABAP SQL SELECT over database tables and CDS views and reads the data it selects, up to the number of records asked. SAP's data as it came. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
 
@@ -1305,7 +1305,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
-**Description:** [read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data of an ABAP database table or CDS view, as SE16 previews it, up to the number of records asked. SAP's data as it came. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
 

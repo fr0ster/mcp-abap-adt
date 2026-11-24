@@ -420,7 +420,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkabapgitrepo-read-only-abapgit"></a>
 #### CheckAbapGitRepo (Read-Only / Abapgit)
-**Description:** [read-only] Checks that the system reaches an abapGit repository's remote and is let in. SAP's status and whether SAP has done it or accepted it.
+**Description:** [read-only] Checks that the system reaches an abapGit repository's remote and is let in.
 
 **Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitRepo.ts`
 
@@ -867,7 +867,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmainprograms-read-only-include"></a>
 #### GetMainPrograms (Read-Only / Include)
-**Description:** [read-only] Finds the main programs of an ABAP include: each program that includes it, or the function group it belongs to. The include's name. For each main program: its type, PROG/P for a program or FUGR/F for a function group and its name.
+**Description:** [read-only] Finds the main programs of an ABAP include: each program that includes it, or the function group it belongs to. The include's name. For each main program: whether it is a program or a function group and its name.
 
 **Source:** `src/handlers/include/readonly/handleGetMainPrograms.ts`
 
@@ -1246,7 +1246,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getsqlquery-read-only-system"></a>
 #### GetSqlQuery (Read-Only / System)
-**Description:** [read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Runs an ABAP SQL SELECT over database tables and CDS views and reads the data it selects, up to the number of records asked. SAP's data as it came. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
 
@@ -1463,7 +1463,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
-**Description:** [read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data of an ABAP database table or CDS view, as SE16 previews it, up to the number of records asked. SAP's data as it came. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
 
@@ -1792,7 +1792,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatebehaviordefinition-high-level-behavior-definition"></a>
 #### ActivateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Activates a RAP behavior definition, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates a RAP behavior definition, so its inactive version is in force.
 
 **Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
 
@@ -1806,7 +1806,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkbehaviordefinition-high-level-behavior-definition"></a>
 #### CheckBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Checks the syntax of a RAP behavior definition. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of a RAP behavior definition.
 
 **Source:** `src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts`
 
@@ -1964,7 +1964,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateclass-high-level-class"></a>
 #### ActivateClass (High-Level / Class)
-**Description:** Activates an ABAP class, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP class, so its inactive version is in force.
 
 **Source:** `src/handlers/class/low/handleActivateClass.ts`
 
@@ -1978,7 +1978,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkclass-high-level-class"></a>
 #### CheckClass (High-Level / Class)
-**Description:** [read-only] Checks the syntax of an ABAP class as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP class as stored or as the source given.
 
 **Source:** `src/handlers/class/high/handleCheckClass.ts`
 
@@ -2262,7 +2262,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateobjects-high-level-common"></a>
 #### ActivateObjects (High-Level / Common)
-**Description:** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once.
 
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
@@ -2271,7 +2271,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, PROG/P, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, program, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes; any other call is a group activation.
 
-**On ABAP Cloud (`cloud`):** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**On ABAP Cloud (`cloud`):** Activates several ABAP repository objects of any type together in one activation, such as domains, data elements and tables at once.
 
 **Parameters (`cloud`):**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
@@ -2603,7 +2603,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatedataelement-high-level-data-element"></a>
 #### ActivateDataElement (High-Level / Data Element)
-**Description:** Activates an ABAP data element, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP data element, so its inactive version is in force.
 
 **Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
 
@@ -2617,7 +2617,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkdataelement-high-level-data-element"></a>
 #### CheckDataElement (High-Level / Data Element)
-**Description:** [read-only] Checks the syntax of an ABAP data element. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP data element.
 
 **Source:** `src/handlers/data_element/high/handleCheckDataElement.ts`
 
@@ -2723,7 +2723,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateddl-high-level-ddl"></a>
 #### ActivateDdl (High-Level / Ddl)
-**Description:** Activates a CDS view, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates a CDS view, so its inactive version is in force.
 
 **Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
 
@@ -2737,7 +2737,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkddl-high-level-ddl"></a>
 #### CheckDdl (High-Level / Ddl)
-**Description:** [read-only] Checks the syntax of a CDS view as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of a CDS view as stored or as the source given.
 
 **Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
 
@@ -2822,7 +2822,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatemetadataextension-high-level-ddlx"></a>
 #### ActivateMetadataExtension (High-Level / Ddlx)
-**Description:** Activates a CDS metadata extension, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates a CDS metadata extension, so its inactive version is in force.
 
 **Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
 
@@ -2836,7 +2836,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkmetadataextension-high-level-ddlx"></a>
 #### CheckMetadataExtension (High-Level / Ddlx)
-**Description:** [read-only] Checks the syntax of a CDS metadata extension. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of a CDS metadata extension.
 
 **Source:** `src/handlers/ddlx/high/handleCheckMetadataExtension.ts`
 
@@ -2889,7 +2889,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatedomain-high-level-domain"></a>
 #### ActivateDomain (High-Level / Domain)
-**Description:** Activates an ABAP domain, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP domain, so its inactive version is in force.
 
 **Source:** `src/handlers/domain/low/handleActivateDomain.ts`
 
@@ -2903,7 +2903,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkdomain-high-level-domain"></a>
 #### CheckDomain (High-Level / Domain)
-**Description:** [read-only] Checks the syntax of an ABAP domain. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP domain.
 
 **Source:** `src/handlers/domain/high/handleCheckDomain.ts`
 
@@ -3002,7 +3002,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatefunctiongroup-high-level-function"></a>
 #### ActivateFunctionGroup (High-Level / Function)
-**Description:** Activates an ABAP function group, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP function group, so its inactive version is in force.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionGroup.ts`
 
@@ -3016,7 +3016,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatefunctionmodule-high-level-function"></a>
 #### ActivateFunctionModule (High-Level / Function)
-**Description:** Activates an ABAP function module of a function group, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP function module of a function group, so its inactive version is in force.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
 
@@ -3031,7 +3031,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkfunctiongroup-high-level-function"></a>
 #### CheckFunctionGroup (High-Level / Function)
-**Description:** [read-only] Checks the syntax of an ABAP function group. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP function group.
 
 **Source:** `src/handlers/function/high/handleCheckFunctionGroup.ts`
 
@@ -3045,7 +3045,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkfunctionmodule-high-level-function"></a>
 #### CheckFunctionModule (High-Level / Function)
-**Description:** [read-only] Checks the syntax of an ABAP function module of a function group. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP function module of a function group.
 
 **Source:** `src/handlers/function/high/handleCheckFunctionModule.ts`
 
@@ -3250,7 +3250,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateinclude-high-level-include"></a>
 #### ActivateInclude (High-Level / Include)
-**Description:** Activates an ABAP include, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP include, so its inactive version is in force.
 
 **Source:** `src/handlers/include/low/handleActivateInclude.ts`
 
@@ -3331,7 +3331,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateinterface-high-level-interface"></a>
 #### ActivateInterface (High-Level / Interface)
-**Description:** Activates an ABAP interface, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP interface, so its inactive version is in force.
 
 **Source:** `src/handlers/interface/low/handleActivateInterface.ts`
 
@@ -3345,7 +3345,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkinterface-high-level-interface"></a>
 #### CheckInterface (High-Level / Interface)
-**Description:** [read-only] Checks the syntax of an ABAP interface. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP interface.
 
 **Source:** `src/handlers/interface/high/handleCheckInterface.ts`
 
@@ -3579,7 +3579,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkpackage-high-level-package"></a>
 #### CheckPackage (High-Level / Package)
-**Description:** [read-only] Checks the syntax of an ABAP package. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP package.
 
 **Source:** `src/handlers/package/high/handleCheckPackage.ts`
 
@@ -3666,7 +3666,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateprogram-high-level-program"></a>
 #### ActivateProgram (High-Level / Program)
-**Description:** Activates an ABAP program (report), so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP program (report), so its inactive version is in force.
 
 **Source:** `src/handlers/program/low/handleActivateProgram.ts`
 
@@ -3680,7 +3680,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkprogram-high-level-program"></a>
 #### CheckProgram (High-Level / Program)
-**Description:** [read-only] Checks the syntax of an ABAP program (report). Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP program (report).
 
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
@@ -3765,7 +3765,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateservicebinding-high-level-service-binding"></a>
 #### ActivateServiceBinding (High-Level / Service Binding)
-**Description:** Activates an OData service binding, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an OData service binding, so its inactive version is in force.
 
 **Source:** `src/handlers/service_binding/low/handleActivateServiceBinding.ts`
 
@@ -3864,7 +3864,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="validateservicebinding-high-level-service-binding"></a>
 #### ValidateServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Validates a new OData service binding for a service definition, in the package and version given, by SAP's transport check of its name and package. Whether SAP admits it and SAP's verdict when it is another. For each message: its severity and its text.
+**Description:** [read-only] Validates a new OData service binding for a service definition, in the package and version given, by SAP's transport check of its name and package.
 
 **Source:** `src/handlers/service_binding/high/handleValidateServiceBinding.ts`
 
@@ -3883,7 +3883,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateservicedefinition-high-level-service-definition"></a>
 #### ActivateServiceDefinition (High-Level / Service Definition)
-**Description:** Activates a service definition, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates a service definition, so its inactive version is in force.
 
 **Source:** `src/handlers/service_definition/low/handleActivateServiceDefinition.ts`
 
@@ -3969,7 +3969,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatestructure-high-level-structure"></a>
 #### ActivateStructure (High-Level / Structure)
-**Description:** Activates an ABAP structure, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP structure, so its inactive version is in force.
 
 **Source:** `src/handlers/structure/low/handleActivateStructure.ts`
 
@@ -3983,7 +3983,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkstructure-high-level-structure"></a>
 #### CheckStructure (High-Level / Structure)
-**Description:** [read-only] Checks the syntax of an ABAP structure as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP structure as stored or as the source given.
 
 **Source:** `src/handlers/structure/high/handleCheckStructure.ts`
 
@@ -4173,7 +4173,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatetable-high-level-table"></a>
 #### ActivateTable (High-Level / Table)
-**Description:** Activates an ABAP database table, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP database table, so its inactive version is in force.
 
 **Source:** `src/handlers/table/low/handleActivateTable.ts`
 
@@ -4187,7 +4187,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checktable-high-level-table"></a>
 #### CheckTable (High-Level / Table)
-**Description:** [read-only] Checks the syntax of an ABAP database table as stored or as the source given. Whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks the syntax of an ABAP database table as stored or as the source given.
 
 **Source:** `src/handlers/table/high/handleCheckTable.ts`
 
@@ -4311,7 +4311,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatetabletype-high-level-table-type"></a>
 #### ActivateTableType (High-Level / Table Type)
-**Description:** Activates an ABAP table type, so its inactive version is in force. Whether SAP activated it, whether SAP generated it and whether it was already active. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** Activates an ABAP table type, so its inactive version is in force.
 
 **Source:** `src/handlers/table_type/low/handleActivateTableType.ts`
 
@@ -4325,7 +4325,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checktabletype-high-level-table-type"></a>
 #### CheckTableType (High-Level / Table Type)
-**Description:** [read-only] Checks an ABAP table type for errors and warnings. The object checked, whether the check ran and SAP's status text. For each message: its severity, its text, the object it is about, the source it names, its position there and SAP's message code.
+**Description:** [read-only] Checks an ABAP table type for errors and warnings.
 
 **Source:** `src/handlers/table_type/high/handleCheckTableType.ts`
 

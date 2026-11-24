@@ -12,11 +12,14 @@ import { servedDescription } from '../../../embeddable/BaseMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import {
   batchable,
+  compactOf,
   longRunning,
+  membersTaken,
   partsOfDescription,
   purpose,
   returnsOf,
   toolDescription,
+  valueFrom,
 } from '../../../lib/description';
 import {
   about,
@@ -258,6 +261,71 @@ describe('the description builder', () => {
     }
   });
 
+  it("states a compact tool's values, each by its function, then the members it takes", () => {
+    const listing = toolDescription({
+      tag: 'read-only',
+      purpose: purpose('Reads the objects a package holds.'),
+      returns: returnsOf({ shapes: [shapesOf(schemas)] }),
+    });
+    const text = toolDescription({
+      purpose: purpose('Reads a package or a class.'),
+      returns: [],
+      values: {
+        of: 'part',
+        each: [
+          valueFrom('contents', listing),
+          {
+            value: 'source',
+            purpose: purpose('Reads the source of a class.'),
+            returns: [],
+          },
+        ],
+      },
+      members: membersTaken('object_type', ['PACKAGE(package_name*)', 'CLASS']),
+    });
+    assert.equal(
+      text,
+      'Reads a package or a class. part contents: reads the objects a package holds: for each object: its type and its name; the objects SAP could not load are named. part source: reads the source of a class. object_type: PACKAGE(package_name*), CLASS.',
+    );
+  });
+
+  it("assembles a compact tool from the full tool's parts, a part of its own replacing one", () => {
+    const full = toolDescription({
+      tag: 'read-only',
+      purpose: purpose('Reads one SAP run by its id.'),
+      returns: returnsOf({ shapes: [shapesOf(schemas)] }),
+      notes: [longRunning],
+    });
+    assert.equal(compactOf(full), full);
+    const own = compactOf(full, { notes: [] });
+    assert.deepStrictEqual(partsOfDescription(own)?.notes, []);
+    assert.equal(
+      partsOfDescription(own)?.purpose,
+      partsOfDescription(full)?.purpose,
+    );
+    assert.throws(() => compactOf('Written whole.'), /not assembled/);
+  });
+
+  it('keeps an opening name in capitals when a fact continues a sentence', () => {
+    assert.equal(
+      toolDescription({
+        purpose: purpose('Reads a table.'),
+        returns: [],
+        values: {
+          of: 'action',
+          each: [
+            {
+              value: 'data',
+              purpose: purpose('SAP gives the data of a table.'),
+              returns: [],
+            },
+          ],
+        },
+      }),
+      'Reads a table. action data: SAP gives the data of a table.',
+    );
+  });
+
   it('keeps each part of an assembled description, by its text', () => {
     const parts = {
       purpose: purpose('Reads a class.'),
@@ -391,6 +459,23 @@ describe('every served tool is assembled, or still listed as not yet', () => {
           for (const fault of factFaults(fact.text)) {
             faults.push(`${tool.name}: its fact "${fact.text}" ${fault}`);
           }
+        }
+        // A compact tool's values, each by its function: a purpose of the
+        // same rules, and facts of the same markers.
+        for (const value of parts.values?.each ?? []) {
+          for (const fault of purposeFaults(value.purpose.text)) {
+            faults.push(`${tool.name}: the purpose of ${value.value} ${fault}`);
+          }
+          for (const fact of value.returns) {
+            for (const fault of factFaults(fact.text)) {
+              faults.push(
+                `${tool.name}: the fact "${fact.text}" of ${value.value} ${fault}`,
+              );
+            }
+          }
+        }
+        for (const fault of factFaults(parts.members?.text ?? '')) {
+          faults.push(`${tool.name}: its members ${fault}`);
         }
         for (const note of parts.notes ?? []) {
           const kind = note === longRunning ? 'long' : 'batch';

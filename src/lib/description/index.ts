@@ -5,6 +5,12 @@
  */
 
 export {
+  assembledParts,
+  compactOf,
+  valueFrom,
+  valueParts,
+} from './compact';
+export {
   activateTool,
   checkTool,
   createTool,
@@ -44,6 +50,10 @@ export {
 export {
   type DescriptionParts,
   type DescriptionTag,
+  type Members,
+  membersTaken,
   partsOfDescription,
   toolDescription,
+  type ValueParts,
+  type ValuesParts,
 } from './toolDescription';

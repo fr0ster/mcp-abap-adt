@@ -22,6 +22,17 @@ export {
   notAccepted,
   sharedMainType,
 } from '../adtTypeCode.js';
+export {
+  assembledParts,
+  compactOf,
+  longRunning,
+  membersTaken,
+  purpose,
+  toolDescription,
+  untypedReturns,
+  valueFrom,
+  valueParts,
+} from '../description/index.js';
 export { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes.js';
 export type { ReadVersion } from '../handlers/readVersion.js';
 export { isJsonObject, type JsonValue, jsonAt } from '../json.js';

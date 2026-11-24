@@ -14,6 +14,13 @@ import { TOOL_DEFINITION as MODIFIED } from '../../../handlers/abapgit/readonly/
 import { TOOL_DEFINITION as STAGING } from '../../../handlers/abapgit/readonly/handleGetAbapGitStaging';
 import { TOOL_DEFINITION as REPOS } from '../../../handlers/abapgit/readonly/handleListAbapGitRepos';
 import {
+  TOOL_DEFINITION as GET_PACKAGE,
+  PACKAGE_HEADS,
+  PACKAGE_MEDIUM,
+  PACKAGE_TERSE,
+  packageHeads,
+} from '../../../handlers/package/high/handleGetPackage';
+import {
   ACCESS_MODE_HEADS,
   BRANCH_INFO_MEDIUM,
   BRANCH_INFO_TERSE,
@@ -52,6 +59,7 @@ import {
   writeJson,
   writtenLines,
 } from '../../../lib/detail';
+import { packageDetails } from '../../../lib/strategies/packageSummary';
 import {
   externalRepo,
   modifiedObjects,
@@ -59,6 +67,7 @@ import {
   reposDocument,
   stagingEveryList,
 } from '../../helpers/abapGitSap';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { NOT_YET_ASSEMBLED, WRITER_TOOLS } from './notYetAssembled';
 import { type ReturnsTie, type TieSample, tieFaults } from './returnsMatch';
 
@@ -70,6 +79,7 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   GetAbapGitModifiedObjects: MODIFIED.description,
   GetAbapGitStaging: STAGING.description,
   GetAbapGitErrorLog: ERROR_LOG.description,
+  GetPackage: GET_PACKAGE.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -209,6 +219,34 @@ const TIED: Readonly<Record<string, () => ReturnsTie>> = {
         );
       })(),
     ),
+  GetPackage: () => {
+    const parts = partsOfDescription(descriptionOf('GetPackage'));
+    assert.ok(parts !== undefined);
+    const samples = [
+      corpusBody('read-metadata-package--01-packages-zmcpshrpkg'),
+      // A package with every setting, its application component and
+      // transport layer among them.
+      '<?xml version="1.0" encoding="utf-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZPKG" adtcore:description="A package" adtcore:type="DEVC/K" adtcore:responsible="DEVELOPER"><pak:attributes pak:packageType="development" pak:languageVersion="5"/><pak:superPackage adtcore:name="ZSUPER"/><pak:applicationComponent pak:name="BC-DWB"/><pak:transport><pak:softwareComponent pak:name="HOME"/><pak:transportLayer pak:name="ZDEV"/></pak:transport><pak:subPackages><pak:packageRef adtcore:name="ZSUB_A" adtcore:description="First"/></pak:subPackages></pak:package>',
+    ].map((document) => {
+      const read = packageDetails(document);
+      return {
+        reading: read,
+        lines: writtenLines({
+          heads: packageHeads('ZPKG', read),
+          reading: read,
+          lists: PACKAGE_TERSE,
+        }),
+        medium: writeJson({}, { metadata: read }, PACKAGE_MEDIUM).answer,
+      };
+    });
+    return {
+      terse: shapesOf(PACKAGE_TERSE),
+      medium: jsonShapesOf(PACKAGE_MEDIUM),
+      heads: PACKAGE_HEADS,
+      returns: parts.returns,
+      samples,
+    };
+  },
   GetAbapGitErrorLog: () =>
     abapGitTie(
       'GetAbapGitErrorLog',

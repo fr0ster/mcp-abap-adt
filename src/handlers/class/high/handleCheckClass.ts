@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { checkTool } from '../../../lib/description';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -25,8 +26,11 @@ import { handleCheckClass as handleCheckClassLow } from '../low/handleCheckClass
 export const TOOL_DEFINITION = {
   name: 'CheckClass',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Runs a syntax check on the ABAP class named by class_name. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.',
+  description: checkTool({
+    tag: 'read-only',
+    object: 'an ABAP class',
+    how: 'as stored or as the source given',
+  }),
   inputSchema: z.object({
     class_name: z.string().describe('Class name.'),
     version: z

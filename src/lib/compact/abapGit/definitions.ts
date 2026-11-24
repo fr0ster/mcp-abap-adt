@@ -13,6 +13,19 @@
  */
 
 import * as z from 'zod';
+import { TOOL_DEFINITION as GetAbapGitBranchInfo } from '../../../handlers/abapgit/high/handleGetAbapGitBranchInfo';
+import { TOOL_DEFINITION as LinkAbapGitRepo } from '../../../handlers/abapgit/high/handleLinkAbapGitRepo';
+import { TOOL_DEFINITION as PullAbapGitRepo } from '../../../handlers/abapgit/high/handlePullAbapGitRepo';
+import { TOOL_DEFINITION as PushAbapGitRepo } from '../../../handlers/abapgit/high/handlePushAbapGitRepo';
+import { TOOL_DEFINITION as SwitchAbapGitBranch } from '../../../handlers/abapgit/high/handleSwitchAbapGitBranch';
+import { TOOL_DEFINITION as UnlinkAbapGitRepo } from '../../../handlers/abapgit/high/handleUnlinkAbapGitRepo';
+import { TOOL_DEFINITION as CheckAbapGitExternalRepo } from '../../../handlers/abapgit/readonly/handleCheckAbapGitExternalRepo';
+import { TOOL_DEFINITION as CheckAbapGitRepo } from '../../../handlers/abapgit/readonly/handleCheckAbapGitRepo';
+import { TOOL_DEFINITION as GetAbapGitErrorLog } from '../../../handlers/abapgit/readonly/handleGetAbapGitErrorLog';
+import { TOOL_DEFINITION as GetAbapGitFile } from '../../../handlers/abapgit/readonly/handleGetAbapGitFile';
+import { TOOL_DEFINITION as GetAbapGitModifiedObjects } from '../../../handlers/abapgit/readonly/handleGetAbapGitModifiedObjects';
+import { TOOL_DEFINITION as GetAbapGitStaging } from '../../../handlers/abapgit/readonly/handleGetAbapGitStaging';
+import { TOOL_DEFINITION as ListAbapGitRepos } from '../../../handlers/abapgit/readonly/handleListAbapGitRepos';
 import {
   APP_LOG_KEY_FIELD,
   AUTHOR_FIELD,
@@ -33,7 +46,14 @@ import {
 import { ABAPGIT_DETAIL_SHAPE } from '../../abapGit/formats';
 import type { ProjectionVariant } from '../../adtProjections';
 import { COMPACT_BACKGROUND_FIELD } from '../../backgroundRuns/tools';
+import {
+  type DescriptionParts,
+  purpose,
+  toolDescription,
+  valueFrom,
+} from '../../description/index';
 import { listedValues } from '../../handlers/listedValues';
+import { listed } from '../memberTexts';
 
 /** `HandlerAbapGitGet`'s actions, each a full read. */
 export const ABAPGIT_GET_ACTIONS = [
@@ -339,40 +359,89 @@ function writeTakes(variant: ProjectionVariant): {
   };
 }
 
-const ACTION_SENTENCES_GET: Readonly<Record<AbapGitGetAction, string>> = {
-  repos:
-    'repos(package_name, repository_key, detail) the linked repositories: key, package, branch, remote URL and on cloud the run state (status, status text, run log key)',
-  external_repo:
-    'external_repo(url*, detail) the access mode and the branches of the remote repository at url',
-  modified_objects:
-    "modified_objects(repository_key*, detail) what a pull would change: every changed object (changed in the remote, in the system or both, added or deleted), the repository's own package left out, and as package warnings the objects whose package in the system differs from the package their path maps to, each with SAP's action (1 add, 2 update: changed only in the remote, 3 overwrite: changed in the system, 4 delete, 5 delete and re-create, 6 package move); SAP leaves a package warning with action 5 out of every selection",
-  staging:
-    'staging(repository_key*, detail) the unstaged, staged and ignored objects with their files, and the proposed author and committer',
-  checks:
-    "checks(repository_key*) SAP's status of the connection to the remote; a refusal with SAP's message key and on cloud the git host's HTTP status",
-  file: 'file(repository_key*, filename*, version*) the text of one file, local or remote',
-  error_log:
-    "error_log(repository_key*, app_log_key*, detail) each object of the repository's last run with its status and message type",
+/** Each action's full tool, by its description: what the action states. */
+const ACTION_DESCRIPTIONS: Readonly<
+  Record<AbapGitGetAction | AbapGitWriteAction, string>
+> = {
+  repos: ListAbapGitRepos.description,
+  external_repo: CheckAbapGitExternalRepo.description,
+  modified_objects: GetAbapGitModifiedObjects.description,
+  staging: GetAbapGitStaging.description,
+  checks: CheckAbapGitRepo.description,
+  file: GetAbapGitFile.description,
+  error_log: GetAbapGitErrorLog.description,
+  link: LinkAbapGitRepo.description,
+  unlink: UnlinkAbapGitRepo.description,
+  pull: PullAbapGitRepo.description,
+  push: PushAbapGitRepo.description,
+  switch_branch: SwitchAbapGitBranch.description,
+  branch_info: GetAbapGitBranchInfo.description,
 };
 
-const ACTION_SENTENCES_WRITE: Readonly<Record<AbapGitWriteAction, string>> = {
-  link: 'link(package_name*, url*, branch*, transport_request) links the package to the remote repository; on premise it also imports every object of the branch',
-  unlink:
-    "unlink(repository_key*) ends the repository's binding to its package; the objects stay",
-  pull: 'pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on; on premise it overwrites local changes and objects of other packages, and when the SAP request or its response is lost mid-import (an SSE or stdio close logs the connection off) the outcome is unknown to this server and what SAP does then is unverified (the staging action shows the current differences, whichever writes made them); on cloud SAP runs it as its own job, which runs to its end whatever happens to the connection, its objects are inactive, and it brings every object modified_objects lists to its remote version, a package warning with action 5 (delete and re-create) excepted, or with overwrite selects by name: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state',
-  push: 'push(repository_key*, objects*, comment*, author*, committer*) commits the chosen objects and pushes the commit; on cloud SAP runs it as its own job',
-  switch_branch:
-    'switch_branch(repository_key*, branch*, create*) switches the branch, creating it in the remote with create true',
-  branch_info:
-    'branch_info(url*, branch*, package_name*, detail) one remote branch with its folder logic; to answer it SAP binds the repository to package_name for the read',
+/** What each read gives, in the purpose's words. */
+const GET_PHRASES: Readonly<Record<AbapGitGetAction, string>> = {
+  repos: 'the linked ones',
+  external_repo: 'a remote',
+  modified_objects: "a pull's changes",
+  staging: 'the staged objects',
+  checks: 'the connection to a remote',
+  file: 'a file',
+  error_log: "a run's error log",
 };
+
+/** What each write does, in the purpose's words. */
+const WRITE_PHRASES: Readonly<Record<AbapGitWriteAction, string>> = {
+  link: 'links a package to a remote',
+  unlink: 'unlinks a package',
+  pull: 'pulls',
+  push: 'pushes',
+  switch_branch: 'switches the branch',
+  branch_info: 'reads a remote branch',
+};
+
+/** `HandlerAbapGitGet`'s parts on `actions`: each read by its full tool's parts. */
+export function handlerAbapGitGetParts(
+  actions: readonly AbapGitGetAction[],
+): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: purpose(
+      `Reads abapGit repositories: ${listed(actions.map((action) => GET_PHRASES[action]))}.`,
+    ),
+    returns: [],
+    values: {
+      of: 'action',
+      each: actions.map((action) =>
+        valueFrom(action, ACTION_DESCRIPTIONS[action]),
+      ),
+    },
+  };
+}
+
+/** `HandlerAbapGit`'s parts on `actions`: each write by its full tool's parts. */
+export function handlerAbapGitParts(
+  actions: readonly AbapGitWriteAction[],
+): DescriptionParts {
+  return {
+    purpose: purpose(
+      `Changes abapGit repositories and their remotes: ${listed(actions.map((action) => WRITE_PHRASES[action]))}.`,
+    ),
+    returns: [],
+    values: {
+      of: 'action',
+      each: actions.map((action) =>
+        valueFrom(action, ACTION_DESCRIPTIONS[action]),
+      ),
+    },
+  };
+}
 
 /** `HandlerAbapGitGet`'s description and schema on `actions`. */
 export function handlerAbapGitGetDefinitionFor(
   actions: readonly AbapGitGetAction[],
 ) {
   return {
-    description: `[read-only] Reads abapGit repositories, one read per action: ${actions.map((action) => ACTION_SENTENCES_GET[action]).join('; ')}. Answers facts only. Each argument is described with the actions that take it.`,
+    description: toolDescription(handlerAbapGitGetParts(actions)),
     inputSchema: z.object(offered(getProperties(actions), GET_TAKES, actions)),
     members: actions,
   };
@@ -384,7 +453,7 @@ export function handlerAbapGitDefinitionFor(
   actions: readonly AbapGitWriteAction[],
 ) {
   return {
-    description: `Changes abapGit repositories and their remotes, one write per action: ${actions.map((action) => ACTION_SENTENCES_WRITE[action]).join('; ')}. Answers facts only. Each argument is described with the actions that take it.`,
+    description: toolDescription(handlerAbapGitParts(actions)),
     inputSchema: z.object(
       offered(writeProperties(actions), writeTakes(variant), actions),
     ),

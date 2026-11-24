@@ -124,6 +124,7 @@ export {
   handlerSystemDefinition,
   handlerSystemDefinitionFor,
   handlerSystemDescription,
+  handlerSystemParts,
   SYSTEM_ACTION_TOOLS,
   SYSTEM_ACTIONS,
   type SystemAction,

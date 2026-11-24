@@ -29,10 +29,12 @@ import {
 import { activationParentDescription } from '../adtTypeCode';
 import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
 import {
+  type DescriptionParts,
   longRunning,
   purpose,
   toolDescription,
   untypedReturns,
+  valueFrom,
 } from '../description/index';
 import { DETAIL_LEVELS } from '../detail/levels';
 import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
@@ -50,7 +52,6 @@ import { READ_VERSION_FIELD } from '../handlers/readVersion';
 import {
   COMPACT_LONG_BACKGROUND_DESCRIPTION,
   COMPACT_LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
 } from '../longTools';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../masterLanguage';
 import { ANSWER_LEVELS } from '../search-source/answerLevel';
@@ -2618,51 +2619,49 @@ function actionTargetRule(variant: ProjectionVariant | undefined) {
   };
 }
 
-/** What each action reads, with the arguments it takes (`*` required). */
-const ACTION_SENTENCES: Readonly<Record<SystemAction, string>> = {
-  search_source:
-    'search_source(query*, packages*, query2, exclude, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, max_hits, answer, version) the source lines of the objects in packages that contain query',
-  search_object:
-    'search_object(object_name*, object_type, maxResults, detail) the objects whose name matches object_name, a name or a mask',
-  where_used:
-    'where_used(object_name* and object_type*, or objects*; container, enable_all_types, enable_only_types, disable_types) every object that uses, calls or references the object named, with its type and package',
-  package_tree:
-    'package_tree(package_name* or package_names*; include_subpackages, max_depth, include_descriptions, debug) the subpackages and objects of a package as a tree',
-  transports:
-    "transports(user, modifiable_only, detail) the transport requests of user, by default the session's user",
-  atc_findings:
-    'atc_findings(worklist_id*, detail) the findings of the ATC run whose worklist is worklist_id',
-  atc_results:
-    'atc_results(created_by*, central_only, age_min, age_max) the stored ATC results, newest first',
-  atc_result:
-    'atc_result(display_id*, detail) the stored ATC result display_id with its findings',
-};
-
-/** What each action answers. */
-const ACTION_ANSWERS: Readonly<Record<SystemAction, string>> = {
-  search_source:
-    'search_source the hits (package, object type, object name, include, line, snippet) with the scanned and truncated counters',
-  search_object: 'search_object the objects found',
-  where_used:
-    'where_used the references with their total (one entry per object for objects)',
-  package_tree:
-    'package_tree the tree (one entry per package for package_names)',
-  transports: 'transports the requests',
-  atc_findings: 'atc_findings the findings with the counts per priority',
-  atc_results: 'atc_results one entry per result',
-  atc_result: 'atc_result the findings with the counts per priority',
+/** What each read gives, in the purpose's words. */
+const SYSTEM_PHRASES: Readonly<Record<SystemAction, string>> = {
+  search_source: 'source code',
+  search_object: 'objects by name',
+  where_used: 'usages',
+  package_tree: 'package hierarchies',
+  transports: 'transport orders',
+  atc_findings: 'ATC findings',
+  atc_results: 'ATC results',
+  atc_result: 'one ATC result',
 };
 
 /**
- * `HandlerSystem`'s description with `actions`: what each reads, its
- * arguments and its answer, naming only those actions.
+ * `HandlerSystem`'s parts with `actions`: each action does what its full
+ * tool does (`SYSTEM_ACTION_TOOLS`), stated in that tool's parts.
  */
+export function handlerSystemParts(
+  actions: readonly SystemAction[] = SYSTEM_ACTIONS,
+): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: purpose(
+      `Reads across the ABAP system: ${listed(actions.map((action) => SYSTEM_PHRASES[action]))}.`,
+    ),
+    returns: [],
+    values: {
+      of: 'action',
+      each: actions.map((action) =>
+        valueFrom(
+          action,
+          READ_DEFINITIONS[SYSTEM_ACTION_TOOLS[action]].description,
+        ),
+      ),
+    },
+    notes: [longRunning],
+  };
+}
+
+/** `HandlerSystem`'s description with `actions`, naming only those actions. */
 export function handlerSystemDescription(
   actions: readonly SystemAction[] = SYSTEM_ACTIONS,
 ): string {
-  return withLongToolAdvice(
-    `[read-only] Reads across the ABAP system, one read per action: ${actions.map((action) => ACTION_SENTENCES[action]).join('; ')}. Each argument is described with the actions that take it. Response: JSON, per action: ${actions.map((action) => ACTION_ANSWERS[action]).join('; ')}.`,
-  );
+  return toolDescription(handlerSystemParts(actions));
 }
 
 /** `HandlerSystem`'s description with every action. */

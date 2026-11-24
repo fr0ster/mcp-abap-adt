@@ -6,13 +6,10 @@
  * refused once it is assembled, so the list only shrinks.
  */
 export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
-  'HandlerAbapGit',
-  'HandlerAbapGitGet',
   'HandlerDebugBreakpoints',
   'HandlerDebugMaintain',
   'HandlerDebugSession',
   'HandlerDebugStep',
-  'HandlerSystem',
 ]);
 
 /**
@@ -20,7 +17,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 7;
+export const NOT_YET_ASSEMBLED_MOST = 4;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

@@ -261,7 +261,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="linkabapgitrepo-high-level-abapgit"></a>
 #### LinkAbapGitRepo (High-Level / Abapgit)
-**Description:** Links package_name to the remote repository at url on branch, and imports every object of the branch into the package and its subpackages, overwriting objects of the system and objects held by other packages, recorded in transport_request. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.
+**Description:** Links an ABAP package to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
 
 **Source:** `src/handlers/abapgit/high/handleLinkAbapGitRepo.ts`
 
@@ -272,7 +272,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `transport_request` (string, optional) - The transport request that records the objects written.
 - `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
 
-**On ABAP Cloud (`cloud`):** Links package_name to the remote repository at url on branch, and links only: a pull imports the objects. folder_logic says how folders map to subpackages. Answers facts only: SAP's status, done, and the objects SAP lists.
+**On ABAP Cloud (`cloud`):** Links an ABAP package to a remote abapGit repository on a branch, mapping its folders to subpackages as asked. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
 
 **Parameters (`cloud`):**
 - `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
@@ -285,7 +285,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="pullabapgitrepo-high-level-abapgit"></a>
 #### PullAbapGitRepo (High-Level / Abapgit)
-**Description:** Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: every object changed in the remote is imported, objects changed in the system are overwritten, and objects held by other packages are written too. Ends on SAP's answer, or with background true runs on an ABAP session of its own. When SAP's request or its response is lost mid-import (an SSE or stdio close logs the connection off), the outcome is unknown to this server and what SAP does then is unverified (unread in SAP's code, unmeasured): the repository's staging read shows the current differences, whichever writes made them. Answers facts only: SAP's status, done, and the objects SAP lists.
+**Description:** Pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
 
 **Source:** `src/handlers/abapgit/high/handlePullAbapGitRepo.ts`
 
@@ -294,7 +294,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 - `transport_request` (string, optional) - The transport request that records the objects written.
 
-**On ABAP Cloud (`cloud`):** Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: the job takes every object the modified-objects read lists and brings it to its remote version, a package warning with action 5 (delete and re-create) excepted: SAP leaves it out; given overwrite, SAP selects by name against the list as it stands when its job runs: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state. SAP accepts it as its own job, which runs to its end whatever happens to the client or its connection after the call; the objects it imports are inactive, and the repository list shows its run state. Answers facts only: SAP's status and accepted.
+**On ABAP Cloud (`cloud`):** Pulls an abapGit repository from the branch it is linked on as an SAP job, recorded in a transport, its imported objects left inactive. SAP's status and whether SAP made the change or accepted it as its own job. For each object SAP lists: its type, its name, its package, its status and the severity of SAP's message for it.
 
 **Parameters (`cloud`):**
 - `overwrite` (array, optional) - The objects listed by GetAbapGitModifiedObjects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused, within one list or across both: SAP matches by name within each list, so a collision inside one list could take an object not named. SAP selects by name when its job runs, against the list as it stands then: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state; SAP leaves a package warning with action 5 (delete and re-create) out of every pull. Without it the job takes every other listed object.
@@ -305,7 +305,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="pushabapgitrepo-high-level-abapgit"></a>
 #### PushAbapGitRepo (High-Level / Abapgit)
-**Description:** Commits the objects and files chosen from the staging with comment, author and committer, and pushes the commit to the remote branch of the repository repository_key. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status and done.
+**Description:** Commits the objects and files chosen from an abapGit repository's staging, with its comment, author and committer, and pushes the commit to its remote branch. SAP's status and whether SAP made the change or accepted it as its own job.
 
 **Source:** `src/handlers/abapgit/high/handlePushAbapGitRepo.ts`
 
@@ -317,7 +317,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `objects` (array, required) - The objects and files to commit, each as GetAbapGitStaging with detail "medium" answers it.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 
-**On ABAP Cloud (`cloud`):** Commits the objects and files chosen from the staging with comment, author and committer, and pushes the commit to the remote branch of the repository repository_key. SAP accepts it as its own job, which runs to its end; the repository list shows its run state. Answers facts only: SAP's status and accepted.
+**On ABAP Cloud (`cloud`):** Commits the objects and files chosen from an abapGit repository's staging and pushes the commit to its remote branch, as an SAP job. SAP's status and whether SAP made the change or accepted it as its own job.
 
 **Parameters (`cloud`):**
 - `author` (object, required) - The commit author: name and email (GetAbapGitStaging answers the proposal of this system).
@@ -330,7 +330,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="switchabapgitbranch-high-level-abapgit"></a>
 #### SwitchAbapGitBranch (High-Level / Abapgit)
-**Description:** Switches the repository repository_key to branch; with create true, creates branch in the remote first when the remote lacks it; with create false and a branch the remote lacks, the repository stays on its branch and SAP answers success. Answers facts only: SAP's status.
+**Description:** Switches an abapGit repository to a branch, creating the branch in the remote first when asked. SAP's status and whether SAP made the change or accepted it as its own job.
 
 **Source:** `src/handlers/abapgit/high/handleSwitchAbapGitBranch.ts`
 
@@ -3089,7 +3089,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="addtransportobject-high-level-transport"></a>
 #### AddTransportObject (High-Level / Transport)
-**Description:** Adds the existing object named by object_name and object_type to the transport task named by transport_number, so it travels with the task's request.
+**Description:** Adds an existing ABAP object to a transport task, so it travels with the task's transport. Whether SAP took the change, that SAP's answer leaves the attachment unconfirmed, the transport task, the object named and where the change is confirmed.
 
 **Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
 
@@ -3106,7 +3106,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtransport-high-level-transport"></a>
 #### CreateTransport (High-Level / Transport)
-**Description:** Creates a transport request and gives the task SAP creates with it the type task_type (default S, Development/Correction). Response: JSON with transport_number and task_number (and task_type_error or a note when the task is left untyped); with detail medium, the request as created too.
+**Description:** Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked. The number of the transport created, the number of its task, SAP's refusal of the task type and what is left to do when the task stays untyped.
 
 **Source:** `src/handlers/transport/high/handleCreateTransport.ts`
 
@@ -3124,7 +3124,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createtransporttask-high-level-transport"></a>
 #### CreateTransportTask (High-Level / Transport)
-**Description:** Creates a task under the existing transport request named by transport_number, owned by the user named by target_user, of the type task_type. The task is itself a request resource — it reads, writes and releases like one — and is what adding and removing an object entry address, since a request's objects live on its tasks. `target_user` is required: it names the task's owner, and an empty owner is refused with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses an added object on premise with SCTS_ADT_MSG 009 / TK127.
+**Description:** Creates a task of the type asked under an existing transport, owned by the SAP user named. The number of the task created, its type, SAP's refusal of the task type and what is left to do when the task stays untyped.
 
 **Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
 
@@ -3140,7 +3140,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="movetransportobjects-high-level-transport"></a>
 #### MoveTransportObjects (High-Level / Transport)
-**Description:** Moves the object entries named by objects from the transport task named by transport_number to the task named by target_number. Each entry is named by its position in the source task's object list.
+**Description:** Moves objects from one transport task to another, each at its position in the task it leaves. Whether SAP took the change, the task they leave, the task they move to and where the change is confirmed. For each object sent: the object named and its position in the task it leaves.
 
 **Source:** `src/handlers/transport/high/handleMoveTransportObjects.ts`
 
@@ -3156,7 +3156,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="removetransportobject-high-level-transport"></a>
 #### RemoveTransportObject (High-Level / Transport)
-**Description:** Removes the entry of the object named by object_name and object_type from the transport task named by transport_number, at position.
+**Description:** Removes a named object from a transport task, at its position among the task's objects. Whether SAP took the change, that SAP's answer leaves the removal unconfirmed, the transport task, the object named, its position in the task and where the change is confirmed.
 
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
 
@@ -3174,7 +3174,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="sortandcompresstransporttask-high-level-transport"></a>
 #### SortAndCompressTransportTask (High-Level / Transport)
-**Description:** Sorts the object list of the transport task named by transport_number and merges its duplicate entries. A task holding the same entry twice refuses removing an entry until this has run.
+**Description:** Sorts the objects of a transport task and merges its duplicates. Whether SAP took the change, the transport task and where the change is confirmed.
 
 **Source:** `src/handlers/transport/high/handleSortAndCompressTransportTask.ts`
 

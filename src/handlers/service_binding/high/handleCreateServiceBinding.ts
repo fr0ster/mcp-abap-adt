@@ -44,6 +44,7 @@ import {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -57,8 +58,10 @@ import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils'
 export const TOOL_DEFINITION = {
   name: 'CreateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Create an OData service binding (V2 or V4, UI or Web API) for a service definition, in initial state.',
+  description: createTool({
+    object: 'an OData service binding (V2 or V4, UI or Web API)',
+    how: 'for a service definition in a package, with its description, recorded in the transport given',
+  }),
   inputSchema: createArguments('CreateServiceBinding', {
     service_binding_name: z.string().describe('Service binding name.'),
     service_definition_name: z

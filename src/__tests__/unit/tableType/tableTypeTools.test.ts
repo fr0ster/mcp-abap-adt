@@ -928,20 +928,19 @@ describe('the definition SAP stored, read at a stated version', () => {
     assertNoProperty(answered, 'stored_version');
   });
 
-  it('the descriptions say which version each answers, per tool', () => {
-    const create = CreateTableType_Tool.description;
-    const update = UpdateTableType_Tool.description;
-    // Create checks after the wait: a refused check carries the inactive
-    // definition. Update checks under the lock, before the read.
-    assert.equal(
-      create.includes('a refused check or a refused activation'),
-      true,
-    );
-    assert.equal(
-      update.includes('activate false or a refused activation'),
-      true,
-    );
-    assert.equal(update.includes('a refused check is answered alone'), true);
+  it('the descriptions state the version the stored definition was read at', () => {
+    // The facts come from the answer's type (plan step 10.6): the version
+    // read, and SAP's failure of that read — which version each case reads
+    // is the code's, pinned by the cases below.
+    for (const tool of [CreateTableType_Tool, UpdateTableType_Tool]) {
+      assert.equal(
+        tool.description.includes(
+          'the version its stored definition was read at',
+        ),
+        true,
+        tool.name,
+      );
+    }
   });
 
   it('a write refused before the wait answers no stored definition', async () => {

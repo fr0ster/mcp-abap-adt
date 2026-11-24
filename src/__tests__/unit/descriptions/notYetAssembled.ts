@@ -78,32 +78,8 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'CheckTableLow',
   'CheckTableType',
   'CheckTableTypeLow',
-  'CreateBehaviorDefinition',
-  'CreateBehaviorImplementation',
-  'CreateCdsUnitTest',
-  'CreateClass',
-  'CreateDataElement',
-  'CreateDdl',
-  'CreateDomain',
-  'CreateFunctionGroup',
-  'CreateFunctionGroupUnitTest',
-  'CreateFunctionInclude',
-  'CreateFunctionModule',
-  'CreateInclude',
-  'CreateInterface',
-  'CreateMessageClass',
-  'CreateMessageClassMessage',
-  'CreateMetadataExtension',
-  'CreateProgram',
-  'CreateProgramUnitTest',
-  'CreateServiceBinding',
-  'CreateServiceDefinition',
-  'CreateStructure',
-  'CreateTable',
-  'CreateTableType',
   'CreateTransport',
   'CreateTransportTask',
-  'CreateUnitTest',
   'DebugBatchAnswers',
   'DebugBatchBegin',
   'DebugBatchEnd',
@@ -381,7 +357,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 368;
+export const NOT_YET_ASSEMBLED_MOST = 344;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

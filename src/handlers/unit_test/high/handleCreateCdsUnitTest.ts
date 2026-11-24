@@ -19,6 +19,7 @@ import {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -31,8 +32,11 @@ import { writeClassTests } from '../shared/writeTests';
 export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Creates the ABAP Unit test class named by class_name for the CDS view named by cds_view_name, from test_class_source. The view is checked to support CDS test doubles, the test class holding the local test classes is created in the package named by package_name, and it is activated.',
+  description: createTool({
+    purpose: purpose(
+      'Creates an ABAP Unit test class for a CDS view in a package, from the test class source given, once the view supports CDS test doubles.',
+    ),
+  }),
   inputSchema: createArguments('CreateCdsUnitTest', {
     cds_view_name: z
       .string()

@@ -25,6 +25,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -34,8 +35,10 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'CreateFunctionModule',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Create a new ABAP function module within an existing function group. Creates the function module in initial state.',
+  description: createTool({
+    object: 'an ABAP function module',
+    how: 'in an existing function group, with its description, recorded in the transport given',
+  }),
   inputSchema: createArguments('CreateFunctionModule', {
     function_group_name: z.string().describe('Parent function group name'),
     function_module_name: z

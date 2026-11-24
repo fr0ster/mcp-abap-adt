@@ -43,6 +43,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool, results } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { domainChanges } from '../../../lib/strategies/documentChanges';
@@ -61,8 +62,11 @@ import { validateTransportRequest } from '../../../utils/transportValidation';
 export const TOOL_DEFINITION = {
   name: 'CreateDomain',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Create a new ABAP domain in SAP system. Creates the domain object in initial state.',
+  description: createTool({
+    object: 'an ABAP domain',
+    how: 'in a package, with its description, recorded in the transport given',
+    result: results.WRITTEN_UNDER_LOCK,
+  }),
   inputSchema: createArguments('CreateDomain', {
     domain_name: z.string().describe('Domain name.'),
     description: z

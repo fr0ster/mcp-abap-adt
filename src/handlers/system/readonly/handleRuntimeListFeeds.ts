@@ -34,6 +34,7 @@ import {
 } from '../../../lib/batch/phases';
 import { withSystemKindOf } from '../../../lib/connectionFactory';
 import {
+  type DescriptionParts,
   longRunning,
   purpose,
   returnsOf,
@@ -516,6 +517,31 @@ export const FEED_HEADS = [
     'the second holding more items than one read gives',
   ),
 ];
+
+/**
+ * One page of one feed of entries, as the compact `HandlerDumpList` reads it:
+ * the dumps, the system messages or the Gateway errors, under the feed's
+ * heads — the feeds' own schemas, the descriptors and variants unread.
+ */
+export const FEED_PAGE_PARTS: DescriptionParts = {
+  tag: 'read-only',
+  purpose: purpose(
+    'Reads one page of the short dumps, system messages or SAP Gateway errors of an ABAP system, newest first, by user, object and time.',
+  ),
+  returns: returnsOf({
+    heads: FEED_HEADS,
+    of: 'for the feed read:',
+    shapes: [
+      shapesOf({
+        heads: FEED_SCHEMAS.heads,
+        dumps: FEED_SCHEMAS.dumps,
+        system_messages: FEED_SCHEMAS.system_messages,
+        gateway_errors: FEED_SCHEMAS.gateway_errors,
+      }),
+    ],
+  }),
+  notes: [longRunning],
+};
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',

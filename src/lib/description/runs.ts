@@ -20,6 +20,7 @@ import type {
   runOutcomeWithStatus,
   runStatusAnswer,
 } from '../../handlers/unit_test/shared/pollRun';
+import type { resultOnceAnswer } from '../../handlers/unit_test/shared/resultOnce';
 import type { projectSync } from '../../handlers/unit_test/shared/runSync';
 import type { projectRun } from '../../handlers/unit_test/shared/runTests';
 import type { TerseClassRun } from '../strategies/runProjections';
@@ -75,6 +76,14 @@ export const UNIT_TEST_RESULT = resultShape<
   run_id: "the run's id",
   status: RUN_STATUS_UNSTARTED,
   finished: RUN_FINISHED,
+  run_result: RUN_RESULT,
+});
+
+/** What a read of a run's result answers, read once without waiting. */
+export const UNIT_TEST_RESULT_ONCE = resultShape<
+  Informative<ReturnType<typeof resultOnceAnswer<XmlRead>>>
+>({
+  run_id: "the run's id",
   run_result: RUN_RESULT,
 });
 

@@ -1,13 +1,18 @@
-import { compactUnitTestResultSchema } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactUnitTestResultSchema,
+  toolDescription,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleGetUnitTestResultOnce } from '@mcp-abap-adt/lib/handlers/read';
+import {
+  handleGetUnitTestResultOnce,
+  RESULT_ONCE_PARTS,
+} from '@mcp-abap-adt/lib/handlers/read';
 import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Reads the result of the ABAP Unit test run named by run_id*, in one request (GET /sap/bc/adt/abapunit/results/{run_id}), and answers { success, run_id, run_result }: run_result is the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime. Optional: with_navigation_uris, format (abapunit or junit).",
+  description: toolDescription(RESULT_ONCE_PARTS.abap),
   inputSchema: compactUnitTestResultSchema,
 } as const;
 

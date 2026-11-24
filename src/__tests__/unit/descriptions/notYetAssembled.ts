@@ -15,8 +15,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'HandlerBackgroundRunGet',
   'HandlerBackgroundRunList',
   'HandlerBatch',
-  'HandlerCdsUnitTestResult',
-  'HandlerCdsUnitTestStatus',
   'HandlerCheckRun',
   'HandlerCreate',
   'HandlerDebugBatch',
@@ -26,17 +24,13 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'HandlerDebugStep',
   'HandlerDelete',
   'HandlerDeletionCheck',
-  'HandlerDumpList',
-  'HandlerDumpView',
   'HandlerGet',
   'HandlerGetData',
   'HandlerLeftoverSessionList',
   'HandlerLeftoverSessionLogoff',
   'HandlerLock',
-  'HandlerProfileList',
   'HandlerProfileRun',
   'HandlerProfileSchedule',
-  'HandlerProfileView',
   'HandlerServiceBindingListTypes',
   'HandlerServiceBindingValidate',
   'HandlerSession',
@@ -44,9 +38,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'HandlerTransportCreate',
   'HandlerTransportMoveObjects',
   'HandlerTransportSortAndCompress',
-  'HandlerUnitTestResult',
   'HandlerUnitTestRun',
-  'HandlerUnitTestStatus',
   'HandlerUnlock',
   'HandlerUpdate',
   'HandlerValidate',
@@ -57,7 +49,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 44;
+export const NOT_YET_ASSEMBLED_MOST = 36;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

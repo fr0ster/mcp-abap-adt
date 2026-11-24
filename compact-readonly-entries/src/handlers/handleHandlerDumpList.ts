@@ -1,17 +1,18 @@
 import {
   compactDumpListSchema,
-  withLongToolAdvice,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleRuntimeListFeedPage } from '@mcp-abap-adt/lib/handlers/read';
+import {
+  FEED_PAGE_PARTS,
+  handleRuntimeListFeedPage,
+} from '@mcp-abap-adt/lib/handlers/read';
 import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpList',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    "[read-only] Reads one page of the runtime feed named by feed_type in one request, newest first: the ABAP short dumps (runtime errors) of the user, object_name or time range from–to given, or system messages or SAP Gateway errors. Optional: feed_type(dumps|system_messages|gateway_errors, default dumps), user, runtime_error, exception, object_name, package, component, top (1 to 100), from, to. Response, by default (detail terse): TSV under '# feed' and '# count' lines, '# next_to' (the `to` of SAP's next link) when more remain; dumps dump_id, updated, title; system messages id, createdOn, author, title; gateway errors opid, detail_kind, dateTime, type, shortText, username. With detail medium or full: JSON { feed_type, count, entries, next_to }, each dump with its dump_id. The next link's page starts at the boundary second, inclusive: entries of that second may repeat; match them by dump_id.",
-  ),
+  description: toolDescription(FEED_PAGE_PARTS),
   inputSchema: compactDumpListSchema,
 } as const;
 

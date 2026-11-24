@@ -1,13 +1,20 @@
-import { compactProfileListSchema } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactOf,
+  compactProfileListSchema,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleRuntimeListProfilerTraceFiles } from '@mcp-abap-adt/lib/handlers/read';
+import {
+  handleRuntimeListProfilerTraceFiles,
+  READ_DEFINITIONS,
+} from '@mcp-abap-adt/lib/handlers/read';
 import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileList',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Lists the ABAP profiler trace files. Response, by default (detail terse): TSV, one row per trace (id, recordedAt, objectName, state, runtime); with detail medium or full every field as JSON.',
+  description: compactOf(
+    READ_DEFINITIONS.RuntimeListProfilerTraceFiles.description,
+  ),
   inputSchema: compactProfileListSchema,
 } as const;
 

@@ -1,13 +1,18 @@
-import { compactDumpViewSchema } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactDumpViewSchema,
+  compactOf,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleRuntimeGetDumpById } from '@mcp-abap-adt/lib/handlers/read';
+import {
+  handleRuntimeGetDumpById,
+  READ_DEFINITIONS,
+} from '@mcp-abap-adt/lib/handlers/read';
 import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpView',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the ABAP short dump (runtime error) named by dump_id in the view given. Required: dump_id* (id or URI). Optional: view(default|summary|formatted). Response: JSON.',
+  description: compactOf(READ_DEFINITIONS.RuntimeGetDumpById.description),
   inputSchema: compactDumpViewSchema,
 } as const;
 

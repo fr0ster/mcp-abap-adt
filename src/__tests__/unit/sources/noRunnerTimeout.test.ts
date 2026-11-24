@@ -1,7 +1,11 @@
 /**
  * The no-timeout scan (D27; spec §2 "No runner timeout", §3 "No force
- * exit"). A test ends on its result: nothing the runner chooses cuts a test,
- * a hook or a file's process. Refused:
+ * exit"). A test ends on its result: nothing the runner chooses cuts a test
+ * or a hook. The one bound is the runner's own per-file bound of the unit
+ * run (`--file-timeout`, the owner's decision of 2026-11-23): a hanging file
+ * fails with its name instead of running until CI cancels the job; the
+ * runner refuses it under a live npm script (`fileTimeout.test.ts`), and it
+ * is none of the flags below. Refused:
  *
  * - `--test-timeout` in an npm script (node:test's per-test bound);
  * - `{ timeout }` on a `test`, `it`, `describe` / `suite` or hook (`before`,

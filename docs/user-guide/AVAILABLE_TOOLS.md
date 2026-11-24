@@ -4831,7 +4831,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugcancel-debug-debugger"></a>
 #### AmdpDebugCancel (Debug / Debugger)
-**Description:** [debug] Cancels the stopped AMDP debuggee's execution.
+**Description:** [debug] Cancels the execution of the stopped AMDP debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugCancel.ts`
 
@@ -4843,7 +4843,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebuggettable-debug-debugger"></a>
 #### AmdpDebugGetTable (Debug / Debugger)
-**Description:** [read-only] [debug] Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.
+**Description:** [read-only] Reads the records of a table variable at the AMDP stop, up to 100, through a SELECT over it when one is set. SAP's data as it came.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugGetTable.ts`
 
@@ -4857,12 +4857,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugsetbreakpoints-debug-debugger"></a>
 #### AmdpDebugSetBreakpoints (Debug / Debugger)
-**Description:** [debug] Sets the AMDP breakpoints of a debug session to the set given, as confirmed by the system. Catches every request of the connected SAP user, from this server and from anywhere else.
+**Description:** [debug] Sets the AMDP breakpoints of a debug session to the set asked, as the system confirms them. For each breakpoint: its class, its source position, its state and SAP's reason for an invalid one.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugSetBreakpoints.ts`
 
 **Parameters:**
-- `breakpoints` (array, required) - Lines in SQLScript methods of a class.
+- `breakpoints` (array, required) - Lines in SQLScript methods of a class. Catches every request of the connected SAP user, from this server and from anywhere else.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
@@ -4870,12 +4870,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstart-debug-debugger"></a>
 #### AmdpDebugStart (Debug / Debugger)
-**Description:** [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. Catches every request of the connected SAP user, from this server and from anywhere else.
+**Description:** [debug] Opens an AMDP debug session of the connected SAP user with breakpoints in SQLScript methods, starting a background run once they are confirmed. The session's main id and the session's state handle. For each breakpoint the system confirmed: its class, its source position, its state and SAP's reason for an invalid one.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStart.ts`
 
 **Parameters:**
-- `breakpoints` (array, required) - Lines in SQLScript methods of a class.
+- `breakpoints` (array, required) - Lines in SQLScript methods of a class. Catches every request of the connected SAP user, from this server and from anywhere else.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
 - `stop_existing` (boolean, optional (default: false)) - Ends an AMDP debug session of this user left behind.
@@ -4884,7 +4884,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstep-debug-debugger"></a>
 #### AmdpDebugStep (Debug / Debugger)
-**Description:** [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.
+**Description:** [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop. The state after the step.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStep.ts`
 
@@ -4897,7 +4897,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugstop-debug-debugger"></a>
 #### AmdpDebugStop (Debug / Debugger)
-**Description:** [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that failed to undo is reported and kept with the answers.
+**Description:** [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStop.ts`
 
@@ -4909,7 +4909,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugwait-debug-debugger"></a>
 #### AmdpDebugWait (Debug / Debugger)
-**Description:** [read-only] [debug] AMDP events of a debug session after waiting up to hold_seconds.
+**Description:** [read-only] Waits for the AMDP events of a debug session, up to the seconds asked. Whether the session is idle, waiting, at an event or ended, why it ended and the outcome of the run it started. For each event: its kind, its id, the debuggee, its source position and the depth of a stack cut to its top frames. For each variable an event carries: its name and its value. For each breakpoint an event reports: its class, its source position, its state and SAP's reason for an invalid one. For each frame of an event from the top: its database procedure, its ADT object address, its position in the database procedure and that its procedure lacks debug compilation.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugWait.ts`
 
@@ -4922,7 +4922,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchanswers-debug-debugger"></a>
 #### DebugBatchAnswers (Debug / Debugger)
-**Description:** [read-only] [debug] Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.
+**Description:** [read-only] Reads the outcome of each recorded debugger call of the last sending, by its number. For each number asked: the number, whether it is an error, that the number is unanswered and why. For each block of the answer of a number: its kind, its text, its annotations and its metadata. For each part of SAP's answer a number kept: its status, its status text, its headers and its body.
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchAnswers.ts`
 
@@ -4934,7 +4934,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchbegin-debug-debugger"></a>
 #### DebugBatchBegin (Debug / Debugger)
-**Description:** [read-only] [debug] Starts the debugger batch on the stopped ABAP debuggee, else at the AMDP break. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable at the ABAP debuggee, and of step over, continue or the data preview of a table variable at the AMDP break, is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).
+**Description:** [read-only] Starts recording the debugger calls at the stopped ABAP debuggee or at the AMDP break, each under the next number, to send them together. That recording is on and the state handle: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchBegin.ts`
 
@@ -4945,7 +4945,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchend-debug-debugger"></a>
 #### DebugBatchEnd (Debug / Debugger)
-**Description:** [debug] Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.
+**Description:** [debug] Sends the recorded debugger calls together on the session they were recorded on, and splits SAP's answer by call. How many calls were recorded, how many were sent and how many parts SAP's answer held.
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchEnd.ts`
 
@@ -4956,7 +4956,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugcreatememorysnapshot-debug-debugger"></a>
 #### DebugCreateMemorySnapshot (Debug / Debugger)
-**Description:** [debug] Writes a memory snapshot of the stopped debuggee and answers the file written.
+**Description:** [debug] Writes a memory snapshot of the stopped ABAP debuggee. SAP's data as it came.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateMemorySnapshot.ts`
 
@@ -4968,7 +4968,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugcreatewatchpoint-debug-debugger"></a>
 #### DebugCreateWatchpoint (Debug / Debugger)
-**Description:** [debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.
+**Description:** [debug] Watches a variable of the stopped ABAP debuggee, stopping it when the variable changes, under a condition when one is set. SAP's data as it came.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateWatchpoint.ts`
 
@@ -4982,7 +4982,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugdeletebreakpoint-debug-debugger"></a>
 #### DebugDeleteBreakpoint (Debug / Debugger)
-**Description:** [debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. An id outside the session's set is refused.
+**Description:** [debug] Removes one breakpoint of an ABAP debug session by its id, the rest staying armed. The id deleted.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteBreakpoint.ts`
 
@@ -4995,7 +4995,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugdeletewatchpoint-debug-debugger"></a>
 #### DebugDeleteWatchpoint (Debug / Debugger)
-**Description:** [debug] Removes a watchpoint.
+**Description:** [debug] Removes a watchpoint of the stopped ABAP debuggee by its id. The id deleted.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteWatchpoint.ts`
 
@@ -5008,7 +5008,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuggetmemorysizes-debug-debugger"></a>
 #### DebugGetMemorySizes (Debug / Debugger)
-**Description:** [read-only] [debug] Memory the stopped debuggee uses. Needs a stopped debuggee.
+**Description:** [read-only] Reads how much memory the stopped ABAP debuggee uses. The memory its ABAP objects use, the internal memory it uses and the peak of its internal memory.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetMemorySizes.ts`
 
@@ -5020,7 +5020,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuggetstack-debug-debugger"></a>
 #### DebugGetStack (Debug / Debugger)
-**Description:** [read-only] [debug] Call stack of the stopped debuggee of the debug session named by state_handle, each frame with its ADT object address and its technical place. Needs a stopped debuggee.
+**Description:** [read-only] Reads the call stack of the stopped ABAP debuggee, each frame with its ADT object address and its place in the source. Where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive and whether the step reached another debuggee. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetStack.ts`
 
@@ -5032,7 +5032,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuggetvariables-debug-debugger"></a>
 #### DebugGetVariables (Debug / Debugger)
-**Description:** [read-only] [debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.
+**Description:** [read-only] Reads variables of the stopped ABAP debuggee by name, or the members of parent variables. For each variable: its id, the parent id of its members, its name, its declared type, its value, the size of a table variable, the label of a member and the parent of a member, when several parents are read.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetVariables.ts`
 
@@ -5046,7 +5046,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuglistbreakpoints-debug-debugger"></a>
 #### DebugListBreakpoints (Debug / Debugger)
-**Description:** [read-only] [debug] Breakpoints a debug session armed.
+**Description:** [read-only] Shows the breakpoints an ABAP debug session armed. For each breakpoint: its id, its kind, its source position, its exception class, its statement, its message class, its message number, its message type, its condition, the tag it was sent with and SAP's reason for refusing it.
 
 **Source:** `src/handlers/debugger/debug/handleDebugListBreakpoints.ts`
 
@@ -5058,7 +5058,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuglistwatchpoints-debug-debugger"></a>
 #### DebugListWatchpoints (Debug / Debugger)
-**Description:** [read-only] [debug] Watchpoints of the stopped debuggee.
+**Description:** [read-only] Shows the watchpoints of the stopped ABAP debuggee. SAP's data as it came.
 
 **Source:** `src/handlers/debugger/debug/handleDebugListWatchpoints.ts`
 
@@ -5070,12 +5070,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetbreakpoints-debug-debugger"></a>
 #### DebugSetBreakpoints (Debug / Debugger)
-**Description:** [debug] Adds breakpoints to a debug session — a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition — and answers the whole set placed, this call's refusals each with its breakpoint and reason, earlier breakpoints that dropped out of the set, and any answer row left unpaired with a breakpoint. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Adds breakpoints to an ABAP debug session: at a source position, optionally conditional, on an exception class, an ABAP statement or a message. For each breakpoint of the set placed: its id, its kind, its source position, its exception class, its statement, its message class, its message number, its message type, its condition, the tag it was sent with and SAP's reason for refusing it. For each breakpoint of this call SAP refused: the breakpoint sent and SAP's reason. For each earlier breakpoint that dropped out of the set: the breakpoint sent and SAP's reason. For each answer SAP gave beside the breakpoints sent: its kind, its id, its tag and SAP's reason.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetBreakpoints.ts`
 
 **Parameters:**
-- `breakpoints` (array, required) - Breakpoints: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
+- `breakpoints` (array, required) - Breakpoints: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
@@ -5083,7 +5083,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetsettings-debug-debugger"></a>
 #### DebugSetSettings (Debug / Debugger)
-**Description:** [debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.
+**Description:** [debug] Changes the debugger settings of an ABAP debug session at its current stop, applied again after each later attach. Whether system programs are debugged, whether update tasks are debugged, whether exception objects are created, whether background RFC is debugged and whether shared objects are debugged.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetSettings.ts`
 
@@ -5113,7 +5113,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetvariable-debug-debugger"></a>
 #### DebugSetVariable (Debug / Debugger)
-**Description:** [debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.
+**Description:** [debug] Sets the value of a variable of the stopped ABAP debuggee. For each variable: its id, the parent id of its members, its name, its declared type, its value and the size of a table variable.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetVariable.ts`
 
@@ -5127,12 +5127,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstartlistener-debug-debugger"></a>
 #### DebugStartListener (Debug / Debugger)
-**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Opens an ABAP debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force, why the settings could be applied only in part, the breakpoints placed and refused, the session's state handle, the terminal id its runs carry, the IDE id its runs carry, its debugging mode and the user whose runs it catches. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStartListener.ts`
 
 **Parameters:**
-- `breakpoints` (array, required) - Breakpoints, at least one: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
+- `breakpoints` (array, required) - Breakpoints, at least one breakpoint: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 - `debugging_mode` (string, optional, one of: `user`, `terminal`) - user (when omitted) catches the requests of the request user; terminal catches the requests that carry this debug session's ids and needs no configuration: the run it starts carries them, so without run it catches only requests carrying the same ids.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `request_user` (string, optional) - User mode: the SAP user whose requests are caught; the connected user when omitted. Debugging another user's requests needs the debug authorization for that user. Not taken in terminal mode.
@@ -5143,7 +5143,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstep-debug-debugger"></a>
 #### DebugStep (Debug / Debugger)
-**Description:** [debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.
+**Description:** [debug] Steps the stopped ABAP debuggee into a call, over it, out of it or on to the next stop, or leaves it running by detaching or freeing the debugger. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force and why the settings could be applied only in part. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStep.ts`
 
@@ -5156,7 +5156,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsteptoline-debug-debugger"></a>
 #### DebugStepToLine (Debug / Debugger)
-**Description:** [debug] Runs or jumps the stopped debuggee to a line.
+**Description:** [debug] Runs or jumps the stopped ABAP debuggee to a source position. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force and why the settings could be applied only in part. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStepToLine.ts`
 
@@ -5174,7 +5174,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstop-debug-debugger"></a>
 #### DebugStop (Debug / Debugger)
-**Description:** [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening, closes the connections and lets the kept answers of its debugger batch go; a part that failed to undo is reported and kept with the answers.
+**Description:** [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes its connections. That the session stopped. For each part that failed to undo: the step it failed at and its error as it came.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStop.ts`
 
@@ -5186,12 +5186,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugtakeoverlistener-debug-debugger"></a>
 #### DebugTakeOverListener (Debug / Debugger)
-**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. Displaces another debugger listening for the same user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Opens an ABAP debug session taking its user over from another debugger: arms breakpoints, listens for a debuggee and attaches the first one caught. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force, why the settings could be applied only in part, the breakpoints placed and refused, the session's state handle, the terminal id its runs carry, the IDE id its runs carry, its debugging mode and the user whose runs it catches. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTakeOverListener.ts`
 
 **Parameters:**
-- `breakpoints` (array, required) - Breakpoints, at least one: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
+- `breakpoints` (array, required) - Breakpoints, at least one breakpoint: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 - `debugging_mode` (string, optional, one of: `user`, `terminal`) - user (when omitted) catches the requests of the request user; terminal catches the requests that carry this debug session's ids and needs no configuration: the run it starts carries them, so without run it catches only requests carrying the same ids.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `request_user` (string, optional) - User mode: the SAP user whose requests are caught; the connected user when omitted. Debugging another user's requests needs the debug authorization for that user. Not taken in terminal mode.
@@ -5202,7 +5202,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugterminate-debug-debugger"></a>
 #### DebugTerminate (Debug / Debugger)
-**Description:** [debug] Ends the stopped debuggee and its program where it stands.
+**Description:** [debug] Ends the stopped ABAP debuggee and its program where it stands. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force and why the settings could be applied only in part. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTerminate.ts`
 
@@ -5214,7 +5214,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugwait-debug-debugger"></a>
 #### DebugWait (Debug / Debugger)
-**Description:** [read-only] [debug] State of a debug session after waiting up to hold_seconds; a debugger that took the user over is an error carrying the system's message.
+**Description:** [read-only] Waits for the next stop or end of an ABAP debug session, up to the seconds asked, and tells its state. Whether the session is idle, listening, stopped or ended, why it ended, the outcome of the run it started, SAP's message of an end, the failure of a refused attach, where the debuggee stopped, the depth of a stack cut to its top frames, whether SAP refuses to attach the catch, the short dump of a post-mortem catch, the kind of a catch other than a debuggee, whether the catch is post-mortem, whether the debuggee runs non-exclusive, whether the step reached another debuggee, why the stack could be read only in part, the debugger settings in force and why the settings could be applied only in part. For each frame from the top: its ADT object address, its processing unit, its program, its include and its position in the include. For each breakpoint whose condition SAP failed to evaluate: its id, its condition and where in the condition SAP failed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugWait.ts`
 
@@ -5227,7 +5227,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotdelta-debug-debugger"></a>
 #### MemorySnapshotDelta (Debug / Debugger)
-**Description:** [read-only] [debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
+**Description:** [read-only] Compares two memory snapshots in a view: memory by kind, largest objects, an object's children or its referrers. SAP's data as it came.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotDelta.ts`
 
@@ -5243,7 +5243,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotget-debug-debugger"></a>
 #### MemorySnapshotGet (Debug / Debugger)
-**Description:** [read-only] [debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
+**Description:** [read-only] Reads one memory snapshot in a view: its header, memory by kind, largest objects, an object's children or its referrers. SAP's data as it came.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotGet.ts`
 
@@ -5258,7 +5258,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotlist-debug-debugger"></a>
 #### MemorySnapshotList (Debug / Debugger)
-**Description:** [read-only] [debug] Memory snapshots the system lists. Empty when the user lacks the memory snapshot authorization.
+**Description:** [read-only] Lists the memory snapshots the system holds, of one user when asked. Beside an empty set, that a user lacking the memory snapshot authorization gets one too. For each snapshot: its id, its user, when it was written, its size and the program it was written in.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotList.ts`
 

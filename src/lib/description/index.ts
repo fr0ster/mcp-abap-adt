@@ -8,6 +8,16 @@ export { batchable, longRunning, type Note } from './notes';
 export { type Purpose, purpose } from './purpose';
 export { type ReturnsFact, returnsOf } from './returns';
 export {
+  type MemberNouns,
+  membersOf,
+  type SourceReadAnswer,
+  type SourceReader,
+  sourceReader,
+  type VersionSourceAnswer,
+  versionHistoryReader,
+  versionSourceReader,
+} from './sourceReader';
+export {
   type DescriptionParts,
   type DescriptionTag,
   partsOfDescription,

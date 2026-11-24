@@ -154,20 +154,16 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetATCRunStatus',
   'GetAbapGitFile',
   'GetBackgroundRun',
-  'GetBehaviorDefinition',
   'GetBehaviorDefinitionVersionDiff',
   'GetBehaviorDefinitionVersionSource',
   'GetBehaviorDefinitionVersions',
-  'GetBehaviorImplementation',
   'GetCdsUnitTest',
   'GetCdsUnitTestResult',
   'GetCdsUnitTestStatus',
-  'GetClass',
   'GetClassVersionDiff',
   'GetClassVersionSource',
   'GetClassVersions',
   'GetDataElement',
-  'GetDdl',
   'GetDdlVersionDiff',
   'GetDdlVersionSource',
   'GetDdlVersions',
@@ -175,13 +171,9 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetEnhancementImpl',
   'GetEnhancementSpot',
   'GetFunctionGroup',
-  'GetFunctionInclude',
-  'GetFunctionModule',
   'GetFunctionModuleVersionDiff',
   'GetFunctionModuleVersionSource',
   'GetFunctionModuleVersions',
-  'GetInclude',
-  'GetInterface',
   'GetInterfaceVersionDiff',
   'GetInterfaceVersionSource',
   'GetInterfaceVersions',
@@ -190,7 +182,6 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetLocalTestClass',
   'GetLocalTypes',
   'GetMessageClassMessage',
-  'GetMetadataExtension',
   'GetMetadataExtensionVersionDiff',
   'GetMetadataExtensionVersionSource',
   'GetMetadataExtensionVersions',
@@ -199,13 +190,11 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
   'GetObjectInfo',
   'GetObjectVersionDiff',
   'GetObjectVersionSource',
-  'GetProgram',
   'GetProgramVersionDiff',
   'GetProgramVersionSource',
   'GetProgramVersions',
   'GetServiceBinding',
   'GetServiceBindingPreviewUrl',
-  'GetServiceDefinition',
   'GetSqlQuery',
   'GetStructure',
   'GetStructureVersionDiff',
@@ -348,7 +337,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 335;
+export const NOT_YET_ASSEMBLED_MOST = 324;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

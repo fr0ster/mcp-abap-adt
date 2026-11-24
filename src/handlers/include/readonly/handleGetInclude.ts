@@ -3,6 +3,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { sourceReader, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -18,7 +19,6 @@ import {
   answerSourceRead,
   rangeFields,
   SOURCE_RANGE_SHAPE,
-  SOURCE_RANGE_WORDS,
   type SourceCut,
   type SourceRangeArgs,
   sourceRangeOf,
@@ -31,7 +31,14 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetInclude',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. ${SOURCE_RANGE_WORDS}`,
+  description: toolDescription(
+    sourceReader({
+      object: 'an ABAP include',
+      answers: 'source',
+      range: 'lines',
+      metadata: true,
+    }),
+  ),
   inputSchema: z.object({
     include_name: requiredText('Include name is required').describe(
       'Include name.',

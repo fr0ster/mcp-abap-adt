@@ -40,7 +40,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, messageCarriedBy } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { results, updateTool } from '../../../lib/description';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
@@ -57,7 +57,6 @@ export const TOOL_DEFINITION = {
     tag: 'low-level',
     object: 'the description of an existing ABAP package',
     how: ', under a lock the caller holds',
-    result: results.WRITTEN,
   }),
   inputSchema: z.object({
     package_name: z

@@ -53,7 +53,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     object: 'the description of an existing ABAP message class (T100)',
-    how: ', recorded in the transport given',
+    transported: true,
   }),
   inputSchema: z.object({
     message_class_name: z.string().describe('Message class name.'),

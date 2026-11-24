@@ -928,21 +928,6 @@ describe('the definition SAP stored, read at a stated version', () => {
     assertNoProperty(answered, 'stored_version');
   });
 
-  it('the descriptions state the version the stored definition was read at', () => {
-    // The facts come from the answer's type (plan step 10.6): the version
-    // read, and SAP's failure of that read — which version each case reads
-    // is the code's, pinned by the cases below.
-    for (const tool of [CreateTableType_Tool, UpdateTableType_Tool]) {
-      assert.equal(
-        tool.description.includes(
-          'the version its stored definition was read at',
-        ),
-        true,
-        tool.name,
-      );
-    }
-  });
-
   it('a write refused before the wait answers no stored definition', async () => {
     const connection = sessionRecording([undefined, { data: STRING_TABLE }]);
     // SAP's refusal rejects, as the shipped connection rejects a non-2xx answer.

@@ -1,13 +1,13 @@
 /**
  * The result shapes of the tools not on the writers (plan step 10.6): each
- * kind's answer type, every member by its domain noun. The types are the
+ * kind's answer type, every member by its domain noun. A create, update or
+ * delete states no facts (`kinds.ts`); its answer types stay here, typed. The types are the
  * projections' own, so a member added to an answer and not named here does
  * not compile; only the members a terse answer writes are stated.
  */
 
 import type { StatusAnswer } from '../abapGit/formats';
 import type {
-  PublicationAnswer,
   TerseActivationAnswer,
   terseCheck,
   terseDeletion,
@@ -16,7 +16,6 @@ import type {
   terseWrite,
 } from '../strategies/projections';
 import type { safeCleanup } from '../strategies/safeFields';
-import type { storedAt } from '../strategies/tableTypeStored';
 import { listOf, resultShape } from './returns';
 
 /** A write's answer: SAP took it. */
@@ -58,19 +57,6 @@ const MESSAGE_NOUNS = {
 /** What a write answers. */
 export const WRITTEN = resultShape<WriteAnswer>({
   result: 'whether SAP took the change',
-});
-
-/** What a write under a lock answers. */
-export const WRITTEN_UNDER_LOCK = resultShape<LockedWriteAnswer>({
-  result: 'whether SAP took the change',
-  cleanup: 'a lock left held when its release failed',
-});
-
-/** What a deletion answers. */
-export const DELETED = resultShape<DeletionAnswer>({
-  deleted: 'whether SAP deleted the object',
-  object: 'its name',
-  message: "SAP's message about it",
 });
 
 /** What a check run answers. */
@@ -130,34 +116,4 @@ export const ABAPGIT_STATUS = resultShape<StatusAnswer>({
 export const VALIDATED = resultShape<ValidationAnswer>({
   admissible: 'whether the name is admissible',
   message: "SAP's message about it",
-});
-
-/** What a publication answers, under the binding's lock. */
-export const PUBLISHED = resultShape<
-  PublicationAnswer & Pick<LockedWriteAnswer, 'cleanup'>
->({
-  result: 'whether SAP made the change or started it',
-  completion: 'whether it has completed or runs in the background',
-  severity: "SAP's severity",
-  short_text: "SAP's status text",
-  note: 'what a started change means for the service',
-  cleanup: 'a lock left held when its release failed',
-});
-
-/**
- * The stored definition a table-type write states beside its answer: the
- * version it was read at, or the failed read — the definition itself is a
- * read of its own, stated only at the whole answer.
- */
-type StoredStated = Exclude<
-  ReturnType<typeof storedAt>,
-  undefined | { readonly stored_definition: unknown }
->;
-
-/** What a table-type write answers: the write's, then the stored definition's version. */
-export const STORED_TABLE_TYPE = resultShape<LockedWriteAnswer & StoredStated>({
-  result: 'whether SAP took the change',
-  cleanup: 'a lock left held when its release failed',
-  stored_version: 'the version its stored definition was read at',
-  stored_definition_not_read: "SAP's failure when that read failed",
 });

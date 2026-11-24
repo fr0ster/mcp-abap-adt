@@ -43,7 +43,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { deleteTool, purpose, resultShape } from '../../../lib/description';
+import { deleteTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
 
@@ -57,14 +57,6 @@ function messageDeleted(className: string, msgno: string) {
   } as const;
 }
 
-/** What the delete answers, by its nouns. */
-const MESSAGE_DELETED = resultShape<ReturnType<typeof messageDeleted>>({
-  success: 'whether SAP deleted the message',
-  message_class_name: 'the message class',
-  msgno: 'the message number',
-  message: 'a sentence saying so',
-});
-
 export const TOOL_DEFINITION = {
   name: 'DeleteMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
@@ -72,7 +64,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Deletes one message, by its number, from an ABAP message class (T100), keeping the class and its other messages.',
     ),
-    result: MESSAGE_DELETED,
   }),
   inputSchema: z.object({
     message_class_name: z.string().describe('Parent message class name.'),

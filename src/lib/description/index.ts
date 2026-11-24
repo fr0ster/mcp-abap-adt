@@ -12,6 +12,7 @@ export {
   type KindTool,
   updateTool,
   validateTool,
+  type WriteTool,
 } from './kinds';
 export { batchable, longRunning, type Note } from './notes';
 export { type Purpose, purpose } from './purpose';

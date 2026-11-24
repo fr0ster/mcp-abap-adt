@@ -29,7 +29,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description: updateTool({
     object: 'the stored metadata of an existing ABAP include',
-    how: ', replacing it whole, recorded in the transport given',
+    how: ', replacing it whole',
+    transported: true,
   }),
   inputSchema: z.object({
     include_name: z

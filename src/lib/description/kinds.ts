@@ -2,21 +2,17 @@
  * The descriptions of the uniform tool kinds (plan step 10.6): a create,
  * update, delete, check, activate or validate tool states its function in
  * its name — an action and an object type — so its purpose is built from
- * the action, the object and what the inputs add, and its facts from the
- * kind's result type (`results.ts`). A tool whose function differs from its
- * kind's sentence gives its own purpose, its facts still the kind's.
+ * the action, the object and what the inputs add for that object. A check,
+ * activation or validation states its facts from the kind's result type
+ * (`results.ts`); a create, update or delete states none: its answer is
+ * whether SAP took the change, which tells nothing of the tool's function
+ * (owner, after the query measurement). A tool whose function differs from
+ * its kind's sentence gives its own purpose.
  */
 
 import type { Note } from './notes';
 import { type Purpose, purpose } from './purpose';
-import {
-  ACTIVATED,
-  CHECKED,
-  DELETED,
-  VALIDATED,
-  WRITTEN,
-  WRITTEN_UNDER_LOCK,
-} from './results';
+import { ACTIVATED, CHECKED, VALIDATED } from './results';
 import { type ResultShape, resultReturns } from './returns';
 import { type DescriptionTag, toolDescription } from './toolDescription';
 
@@ -31,21 +27,50 @@ export interface KindTool {
   readonly how?: string | undefined;
   /** The tool's own purpose, when its function differs from the kind's sentence. */
   readonly purpose?: Purpose | undefined;
-  /** The answer, when it is not the kind's own (a delete that writes, say). */
+  /** The answer, when it is not the kind's own (a check that names its object, say). */
   readonly result?: ResultShape | undefined;
   readonly tag?: DescriptionTag | undefined;
   readonly notes?: readonly Note[] | undefined;
 }
 
-/** `verb object how.` — the kind's purpose sentence. */
-function sentenceOf(verb: string, tool: KindTool): Purpose {
+/**
+ * A create, update or delete: what it acts on, what it writes for that
+ * object, and whether the write is recorded in the transport the caller
+ * names. Its answer is the kind's, stated nowhere.
+ */
+export interface WriteTool {
+  /** The object written, with its article: `an ABAP domain`. */
+  readonly object?: string | undefined;
+  /**
+   * What the tool writes for that object, and where: `in a package, with
+   * its data type, length and fixed values`; one starting with a comma
+   * follows the object directly.
+   */
+  readonly how?: string | undefined;
+  /** The sentence ends `, recorded in the transport given`. */
+  readonly transported?: true | undefined;
+  /** The tool's own purpose, when its function differs from the kind's sentence. */
+  readonly purpose?: Purpose | undefined;
+  readonly tag?: DescriptionTag | undefined;
+  readonly notes?: readonly Note[] | undefined;
+}
+
+/** The transport a write is recorded in, at its sentence's end. */
+const TRANSPORTED = ', recorded in the transport given';
+
+/** `verb object how[, recorded in the transport given].` — the kind's purpose sentence. */
+function sentenceOf(
+  verb: string,
+  tool: Pick<WriteTool, 'object' | 'how' | 'transported'>,
+): Purpose {
   const how =
     tool.how === undefined
       ? ''
-      : tool.how.startsWith(',')
+      : tool.how.startsWith(',') || tool.how.startsWith(':')
         ? tool.how
         : ` ${tool.how}`;
-  return purpose(`${verb} ${tool.object ?? ''}${how}.`);
+  const transport = tool.transported === true ? TRANSPORTED : '';
+  return purpose(`${verb} ${tool.object ?? ''}${how}${transport}.`);
 }
 
 /** A kind's description: its purpose (the tool's own, or the kind's sentence), the kind's facts. */
@@ -58,19 +83,29 @@ function kind(verb: string, result: ResultShape, tool: KindTool): string {
   });
 }
 
-/** A create: `Creates <object> <how>.`, then whether SAP took it. */
-export function createTool(tool: KindTool): string {
-  return kind('Creates', WRITTEN, tool);
+/** A write's description: its purpose alone (the tool's own, or the kind's sentence). */
+function write(verb: string, tool: WriteTool): string {
+  return toolDescription({
+    tag: tool.tag,
+    purpose: tool.purpose ?? sentenceOf(verb, tool),
+    returns: [],
+    notes: tool.notes,
+  });
 }
 
-/** An update: `Updates <object> <how>.`, then whether SAP took it and a lock left held. */
-export function updateTool(tool: KindTool): string {
-  return kind('Updates', WRITTEN_UNDER_LOCK, tool);
+/** A create: `Creates <object> <how>[, recorded in the transport given].` */
+export function createTool(tool: WriteTool): string {
+  return write('Creates', tool);
 }
 
-/** A delete: `Deletes <object> <how>.`, then SAP's deletion verdict. */
-export function deleteTool(tool: KindTool): string {
-  return kind('Deletes', DELETED, tool);
+/** An update: `Updates <object> <how>[, recorded in the transport given].` */
+export function updateTool(tool: WriteTool): string {
+  return write('Updates', tool);
+}
+
+/** A delete: `Deletes <object> <how>[, recorded in the transport given].` */
+export function deleteTool(tool: WriteTool): string {
+  return write('Deletes', tool);
 }
 
 /** A check: `Checks the syntax of <object> <how>.`, then the check's verdict and messages. */

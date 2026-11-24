@@ -38,7 +38,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description: createTool({
     object: 'an ABAP program (report)',
-    how: 'in a package, with its description, recorded in the transport given',
+    how: 'in a package, with its description',
+    transported: true,
   }),
   inputSchema: createArguments('CreateProgram', {
     program_name: z.string().describe('Program name.'),

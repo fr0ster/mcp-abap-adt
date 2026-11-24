@@ -37,7 +37,7 @@ import {
   messageCarriedBy,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { results, updateTool } from '../../../lib/description';
+import { updateTool } from '../../../lib/description';
 import type {
   HandlerContext,
   ToolArgValue,
@@ -67,7 +67,6 @@ export const TOOL_DEFINITION = {
     tag: 'low-level',
     object: 'the properties of an existing ABAP domain',
     how: ', under a lock the caller holds',
-    result: results.WRITTEN,
   }),
   inputSchema: z.object({
     domain_name: z.string().describe('Domain name. Domain must already exist.'),

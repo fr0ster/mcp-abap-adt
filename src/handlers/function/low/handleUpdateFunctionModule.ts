@@ -17,7 +17,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { results, updateTool } from '../../../lib/description';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { inCheckedGroup } from '../../../lib/strategies/functionModuleGroup';
@@ -32,7 +32,6 @@ export const TOOL_DEFINITION = {
     tag: 'low-level',
     object: 'the source code of an existing ABAP function module',
     how: ', under a lock the caller holds',
-    result: results.WRITTEN,
   }),
   inputSchema: z.object({
     function_module_name: z

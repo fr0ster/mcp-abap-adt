@@ -6,7 +6,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  */
 
 import { answer } from '../../../lib/answer';
-import { results, updateTool } from '../../../lib/description';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -18,8 +18,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     object: 'the ABAP Unit test classes of a CDS view test class',
-    how: 'from the test class source given, activating it, recorded in the transport given',
-    result: results.WRITTEN,
+    how: 'from the test class source given, activating it',
+    transported: true,
   }),
   inputSchema: z.object({
     class_name: z

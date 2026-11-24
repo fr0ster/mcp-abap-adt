@@ -72,7 +72,8 @@ export const TOOL_DEFINITION = {
   description: updateTool({
     object:
       'the implementations of an existing RAP behavior implementation class',
-    how: ', activating it when asked, recorded in the transport given',
+    how: ', activating it when asked',
+    transported: true,
   }),
   inputSchema: z.object({
     class_name: z

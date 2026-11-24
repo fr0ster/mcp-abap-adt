@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { deleteTool, purpose, results } from '../../../lib/description';
+import { deleteTool, purpose } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteLocalTestClass Handler - Empty a class's testclasses include
@@ -40,7 +40,6 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Clears the local test classes of an ABAP class, activating the class when asked.',
     ),
-    result: results.WRITTEN_UNDER_LOCK,
   }),
   inputSchema: z.object({
     class_name: z.string().describe('Parent class name.'),

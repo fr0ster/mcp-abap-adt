@@ -54,12 +54,7 @@ import {
   createOnPremAdtClient,
   textElementsClientOf,
 } from '../../../lib/clients';
-import {
-  listOf,
-  resultShape,
-  type results,
-  updateTool,
-} from '../../../lib/description';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -143,18 +138,6 @@ function updateSchema(variant: ProjectionVariant) {
 /** A part SAP saved, and the list saved for it. */
 type SavedPart = { part: string; saved: string };
 
-/** What the write answers: the write's own, and each part SAP saved beside it. */
-const PARTS_WRITTEN = resultShape<
-  results.LockedWriteAnswer & { readonly parts?: readonly SavedPart[] }
->({
-  result: 'whether SAP took the change',
-  cleanup: 'a lock left held when its release failed',
-  parts: listOf('for each part SAP saved', {
-    part: 'its name',
-    saved: 'what was saved',
-  }),
-});
-
 export const TOOL_DEFINITION = {
   name: 'UpdateTextElements',
   available_in: ['onprem', 'cloud'] as const,
@@ -163,7 +146,6 @@ export const TOOL_DEFINITION = {
       object:
         'the text elements of an existing ABAP program, function group or class',
       how: ', each part given replacing its stored one, activating the object when asked',
-      result: PARTS_WRITTEN,
     }),
     inputSchema: updateSchema(variant),
   })),

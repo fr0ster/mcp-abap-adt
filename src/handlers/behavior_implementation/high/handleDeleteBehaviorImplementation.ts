@@ -29,7 +29,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: deleteTool({
     object: 'a RAP behavior implementation class',
-    how: ', recorded in the transport given',
+    transported: true,
   }),
   inputSchema: z.object({
     behavior_implementation_name: z

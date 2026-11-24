@@ -68,7 +68,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     object: 'the properties of an existing ABAP domain',
-    how: ', replacing them whole and activating it when asked, recorded in the transport given',
+    how: ', replacing them whole and activating it when asked',
+    transported: true,
   }),
   inputSchema: z.object({
     domain_name: z.string().describe('Domain name to update'),

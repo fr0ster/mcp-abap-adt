@@ -42,7 +42,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     object: 'the local macros of an existing ABAP class',
-    how: ', activating the class when asked, recorded in the transport given',
+    how: ', activating the class when asked',
+    transported: true,
   }),
   inputSchema: z.object({
     class_name: z.string().describe('Parent class name.'),

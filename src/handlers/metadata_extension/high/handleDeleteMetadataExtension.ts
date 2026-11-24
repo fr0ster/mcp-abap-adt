@@ -56,7 +56,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: deleteTool({
     object: 'a CDS metadata extension',
-    how: ', recorded in the transport given',
+    transported: true,
   }),
   inputSchema: z.object({
     metadata_extension_name: z.string().describe('MetadataExtension name.'),

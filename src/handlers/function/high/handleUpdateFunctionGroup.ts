@@ -52,7 +52,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     object: 'the description of an existing ABAP function group',
-    how: ', recorded in the transport given',
+    transported: true,
   }),
   inputSchema: z.object({
     function_group_name: z

@@ -60,7 +60,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'an OData service binding (V2 or V4, UI or Web API)',
-    how: 'for a service definition in a package, with its description, recorded in the transport given',
+    how: 'for a service definition in a package, with its description',
+    transported: true,
   }),
   inputSchema: createArguments('CreateServiceBinding', {
     service_binding_name: z.string().describe('Service binding name.'),

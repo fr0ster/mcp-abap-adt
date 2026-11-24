@@ -46,7 +46,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
     object: 'the description of an existing ABAP package',
-    how: ', recorded in the transport given',
+    transported: true,
   }),
   inputSchema: z.object({
     package_name: z

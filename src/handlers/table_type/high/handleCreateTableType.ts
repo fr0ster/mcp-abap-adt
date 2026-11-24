@@ -37,7 +37,7 @@ import {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { createTool, results } from '../../../lib/description';
+import { createTool } from '../../../lib/description';
 import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -149,8 +149,8 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
     object: 'an ABAP table type',
-    how: 'in a package, with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given',
-    result: results.STORED_TABLE_TYPE,
+    how: 'in a package, with the type it holds, its access type and primary key, activating it when asked',
+    transported: true,
   }),
   inputSchema: createArguments('CreateTableType', {
     table_type_name: z.string().describe('Table type name.'),

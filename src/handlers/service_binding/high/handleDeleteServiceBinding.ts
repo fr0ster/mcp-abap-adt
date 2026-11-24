@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: deleteTool({
     object: 'an OData service binding',
-    how: ', recorded in the transport given',
+    transported: true,
   }),
   inputSchema: z.object({
     service_binding_name: z

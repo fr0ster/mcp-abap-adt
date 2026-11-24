@@ -13,6 +13,7 @@ import {
 } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import { toolDescription, versionSourceReader } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { asError } from '../../../lib/thrownValue';
 import {
@@ -30,8 +31,11 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectVersionSource',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description:
-      "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
+    description: toolDescription(
+      versionSourceReader(
+        'an ABAP class, program, interface, function module, table, CDS view or other versioned object',
+      ),
+    ),
     inputSchema: objectVersionSourceSchema(variant),
   })),
 } as const;

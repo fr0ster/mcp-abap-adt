@@ -22,6 +22,11 @@ import type {
 } from '../../../lib/adtProjections';
 import type { McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  toolDescription,
+  versionHistoryReader,
+  versionSourceReader,
+} from '../../../lib/description';
 import type {
   HandlerContext,
   SapEnvironment,
@@ -63,6 +68,8 @@ interface VersionedTypeRow<K extends VersionedKind> {
   label: string;
   /** A sentence appended to each version tool's description, when the type needs one. */
   note?: string;
+  /** What the object read is on some system, said in its version tools' purpose. */
+  aside?: string;
   /** Environments — MUST match this type's existing high-level Get<X> TOOL_DEFINITION. */
   available_in?: readonly SapEnvironment[];
 }
@@ -92,6 +99,7 @@ export const VERSIONED_TYPES: VersionedTypeRow<VersionSourceKind>[] = [
     nameParam: 'program_name',
     label: 'ABAP program',
     note: "On ABAP Cloud, the programs are SAP's standard programs.",
+    aside: "on ABAP Cloud one of SAP's standard programs",
     available_in: ['onprem', 'cloud'],
   },
   {
@@ -163,6 +171,12 @@ export const LIST_ONLY_VERSIONED_TYPES: VersionedTypeRow<
   },
 ];
 
+/** The object a version tool reads, with its article: `an ABAP class`. */
+function objectOf(row: VersionedTypeRow<VersionedKind>): string {
+  const article = row.label.startsWith('ABAP') ? 'an' : 'a';
+  return `${article} ${row.label}${row.aside === undefined ? '' : `, ${row.aside}`}`;
+}
+
 function buildVersionsTool(
   row: VersionedTypeRow<VersionedKind>,
 ): ObjectVersionToolEntry {
@@ -184,7 +198,7 @@ function buildVersionsTool(
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}Versions`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
-    description: `[read-only] Lists the version history of the ${row.label} named by ${row.nameParam}: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.${row.note ? ` ${row.note}` : ''}`,
+    description: toolDescription(versionHistoryReader(objectOf(row))),
     inputSchema,
   };
 
@@ -240,7 +254,7 @@ function buildVersionSourceTool(
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}VersionSource`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
-    description: `[read-only] Reads the source of the ${row.label} version named by content_uri, an entry of the ${row.label}'s version history.${row.note ? ` ${row.note}` : ''}`,
+    description: toolDescription(versionSourceReader(objectOf(row))),
     inputSchema: z.object({
       content_uri: z
         .string()

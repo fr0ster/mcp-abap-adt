@@ -226,7 +226,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runatc-read-only-atc"></a>
 #### RunATC (Read-Only / Atc)
-**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, program, program_include, function_include (with function_group, the include's function group), class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
+**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist. The check variant it ran, the worklist holding its findings, whether the call waited for the checks to end, the finding counts of a run waited for and the id of a started run to read its status by. For each object checked: its name, its type, the function group of a function include and the include of a class include.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
@@ -236,19 +236,11 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
 - `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
 
-**On ABAP Cloud (`cloud`):** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, function_include (with function_group, the include's function group), class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
-
-**Parameters (`cloud`):**
-- `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
-- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
-- `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
-- `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
-
 ---
 
 <a id="getatcrunstatus-read-only-atc"></a>
 #### GetATCRunStatus (Read-Only / Atc)
-**Description:** [read-only] Answers whether the ATC run named by run_id has ended (a run started with wait=false answers its run_id). Answers the status the server reports and whether it is finished — finished means ended, whatever the checks found. The run's findings are read by its worklist_id.
+**Description:** [read-only] Reads the status of an ATC run by its id, and whether it has ended. The run's id, SAP's status of the run, whether the run has ended, the worklist holding its findings and the id of its result.
 
 **Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
 
@@ -272,7 +264,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listatcresults-read-only-atc"></a>
 #### ListATCResults (Read-Only / Atc)
-**Description:** [read-only] Lists the ATC results the system holds, newest first. Answers each result with its display_id, title, check_variant, run_series, created_at, the finding counts per priority and the failure count. created_by names whose results (a user name, or * for every user); central_only=true lists central results only; age_min and age_max bound the age in days, and when both are absent the system applies an age window of its own. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. How many results the system holds. For each result, newest first: its display id, its title, its check variant, its run series, when it was created, its finding counts per priority and its failure count. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleListATCResults.ts`
 
@@ -1000,7 +992,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimegetprofilertracedata-read-only-system"></a>
 #### RuntimeGetProfilerTraceData (Read-Only / System)
-**Description:** [read-only] [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads one view of an ABAP profiler trace: its hit list, its statements or its database accesses. The view read, the trace and the view's data as the profiler read it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts`
 
@@ -1017,7 +1009,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimegetdumpbyid-read-only-system"></a>
 #### RuntimeGetDumpById (Read-Only / System)
-**Description:** [read-only] [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.
+**Description:** [read-only] Reads an ABAP runtime dump by its id, with a summary of where and why its program terminated. The dump's id, the view read, the summary of where and why its program terminated and the dump as SAP gave it.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
 
@@ -1030,7 +1022,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimeanalyzeprofilertrace-read-only-system"></a>
 #### RuntimeAnalyzeProfilerTrace (Read-Only / System)
-**Description:** [read-only] [runtime] Read profiler trace view and return compact analysis summary (totals + top entries). Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Summarises one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time. The trace, the view read, the view's record count and its top records by time and the view's data as the profiler read it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
 
@@ -1429,7 +1421,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getunittestresult-read-only-unit-test"></a>
 #### GetUnitTestResult (Read-Only / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.
+**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on. The run's id, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 

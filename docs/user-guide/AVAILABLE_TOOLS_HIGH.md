@@ -383,7 +383,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getatcrunstatus-high-level-atc"></a>
 #### GetATCRunStatus (High-Level / Atc)
-**Description:** [read-only] Answers whether the ATC run named by run_id has ended (a run started with wait=false answers its run_id). Answers the status the server reports and whether it is finished — finished means ended, whatever the checks found. The run's findings are read by its worklist_id.
+**Description:** [read-only] Reads the status of an ATC run by its id, and whether it has ended. The run's id, SAP's status of the run, whether the run has ended, the worklist holding its findings and the id of its result.
 
 **Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
 
@@ -394,7 +394,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="listatcresults-high-level-atc"></a>
 #### ListATCResults (High-Level / Atc)
-**Description:** [read-only] Lists the ATC results the system holds, newest first. Answers each result with its display_id, title, check_variant, run_series, created_at, the finding counts per priority and the failure count. created_by names whose results (a user name, or * for every user); central_only=true lists central results only; age_min and age_max bound the age in days, and when both are absent the system applies an age window of its own. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. How many results the system holds. For each result, newest first: its display id, its title, its check variant, its run series, when it was created, its finding counts per priority and its failure count. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleListATCResults.ts`
 
@@ -409,19 +409,11 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, program, program_include, function_include (with function_group, the include's function group), class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
+**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages, recording their findings in a new worklist. The check variant it ran, the worklist holding its findings, whether the call waited for the checks to end, the finding counts of a run waited for and the id of a started run to read its status by. For each object checked: its name, its type, the function group of a function include and the include of a class include.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
 **Parameters:**
-- `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
-- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
-- `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
-- `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
-
-**On ABAP Cloud (`cloud`):** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, function_include (with function_group, the include's function group), class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
-
-**Parameters (`cloud`):**
 - `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
 - `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
 - `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
@@ -2731,7 +2723,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimecreateprofilertraceparameters-high-level-system"></a>
 #### RuntimeCreateProfilerTraceParameters (High-Level / System)
-**Description:** [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
+**Description:** Schedules an ABAP profiler trace with its parameters, for a later profiled run of a class or a report. The profiler id a profiled run names.
 
 **Source:** `src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts`
 
@@ -2755,7 +2747,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimerunclass-high-level-system"></a>
 #### RuntimeRunClass (High-Level / System)
-**Description:** [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.
+**Description:** Runs an ABAP class implementing if_oo_adt_classrun and gives its console output, under the ABAP profiler when asked. The class that ran, its console output and the profiler and trace ids of a profiled run.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunClass.ts`
 
@@ -2785,7 +2777,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runtimerunprogram-high-level-system"></a>
 #### RuntimeRunProgram (High-Level / System)
-**Description:** [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).
+**Description:** Runs an ABAP report and gives its output, under the ABAP profiler when asked. The report that ran, its output and the profiler id of a profiled run.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunProgram.ts`
 
@@ -3291,7 +3283,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.
+**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on. The run's id, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -3307,7 +3299,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runabapunit-high-level-unit-test"></a>
 #### RunAbapUnit (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the run target named by target. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, whose run covers the ABAP Unit tests of the module's whole function group, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.
+**Description:** Runs the ABAP Unit tests of a class, report, function group, function module's group, CDS view, package, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
 
@@ -3325,7 +3317,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runcdsunittest-high-level-unit-test"></a>
 #### RunCdsUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the CDS view test class named by class_name. The run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.
+**Description:** Runs the ABAP Unit tests of a CDS view test class, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
 
@@ -3338,7 +3330,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Runs every ABAP Unit test of the function group named by function_group_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out.
+**Description:** Runs every ABAP Unit test of a function group, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
@@ -3355,7 +3347,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the module's whole function group: the function module named by function_module_name is run, and SAP runs the tests of the function group holding it. runner async (default), addressed by function_module_name alone: the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group, called with wait left out.
+**Description:** Runs the ABAP Unit tests of the function group holding a function module, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
@@ -3373,7 +3365,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the report named by program_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** Runs the ABAP Unit tests of an ABAP report, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
@@ -3390,7 +3382,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the ABAP class named by class_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out.
+**Description:** Runs the ABAP Unit tests of an ABAP class, waiting for the result or giving the run's id at once. The run's id to read its status and result by, SAP's status of a run yet to start, the runner that ran it, whether the run finished and the run's result as SAP gave it.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 

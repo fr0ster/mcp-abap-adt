@@ -444,7 +444,7 @@ function stagingSchemas(
       }),
     );
   return {
-    unstaged: list('unstaged', 'for each changed file not staged'),
+    unstaged: list('unstaged', 'for each changed file left unstaged'),
     staged: list('staged', 'for each staged file'),
     ignored: list('ignored', 'for each ignored file'),
   };

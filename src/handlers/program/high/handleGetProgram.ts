@@ -28,9 +28,9 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: toolDescription(
     sourceReader({
-      object: 'an ABAP program',
+      object: 'an ABAP program or report',
       purpose: purpose(
-        "Reads the current source code of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, or its metadata.",
+        "Reads the current source code of an ABAP program or report, on ABAP Cloud one of SAP's standard programs, or its metadata.",
       ),
       metadata: true,
     }),

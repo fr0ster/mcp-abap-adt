@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateProgram',
   available_in: ['onprem'] as const,
   description: createTool({
-    object: 'an executable ABAP program (report)',
+    object: 'an executable ABAP program or report',
     how: ', with its description and application area',
     transported: true,
   }),

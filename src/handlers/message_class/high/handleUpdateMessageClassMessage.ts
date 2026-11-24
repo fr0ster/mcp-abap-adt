@@ -44,7 +44,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description: updateTool({
-    object: 'the text and flags of a message in an ABAP message class (T100)',
+    object: 'the text and flags of a message in an ABAP message class',
     how: ', creating the message when the class lacks it',
     transported: true,
   }),

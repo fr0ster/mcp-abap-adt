@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteProgram',
   available_in: ['onprem'] as const,
   description: deleteTool({
-    object: 'an ABAP program (report)',
+    object: 'an ABAP program or report',
     transported: true,
   }),
   inputSchema: z.object({

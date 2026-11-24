@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
   ...byVariant((variant) => ({
     description: toolDescription(
       versionSourceReader(
-        'an ABAP class, program, interface, function module, table, CDS view or other versioned object',
+        'an ABAP class, program, function module, table, CDS view or other versioned object',
       ),
     ),
     inputSchema: objectVersionSourceSchema(variant),

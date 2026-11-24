@@ -28,7 +28,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description: createTool({
-    object: 'an ABAP message class (T100)',
+    object: 'an ABAP message class',
     how: ', with its description',
     transported: true,
   }),

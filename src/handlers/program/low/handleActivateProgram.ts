@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description: activateTool({
     tag: 'low-level',
-    object: 'an ABAP program (report)',
+    object: 'an ABAP program or report',
     how: ', so its inactive version is in force',
   }),
   inputSchema: z.object({

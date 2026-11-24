@@ -43,7 +43,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
   available_in: ['onprem'] as const,
   description: updateTool({
-    object: 'the source code of an existing ABAP program (report)',
+    object: 'the source code of an existing ABAP program or report',
     how: ', activating it when asked',
     transported: true,
   }),

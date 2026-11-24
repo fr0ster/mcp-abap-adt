@@ -32,18 +32,12 @@ export function sourceReader(reader: SourceReader): DescriptionParts {
   };
 }
 
-/** A version source reader: "Reads an older version of <object>'s source from its version history". */
+/** A version source reader: "Reads an older version of the source code of <object> from its version history". */
 export function versionSourceReader(object: string): DescriptionParts {
-  // One named object takes the possessive; a list, or `a CDS view (DDL
-  // source)`, takes `the source of`.
-  const source =
-    object.endsWith(')') || object.includes(',')
-      ? `the source of ${object}`
-      : `${object}'s source`;
   return {
     tag: 'read-only',
     purpose: purpose(
-      `Reads an older version of ${source} from its version history.`,
+      `Reads an older version of the source code of ${object} from its version history.`,
     ),
   };
 }

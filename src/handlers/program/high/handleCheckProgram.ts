@@ -28,7 +28,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: checkTool({
     tag: 'read-only',
-    object: 'an ABAP program (report)',
+    object: 'an ABAP program or report',
   }),
   inputSchema: z.object({
     program_name: z.string().describe('Program name.'),

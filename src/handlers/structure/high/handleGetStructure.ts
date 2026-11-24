@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
     readerParts({
       object: 'an ABAP structure',
       holding:
-        'its definition source, or its package, person responsible and description',
+        'its source code, or its package, person responsible and description',
     }),
   ),
   inputSchema: z.object({

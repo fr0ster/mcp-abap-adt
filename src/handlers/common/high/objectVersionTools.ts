@@ -137,7 +137,7 @@ export const VERSIONED_TYPES: VersionedTypeRow<VersionSourceKind>[] = [
     object_type: 'ddl',
     display: 'Ddl',
     nameParam: 'ddl_name',
-    label: 'CDS view (DDL source)',
+    label: 'CDS view',
     available_in: ['onprem', 'cloud'],
   },
   {

@@ -62,7 +62,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: deleteTool({
     purpose: purpose(
-      'Deletes one message, by its number, from an ABAP message class (T100), keeping the class and its other messages.',
+      'Deletes one message, by its number, from an ABAP message class, keeping the class and its other messages.',
     ),
   }),
   inputSchema: z.object({

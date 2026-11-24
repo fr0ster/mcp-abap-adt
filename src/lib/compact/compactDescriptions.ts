@@ -45,12 +45,12 @@ const TYPE_WORDS: { readonly [K in CompactObjectType]: string } = {
   SERVICE_DEFINITION: 'service definition',
   SERVICE_BINDING: 'service binding',
   CLASS: 'class',
-  UNIT_TEST: "class's unit tests",
-  CDS_UNIT_TEST: "CDS view's unit tests",
-  LOCAL_TEST_CLASS: "class's local test classes",
-  LOCAL_TYPES: "class's local types",
-  LOCAL_DEFINITIONS: "class's local definitions",
-  LOCAL_MACROS: "class's local macros",
+  UNIT_TEST: 'the unit tests of a class',
+  CDS_UNIT_TEST: 'the unit tests of a CDS view',
+  LOCAL_TEST_CLASS: 'the local test classes of a class',
+  LOCAL_TYPES: 'the local types of a class',
+  LOCAL_DEFINITIONS: 'the local definitions of a class',
+  LOCAL_MACROS: 'the local macros of a class',
   PROGRAM: 'program',
   INCLUDE: 'include',
   INTERFACE: 'interface',
@@ -61,10 +61,10 @@ const TYPE_WORDS: { readonly [K in CompactObjectType]: string } = {
   METADATA_EXTENSION: 'metadata extension',
   RUNTIME_PROFILE: 'profiler trace',
   RUNTIME_DUMP: 'short dump',
-  PROGRAM_TEXT_ELEMENTS: "program's text elements",
-  FUNCTION_GROUP_TEXT_ELEMENTS: "function group's text elements",
-  CLASS_TEXT_ELEMENTS: "class's text elements",
-  TABLE_SETTINGS: "table's technical settings",
+  PROGRAM_TEXT_ELEMENTS: 'the text elements of a program',
+  FUNCTION_GROUP_TEXT_ELEMENTS: 'the text elements of a function group',
+  CLASS_TEXT_ELEMENTS: 'the text elements of a class',
+  TABLE_SETTINGS: 'the technical settings of a table',
 };
 
 /** One pair per object type: `verb` and the type in words, with its article. */
@@ -198,14 +198,14 @@ const METADATA_ONLY: readonly ReadMember[] = [
 /** What HandlerGet reads of `member`, one pair per part it offers. */
 function readPairs(member: ReadMember): string[] {
   const word = TYPE_WORDS[member];
-  const of = (part: string) => `reads ${withArticle(word)}'s ${part}`;
+  const of = (part: string) => `reads the ${part} of ${withArticle(word)}`;
   switch (member) {
     case 'PACKAGE':
       return [of('metadata'), of('contents')];
     case 'TRANSPORT':
       return [of('objects'), of('header')];
     case 'SERVICE_BINDING':
-      return [of('source'), of('metadata'), of('URLs')];
+      return [of('source code'), of('metadata'), of('URLs')];
     case 'UNIT_TEST':
       return ["reads an ABAP Unit run's result"];
     case 'CDS_UNIT_TEST':
@@ -213,7 +213,7 @@ function readPairs(member: ReadMember): string[] {
     default:
       if (PART_WORDS.includes(member)) return [`reads ${withArticle(word)}`];
       if (METADATA_ONLY.includes(member)) return [of('metadata')];
-      return [of('source'), of('metadata')];
+      return [of('source code'), of('metadata')];
   }
 }
 
@@ -232,7 +232,7 @@ export function compactGetParts(
     purpose: pairsPurpose([
       ...members.flatMap(readPairs),
       ...(variant === 'onprem' && left(variant, members).has('INCLUDE')
-        ? ["reads an include's main programs"]
+        ? ['reads the main programs of an include']
         : []),
       "reads a repository object's unactivated change",
       "reads a repository object's structure",

@@ -60,7 +60,7 @@ export const TOOL_DEFINITION = {
   description: toolDescription({
     tag: 'read-only',
     purpose: purpose(
-      'Reads the active source of an ABAP enhancement implementation, by its name and enhancement spot.',
+      'Reads the active source code of an ABAP enhancement implementation, by its name and enhancement spot.',
     ),
   }),
   inputSchema: z.object({

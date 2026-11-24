@@ -78,6 +78,7 @@ import {
   type Repository,
   searchesOf,
   searchOn,
+  sentInOrder,
   sentUrls,
   standOn,
   textOf,
@@ -976,19 +977,17 @@ describe('D23b: package masks (DO12)', () => {
     );
 
   /** The package roots a fake was asked for, in order. */
-  const walkedRoots = (fake: Fake, sequential = false): string[] =>
-    (sequential
-      ? fake.directs.map((r) => {
-          const u = new URL(r.url, 'https://system.invalid');
-          for (const [k, v] of Object.entries(r.params ?? {})) {
-            u.searchParams.set(k, String(v));
-          }
-          return u;
-        })
-      : fake.envelopes.flatMap((e) =>
-          e.parts.map((p) => new URL(p.url, 'https://system.invalid')),
-        )
-    )
+  // Both paths alike: a walk level of one root is a single request on the
+  // batched path too, so every request counts, in the order sent.
+  const walkedRoots = (fake: Fake, _sequential = false): string[] =>
+    sentInOrder(fake)
+      .map(({ url, params }) => {
+        const u = new URL(url, 'https://system.invalid');
+        for (const [k, v] of Object.entries(params ?? {})) {
+          u.searchParams.set(k, String(v));
+        }
+        return u;
+      })
       .filter(
         (u) =>
           u.pathname.endsWith('/repository/nodestructure') &&
@@ -1018,9 +1017,14 @@ describe('D23b: package masks (DO12)', () => {
           [all[1000]],
         );
         if (!sequential) {
-          // Each round is a phase of its own: one envelope per round.
-          assert.equal(fake.envelopes[0]?.parts.length, 1);
-          assert.equal(fake.envelopes[1]?.parts.length, 1);
+          // Each round is a phase of its own, of one search: a single
+          // request each, never an envelope.
+          assert.equal(
+            fake.envelopes.some((e) =>
+              e.parts.some((p) => p.url.includes('/informationsystem/search')),
+            ),
+            false,
+          );
           assert.equal(new Set(walkedRoots(fake)).size, 1001);
         } else {
           assert.equal(new Set(walkedRoots(fake, true)).size, 1001);
@@ -1073,10 +1077,19 @@ describe('D23b: package masks (DO12)', () => {
             ['ZE*', 4000],
           ]);
         } else {
-          // Round by round, every unresolved mask's search in one phase.
-          assert.deepStrictEqual(
-            fake.envelopes.slice(0, 3).map((e) => e.parts.length),
-            [2, 1, 1],
+          // Round by round, every unresolved mask's search in one phase:
+          // the first round's two in an envelope, then one search each,
+          // a single request.
+          assert.equal(fake.envelopes[0]?.parts.length, 2);
+          assert.equal(
+            fake.envelopes
+              .slice(1)
+              .some((e) =>
+                e.parts.some((p) =>
+                  p.url.includes('/informationsystem/search'),
+                ),
+              ),
+            false,
           );
           assert.deepStrictEqual(searches, [
             ['ZD*', 1000],
@@ -1249,8 +1262,10 @@ describe('D23b: the line match is a strategy (DO14)', () => {
         lineMatch: strategy,
         sapAnswers: skipSapAnswers,
       });
-      assert.ok(fake.envelopes.length > 0);
-      assert.equal(fake.directs.length, 0);
+      // The batched version, served — one package, one target: every phase
+      // of one read, so single requests.
+      assert.equal(fake.envelopes.length, 0);
+      assert.ok(fake.directs.length > 0);
       assert.deepStrictEqual(
         seen.map((s) => s.lines),
         [['first', 'second']],
@@ -3226,6 +3241,8 @@ describe('D23b: the fixed classification and the SAP-answer strategy (DO22)', ()
                 }),
                 false,
                 strategy,
+                // Two masks: a mask-search phase of one is no envelope.
+                { ...ARGS, packages: [...ARGS.packages, 'ZQ*'] },
               ),
             ),
             undefined,

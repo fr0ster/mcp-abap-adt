@@ -13,9 +13,11 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import { handleSearchSource } from '../../handlers/system/readonly/handleSearchSource';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import {
+  type EnvelopeCalls,
   envelopeConnection,
   envelopeResponse as envelopeOf,
   type InnerRequest,
+  innerRequests,
   type PartAnswer,
   type SeenEnvelope,
   statusError,
@@ -106,15 +108,26 @@ function searchParamsOf(url: string, params?: unknown): URLSearchParams {
   return query;
 }
 
-/** Every quick search a fake received, as `[query, maxResults]`, in order (envelopes first). */
+/**
+ * Every request a fake received, in the order sent: a direct request as
+ * itself, an envelope as its parts — a phase of one read is a single
+ * request, so the two interleave.
+ */
+export function sentInOrder(fake: {
+  calls: EnvelopeCalls;
+}): Array<{ url: string; params?: unknown }> {
+  return fake.calls.makeAdtRequest.flatMap((request) =>
+    request.url.endsWith('/batch')
+      ? innerRequests(request).map((p) => ({ url: p.url }))
+      : [{ url: request.url, params: request.params }],
+  );
+}
+
+/** Every quick search a fake received, as `[query, maxResults]`, in the order sent. */
 export function searchesOf(fake: {
-  envelopes: SeenEnvelope[];
-  directs: IAbapRequestOptions[];
+  calls: EnvelopeCalls;
 }): Array<[string, number]> {
-  const urls: Array<{ url: string; params?: unknown }> = [
-    ...fake.envelopes.flatMap((e) => e.parts.map((p) => ({ url: p.url }))),
-    ...fake.directs.map((r) => ({ url: r.url, params: r.params })),
-  ];
+  const urls = sentInOrder(fake);
   return urls
     .filter(({ url }) =>
       new URL(url, 'https://system.invalid').pathname.endsWith(

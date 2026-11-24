@@ -140,7 +140,7 @@ describe('renderInstruction', () => {
     );
     assert.ok(
       text.includes(
-        '4. Unlock it: call HandlerLock with action: "unlock", lock_handle: the lock_handle from step 2 — after step 3, whatever it answered.',
+        '4. Unlock it: call HandlerLock with lock_handle: the lock_handle from step 2 — after step 3, whatever it answered.',
       ),
     );
     assert.ok(text.endsWith('\nThe change: "add a method"'));

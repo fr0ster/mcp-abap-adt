@@ -155,7 +155,7 @@ describe('the four tool sets', () => {
       new CompactModifyHandlersGroup(context),
     ]);
     // The 28 compact tools but the data tool (HandlerGetData, opt-in).
-    assert.equal(both.length, 27);
+    assert.equal(both.length, 26);
     assert.deepStrictEqual(
       shape(compact.groups(context, 'stdio', { dataTools: false })),
       [

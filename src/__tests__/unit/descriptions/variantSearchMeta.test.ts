@@ -160,7 +160,7 @@ describe('a compact tool’s search texts name only the members its variant offe
           }
         }
       }
-      assert.ok(checked >= (kind === 'compact' ? 8 : 1));
+      assert.ok(checked >= (kind === 'compact' ? 7 : 1));
       assert.deepStrictEqual(naming, []);
     });
 

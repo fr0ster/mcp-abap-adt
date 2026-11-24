@@ -217,7 +217,7 @@ describe('a compact tool offers on each variant the properties its offered membe
           );
           if (absent.length > 0) missing[tool.name] = absent;
         }
-        assert.ok(checked >= (kind === 'compact' ? 11 : 4));
+        assert.ok(checked >= (kind === 'compact' ? 10 : 4));
         assert.deepStrictEqual(
           { untaken, missing },
           { untaken: {}, missing: {} },

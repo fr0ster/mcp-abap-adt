@@ -451,7 +451,8 @@ const WALKS: Readonly<Record<string, Walk>> = {
       }),
     routes: routesOf(COMPACT_LOCK_ROUTES),
   }),
-  'HandlerUnlock.object_type': walk({
+  // HandlerLock's action unlock: its own routes, walked beside the lock's.
+  'HandlerLock unlock.object_type': walk({
     values: COMPACT_UNLOCK,
     send: (context, value) =>
       handleHandlerUnlock(context, {
@@ -680,7 +681,8 @@ describe('every projected value reaches a served path', () => {
         );
       }
     }
-    assert.equal(Object.keys(WALKS).length, PROJECTED_ARGUMENTS.length);
+    // Every projected argument walked, and the unlock action of HandlerLock.
+    assert.equal(Object.keys(WALKS).length, PROJECTED_ARGUMENTS.length + 1);
     assert.ok(cases.length > 400);
   });
 

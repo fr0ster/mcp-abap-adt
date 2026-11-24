@@ -531,7 +531,7 @@ describe('the description names the tools the prompt asks for', () => {
   it('compact delete asks for the delete and the lock tools', () => {
     assert.equal(
       promptOf(deletePrompt, compactOnprem).description,
-      'Deletes an ABAP object of object_type named name: asks the model to call HandlerDelete, HandlerLock, HandlerUnlock.',
+      'Deletes an ABAP object of object_type named name: asks the model to call HandlerDelete, HandlerLock.',
     );
   });
 

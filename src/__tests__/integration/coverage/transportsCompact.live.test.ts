@@ -87,6 +87,32 @@ function transportablePackage(): string {
   return accepted;
 }
 
+/**
+ * The attributes of every `tm:task` element in GetTransport's full answer
+ * (SAP's document as JSON: each element's attributes under `@`).
+ */
+function taskAttributesIn(node: unknown): unknown[] {
+  const found: unknown[] = [];
+  const pending: unknown[] = [node];
+  while (pending.length > 0) {
+    const each = pending.pop();
+    if (Array.isArray(each)) {
+      pending.push(...each);
+      continue;
+    }
+    if (typeof each !== 'object' || each === null) continue;
+    for (const [key, value] of Object.entries(each)) {
+      if (key === 'tm:task') {
+        for (const task of Array.isArray(value) ? value : [value]) {
+          found.push(member(task, '@'));
+        }
+      }
+      pending.push(value);
+    }
+  }
+  return found;
+}
+
 /** A request's tasks, by number, as GetTransport answers them. */
 async function tasksOf(request: string): Promise<string[]> {
   const read = succeeded(
@@ -350,16 +376,21 @@ liveSuite(['onprem'], 'Compact transport create with a typed task', () => {
     const task = member(answered, 'task_number');
     if (typeof task !== 'string') throw new Error('no task number');
     recordCreatedRequest(task);
-    // Read back: the request's one task, of type R — GetTransport names it
-    // Repair (measured on premise).
+    // Read back: the request's one task, of type R — SAP writes it Repair
+    // (measured on premise). The terse task rows carry no type, so the
+    // request is read at full: SAP's document, each task's attributes.
     const read = succeeded(
       `GetTransport ${request}`,
-      await livePrepare('GetTransport', { transport_number: request }),
+      await livePrepare('GetTransport', {
+        transport_number: request,
+        detail: 'full',
+      }),
     );
-    const tasks = member(payloadOf(read), 'tasks');
-    const listed = Array.isArray(tasks) ? tasks : [];
     assert.deepEqual(
-      listed.map((entry) => [member(entry, 'number'), member(entry, 'type')]),
+      taskAttributesIn(payloadOf(read)).map((attributes) => [
+        member(attributes, 'tm:number'),
+        member(attributes, 'tm:type'),
+      ]),
       [[task, 'Repair']],
       read.text,
     );

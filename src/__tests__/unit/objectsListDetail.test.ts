@@ -223,7 +223,8 @@ describe('GetObjectsList detail', () => {
         detail === 'medium' ? missing.metadata_error : missing.METADATA_ERROR;
       assert.equal(error?.status, 404, text);
       assert.equal(error?.step, 'read object metadata', text);
-      assert.ok(String(error?.message).includes('404'), text);
+      // SAP's message as it came, nothing of the path that carried it.
+      assert.equal(error?.message, 'Resource FUGR Z_FM does not exist.', text);
       assert.equal(
         detail === 'medium' ? top.description : top.DESCRIPTION,
         'Top',

@@ -252,6 +252,8 @@ const SEARCH_XML = (name: string, type: string) =>
 interface Model {
   /** Requests answered with this status instead (a key of `keyOf`). */
   refuse?: Record<string, number>;
+  /** The body a refused request is answered with (default: none). */
+  refuseBody?: Record<string, string>;
 }
 
 /** The key of any request: a node structure's, else `METHOD path`. */
@@ -285,7 +287,11 @@ function answerOf(
   const key = keyOf(method, url, params);
   const refused = model.refuse?.[key];
   if (refused !== undefined) {
-    return { status: refused, statusText: 'Refused', body: '' };
+    return {
+      status: refused,
+      statusText: 'Refused',
+      body: model.refuseBody?.[key] ?? '',
+    };
   }
   const xml = { 'content-type': 'application/xml' };
   if (key.startsWith('SEARCH|')) {
@@ -1021,7 +1027,14 @@ describe('GetObjectsList', () => {
     );
     const metadataKey = (probe.envelopes.map(partKeys)[3] ?? [])[0] ?? '';
     assert.ok(metadataKey.startsWith('GET '), metadataKey);
-    const model = { refuse: { [metadataKey]: 404 } };
+    const model = {
+      refuse: { [metadataKey]: 404 },
+      refuseBody: {
+        [metadataKey]:
+          '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><message lang="EN">Resource PROG ZX does not exist.</message></exc:exception>',
+      },
+    };
+    const recorded: unknown[] = [];
     for (const batch of ['served', 'absent'] as const) {
       const result = await withinTurns(
         handleGetObjectsListOf(contextOn(system(model), batch), {
@@ -1038,7 +1051,16 @@ describe('GetObjectsList', () => {
       assert.equal(gone.length, 1, text);
       assert.equal(gone[0].metadata_error.status, 404, text);
       assert.equal(gone[0].metadata_error.step, 'read object metadata', text);
+      recorded.push(gone[0].metadata_error);
     }
+    // The same 404 recorded the same way on both paths: SAP's status and
+    // SAP's message as it came, nothing of the path that carried it.
+    assert.deepStrictEqual(recorded[0], recorded[1]);
+    assert.deepStrictEqual(recorded[0], {
+      status: 404,
+      message: 'Resource PROG ZX does not exist.',
+      step: 'read object metadata',
+    });
   });
 
   // Codex round 8: a part's own status is that read's answer. A metadata

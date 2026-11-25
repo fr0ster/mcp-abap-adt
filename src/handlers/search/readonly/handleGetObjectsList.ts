@@ -670,16 +670,46 @@ type MetadataAnswer =
   | { readonly gone: FailureEntry };
 
 /**
+ * SAP's message in a refusal's body, as it came: the text of its exception's
+ * `<message>` element; `undefined` when the body holds none. Plain code over
+ * the document SAP sent, no regular expression.
+ */
+function sapMessageIn(body: unknown): string | undefined {
+  if (typeof body !== 'string') return undefined;
+  const open = body.indexOf('<message');
+  if (open < 0) return undefined;
+  const start = body.indexOf('>', open);
+  const end = body.indexOf('</message>', start);
+  if (start < 0 || end < 0) return undefined;
+  return body.slice(start + 1, end);
+}
+
+/**
+ * An object SAP answered 404 for, as its error: SAP's status and SAP's
+ * message as it came, with the step — the same on every path, whether the
+ * 404 came as a direct request's answer, its throw, or an envelope part's.
+ */
+function notFoundEntry(body: unknown): FailureEntry {
+  const message = sapMessageIn(body);
+  return {
+    status: 404,
+    ...(message === undefined ? {} : { message }),
+    step: METADATA_STEP,
+  };
+}
+
+/**
  * SAP's 404 in what a metadata read threw — its response's status, read
- * structurally, on the throw or on what it wraps — as the object's error:
- * the throw's entry with that status. `undefined` for any other throw.
+ * structurally, on the throw or on what it wraps — as the object's error;
+ * `undefined` for any other throw.
  */
 function goneIn(thrown: unknown): FailureEntry | undefined {
-  const status =
-    sapAnswerOf(thrown)?.status ?? sapAnswerOf(child(thrown, 'cause'))?.status;
-  return status === 404
-    ? { ...thrownEntry(thrown, METADATA_STEP), status }
-    : undefined;
+  for (const each of [thrown, child(thrown, 'cause')]) {
+    if (sapAnswerOf(each)?.status === 404) {
+      return notFoundEntry(child(child(each, 'response'), 'data'));
+    }
+  }
+  return undefined;
 }
 
 /** What pass 2 reads: every object's description (medium, full), or only the types SAP left out (terse). */
@@ -826,9 +856,11 @@ async function secondPass(
       continue;
     }
     if (!answered.ok) {
-      const failed = failureEntry(answered.getError(), METADATA_STEP);
-      if (object === undefined || failed.status !== 404) return answered;
-      object.METADATA_ERROR = failed;
+      const error = answered.getError();
+      if (object === undefined || error.response?.status !== 404) {
+        return answered;
+      }
+      object.METADATA_ERROR = notFoundEntry(error.response.data);
       continue;
     }
     if (object === undefined) continue;

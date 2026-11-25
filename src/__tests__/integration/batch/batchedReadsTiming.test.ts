@@ -180,6 +180,12 @@ type Case = {
    * choice).
    */
   alone?: true;
+  /**
+   * Whether the batched path has independent reads to put together, read
+   * off the sequential reference's answer: where it has none, it sends no
+   * envelope. Absent: it always has.
+   */
+  batches?: (reference: unknown) => boolean;
 };
 
 const CASES: Case[] = [
@@ -231,8 +237,30 @@ const CASES: Case[] = [
         query: 'DATA',
         packages: [name],
       }),
+    // One target or none (a package of one object, or an empty one) is read
+    // as single requests, by the code's choice: an envelope only with two
+    // or more targets.
+    batches: (reference) => scannedObjects(reference) >= 2,
   },
 ];
+
+/** The objects a SearchSource answer scanned (`scanned.objects`); 0 when unread. */
+function scannedObjects(answer: unknown): number {
+  try {
+    const parsed: unknown = JSON.parse(answerText(answer));
+    const scanned: unknown =
+      typeof parsed === 'object' && parsed !== null
+        ? Reflect.get(parsed, 'scanned')
+        : undefined;
+    const objects: unknown =
+      typeof scanned === 'object' && scanned !== null
+        ? Reflect.get(scanned, 'objects')
+        : undefined;
+    return typeof objects === 'number' ? objects : 0;
+  } catch {
+    return 0;
+  }
+}
 
 /** The packages read: the config's default one, and a larger one if named. */
 function packagesRead(): Array<{ label: string; name: string }> {
@@ -424,6 +452,7 @@ async function timeBothPaths(
   scope: string,
   read: (context: HandlerContext) => Promise<unknown>,
   alone = false,
+  batches?: (reference: unknown) => boolean,
 ): Promise<void> {
   const reference = await measured(connection, 'sequential', read);
   assert.equal(
@@ -431,8 +460,15 @@ async function timeBothPaths(
     false,
     `${tool} answered an error: ${answerText(reference.answer)}`,
   );
-  assertEquals(itemErrors(reference.answer), []);
+  // A failed item leaves its words in the log (the reference is the
+  // sequential read, before any path is timed).
+  assertEquals(
+    itemErrors(reference.answer),
+    [],
+    `${tool} on ${scope}, the sequential reference: ${answerText(reference.answer)}`,
+  );
   assert.equal(reference.measure.envelopes, 0);
+  const single = alone || (batches !== undefined && !batches(reference.answer));
 
   const runs: Record<Path, Measure[]> = { sequential: [], batched: [] };
   // Compared once every repetition is timed, so a differing answer
@@ -445,7 +481,7 @@ async function timeBothPaths(
       const { answer, measure } = await measured(connection, path, read);
       answers.push({ path, answer });
       const counts = `${tool} on ${scope}, ${path}: envelopes=${measure.envelopes}, requests=${measure.requests}, parts=${measure.parts}`;
-      if (path === 'sequential' || alone) {
+      if (path === 'sequential' || single) {
         assert.equal(measure.envelopes, 0, counts);
       } else {
         assert.ok(measure.envelopes > 0, counts);
@@ -526,6 +562,7 @@ describe('batched reads timed against the sequential path on the system the test
           scope,
           read,
           tool.alone === true,
+          tool.batches,
         );
       });
     }

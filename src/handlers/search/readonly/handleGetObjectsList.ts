@@ -719,6 +719,9 @@ interface SecondRead {
   ) => Promise<IAdtResponse<string, IAdtError>>;
 }
 
+/** What a read by an object's own URI accepts: any document, its type unknown. */
+const OWN_URI_ACCEPT = '*/*';
+
 /** An object's metadata read by its own URI: for an object SAP listed without a type. */
 function uriRead(uri: string): SecondRead['read'] {
   return atStep(METADATA_STEP, async (connection: IAbapConnection) => {
@@ -726,6 +729,11 @@ function uriRead(uri: string): SecondRead['read'] {
       url: uri,
       method: 'GET',
       timeout: 0,
+      // Stated, so every path sends the same read: SAP answers a GET
+      // without an Accept 400 (measured on premise), and an envelope part
+      // carries only the headers given here, where a direct request had the
+      // HTTP client's default.
+      headers: { Accept: OWN_URI_ACCEPT },
     });
     return succeeded(rawOf(answered));
   });

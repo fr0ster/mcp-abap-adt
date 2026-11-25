@@ -1017,6 +1017,25 @@ describe('GetObjectsList', () => {
       second.join('\n'),
     );
   });
+  // Onprem live rerun: SAP answers 400 "Accept header missing" to a GET
+  // without one (measured, GET-only, an enhancement's URI: 404 with
+  // Accept */*). A direct request has axios' default Accept, an envelope
+  // part only the headers its read gives: every metadata part states one.
+  it('medium: every metadata part of the envelope states its Accept', async () => {
+    const fake = system();
+    await withinTurns(
+      handleGetObjectsListOf(contextOn(fake), { ...single, detail: 'medium' }),
+    );
+    const parts = fake.envelopes[3]?.parts ?? [];
+    assert.ok(parts.length > 0);
+    for (const part of parts) {
+      const accept = Object.entries(part.headers).find(
+        ([name]) => name.toLowerCase() === 'accept',
+      )?.[1];
+      assert.ok(accept !== undefined && accept !== '', JSON.stringify(part));
+    }
+  });
+
   // Onprem live rerun: in an envelope, a metadata part SAP answers 404 (an
   // object it lists and serves no metadata for) is that object's, as on the
   // sequential path: listed with SAP's error, the call answered on both paths.

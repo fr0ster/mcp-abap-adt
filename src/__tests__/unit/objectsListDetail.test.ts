@@ -398,6 +398,11 @@ describe('GetObjectsList detail', () => {
     assert.equal(result.isError, false, result.content[0]?.text);
     const urls = connection.requests.slice(1).map((r) => r.url);
     assert.deepStrictEqual(urls, ['/sap/bc/adt/x/one', '/sap/bc/adt/x/two']);
+    // Read by its URI, it states what it accepts: SAP answers a GET without
+    // an Accept 400 (measured on premise), on every path alike.
+    for (const request of connection.requests.slice(1)) {
+      assert.equal(request.headers?.Accept, '*/*', JSON.stringify(request));
+    }
   });
 
   it('two nodes SAP could not load in one response stay two rows', async () => {

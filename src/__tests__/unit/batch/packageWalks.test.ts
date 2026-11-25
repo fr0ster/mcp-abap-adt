@@ -1011,6 +1011,36 @@ describe('GetObjectsList', () => {
       second.join('\n'),
     );
   });
+  // Onprem live rerun: in an envelope, a metadata part SAP answers 404 (an
+  // object it lists and serves no metadata for) is that object's, as on the
+  // sequential path: listed with SAP's error, the call answered on both paths.
+  it('a metadata part answered 404 inside an envelope: the object listed with it, as on the sequential path', async () => {
+    const probe = system();
+    await withinTurns(
+      handleGetObjectsListOf(contextOn(probe), { ...single, detail: 'medium' }),
+    );
+    const metadataKey = (probe.envelopes.map(partKeys)[3] ?? [])[0] ?? '';
+    assert.ok(metadataKey.startsWith('GET '), metadataKey);
+    const model = { refuse: { [metadataKey]: 404 } };
+    for (const batch of ['served', 'absent'] as const) {
+      const result = await withinTurns(
+        handleGetObjectsListOf(contextOn(system(model), batch), {
+          ...single,
+          detail: 'medium',
+        }),
+      );
+      const text = textOf(result);
+      assert.equal((result as { isError?: boolean }).isError, false, text);
+      const gone = payloadOf(result).objects.filter(
+        (o: { metadata_error?: { status?: number } }) =>
+          o.metadata_error !== undefined,
+      );
+      assert.equal(gone.length, 1, text);
+      assert.equal(gone[0].metadata_error.status, 404, text);
+      assert.equal(gone[0].metadata_error.step, 'read object metadata', text);
+    }
+  });
+
   // Codex round 8: a part's own status is that read's answer. A metadata
   // part answering 500 inside an envelope SAP answered 200 is a failed read:
   // full answers the error, and raw the same error, never a success.

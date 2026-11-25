@@ -232,6 +232,65 @@ describe('GetObjectsList detail', () => {
     });
   }
 
+  // Onprem live rerun: a live connection throws on a 404 (the request's
+  // failure, SAP's status on its response), where the recording connection
+  // answers one. Thrown, it is the same answer: the object listed with it.
+  it("medium: a metadata read that throws SAP's 404 lists the object with it", async () => {
+    const recorded = recordingConnection([
+      { data: LEVEL },
+      { data: '' },
+      {
+        data: '<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="Top"/>',
+      },
+    ]);
+    let call = 0;
+    const connection = {
+      ...recorded,
+      makeAdtRequest: async (
+        options: Parameters<typeof recorded.makeAdtRequest>[0],
+      ) => {
+        const answered = await recorded.makeAdtRequest(options);
+        call += 1;
+        if (call === 2) {
+          throw Object.assign(
+            new Error('Request failed with status code 404'),
+            {
+              response: {
+                status: 404,
+                statusText: 'Not Found',
+                headers: {},
+                data: '',
+              },
+            },
+          );
+        }
+        return answered;
+      },
+    } as typeof recorded;
+    declareSystemKind(connection, 'onprem');
+    const batchAvailability = createBatchAvailability();
+    batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+    const result = await handleGetObjectsList(
+      { connection, logger: undefined, batchAvailability },
+      {
+        parent_name: 'ZFG',
+        parent_tech_name: 'ZFG',
+        parent_type: 'FUGR/F',
+        detail: 'medium',
+      },
+    );
+    const text = result.content[0]?.text ?? '';
+    assert.equal(result.isError, false, text);
+    const answer = JSON.parse(text);
+    assert.equal(answer.objects[0].metadata_error?.status, 404, text);
+    assert.equal(
+      answer.objects[0].metadata_error?.step,
+      'read object metadata',
+      text,
+    );
+    assert.equal(answer.objects[1].description, 'Top', text);
+  });
+
   // Codex re-review: an object kept with its 404 (METADATA_ERROR) is shown at
   // terse too — SAP's error on a line of its own after the rows, never a
   // row as if nothing failed. The terse pass reads metadata only for an

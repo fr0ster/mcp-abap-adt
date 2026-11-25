@@ -248,6 +248,7 @@ import { runPhase, withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { sapAnswerOf } from '../../../lib/leftoverSessions/port';
 import {
   type MetadataRead,
   metadataReadOf,
@@ -267,6 +268,7 @@ import {
 import { rawOf } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
+import { child } from '../../../lib/thrownValue';
 import { return_error } from '../../../lib/utils';
 
 function utilsOf(context: HandlerContext) {
@@ -662,6 +664,24 @@ function objectsListAnswers(): ListAnswerTable<ParentList, string | object> {
   };
 }
 
+/** A metadata read's answer, or SAP's 404 its read threw (an envelope part's), as the object's error. */
+type MetadataAnswer =
+  | IAdtResponse<string, IAdtError>
+  | { readonly gone: FailureEntry };
+
+/**
+ * SAP's 404 in what a metadata read threw — its response's status, read
+ * structurally, on the throw or on what it wraps — as the object's error:
+ * the throw's entry with that status. `undefined` for any other throw.
+ */
+function goneIn(thrown: unknown): FailureEntry | undefined {
+  const status =
+    sapAnswerOf(thrown)?.status ?? sapAnswerOf(child(thrown, 'cause'))?.status;
+  return status === 404
+    ? { ...thrownEntry(thrown, METADATA_STEP), status }
+    : undefined;
+}
+
 /** What pass 2 reads: every object's description (medium, full), or only the types SAP left out (terse). */
 type SecondPass = 'descriptions' | 'types';
 
@@ -773,15 +793,26 @@ async function secondPass(
       const results = await runPhase(context, reads, (each, batch) =>
         each.read(batch),
       );
-      return results.map((result) => {
-        if (!result.ok) throw result.error;
-        return result.value;
+      return results.map((result): MetadataAnswer => {
+        if (result.ok) return result.value;
+        // A part SAP answered 404 rejects its read: the object's answer.
+        const gone = goneIn(result.error);
+        if (gone === undefined) throw result.error;
+        return { gone };
       });
     },
     async () => {
-      const results: IAdtResponse<string, IAdtError>[] = [];
-      for (const each of reads)
-        results.push(await each.read(context.connection));
+      const results: MetadataAnswer[] = [];
+      for (const each of reads) {
+        try {
+          results.push(await each.read(context.connection));
+        } catch (thrown) {
+          // A read the connection rejects on SAP's 404: the object's answer.
+          const gone = goneIn(thrown);
+          if (gone === undefined) throw thrown;
+          results.push({ gone });
+        }
+      }
       return results;
     },
   );
@@ -789,6 +820,11 @@ async function secondPass(
     const answered = answers[i];
     if (answered === undefined) continue;
     const object = out[each.list]?.[each.index];
+    if ('gone' in answered) {
+      if (object === undefined) continue;
+      object.METADATA_ERROR = answered.gone;
+      continue;
+    }
     if (!answered.ok) {
       const failed = failureEntry(answered.getError(), METADATA_STEP);
       if (object === undefined || failed.status !== 404) return answered;

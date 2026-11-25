@@ -1078,6 +1078,7 @@ describe('GetObjectsList', () => {
       },
     };
     const recorded: unknown[] = [];
+    const answers: unknown[] = [];
     for (const batch of ['served', 'absent'] as const) {
       const result = await withinTurns(
         handleGetObjectsListOf(contextOn(system(model), batch), {
@@ -1095,7 +1096,10 @@ describe('GetObjectsList', () => {
       assert.equal(gone[0].metadata_error.status, 404, text);
       assert.equal(gone[0].metadata_error.step, 'read object metadata', text);
       recorded.push(gone[0].metadata_error);
+      answers.push(payloadOf(result));
     }
+    // The whole answers alike: every row, and which object failed.
+    assert.deepStrictEqual(answers[0], answers[1]);
     // The same 404 recorded the same way on both paths: SAP's status and
     // SAP's message as it came, nothing of the path that carried it.
     assert.deepStrictEqual(recorded[0], recorded[1]);

@@ -1,6 +1,6 @@
 # @mcp-abap-adt/compact-readonly-entries
 
-Compact read-only tools — 16 tools that change nothing (the data tool `HandlerGetData` among them, opt-in).
+Compact read-only tools — 17 tools that change nothing (the data tool `HandlerGetData` among them, opt-in).
 
 > **A library, not a server.** To run the compact server, install [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) (`mcp-abap-adt-compact`); to run a server of these 16 tools alone, [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro) (`mcp-abap-adt-compact-ro`, and `-compact-http-ro`, `-compact-sse-ro`); see [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants).
 >

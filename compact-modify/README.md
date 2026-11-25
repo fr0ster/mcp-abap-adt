@@ -9,7 +9,7 @@ Compact modifying tools — 11 tools that write, lock, activate or execute.
 A different decomposition of the same ABAP ADT surface: the **operation** is the
 tool and the object moves into the arguments. Where the object-oriented surface has
 `CreateClass`, `CreateDomain`, `CreateDdl` and so on, compact has one
-`HandlerCreate` with `object_type`. Twenty-seven tool schemas instead of hundreds.
+`HandlerCreate` with `object_type`. Twenty-eight tool schemas instead of hundreds.
 Each `object_type` enum, and each tool's description, is the declared system type's: its
 members are those the system type's ADT type table serves (22.0.0) — on cloud the writes offer
 no `PROGRAM` and no `INCLUDE` — and a member outside them is refused naming the list, before

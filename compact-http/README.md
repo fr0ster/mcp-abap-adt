@@ -7,7 +7,7 @@ of its own.
 It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s launcher — the one in
 [`@mcp-abap-adt/server-runtime`](https://www.npmjs.com/package/@mcp-abap-adt/server-runtime) — with the
 compact tool set and nothing else: the same options, the same credentials, the same failures and
-shutdown as `mcp-abap-adt-http`; only the tools differ. The 16 that change nothing alone are
+shutdown as `mcp-abap-adt-http`; only the tools differ. The 17 that change nothing alone are
 [`@mcp-abap-adt/compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro)
 (`mcp-abap-adt-compact-http-ro`): the binary fixes the tool set (19.0.0). stdio is
 [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact), the other HTTP
@@ -49,8 +49,8 @@ The handle is a bearer secret — the server does not identify the caller. `Hand
 nothing in the system, so `mcp-abap-adt-compact-http-ro` serves it too; in batch mode it runs at
 once and is never recorded — open leaves the batch open, close drops it.
 
-**The tools are fixed by the binary**: all 28, the four debugger tools (`HandlerDebugBreakpoints`,
-`HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`), the debugger batch (`HandlerDebugBatch`), the background-run tools, `HandlerBatch` and the long session (`HandlerSession`) — 37; `HandlerGetData`, one of the 28, only with `--enable-data-tools` (38). `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
+**The tools are fixed by the binary**: all 29, the four debugger tools (`HandlerDebugBreakpoints`,
+`HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`), the debugger batch (`HandlerDebugBatch`), the background-run tools, `HandlerBatch` and the long session (`HandlerSession`) — 38; `HandlerGetData`, one of the 29, only with `--enable-data-tools` (39). `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
 `exposition` stop the start, naming the binary to install instead
 (`mcp-abap-adt-compact-http-ro` for `ro`). No leftover-session tool and no runtime session file: one server holds the sessions of many
 users, so those are the stdio binaries' (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`); resuming

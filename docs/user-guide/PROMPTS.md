@@ -15,7 +15,7 @@ A client that supports MCP completion (`completion/complete`) completes a prompt
 - `object_type` (every object prompt, `unit_test`, `where_used`): the values this binary's tools serve on the system kind, after `--deny-actions`, in lower case.
 - `transport` `action`: the actions this binary serves.
 - `transport` `object_type`: the transport object types, when the action given takes one (or no action is given yet).
-- `where_used` `container`: the values the where-used tool lists.
+- `where_used` `container`: the values the where-used tool lists, while the `object_type` given so far is `text_elements` or none is given yet.
 - `unit_test` `include_subpackages`: `true`, `false`.
 
 The lists per binary and kind below are these completions.

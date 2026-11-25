@@ -334,10 +334,14 @@ describe('GetObjectsList detail', () => {
     assert.deepStrictEqual(JSON.parse(String(written)), error, text);
     // The failed object stays among the rows, and its line follows them.
     const lines = text.split('\n');
-    const row = lines.indexOf('\tZGONE\t\t');
-    assert.ok(row >= 0, text);
-    const lastRow = Math.max(row, lines.indexOf('FUGR/FF\tZ_FM\t\t'));
-    assert.ok(lines.indexOf(marked[0] ?? '') > lastRow, text);
+    const failedRow = lines.indexOf('\tZGONE\t\t');
+    const healthyRow = lines.indexOf('FUGR/FF\tZ_FM\t\t');
+    const marker = lines.indexOf(marked[0] ?? '');
+    // Both rows are there, and both come before the error's line.
+    assert.ok(failedRow >= 0, text);
+    assert.ok(healthyRow >= 0, text);
+    assert.ok(marker > failedRow, text);
+    assert.ok(marker > healthyRow, text);
   });
 
   it('medium: the objects SAP answered 404 for are named apart, none no member', async () => {

@@ -272,6 +272,12 @@ describe('GetObjectsList detail', () => {
       text,
     );
     assert.deepStrictEqual(JSON.parse(String(written)), error, text);
+    // The failed object stays among the rows, and its line follows them.
+    const lines = text.split('\n');
+    const row = lines.indexOf('\tZGONE\t\t');
+    assert.ok(row >= 0, text);
+    const lastRow = Math.max(row, lines.indexOf('FUGR/FF\tZ_FM\t\t'));
+    assert.ok(lines.indexOf(marked[0] ?? '') > lastRow, text);
   });
 
   it('medium: the objects SAP answered 404 for are named apart, none no member', async () => {

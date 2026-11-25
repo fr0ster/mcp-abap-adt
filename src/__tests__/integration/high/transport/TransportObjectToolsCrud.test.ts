@@ -915,13 +915,23 @@ systemsDescribe(['onprem'], SUITE, () => {
       assert.equal('success' in moveData, false);
 
       // The echo is not proof: re-read both tasks.
-      const holds = async (task: string) =>
-        readEntries(
-          await handleReadTransportObjects(
-            createHandlerContext({ connection, logger }),
-            { transport_number: task },
-          ),
-        ).objects.filter((o) => o.name === programName && o.type === 'PROG');
+      // Each re-read first proven a read of that task: an error parses to
+      // no entries, which would pass for the object having left.
+      const holds = async (task: string) => {
+        const read = await handleReadTransportObjects(
+          createHandlerContext({ connection, logger }),
+          { transport_number: task },
+        );
+        expectOk(read, `re-read ${task}`, logger);
+        const text = String(read.content[0]?.text ?? '');
+        assert.ok(
+          text.split('\n').includes(`# transport ${task}`),
+          `the re-read of ${task} is no read of it: ${text.slice(0, 2000)}`,
+        );
+        return readEntries(read).objects.filter(
+          (o) => o.name === programName && o.type === 'PROG',
+        );
+      };
       const onFirst = await holds(taskNumber);
       assert.equal(onFirst.length, 0, JSON.stringify(onFirst));
       const onSecond = await holds(secondTaskNumber);

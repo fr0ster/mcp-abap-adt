@@ -47,8 +47,11 @@ function terseTotal(result: any): number {
     assert.ok(answer.columns.includes(column), shown);
   }
   if (total > 0) assert.ok(answer.rows.length > 0, shown);
+  // Each usage names its object (a nameless one by its uri); its type is
+  // SAP's, which a reference may carry none of (CONVERT_FILE_TO_STRING
+  // came without adtcore:type on premise).
   for (const row of answer.rows.slice(0, 50)) {
-    assert.ok(row.type && row.name, JSON.stringify(row));
+    assert.ok(row.name || row.uri, JSON.stringify(row));
   }
   return total;
 }

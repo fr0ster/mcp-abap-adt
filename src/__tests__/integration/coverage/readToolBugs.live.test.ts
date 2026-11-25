@@ -31,6 +31,7 @@ import {
 import type { LaunchedServer } from '../helpers/launchedServers';
 import { liveConnection, liveSuite } from '../helpers/live';
 import { skipRunningTest } from '../helpers/runningTest';
+import { headOf, terseOf } from '../helpers/terseAnswer';
 import {
   destinationArgs,
   getHardModeConfig,
@@ -188,19 +189,20 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
           background: false,
         }),
       );
-      const lines = text.split('\n');
-      const total = lines[0] ?? '';
-      assert.ok(total.startsWith('# total '), text.slice(0, 2000));
-      // The usages SAP answered, as rows: type, name and usage under their
-      // package.
-      assert.equal(lines[1], 'type\tname\tusage', text.slice(0, 2000));
-      const rows = lines.filter(
-        (line) => line !== '' && !line.startsWith('#') && line !== lines[1],
-      );
-      assert.ok(rows.length > 0, text.slice(0, 2000));
-      for (const row of rows.slice(0, 50)) {
-        const [type, rowName] = row.split('\t');
-        assert.ok(type && rowName, row);
+      const answer = terseOf(text);
+      const shown = text.slice(0, 2000);
+      const total = `# total ${headOf(answer, 'total') ?? ''}`;
+      assert.ok(Number.isFinite(Number(headOf(answer, 'total'))), shown);
+      // The usages SAP answered, as rows under their package, each read by
+      // the header's column names; a usage names its object (a nameless one
+      // by its uri), its type SAP's, which a reference may lack (SAP lists
+      // local test classes without one, measured on premise).
+      for (const column of ['type', 'name', 'usage']) {
+        assert.ok(answer.columns.includes(column), shown);
+      }
+      assert.ok(answer.rows.length > 0, shown);
+      for (const row of answer.rows.slice(0, 50)) {
+        assert.ok(row.name || row.uri, JSON.stringify(row));
       }
       console.log(
         `[readToolBugs] GetWhereUsed ${name} terse: ${text.length} characters, ${total}`,

@@ -38,9 +38,11 @@ import { handleGetServiceDefinition } from '../../../handlers/service_definition
 import { handleGetStructure } from '../../../handlers/structure/high/handleGetStructure';
 import { handleGetTable } from '../../../handlers/table/high/handleGetTable';
 import { createBatchAvailability } from '../../../lib/batch/availability';
+import { READS_PER_ENVELOPE } from '../../../lib/batch/phases';
 import {
   METADATA_READ_TYPES,
   type MetadataTarget,
+  metadataKeyOf,
 } from '../../../lib/strategies/metadataReads';
 import { metadataDescriptions } from '../../../lib/strategies/packageWalk';
 import {
@@ -383,11 +385,16 @@ describe('one metadata read per type, shared by handler and batch', () => {
           batchAvailability: createBatchAvailability(),
         } as unknown as HandlerContext;
         const { descriptions } = await withinTurns(
-          metadataDescriptions(context, [targetOf(type)]),
+          // Two objects of the type: one envelope (one alone is a single
+          // request); the first part is this target's.
+          metadataDescriptions(context, [
+            targetOf(type),
+            { ...targetOf(type), name: `${NAME}2` },
+          ]),
         );
         assert.equal(fake.envelopes.length, 1);
         const parts = fake.envelopes[0]?.parts ?? [];
-        assert.equal(parts.length, 1);
+        assert.equal(parts.length, 2);
         const inner = parts[0];
         assert.deepStrictEqual(
           {
@@ -398,7 +405,10 @@ describe('one metadata read per type, shared by handler and batch', () => {
           },
           { ...expected, body: '' },
         );
-        assert.deepStrictEqual([...descriptions.values()], ['Placeholder']);
+        assert.deepStrictEqual(
+          [...descriptions.values()],
+          ['Placeholder', 'Placeholder'],
+        );
       },
     );
   }
@@ -427,11 +437,16 @@ describe('one metadata read per type, shared by handler and batch', () => {
           batchAvailability: createBatchAvailability(),
         } as unknown as HandlerContext;
         const { descriptions } = await withinTurns(
-          metadataDescriptions(context, [targetOf(type)]),
+          // Two objects of the type: one envelope (one alone is a single
+          // request); the first part is this target's.
+          metadataDescriptions(context, [
+            targetOf(type),
+            { ...targetOf(type), name: `${NAME}2` },
+          ]),
         );
         assert.equal(fake.envelopes.length, 1);
         const parts = fake.envelopes[0]?.parts ?? [];
-        assert.equal(parts.length, 1);
+        assert.equal(parts.length, 2);
         const inner = parts[0];
         const version = WALK_VERSION[type] ?? '';
         assert.deepStrictEqual(
@@ -449,8 +464,92 @@ describe('one metadata read per type, shared by handler and batch', () => {
           version,
         );
         assert.ok(direct.headers.accept);
-        assert.deepStrictEqual([...descriptions.values()], ['Placeholder']);
+        assert.deepStrictEqual(
+          [...descriptions.values()],
+          ['Placeholder', 'Placeholder'],
+        );
       },
     );
   }
+});
+
+describe('the metadata phase is bounded (GetObjectInfo include_descriptions)', () => {
+  const classes = (count: number): MetadataTarget[] =>
+    Array.from({ length: count }, (_, i) => ({
+      type: 'CLAS/OC',
+      name: `ZCL_${i}`,
+    }));
+  const contextOn = (fake: ReturnType<typeof envelopeConnection>) =>
+    ({
+      connection: fake.connection,
+      logger: undefined,
+      batchAvailability: createBatchAvailability(),
+    }) as unknown as HandlerContext;
+
+  /** Each class's own metadata document: its description names it. */
+  const ownDocument = (url: string) => {
+    const name = url.split('?')[0]?.split('/').pop()?.toUpperCase() ?? '';
+    return `<?xml version="1.0" encoding="utf-8"?><adtcore:mainObject xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${name}" adtcore:description="Own ${name}"/>`;
+  };
+
+  it(`more than ${READS_PER_ENVELOPE} objects: balanced envelopes, each object its own description`, async () => {
+    const fake = envelopeConnection((parts) =>
+      envelopeResponse(
+        parts.map((p) => ({
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'application/xml' },
+          body: ownDocument(p.url),
+        })),
+      ),
+    );
+    const targets = classes(READS_PER_ENVELOPE + 2);
+    const { descriptions } = await withinTurns(
+      metadataDescriptions(contextOn(fake), targets),
+      2000,
+    );
+    assert.deepStrictEqual(
+      fake.envelopes.map((e) => e.parts.length),
+      [151, 151],
+    );
+    for (const target of targets) {
+      const key = metadataKeyOf(target);
+      assert.notEqual(key, undefined);
+      assert.equal(
+        descriptions.get(key ?? ''),
+        `Own ${target.name}`,
+        target.name,
+      );
+    }
+  });
+
+  it('a 401 on one object’s metadata: that object has no description, every other its own, every envelope sent', async () => {
+    const fake = envelopeConnection((parts) =>
+      envelopeResponse(
+        parts.map((p) =>
+          p.url.includes('/zcl_7?') || p.url.endsWith('/zcl_7')
+            ? { status: 401, statusText: 'Unauthorized', body: '' }
+            : {
+                status: 200,
+                statusText: 'OK',
+                headers: { 'content-type': 'application/xml' },
+                body: ownDocument(p.url),
+              },
+        ),
+      ),
+    );
+    const targets = classes(READS_PER_ENVELOPE + 2);
+    const { descriptions } = await withinTurns(
+      metadataDescriptions(contextOn(fake), targets),
+      2000,
+    );
+    assert.equal(fake.envelopes.length, 2);
+    for (const target of targets) {
+      const own = descriptions.get(metadataKeyOf(target) ?? '');
+      assert.equal(
+        own,
+        target.name === 'ZCL_7' ? undefined : `Own ${target.name}`,
+      );
+    }
+  });
 });

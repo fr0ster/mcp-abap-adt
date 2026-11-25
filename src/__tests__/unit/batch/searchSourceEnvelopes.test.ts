@@ -15,6 +15,7 @@ import { READS_PER_ENVELOPE } from '../../../lib/search-source/orchestrator';
 import {
   type Fake,
   hitNames,
+  keyOf,
   type Model,
   nodeKey,
   partKeys,
@@ -141,17 +142,15 @@ describe('SearchSource: source reads in envelopes of at most 300', () => {
   it('650 one-read targets go as 300 + 300 + 50 reads, in target order', async () => {
     const fake = on(programs(650));
     const result = await search(fake, ['ZBIG']);
-    // The walk: the root node, then its type node.
-    assert.deepStrictEqual(fake.envelopes.slice(0, 2).map(partKeys), [
-      [nodeKey('ZBIG')],
-      [nodeKey('ZBIG', '20')],
-    ]);
-    assert.deepStrictEqual(sourceSizes(fake, 2), [300, 300, 50]);
+    // The walk of one package: the root node, then its type node — one
+    // read each, single requests.
     assert.deepStrictEqual(
-      fake.envelopes
-        .slice(2)
-        .flatMap(partKeys)
-        .map((k) => k.slice('PROGRAM '.length)),
+      fake.directs.map((r) => keyOf(r.url, r.params)),
+      [nodeKey('ZBIG'), nodeKey('ZBIG', '20')],
+    );
+    assert.deepStrictEqual(sourceSizes(fake, 0), [300, 300, 50]);
+    assert.deepStrictEqual(
+      fake.envelopes.flatMap(partKeys).map((k) => k.slice('PROGRAM '.length)),
       Array.from({ length: 650 }, (_, i) => `ZP${pad(i)}`),
     );
     const p = payloadOf(result);
@@ -160,13 +159,30 @@ describe('SearchSource: source reads in envelopes of at most 300', () => {
     assert.deepStrictEqual(p.truncated, { by_object_cap: false });
   });
 
-  it("a function group's second round of 400 reads goes as 300 + 100; nothing dropped", async () => {
+  it('a single target — one function group, 400 includes — is read as single requests, no envelope; nothing dropped', async () => {
     const fake = on(bigGroup());
     const result = await search(fake, ['ZFGP'], { max_hits_per_object: 1000 });
-    assert.deepStrictEqual(sourceSizes(fake, 2), [1, 300, 100]);
-    assert.deepStrictEqual(partKeys(fake.envelopes[2]), ['STRUCTURE ZFG_BIG']);
-    assert.equal(new Set(fake.envelopes.slice(3).flatMap(partKeys)).size, 400);
+    assert.equal(fake.envelopes.length, 0);
+    const keys = fake.directs.map((r) => keyOf(r.url, r.params));
+    assert.ok(keys.includes('STRUCTURE ZFG_BIG'));
+    assert.equal(keys.filter((k) => k.startsWith('FINCLUDE ')).length, 400);
     assert.equal(payloadOf(result).results.length, 400);
+  });
+
+  it('a round of one read among several targets is a single request', async () => {
+    // ZB's chunk: ZFG_B and two programs; its second round is ZFG_B's one
+    // include.
+    const fake = on(twoChunks());
+    await search(fake, ['ZA', 'ZB']);
+    assert.ok(
+      fake.directs
+        .map((r) => keyOf(r.url, r.params))
+        .includes('FINCLUDE ZFG_B/LZFG_BTOP'),
+    );
+    assert.equal(
+      fake.envelopes.flatMap(partKeys).includes('FINCLUDE ZFG_B/LZFG_BTOP'),
+      false,
+    );
   });
 
   it('the hits over envelopes are the hits of the same targets read one by one', async () => {

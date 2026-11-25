@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { isDeepStrictEqual } from 'node:util';
+import { format, isDeepStrictEqual } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type {
@@ -160,24 +160,24 @@ const NODES: Record<string, NodeDoc> = {
     ],
   },
   [nodeKey('PROG/P', 'ZPROG_X', '101')]: {
-    objects: [{ type: 'PROG/I', name: 'ZINCL_X1' }],
+    objects: [{ type: 'PROG/I', name: 'ZINCL_X1', description: 'Include X1' }],
     types: [{ type: 'PROG/PY', nodeId: '000103' }],
   },
   [nodeKey('PROG/P', 'ZPROG_X', '102')]: {
-    objects: [{ type: 'PROG/PX', name: 'ZEVENT_X' }],
+    objects: [{ type: 'PROG/PX', name: 'ZEVENT_X', description: 'Event X' }],
   },
   [nodeKey('PROG/P', 'ZPROG_X', '103')]: {
-    objects: [{ type: 'PROG/PY', name: 'ZFORM_X' }],
+    objects: [{ type: 'PROG/PY', name: 'ZFORM_X', description: 'Form X' }],
   },
   [nodeKey('PROG/P', 'ZPROG_Y')]: {
     types: [{ type: 'PROG/I', nodeId: '000101' }],
   },
   [nodeKey('PROG/P', 'ZPROG_Y', '101')]: {
-    objects: [{ type: 'PROG/I', name: 'ZINCL_Y1' }],
+    objects: [{ type: 'PROG/I', name: 'ZINCL_Y1', description: 'Include Y1' }],
     types: [{ type: 'PROG/PY', nodeId: '000103' }],
   },
   [nodeKey('PROG/P', 'ZPROG_Y', '103')]: {
-    objects: [{ type: 'PROG/PY', name: 'ZFORM_Y' }],
+    objects: [{ type: 'PROG/PY', name: 'ZFORM_Y', description: 'Form Y' }],
   },
 };
 
@@ -1199,7 +1199,12 @@ describe('GetObjectsList', () => {
       throw credential();
     });
     const result = await withinTurns(
-      handleGetObjectsList(contextOn(fake), single),
+      handleGetObjectsList(contextOn(fake), {
+        objects: [
+          { parent_type: 'PROG/P', parent_name: 'ZPROG_X' },
+          { parent_type: 'PROG/P', parent_name: 'ZPROG_Y' },
+        ],
+      }),
     );
     assert.equal((result as { isError?: boolean }).isError, true);
     assert.equal(payloadOf(result).error, 'authentication_failed');
@@ -1242,16 +1247,13 @@ describe('GetObjectInfo', () => {
     assert.equal(tree.CHILDREN[0].CHILDREN[0].OBJECT_NAME, 'ZPROG_A');
   });
 
-  it("envelopes per spec §11's row (per tier: roots, then type nodes; the searches last)", async () => {
+  it('the structure as single requests, no node structure in an envelope; the searches last, in one', async () => {
     const fake = system();
     await withinTurns(handleGetObjectInfo(contextOn(fake), single));
     assert.deepStrictEqual(fake.envelopes.map(partKeys), [
-      [nodeKey('DEVC/K', 'ZROOT_A')],
-      [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
-      [nodeKey('DEVC/K', 'ZSUB_A')],
-      [nodeKey('DEVC/K', 'ZSUB_A', '30')],
       ['SEARCH|ZROOT_A', 'SEARCH|ZSUB_A'],
     ]);
+    assert.equal(nodeReads(fake).length, 5);
   });
 
   it('no envelope holds a request needing another of its parts', async () => {
@@ -1282,7 +1284,8 @@ describe('GetObjectInfo', () => {
         maxDepth: 2,
       }),
     );
-    assert.equal(fake.envelopes.length, 5);
+    // The node structures go alone; one envelope holds every search.
+    assert.equal(fake.envelopes.length, 1);
     const [a, b] = payloadOf(result);
     assert.equal(a.OBJECT_NAME, 'ZROOT_A');
     assert.equal(b.CHILDREN[0].CHILDREN[0].OBJECT_NAME, 'ZPROG_B');
@@ -1384,6 +1387,16 @@ for (const { tool, call, refused } of LIST_CALLS) {
       const result = await withinTurns(call(contextOn(fake)));
       assert.equal((result as { isError?: boolean }).isError, true);
       assert.ok(textOf(result).includes('401'));
+      if (tool === 'GetObjectInfo') {
+        // Its structure is read as single requests: none in an envelope.
+        assert.equal(fake.envelopes.length, 0);
+        assert.ok(
+          fake.directs.some(
+            (r) => keyOf(r.method, r.url, r.params) === refused,
+          ),
+        );
+        return;
+      }
       const at = fake.envelopes.findIndex((e) => partKeys(e).includes(refused));
       assert.ok(at >= 0);
       assert.equal(fake.envelopes.length, at + 1);
@@ -1400,7 +1413,11 @@ for (const { tool, call, refused } of LIST_CALLS) {
   });
 }
 
-for (const { tool, call } of LIST_CALLS) {
+// GetObjectInfo reads its structure as single requests; its envelopes are
+// the metadata phase's and the searches' (their failures: below).
+for (const { tool, call } of LIST_CALLS.filter(
+  (c) => c.tool !== 'GetObjectInfo',
+)) {
   describe(`${tool}: an envelope failure`, () => {
     it("is every item of that phase's failure, the envelope's error with its step", async () => {
       const fake = system({}, () => {
@@ -1457,7 +1474,7 @@ describe('GetObjectInfo: a credential refusal of the searches', () => {
     );
     assert.equal((result as { isError?: boolean }).isError, true);
     assert.equal(payloadOf(result).error, 'authentication_failed');
-    assert.equal(fake.envelopes.length, 5);
+    assert.equal(fake.envelopes.length, 1);
   });
 });
 
@@ -1822,14 +1839,21 @@ describe('GetObjectInfo: descriptions', () => {
       include_descriptions: true,
     });
 
-  it("a part carrying another part's DESCRIPTION: the answer is the sequential one", async () => {
+  it('the structure as single requests, then the metadata phase: the sequential answer', async () => {
     const leaking = leakingSystem();
     const batched = await withinTurns(call(contextOn(leaking as Fake)));
     const sequential = await withinTurns(
       call(contextOn(leakingSystem() as Fake, 'absent')),
     );
-    // The envelopes did carry another part's description.
-    assert.ok(leaking.leaks.count > 0);
+    // The structure first, no node structure in an envelope: nothing leaked;
+    // each description is its leaf's metadata's, on both paths.
+    assert.equal(leaking.leaks.count, 0);
+    assert.equal(
+      leaking.envelopes
+        .flatMap(partKeys)
+        .some((k) => k.includes('|') && !k.startsWith('SEARCH|')),
+      false,
+    );
     assert.equal((batched as { isError?: boolean }).isError, false);
     assert.equal(textOf(batched), textOf(sequential));
     assert.ok(textOf(batched).includes('Class A'));
@@ -1863,54 +1887,52 @@ describe('GetObjectInfo: descriptions', () => {
     );
   });
 
-  it("a metadata part's failure: that object has no description; the call answers", async () => {
-    const fake = system({
-      refuse: { 'GET /sap/bc/adt/oo/classes/zcl_a': 500 },
+  for (const status of [401, 500]) {
+    it(`a ${status} on one leaf's metadata: that leaf has no description, the call answers — the same on both paths`, async () => {
+      const model = { refuse: { 'GET /sap/bc/adt/oo/classes/zcl_a': status } };
+      const batched = await withinTurns(call(contextOn(system(model))));
+      const sequential = await withinTurns(
+        call(contextOn(system(model), 'absent')),
+      );
+      for (const result of [batched, sequential]) {
+        assert.equal((result as { isError?: boolean }).isError, false);
+        assert.ok(textOf(result).includes('ZCL_A'));
+        assert.ok(!textOf(result).includes('Class A'));
+        assert.ok(textOf(result).includes('Interface B'));
+      }
+      assert.equal(textOf(batched), textOf(sequential));
     });
-    const result = await withinTurns(call(contextOn(fake)));
-    assert.equal((result as { isError?: boolean }).isError, false);
-    assert.ok(textOf(result).includes('ZCL_A'));
-    assert.ok(!textOf(result).includes('Class A'));
-    assert.ok(textOf(result).includes('Interface B'));
-  });
+  }
 
-  it('a 401 SAP answered to a metadata part ends the call as it came', async () => {
-    const fake = system({
-      refuse: { 'GET /sap/bc/adt/oo/classes/zcl_a': 401 },
-    });
-    const result = await withinTurns(call(contextOn(fake)));
-    assert.equal((result as { isError?: boolean }).isError, true);
-    assertMatchObject(payloadOf(result), {
-      status: 401,
-      step: 'read object metadata',
-    });
+  it("the sequential version reads each leaf's description from its metadata too, one request each", async () => {
+    const fake = system();
+    const result = await withinTurns(call(contextOn(fake, 'absent')));
+    assert.equal(fake.envelopes.length, 0);
+    const metadata = fake.directs.filter((r) =>
+      r.url.startsWith('/sap/bc/adt/oo/'),
+    );
+    assert.ok(
+      metadata.some((r) => r.url.startsWith('/sap/bc/adt/oo/classes/zcl_a')),
+    );
+    assert.ok(textOf(result).includes('Class A'));
   });
 
   it("the connection's credential refusal of the metadata envelope ends the call as it came", async () => {
-    const fake = envelopeConnection((parts) => {
+    // The structure is read alone, from the model; the metadata envelope
+    // is refused by the connection.
+    const fake = system();
+    fake.answerRequests(async (request, previous) => {
       if (
-        parts.some(
-          (p) => keyOf(p.method, p.url) === 'GET /sap/bc/adt/oo/classes/zcl_a',
-        )
+        request.url.endsWith('/batch') &&
+        String(request.data ?? '').includes('/sap/bc/adt/oo/classes/zcl_a')
       ) {
         throw credential();
       }
-      return envelopeOf(parts.map((p) => answerOf({}, p.method, p.url)));
+      return previous(request);
     });
     const result = await withinTurns(call(contextOn(fake as unknown as Fake)));
     assert.equal((result as { isError?: boolean }).isError, true);
     assert.equal(payloadOf(result).error, 'authentication_failed');
-  });
-
-  it('no communication batch: no metadata read, the descriptions of today', async () => {
-    const fake = system();
-    const result = await withinTurns(call(contextOn(fake, 'absent')));
-    assert.equal(fake.envelopes.length, 0);
-    assert.equal(
-      fake.directs.some((r) => r.url.startsWith('/sap/bc/adt/oo/classes/')),
-      false,
-    );
-    assert.ok(textOf(result).includes('Class A'));
   });
 });
 
@@ -2035,6 +2057,49 @@ for (const { tool, call } of [
         true,
       );
       assert.ok(!textOf(result).includes('Class A'));
+      // Structure only: no object metadata read on this path either.
+      assert.equal(
+        fake.directs.some((r) => r.url.startsWith('/sap/bc/adt/oo/')),
+        false,
+      );
     });
   });
 }
+
+describe('GetObjectsList: descriptions', () => {
+  // GetObjectsList takes no description from a node structure: pass 1
+  // asks none, and a description comes from the object's own metadata in
+  // pass 2. So a node structure part carrying another part's DESCRIPTION,
+  // as SAP answers inside an envelope (measured, 2026-10-18), reaches no
+  // answer: the batched answer is the sequential one, read alone.
+  for (const args of [
+    {},
+    { with_short_descriptions: true },
+    { with_short_descriptions: false },
+  ]) {
+    it(
+      format(
+        "parts carrying each other's DESCRIPTION: the sequential answer, each description its object's own: %j",
+        args,
+      ),
+      async () => {
+        const call: Call = (c) =>
+          handleGetObjectsList(c, {
+            objects: [
+              { parent_type: 'PROG/P', parent_name: 'ZPROG_X' },
+              { parent_type: 'PROG/P', parent_name: 'ZPROG_Y' },
+            ],
+            ...args,
+          });
+        const leaking = leakingSystem();
+        const batched = await withinTurns(call(contextOn(leaking as Fake)));
+        const sequential = await withinTurns(
+          call(contextOn(leakingSystem() as Fake, 'absent')),
+        );
+        assert.ok(leaking.envelopes.length > 0);
+        assert.ok(leaking.leaks.count > 0);
+        assert.equal(textOf(batched), textOf(sequential));
+      },
+    );
+  }
+});

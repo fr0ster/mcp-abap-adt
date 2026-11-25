@@ -3,7 +3,7 @@ import { analyseException, utilSearchHits } from '@mcp-abap-adt/adt-strategies';
 import { ADT_TYPES_ONPREM } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtCodes, TableMainOf } from '../adtProjections';
 import { appendAll } from '../appendAll';
-import { type PhaseResult, runPhaseOutcome } from '../batch/phases';
+import { type PhaseResult, runPhaseOrAlone } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import { carryingFailure } from '../strategies/step';
@@ -215,7 +215,8 @@ export async function searchPackagesInPhase(
   const distinct = [
     ...new Map(asked.map((args) => [searchKey(args), args])).values(),
   ];
-  const { results, envelope } = await runPhaseOutcome(
+  // One search alone is a single request (`runPhaseOrAlone`).
+  const { results, envelope } = await runPhaseOrAlone(
     ctx,
     distinct,
     (args, connection) =>

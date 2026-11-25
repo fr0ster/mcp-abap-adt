@@ -32,8 +32,10 @@ import {
 } from '../../../lib/answer';
 import { failureOf } from '../../../lib/auth/failures';
 import {
+  chunksOf,
   type PhaseResult,
-  runPhase,
+  READS_PER_ENVELOPE,
+  runPhaseOutcome,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
@@ -136,6 +138,20 @@ const HOST_SPELLINGS = {
   program: { code: 'PROG/P', main: 'PROG', names: ['PROGRAM'] },
   include: { code: 'PROG/I', names: ['INCLUDE'] },
 } as const satisfies Readonly<Record<string, HostSpelling>>;
+
+/**
+ * An object as the decision reads it: its name upper-cased, and the host
+ * its type names (none: it is probed).
+ */
+function objectKeyOf(name: string, type: string | undefined): string {
+  const kind = String(type ?? '')
+    .trim()
+    .toUpperCase();
+  const host = Object.entries(HOST_SPELLINGS).find(([, spelling]) =>
+    spelledAs(kind, spelling),
+  )?.[0];
+  return `${name.toUpperCase()}|${host ?? ''}`;
+}
 
 /** Whether `kind`, upper-cased, names `host`. */
 function spelledAs(kind: string, host: HostSpelling): boolean {
@@ -1341,6 +1357,53 @@ function enhancementAnswers(context: HandlerContext) {
     PhaseResult<IAdtResponse<string, IAdtError>>
   >();
   const nodes = new Map<string, PhaseResult<NodeAnswer>>();
+  /**
+   * The answers of `pending`, kept by read. A credential failure ends the
+   * call, thrown at the first read answering it — except, with `probes`,
+   * a probe's: kept as its answer, so it decides only when the decision
+   * reaches that probe (`pathFromAnswers` throws it there), as the
+   * sequential version, which sends no probe past the one that decides.
+   */
+  const keep = (
+    pending: readonly EnhancementRead[],
+    results: readonly PhaseResult<
+      Awaited<ReturnType<typeof sendEnhancementRead>>
+    >[],
+    probes: boolean,
+  ): void => {
+    results.forEach((result, i) => {
+      const read = pending[i];
+      const key = enhancementKey(read);
+      const deferred = probes && read.kind === 'metadata';
+      if (!result.ok) {
+        if (!deferred && endsTheCall(result.error)) throw result.error;
+        if (read.kind === 'node') nodes.set(key, result);
+        else documents.set(key, result);
+        return;
+      }
+      const answer = result.value;
+      const step = enhancementStep(read);
+      if (
+        !deferred &&
+        answer.response.ok === false &&
+        isCredentialPayload(failureEntry(answer.response.getError(), step))
+      ) {
+        const error = answer.response.getError();
+        throw carryingFailure(
+          read.kind === 'elements'
+            ? new EnhancementInputError(error.message)
+            : new Error(error.message),
+          error,
+          step,
+        );
+      }
+      if (answer.of === 'node') {
+        nodes.set(key, { ok: true, value: answer.response });
+      } else {
+        documents.set(key, { ok: true, value: answer.response });
+      }
+    });
+  };
   return {
     /** The answer to a document's read; `Unanswered` thrown when no phase sent it yet. */
     answered(read: DocumentRead): PhaseResult<IAdtResponse<string, IAdtError>> {
@@ -1354,52 +1417,90 @@ function enhancementAnswers(context: HandlerContext) {
       if (result === undefined) throw new Unanswered(read);
       return result;
     },
-    async phase(reads: readonly EnhancementRead[]): Promise<void> {
+    /**
+     * The reads not answered yet. Reads of two or more objects go in ADT
+     * batch envelopes of at most `READS_PER_ENVELOPE`, each judged as it
+     * answered, so a credential failure sends no later one; an envelope
+     * whose own request answered `404` (the endpoint once served) is every
+     * read's failure, never each read's "not found". Reads of one object
+     * go as single requests, one after another, as the sequential version
+     * sends them. `probes`: the probes' credential failures are kept, not
+     * thrown (`keep`).
+     */
+    async phase(
+      reads: readonly EnhancementRead[],
+      probes = false,
+    ): Promise<void> {
       const asked = new Map<string, EnhancementRead>();
       for (const read of reads) {
         const key = enhancementKey(read);
         if (!documents.has(key) && !nodes.has(key)) asked.set(key, read);
       }
-      if (asked.size === 0) return;
       const pending = [...asked.values()];
-      const results = await runPhase(context, pending, (read, connection) =>
-        sendEnhancementRead(context, connection, read),
-      );
-      results.forEach((result, i) => {
-        const read = pending[i];
-        const key = enhancementKey(read);
-        if (!result.ok) {
-          if (endsTheCall(result.error)) throw result.error;
-          if (read.kind === 'node') nodes.set(key, result);
-          else documents.set(key, result);
-          return;
-        }
-        const answer = result.value;
-        const step = enhancementStep(read);
-        if (
-          answer.response.ok === false &&
-          isCredentialPayload(failureEntry(answer.response.getError(), step))
-        ) {
-          const error = answer.response.getError();
-          throw carryingFailure(
-            read.kind === 'elements'
-              ? new EnhancementInputError(error.message)
-              : new Error(error.message),
-            error,
-            step,
+      if (new Set(pending.map(ownerOf)).size < 2) {
+        for (const read of pending) {
+          const result = await sendEnhancementRead(
+            context,
+            context.connection,
+            read,
+          ).then(
+            (value) => ({ ok: true as const, value }),
+            (error: unknown) => ({ ok: false as const, error }),
           );
+          keep([read], [result], probes);
         }
-        if (answer.of === 'node') {
-          nodes.set(key, { ok: true, value: answer.response });
-        } else {
-          documents.set(key, { ok: true, value: answer.response });
-        }
-      });
+        return;
+      }
+      for (const chunk of chunksOf(pending, READS_PER_ENVELOPE)) {
+        const { results, envelope } = await runPhaseOutcome(
+          context,
+          chunk,
+          (read, connection) => sendEnhancementRead(context, connection, read),
+        );
+        keep(
+          chunk,
+          envelope.failed && envelope.outer === NOT_FOUND
+            ? results.map((result, i) => envelopeFailureOf(result, chunk[i]))
+            : results,
+          probes,
+        );
+      }
     },
   };
 }
 
 type EnhancementAnswers = ReturnType<typeof enhancementAnswers>;
+
+/** The status of an envelope request answered "not found". */
+const NOT_FOUND = 404;
+
+/**
+ * A read's answer when its envelope failed with an outer `404`: the part's
+ * failure (SAP's status, the envelope's request) carried as a thrown
+ * failure, so it is reported as a failure of that read — never read as
+ * the `404` that means "not this kind".
+ */
+function envelopeFailureOf(
+  result: PhaseResult<Awaited<ReturnType<typeof sendEnhancementRead>>>,
+  read: EnhancementRead | undefined,
+): PhaseResult<Awaited<ReturnType<typeof sendEnhancementRead>>> {
+  if (!result.ok || result.value.response.ok || read === undefined) {
+    return result;
+  }
+  const error = result.value.response.getError();
+  return {
+    ok: false,
+    error: carryingFailure(
+      new Error(error.message),
+      error,
+      enhancementStep(read),
+    ),
+  };
+}
+
+/** The object a read is about: the host it names, or the node's parent. */
+const ownerOf = (read: EnhancementRead): string =>
+  read.kind === 'node' ? read.parentName : read.name;
 
 /** A resolved object: what kind it is, and the read of its elements. */
 interface EnhancementPath {
@@ -1415,7 +1516,7 @@ interface EnhancementPath {
  * is thrown as `Unanswered`: the next phase sends it, one probe per object.
  */
 function pathFromAnswers(
-  answers: EnhancementAnswers,
+  answers: Pick<EnhancementAnswers, 'answered'>,
   objectName: string,
   manualProgramContext?: string,
   requestedType?: string,
@@ -1540,17 +1641,70 @@ type Resolved =
   | { ok: true; path: EnhancementPath }
   | { ok: false; error: unknown };
 
+/** What a speculative probe answers: nothing, so the decision asks its next probe. */
+const NOT_ASKED: PhaseResult<IAdtResponse<string, IAdtError>> = {
+  ok: false,
+  error: new Error('not asked'),
+};
+
 /**
- * Every object's path, probe by probe: each phase sends the next probe of
+ * Every probe `pathFromAnswers` may send for `objectName`, in its order:
+ * the probes it asks when each answers nothing (the class, program and
+ * include metadata of an object of no known type; the include metadata of
+ * an include; none for a type that decides alone). Asked of the decision
+ * itself, so the set is the one it reads.
+ */
+function probesOf(
+  objectName: string,
+  manualProgramContext?: string,
+  requestedType?: string,
+): DocumentRead[] {
+  const asked: DocumentRead[] = [];
+  try {
+    pathFromAnswers(
+      {
+        answered(read) {
+          asked.push(read);
+          return NOT_ASKED;
+        },
+      },
+      objectName,
+      manualProgramContext,
+      requestedType,
+    );
+  } catch {
+    // Every probe answered nothing: the object resolves to no path.
+  }
+  return asked;
+}
+
+/**
+ * Every object's path. Two or more objects that probe: every probe of each
+ * (class, program and include metadata — independent reads) goes in one
+ * phase, and each path is decided over those answers as the sequential
+ * version decides it, a probe it never reaches unread by the decision. One
+ * object's probes are not put together: each phase sends the next probe of
  * every object still unresolved (class, then program, then include — each
- * only when the earlier answered none), one per object. One path per object,
- * in the objects' order.
+ * only when the earlier answered none), one per object. One path per
+ * object, in the objects' order.
  */
 async function resolvePaths(
   answers: EnhancementAnswers,
   objects: ReadonlyArray<{ name: string; type?: string | undefined }>,
   manualProgramContext?: string,
+  probesDecide = false,
 ): Promise<Resolved[]> {
+  // Objects counted as the decision reads them: two spellings of one
+  // object ask the same probes, and are one object.
+  const probing = new Map<string, DocumentRead[]>();
+  for (const o of objects) {
+    const probes = probesOf(o.name, manualProgramContext, o.type);
+    if (probes.length > 0)
+      probing.set(probes.map(enhancementKey).join(), probes);
+  }
+  if (probing.size > 1) {
+    await answers.phase([...probing.values()].flat(), probesDecide);
+  }
   const resolved: Array<Resolved | undefined> = objects.map(() => undefined);
   for (;;) {
     const next: EnhancementRead[] = [];
@@ -1571,7 +1725,7 @@ async function resolvePaths(
     if (next.length === 0) {
       return resolved.flatMap((path) => (path === undefined ? [] : [path]));
     }
-    await answers.phase(next);
+    await answers.phase(next, probesDecide);
   }
 }
 
@@ -1853,35 +2007,53 @@ function enhancementsAnswerFrom(
 
 /**
  * Every object's enhancements in ADT batch envelopes (spec §11): (1) the
- * type probes, one per phase for every object still unresolved; (2) every
- * object's enhancements, with `include_nested` beside its root node
- * structure; (3) the includes node of every object that lists one; (4) the
- * metadata of every include, up to `max_includes` per object; (5) the
- * enhancements of every include resolved. Each answer is then the
- * sequential version's assembly over these answers. A credential failure
- * ends the call: thrown.
+ * type probes (`resolvePaths`), a probe's credential refusal deciding only
+ * where the decision reaches it, and ending the list at that object; (2)
+ * every object's enhancements; (3) with `include_nested`, the root node
+ * structure of every object whose enhancements answered; (4) the includes
+ * node of every object that lists one; (5) the metadata of every include,
+ * up to `max_includes` per object; (6) the enhancements of every include
+ * resolved. A phase of one object's reads sends them as single requests.
+ * Each answer is then the sequential version's assembly over these
+ * answers; past a cut, the answer that ended the list is the last. Any
+ * other credential failure ends the call: thrown.
  */
 async function enhancementsInPhases(
   context: HandlerContext,
-  objects: ReadonlyArray<{ name: string; type?: string | undefined }>,
+  every: ReadonlyArray<{ name: string; type?: string | undefined }>,
   options: EnhancementOptions,
 ): Promise<McpResult[]> {
   const answers = enhancementAnswers(context);
-  const paths = await resolvePaths(answers, objects, options.manualProgram);
-  const second: EnhancementRead[] = [];
-  objects.forEach((o, i) => {
-    const resolved = paths[i];
-    if (!resolved.ok) return;
-    second.push(resolved.path.elements);
-    if (options.includeNested && resolved.path.type !== 'class') {
-      second.push({
-        kind: 'node',
-        ...includesParentOf(o.name, resolved.path.type),
-        nodeId: '000000',
-      });
-    }
-  });
-  await answers.phase(second);
+  const resolvedAll = await resolvePaths(
+    answers,
+    every,
+    options.manualProgram,
+    true,
+  );
+  // A credential refusal a probe met ends the list there, as the
+  // sequential version ends it: the objects before it are read whole,
+  // nothing after it.
+  const answerOf = (i: number, resolved: Resolved) =>
+    enhancementsAnswerFrom(
+      context,
+      answers,
+      every[i]?.name ?? '',
+      resolved,
+      undefined,
+      new Map(),
+      options,
+    );
+  const cut = resolvedAll.findIndex(
+    (resolved, i) => !resolved.ok && endsList(answerOf(i, resolved)),
+  );
+  const objects = cut < 0 ? every : every.slice(0, cut);
+  const paths = cut < 0 ? resolvedAll : resolvedAll.slice(0, cut);
+  const ended = cut < 0 ? [] : [answerOf(cut, resolvedAll[cut])];
+  // The enhancements first; an object's includes root only once they
+  // answered — the read the sequential version sends next.
+  await answers.phase(
+    paths.flatMap((resolved) => (resolved.ok ? [resolved.path.elements] : [])),
+  );
 
   const includes: Array<string[] | { thrown: unknown } | undefined> =
     objects.map(() => undefined);
@@ -1897,6 +2069,20 @@ async function enhancementsInPhases(
         return false;
       }
     });
+    await answers.phase(
+      objects.flatMap((o, i): EnhancementRead[] => {
+        const resolved = paths[i];
+        if (!resolved.ok || !answeredMain[i] || resolved.path.type === 'class')
+          return [];
+        return [
+          {
+            kind: 'node',
+            ...includesParentOf(o.name, resolved.path.type),
+            nodeId: '000000',
+          },
+        ];
+      }),
+    );
     const third: EnhancementRead[] = [];
     objects.forEach((o, i) => {
       const resolved = paths[i];
@@ -1938,25 +2124,21 @@ async function enhancementsInPhases(
       resolvedIncludes.flatMap((r) => (r.ok ? [r.path.elements] : [])),
     );
   }
-  return objects.map((o, i) =>
-    enhancementsAnswerFrom(
-      context,
-      answers,
-      o.name,
-      paths[i],
-      includes[i],
-      includePaths,
-      options,
+  return [
+    ...objects.map((o, i) =>
+      enhancementsAnswerFrom(
+        context,
+        answers,
+        o.name,
+        paths[i],
+        includes[i],
+        includePaths,
+        options,
+      ),
     ),
-  );
+    ...ended,
+  ];
 }
-
-/** The hosts whose call is one request: the elements, read directly. */
-const ONE_REQUEST_HOSTS: readonly HostSpelling[] = [
-  HOST_SPELLINGS.class,
-  HOST_SPELLINGS.group,
-  HOST_SPELLINGS.program,
-];
 
 /** Whether an answer is a credential failure: it ends a call for several objects. */
 function endsList(result: McpResult): boolean {
@@ -2095,33 +2277,10 @@ async function answeredGetEnhancements(
   const listed = args?.objects;
   const shown = listAnswerAt(ENHANCEMENT_ANSWERS, levelOf(args));
   try {
-    if (listed === undefined) {
-      const objectName = args.object_name;
-      if (!objectName) return await enhancementsOf(context, args, shown);
-      const options = enhancementOptionsOf(args, shown);
-      const kind = String(args.object_type ?? '')
-        .trim()
-        .toUpperCase();
-      // The elements of an object named by its type: one request.
-      if (
-        !options.includeNested &&
-        ONE_REQUEST_HOSTS.some((host) => spelledAs(kind, host))
-      ) {
-        return await enhancementsOf(context, args, shown);
-      }
-      return await withSequentialFallback<McpResult>(
-        context,
-        async () =>
-          (
-            await enhancementsInPhases(
-              context,
-              [{ name: objectName, type: args.object_type }],
-              options,
-            )
-          )[0],
-        () => enhancementsOf(context, args, shown),
-      );
-    }
+    // One object — its probes, its enhancements, its includes — is read
+    // in single requests, as the sequential version reads it (an
+    // implementation choice; envelopes would be as correct).
+    if (listed === undefined) return await enhancementsOf(context, args, shown);
     if (
       args.object_name !== undefined ||
       args.object_type !== undefined ||
@@ -2141,6 +2300,25 @@ async function answeredGetEnhancements(
       return { ...rest, ...o };
     };
     const options = enhancementOptionsOf(args, shown);
+    const oneByOne = async () => {
+      // One object after another, each as the single call reads it; a
+      // credential failure ends the call, and nothing after it is read.
+      const results: McpResult[] = [];
+      for (const o of objects) {
+        const result = await enhancementsOf(context, single(o), shown);
+        if (endsList(result)) return result;
+        results.push(result);
+      }
+      return listAnswer(objects, results, levelOf(args));
+    };
+    // A list naming one object — two spellings of one name and type are
+    // one — reads as the single call does.
+    const named = new Set(
+      objects.flatMap((o) =>
+        o.object_name ? [objectKeyOf(o.object_name, o.object_type)] : [],
+      ),
+    );
+    if (named.size < 2) return await oneByOne();
     return await withSequentialFallback<McpResult>(
       context,
       async () => {
@@ -2153,25 +2331,18 @@ async function answeredGetEnhancements(
         const results: McpResult[] = [];
         let at = 0;
         for (const o of objects) {
-          results.push(
-            o.object_name
-              ? answered[at++]
-              : await enhancementsOf(context, single(o), shown),
-          );
-        }
-        return listAnswer(objects, results, levelOf(args));
-      },
-      async () => {
-        // One object after another, each as the single call reads it; a
-        // credential failure ends the call, and nothing after it is read.
-        const results: McpResult[] = [];
-        for (const o of objects) {
-          const result = await enhancementsOf(context, single(o), shown);
+          const result = o.object_name
+            ? answered[at++]
+            : await enhancementsOf(context, single(o), shown);
+          if (result === undefined) break;
+          // A credential failure ends the list, as the sequential version
+          // ends it: that answer alone.
           if (endsList(result)) return result;
           results.push(result);
         }
         return listAnswer(objects, results, levelOf(args));
       },
+      oneByOne,
     );
   } catch (error) {
     return return_error(error);

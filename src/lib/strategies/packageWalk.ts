@@ -8,7 +8,6 @@ import type {
   AdtTypeCode,
   IAdtAnsweredObject,
   IAdtError,
-  IAdtFailure,
   IAdtHeaders,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -25,15 +24,17 @@ import {
 } from '../adtHeaders/withAdtHeaders';
 import type { AdtCodes } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
-import {
-  failureEntry,
-  isCredentialFailure,
-  isCredentialPayload,
-} from '../answer';
+import { isCredentialFailure } from '../answer';
 import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
-import { type PhaseResult, runPhase } from '../batch/phases';
+import {
+  chunksOf,
+  type PhaseResult,
+  READS_PER_ENVELOPE,
+  runPhase,
+} from '../batch/phases';
 import { createAdtClient } from '../clients';
+import { readsInFlight } from '../connectionKind';
 import { parseXml, type XmlNode } from '../xml/node';
 import {
   childAt as nodeAt,
@@ -130,14 +131,23 @@ export type LevelReader<I, R> = ((
 ) => Promise<PhaseResult<R>[]>) & { readonly ownAnswers?: boolean };
 
 /**
- * One level's reads in one ADT batch envelope (spec §11): `read(item,
- * connection)` for every item, on the phase's batch connection (`runPhase`).
+ * One level's reads in ADT batch envelopes (spec §11): `read(item,
+ * connection)` for every item, on the phase's batch connection (`runPhase`),
+ * in consecutive envelopes of at most `READS_PER_ENVELOPE` (`chunksOf`);
+ * each item's settlement, in item order. A failure that ends the call is
+ * thrown at its envelope, and no later envelope is sent.
  */
 export function batchReader<I, R>(
   context: HandlerContext,
   read: (item: I, connection: IAbapConnection) => Promise<R>,
 ): LevelReader<I, R> {
-  return (items) => runPhase(context, items, read);
+  return async (items) => {
+    const results: PhaseResult<R>[] = [];
+    for (const chunk of chunksOf(items, READS_PER_ENVELOPE)) {
+      results.push(...(await runPhase(context, chunk, read)));
+    }
+    return results;
+  };
 }
 
 /** How many node structure requests `concurrentReader` keeps open at once. */
@@ -145,7 +155,8 @@ export const NODE_READ_CONCURRENCY = 8;
 
 /**
  * One level's reads as requests sent alone, `NODE_READ_CONCURRENCY` at a
- * time, on the call's connection: `read(item, connection)` for every item;
+ * time over HTTP and one at a time over RFC (`readsInFlight`), on the
+ * call's connection: `read(item, connection)` for every item;
  * each item's settlement, in item order. Every answer is its own request's
  * (`ownAnswers`), so a node structure's `DESCRIPTION` is the object's own —
  * which an envelope part's is not (measured on an on-premise system: inside
@@ -181,7 +192,13 @@ export function concurrentReader<I, R>(
         }
       }
     };
-    const pumps = Math.max(1, Math.min(NODE_READ_CONCURRENCY, items.length));
+    const pumps = Math.max(
+      1,
+      Math.min(
+        readsInFlight(context.connection, NODE_READ_CONCURRENCY),
+        items.length,
+      ),
+    );
     await Promise.all(Array.from({ length: pumps }, pump));
     if (ended !== undefined) throw ended.error;
     return stopped ? out.slice(0, next) : out;
@@ -1039,22 +1056,24 @@ function rawOf(value: AdtReading<string> | string): string {
 export interface MetadataDescriptions {
   /** Each object's description, by `metadataKeyOf`. */
   descriptions: Map<string, string | undefined>;
-  /** A metadata read SAP refused with a credential failure, with its step. */
-  refused?: IAdtFailure;
 }
 
 /**
- * The description of every object of `targets`, read in one ADT batch
- * envelope (`runPhase`): one metadata read per distinct object, the one its
- * type's `Get<Type>` handler sends (`metadataReadOf`), keyed by
- * `metadataKeyOf`. An object of a type with no metadata read, or whose read
- * failed, has no entry. A failure the server's reader answers ends the call,
- * thrown as it came; a read SAP refused with a credential failure is
- * answered as `refused`, the method's error with its step.
+ * The description of every object of `targets`: one metadata read per
+ * distinct object, the one its type's `Get<Type>` handler sends
+ * (`metadataReadOf`), keyed by `metadataKeyOf`. Metadata reads do not
+ * cross-talk inside an envelope, so two or more go in ADT batch envelopes
+ * (`runPhase`) of at most `READS_PER_ENVELOPE`, balanced (`chunksOf`); one
+ * read, or `alone` (the sequential version), goes as single requests, one
+ * after another. A read SAP refused — any status, a `401` included — is
+ * that object's: it has no entry, the others theirs, on both paths alike.
+ * A failure the server's reader answers (a thrown credential refusal) ends
+ * the call, thrown as it came.
  */
 export async function metadataDescriptions(
   context: HandlerContext,
   targets: readonly MetadataTarget[],
+  alone = false,
 ): Promise<MetadataDescriptions> {
   const reads = new Map<string, MetadataRead>();
   for (const target of targets) {
@@ -1064,15 +1083,11 @@ export async function metadataDescriptions(
       reads.set(key, read);
     }
   }
-  const keyed = [...reads];
-  const keys = keyed.map(([key]) => key);
   const descriptions = new Map<string, string | undefined>();
-  if (keys.length === 0) return { descriptions };
-  const results = await runPhase(context, keyed, ([, read], connection) =>
-    atStep(METADATA_STEP, read)(createAdtClient(connection, context.logger)),
-  );
-  let refused: IAdtFailure | undefined;
-  results.forEach((result, i) => {
+  const keep = (
+    key: string,
+    result: PhaseResult<Awaited<ReturnType<MetadataRead>>>,
+  ) => {
     if (!result.ok) {
       if (endsTheCall(result.error)) throw result.error;
       return;
@@ -1080,19 +1095,37 @@ export async function metadataDescriptions(
     const response = result.value;
     if (response.ok) {
       descriptions.set(
-        keys[i],
+        key,
         metadataDescriptionOf(rawOf(response.getResult().value)),
       );
-      return;
     }
-    if (
-      refused === undefined &&
-      isCredentialPayload(failureEntry(response.getError(), METADATA_STEP))
-    ) {
-      refused = response;
+  };
+  if (alone || reads.size < 2) {
+    const client = createAdtClient(context.connection, context.logger);
+    for (const [key, read] of reads) {
+      keep(
+        key,
+        await atStep(
+          METADATA_STEP,
+          read,
+        )(client).then(
+          (value) => ({ ok: true as const, value }),
+          (error: unknown) => ({ ok: false as const, error }),
+        ),
+      );
     }
-  });
-  return refused === undefined ? { descriptions } : { descriptions, refused };
+    return { descriptions };
+  }
+  for (const keyed of chunksOf([...reads], READS_PER_ENVELOPE)) {
+    const results = await runPhase(context, keyed, ([, read], connection) =>
+      atStep(METADATA_STEP, read)(createAdtClient(connection, context.logger)),
+    );
+    results.forEach((result, i) => {
+      const key = keyed[i]?.[0];
+      if (key !== undefined) keep(key, result);
+    });
+  }
+  return { descriptions };
 }
 
 /** The flat listing. */

@@ -176,6 +176,14 @@ const answerText = (answer: unknown): string => {
 type Case = {
   tool: string;
   read: (name: string) => (context: HandlerContext) => Promise<unknown>;
+  /**
+   * The batched path sends an envelope exactly when a phase holds two or
+   * more independent reads, and a phase of one read as a single request:
+   * measured, it sends an envelope iff it sends fewer requests than the
+   * sequential reference (each envelope stands for its parts). Absent: an
+   * envelope is always expected.
+   */
+  envelopeWhenMerged?: true;
 };
 
 const CASES: Case[] = [
@@ -229,6 +237,9 @@ const CASES: Case[] = [
         packages: [name],
         detail: 'full',
       }),
+    // A phase of one read (one target's round, a walk level of one node)
+    // goes as a single request: an envelope only where reads were merged.
+    envelopeWhenMerged: true,
   },
 ];
 
@@ -429,6 +440,7 @@ async function timeBothPaths(
   tool: string,
   scope: string,
   read: (context: HandlerContext) => Promise<unknown>,
+  envelopeWhenMerged = false,
 ): Promise<void> {
   const reference = await measured(connection, 'sequential', read);
   assert.equal(
@@ -436,7 +448,13 @@ async function timeBothPaths(
     false,
     `${tool} answered an error: ${answerText(reference.answer)}`,
   );
-  assertEquals(itemErrors(reference.answer), []);
+  // A failed item leaves its words in the log (the reference is the
+  // sequential read, before any path is timed).
+  assertEquals(
+    itemErrors(reference.answer),
+    [],
+    `${tool} on ${scope}, the sequential reference: ${answerText(reference.answer)}`,
+  );
   assert.equal(reference.measure.envelopes, 0);
 
   const runs: Record<Path, Measure[]> = { sequential: [], batched: [] };
@@ -449,8 +467,20 @@ async function timeBothPaths(
     for (const path of order) {
       const { answer, measure } = await measured(connection, path, read);
       answers.push({ path, answer });
-      if (path === 'sequential') assert.equal(measure.envelopes, 0);
-      else assert.ok(measure.envelopes > 0);
+      const counts = `${tool} on ${scope}, ${path}: envelopes=${measure.envelopes}, requests=${measure.requests}, parts=${measure.parts}`;
+      if (path === 'sequential') {
+        assert.equal(measure.envelopes, 0, counts);
+      } else if (envelopeWhenMerged) {
+        // An envelope iff reads were merged: fewer requests than the
+        // sequential reference's.
+        assert.equal(
+          measure.envelopes > 0,
+          measure.requests < reference.measure.requests,
+          `${counts}; sequential requests=${reference.measure.requests}`,
+        );
+      } else {
+        assert.ok(measure.envelopes > 0, counts);
+      }
       runs[path].push(measure);
     }
   }
@@ -521,10 +551,56 @@ describe('batched reads timed against the sequential path on the system the test
         }
         const read = tool.read(target.name);
 
-        await timeBothPaths(connection, tool.tool, scope, read);
+        await timeBothPaths(
+          connection,
+          tool.tool,
+          scope,
+          read,
+          tool.envelopeWhenMerged === true,
+        );
       });
     }
   }
+
+  it('GetObjectsList on both packages: the same answer, timed on both paths', async () => {
+    if (!served || connection === null) {
+      skipRunningTest(
+        'runs only on the system the test config names, a served kind, with a connection',
+      );
+      return;
+    }
+    // Two distinct parents, upper-cased as the tool reads them: the
+    // default package, the super package and the shared objects' package,
+    // in that order. One package named twice is one parent (no envelope).
+    const shared: unknown = getSharedDependenciesConfig()?.package;
+    const parents = [
+      ...new Set(
+        [...packages.map((p) => p.name), shared]
+          .filter((name): name is string => typeof name === 'string')
+          .map((name) => name.trim().toUpperCase())
+          .filter((name) => name !== ''),
+      ),
+    ].slice(0, 2);
+    if (parents.length < 2) {
+      skipRunningTest(
+        `GetObjectsList on both packages: the config names one distinct package (${parents.join(', ')}); two are needed`,
+      );
+      return;
+    }
+    // Several parents: the batched path walks them in envelopes.
+    await timeBothPaths(
+      connection,
+      'GetObjectsList',
+      `both packages (${parents.join(', ')})`,
+      (context) =>
+        handleGetObjectsList(context, {
+          objects: parents.map((name) => ({
+            parent_type: 'DEVC/K',
+            parent_name: name,
+          })),
+        }),
+    );
+  });
 
   for (const shared of SHARED_CASES) {
     it(`${shared.tool} on the shared objects: the same answer, timed on both paths`, async () => {

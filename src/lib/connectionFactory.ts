@@ -23,6 +23,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { ServerRefusal, systemTypeConflictWords } from './auth/serverRefusal';
+import { carryConnectionKind } from './connectionKind';
 import { asciiLower } from './plainText';
 import {
   type AbapSystemKind,
@@ -476,11 +477,17 @@ export function admitOnKind(
 
 /**
  * Gives `view` — a connection built over `outer` (a batch connection, a
- * forwarding or recording view) — the system kind `outer` has
+ * forwarding or recording view) — the system kind and the transport kind
+ * (`carryConnectionKind`) `outer` has
  * (`systemKindOf`). An `outer` with no kind gives the view none, and nothing
  * (`SAP_SYSTEM_TYPE` above all) is read for the view later. Answers `view`.
  */
-export function withSystemKindOf<V extends object>(view: V, outer: object): V {
+export function withSystemKindOf<V extends object>(
+  view: V,
+  outer: IAbapConnection,
+): V {
+  // The transport kind travels with the system kind (`isRfcConnection`).
+  carryConnectionKind(view, outer);
   const kind = systemKindOf(outer);
   if (kind !== undefined) declareSystemKind(view, kind);
   else stateSystemKind(view, undefined);

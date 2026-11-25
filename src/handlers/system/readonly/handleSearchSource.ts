@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import type { McpResult } from '../../../lib/answer';
-import { isRfcConnection } from '../../../lib/connectionKind';
+import { readsInFlight } from '../../../lib/connectionKind';
 import {
   longRunning,
   purpose,
@@ -241,12 +241,16 @@ export const TOOL_DEFINITION = {
 type SearchSourceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 // Over RFC the sequential version (a destination with no communication batch)
-// runs one fetch at a time. An RFC connection is one ABAP session, and one
-// session answers one call at a time. Fetched in parallel (the sequential
-// version's default is 8 at once), sources were lost without an error: on
-// premise (2026-09-26) a scan of the shared package read 4 of its 13 sources
-// and found nothing, where one at a time read all 13 and found both hits, as
-// HTTP does.
+// runs one fetch at a time (`readsInFlight`, where the measurement is told);
+// over HTTP its default, 8 at once.
+
+/** `args` with `concurrency` set only where the connection bounds it. */
+function withReadsInFlight<A extends object>(
+  args: A,
+  inFlight: number | undefined,
+): A & { concurrency?: number } {
+  return inFlight === undefined ? args : { ...args, concurrency: inFlight };
+}
 
 /**
  * What each hit is read as, selected before the scan: the `answer` given, or
@@ -361,9 +365,7 @@ async function answeredSearchSource(
   try {
     const result = await runSearchSourceWithContext(
       context,
-      isRfcConnection(context.connection)
-        ? { ...asked, concurrency: 1 }
-        : asked,
+      withReadsInFlight(asked, readsInFlight(context.connection, undefined)),
       // The server's strategies, set from its options; absent, the shipped
       // ones — the one place their default lives (DO24).
       {

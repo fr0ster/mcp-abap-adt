@@ -1,8 +1,10 @@
 import type { AdtCodes } from '../adtProjections';
 import { appendAll } from '../appendAll';
 import {
+  chunksOf,
   type PhaseResult,
-  runPhaseOutcome,
+  READS_PER_ENVELOPE,
+  runPhaseOrAlone,
   withSequentialFallback,
 } from '../batch/phases';
 import { createAdtClient } from '../clients';
@@ -547,8 +549,8 @@ export async function runSearchSource(
   return result;
 }
 
-/** The most reads one envelope of the source-read phase carries. */
-export const READS_PER_ENVELOPE = 300;
+/** The most reads one envelope of the source-read phase carries (`phases.ts`). */
+export { READS_PER_ENVELOPE };
 
 /**
  * The targets read together through their rounds: a chunk's first round (one
@@ -607,7 +609,8 @@ async function runSearchSourceInPhases(
   // Each level in one envelope; a failed envelope is decided here, once,
   // before any part reaches the walk.
   const levels: LevelReader<NodeRequest, NodeAnswer> = async (requests) => {
-    const { results, envelope } = await runPhaseOutcome(
+    // A level of one node structure is a single request.
+    const { results, envelope } = await runPhaseOrAlone(
       ctx,
       requests,
       (request, connection) =>
@@ -693,11 +696,14 @@ async function runSearchSourceInPhases(
         ...new Map(asked.map((read) => [sourceReadKey(read), read])).values(),
       ];
       if (unique.length === 0) break;
-      for (let i = 0; i < unique.length; i += READS_PER_ENVELOPE) {
+      // A chunk of one target reads as single requests; so does a round of
+      // one read.
+      for (const reads of chunksOf(unique, READS_PER_ENVELOPE)) {
         await readSourcesInPhase(
           ctx,
-          unique.slice(i, i + READS_PER_ENVELOPE),
+          reads,
           sources,
+          chunk.length < 2 || reads.length < 2,
         );
       }
     }

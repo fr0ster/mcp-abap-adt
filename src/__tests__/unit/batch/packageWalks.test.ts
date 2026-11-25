@@ -1017,6 +1017,30 @@ describe('GetObjectsList', () => {
       second.join('\n'),
     );
   });
+  // Codex review P1: the metadata envelope answered with an outer 404 is
+  // the envelope's failure, which reaches every part: no part is an object
+  // SAP answered 404 for. With the endpoint served by the envelopes before
+  // it, it fails the call as before — never a listing of metadata errors.
+  it('the metadata envelope answered with an outer 404 is no object 404: the call fails as before', async () => {
+    const fake = system();
+    let batches = 0;
+    fake.answerRequests(async (request, previous) => {
+      if (request.url.endsWith('/batch')) {
+        batches += 1;
+        // The node structures' three envelopes, then the metadata's.
+        if (batches === 4) throw statusError(404, 'Not Found');
+      }
+      return previous(request);
+    });
+    const outer = await withinTurns(
+      handleGetObjectsListOf(contextOn(fake), { ...single, detail: 'medium' }),
+    );
+    assert.equal(batches, 4);
+    assert.equal((outer as { isError?: boolean }).isError, true, textOf(outer));
+    assert.ok(!textOf(outer).includes('metadata_error'), textOf(outer));
+    assert.equal(payloadOf(outer).step, 'read object metadata', textOf(outer));
+  });
+
   // Onprem live rerun: SAP answers 400 "Accept header missing" to a GET
   // without one (measured, GET-only, an enhancement's URI: 404 with
   // Accept */*). A direct request has axios' default Accept, an envelope

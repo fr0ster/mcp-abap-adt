@@ -245,7 +245,11 @@ import {
   isCredentialPayload,
   thrownEntry,
 } from '../../../lib/answer';
-import { runPhase, withSequentialFallback } from '../../../lib/batch/phases';
+import {
+  runPhase,
+  runPhaseOutcome,
+  withSequentialFallback,
+} from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -823,9 +827,19 @@ async function secondPass(
   const answers = await withSequentialFallback(
     context,
     async () => {
-      const results = await runPhase(context, reads, (each, batch) =>
-        each.read(batch),
+      const { results, envelope } = await runPhaseOutcome(
+        context,
+        reads,
+        (each, batch) => each.read(batch),
       );
+      // A failed envelope reaches every part with its own rejection: no
+      // part is SAP's answer, so it fails as before — the first part's
+      // error, the endpoint's absence included (then the reads go one by
+      // one).
+      if (envelope.failed) {
+        const first = results.find((result) => !result.ok);
+        throw first !== undefined && !first.ok ? first.error : envelope.error;
+      }
       return results.map((result): MetadataAnswer => {
         if (result.ok) return result.value;
         // A part SAP answered 404 rejects its read: the object's answer.

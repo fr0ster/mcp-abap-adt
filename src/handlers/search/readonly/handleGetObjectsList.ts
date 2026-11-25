@@ -1,3 +1,4 @@
+import { readExceptionRefusal } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import {
@@ -670,18 +671,12 @@ type MetadataAnswer =
   | { readonly gone: FailureEntry };
 
 /**
- * SAP's message in a refusal's body, as it came: the text of its exception's
- * `<message>` element; `undefined` when the body holds none. Plain code over
- * the document SAP sent, no regular expression.
+ * SAP's message in a refusal's body, as it came: what adt-strategies reads
+ * of SAP's exception document (`readExceptionRefusal`); `undefined` when the
+ * body is no such document.
  */
 function sapMessageIn(body: unknown): string | undefined {
-  if (typeof body !== 'string') return undefined;
-  const open = body.indexOf('<message');
-  if (open < 0) return undefined;
-  const start = body.indexOf('>', open);
-  const end = body.indexOf('</message>', start);
-  if (start < 0 || end < 0) return undefined;
-  return body.slice(start + 1, end);
+  return readExceptionRefusal(body)?.message;
 }
 
 /**

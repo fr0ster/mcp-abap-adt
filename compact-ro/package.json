@@ -2,7 +2,7 @@
   "name": "@mcp-abap-adt/compact-ro",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-compact-ro",
   "version": "24.2.0",
-  "description": "The read-only compact MCP server for SAP ABAP ADT over stdio, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: the compact tools that change nothing: reads, where-used, checks, transport reads, unit-test results, background long reads, batch mode, MCP prompts and access restrictions, and the leftover-session list. Configured as @mcp-abap-adt/core; connects over HTTP, RFC or SNC (RFC and SNC need the SAP NW RFC library at run time).",
+  "description": "The read-only compact MCP server for SAP ABAP ADT over stdio, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: the compact tools that change nothing: reads, where-used, checks, transport reads, unit-test results, the abapGit reads, background long reads, batch mode, MCP prompts and access restrictions, and the leftover-session list. Configured as @mcp-abap-adt/core; connects over HTTP, RFC or SNC (RFC and SNC need the SAP NW RFC library at run time).",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"

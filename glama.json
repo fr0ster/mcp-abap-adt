@@ -1,6 +1,6 @@
 {
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "name": "mcp-abap-adt",
-  "description": "MCP server for ABAP ADT in SAP ECC/S/4HANA (on-premise) and SAP BTP ABAP Cloud systems: CRUD of ABAP, DDIC, CDS and RAP objects, where-used, ATC, unit tests, transports, the ABAP and AMDP debugger, MCP prompts and access restrictions, the data tools off by default. Twelve binaries, from eighteen packages: the full, compact and read-only tool sets over stdio (destinations and logins; SAP over HTTP, RFC or SNC), Streamable HTTP or HTTP+SSE (credentials from x-sap-* headers)",
+  "description": "MCP server for ABAP ADT in SAP ECC/S/4HANA (on-premise) and SAP BTP ABAP Cloud systems: CRUD of ABAP, DDIC, CDS and RAP objects, where-used, ATC, unit tests, transports, the ABAP and AMDP debugger, abapGit, MCP prompts and access restrictions, the data tools off by default. Twelve binaries, from eighteen packages: the full, compact and read-only tool sets over stdio (destinations and logins; SAP over HTTP, RFC or SNC), Streamable HTTP or HTTP+SSE (credentials from x-sap-* headers)",
   "maintainers": ["fr0ster"]
 }

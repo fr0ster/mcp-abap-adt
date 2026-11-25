@@ -2,7 +2,7 @@
   "name": "@mcp-abap-adt/core-ro",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-ro",
   "version": "24.2.0",
-  "description": "The read-only MCP server for SAP ABAP ADT over stdio, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: nothing that changes the system: where-used, search, source and metadata reads, ATC and unit-test results, transport reads, background long reads, MCP prompts and access restrictions, and the leftover-session list. One destination through the auth broker; connects over HTTP, RFC or SNC (RFC and SNC need the SAP NW RFC library at run time).",
+  "description": "The read-only MCP server for SAP ABAP ADT over stdio, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: nothing that changes the system: where-used, search, source and metadata reads, ATC and unit-test results, transport reads, the abapGit reads, background long reads, MCP prompts and access restrictions, and the leftover-session list. One destination through the auth broker; connects over HTTP, RFC or SNC (RFC and SNC need the SAP NW RFC library at run time).",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"

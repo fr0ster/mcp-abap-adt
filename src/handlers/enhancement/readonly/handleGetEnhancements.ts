@@ -18,33 +18,74 @@ import {
 } from '../../../lib/adtHeaders/withAdtHeaders';
 import type { AdtCodes, TableMainOf } from '../../../lib/adtProjections';
 import {
+  answerPayload,
   type FailureEntry,
   failedPayloadOf,
   failureEntry,
   isCredentialFailure,
   isCredentialPayload,
+  type ListedAnswer,
+  listedAnswer,
   type McpResult,
   messageOf,
   thrownEntry,
 } from '../../../lib/answer';
-import type { IAnswerSerializer } from '../../../lib/answerSerializer';
 import { failureOf } from '../../../lib/auth/failures';
 import {
+  chunksOf,
   type PhaseResult,
-  runPhase,
+  READS_PER_ENVELOPE,
+  runPhaseOutcome,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import {
+  about,
+  asJsonResult,
+  asTextResult,
+  byListing,
+  type DetailLevel,
+  entries,
+  type Head,
+  type JsonSchemas,
+  type ListAnswerTable,
+  type Listing,
+  listAnswerAt,
+  marks,
+  partsOf,
+  type RowSchemas,
+  rows,
+  sections,
+  type TextResult,
+  values,
+  type Written,
+  wholeEntries,
+  wholeMarks,
+  wireAnswer,
+  within,
+  writeJson,
+  writeJsonList,
+  writeListing,
+  writeWhole,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { ReadVersion } from '../../../lib/handlers/readVersion';
 import {
   isAnswerList,
   isAnswerObject,
   type JsonValue,
-  jsonOrText,
 } from '../../../lib/json';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { includeContextUriOf } from '../../../lib/strategies/metadataFields';
-import { endsTheCall } from '../../../lib/strategies/packageWalk';
+import {
+  childNodesOf,
+  endsTheCall,
+  nodeItemsOf,
+} from '../../../lib/strategies/packageWalk';
 import {
   attributeOf,
   parseStructure,
@@ -61,10 +102,9 @@ import { thrownAs } from '../../../lib/thrownValue';
 import { logger, return_error } from '../../../lib/utils';
 import {
   child,
-  entries,
-  isList,
   text,
   type XmlRead,
+  entries as xmlEntries,
 } from '../../../lib/xml/tree';
 
 /**
@@ -99,63 +139,24 @@ const HOST_SPELLINGS = {
   include: { code: 'PROG/I', names: ['INCLUDE'] },
 } as const satisfies Readonly<Record<string, HostSpelling>>;
 
+/**
+ * An object as the decision reads it: its name upper-cased, and the host
+ * its type names (none: it is probed).
+ */
+function objectKeyOf(name: string, type: string | undefined): string {
+  const kind = String(type ?? '')
+    .trim()
+    .toUpperCase();
+  const host = Object.entries(HOST_SPELLINGS).find(([, spelling]) =>
+    spelledAs(kind, spelling),
+  )?.[0];
+  return `${name.toUpperCase()}|${host ?? ''}`;
+}
+
 /** Whether `kind`, upper-cased, names `host`. */
 function spelledAs(kind: string, host: HostSpelling): boolean {
   return kind === host.code || kind === host.main || host.names.includes(kind);
 }
-
-export const TOOL_DEFINITION = {
-  name: 'GetEnhancements',
-  available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Lists the enhancements (enhancement implementations) of the program, include, function group or class named by object_name and object_type, read at its active version. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).',
-  inputSchema: z.object({
-    object_name: z
-      .string()
-      .optional()
-      .describe('Name of the ABAP object (with object_type; or give objects)'),
-    object_type: z
-      .string()
-      .optional()
-      .describe('[read-only] Type of the ABAP object'),
-    objects: z
-      .array(
-        z.object({
-          object_name: z.string().describe('Name of the ABAP object'),
-          object_type: z.string().describe('Type of the ABAP object'),
-        }),
-      )
-      .optional()
-      .describe(
-        '[read-only] Several objects, read together (give this or object_name and object_type)',
-      ),
-    program: z
-      .string()
-      .optional()
-      .describe(
-        "[read-only] An include's main program, when its metadata names none",
-      ),
-    include_nested: z
-      .boolean()
-      .optional()
-      .describe(
-        '[read-only] true: also the enhancements of every include of a program or function group',
-      ),
-    detailed: z
-      .boolean()
-      .optional()
-      .describe(
-        '[read-only] true: every enhancement with its whole source; false (default): a short one',
-      ),
-    max_includes: z
-      .number()
-      .int()
-      .optional()
-      .describe(
-        '[read-only] With include_nested: how many includes are read (default 50)',
-      ),
-  }),
-} as const;
 
 /** The tool's arguments, as its schema parses them. */
 type GetEnhancementsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
@@ -191,7 +192,9 @@ export interface EnhancementResponse {
 
 /** The first attribute of `node` whose name ends in `suffix` (`name` takes `enh:full_name` too). */
 function endingIn(node: XmlRead, suffix: string): string | undefined {
-  const found = entries(child(node, '@')).find(([key]) => key.endsWith(suffix));
+  const found = xmlEntries(child(node, '@')).find(([key]) =>
+    key.endsWith(suffix),
+  );
   return found ? attributeOf(node, found[0]) : undefined;
 }
 
@@ -540,8 +543,8 @@ async function getIncludesListInternal(
     // Create AdtClient and get utilities. `ourUtils` — not `resultsFor`'s
     // generic `structured` reading — because the shape this function needs
     // (objects at a level, and the type→nodeId pairs to descend into) is
-    // exactly `nodeLevel`'s `NodeLevel`, the one reading every node-structure
-    // caller in this migration reuses rather than re-derives.
+    // exactly the node reading's level (`utilNodeContents`), the one reading
+    // every node-structure caller reuses rather than re-derives.
     const client = createAdtClient(connection, logger);
     const utils = client.getUtils(ourUtils);
 
@@ -569,11 +572,11 @@ async function getIncludesListInternal(
     }
 
     // Step 2: Find the includes (PROG/I) node id among the type folders.
-    const includesNode = rootResponse
-      .getResult()
-      // The includes node is `PROG/I` or `FUGR/I` (SAPMV45A's is FUGR/I,
-      // with PROG/I objects under it — on premise, 2026-09-25).
-      .value.childNodes.find((info) => isIncludesFolder(info.type));
+    // The includes node is `PROG/I` or `FUGR/I` (SAPMV45A's is FUGR/I,
+    // with PROG/I objects under it — on premise, 2026-09-25).
+    const includesNode = childNodesOf(rootResponse.getResult().value).find(
+      (info) => isIncludesFolder(info.type),
+    );
 
     if (!includesNode) {
       logger?.info(`No includes node found for ${objectType} '${objectName}'`);
@@ -604,7 +607,9 @@ async function getIncludesListInternal(
     // Step 4: Names of the objects under that node — de-duplicated, matching
     // the pre-migration parser's `[...new Set(...)]`.
     const includeNames = [
-      ...new Set(includesResponse.getResult().value.objects.map((o) => o.name)),
+      ...new Set(
+        nodeItemsOf(includesResponse.getResult().value).map((o) => o.name),
+      ),
     ];
 
     logger?.info(
@@ -715,7 +720,7 @@ interface IncludeUnread {
 }
 
 /** The answer with `include_nested`: every object read, the main one first. */
-interface NestedEnhancements {
+export interface NestedEnhancements {
   main_object: { name: string; type: EnhancementResponse['object_type'] };
   include_nested: true;
   total_objects_analyzed: number;
@@ -724,55 +729,300 @@ interface NestedEnhancements {
   includes_unread?: IncludeUnread[];
 }
 
-/** An enhancement with its source short: whole up to 500 characters, else its first 200. */
+/** An enhancement with its whole source: an answer is never cut. */
 function minimalEnhancement(enh: EnhancementImplementation) {
   return {
     name: enh.name,
     type: enh.type,
-    // Include source code only if it's short (< 500 chars) or first 200 chars
-    sourceCode: enh.sourceCode
-      ? enh.sourceCode.length <= 500
-        ? enh.sourceCode
-        : `${enh.sourceCode.substring(0, 200)}...[truncated]`
-      : undefined,
+    sourceCode: enh.sourceCode,
   };
 }
+
+/** An object's enhancements and refused probes, each entry short: written by the JSON writer. */
+const objectLists: JsonSchemas<EnhancementResponse> = {
+  enhancements: entries('enhancements', minimalEnhancement),
+  unreadable: entries('unreadable', (entry: FailureEntry) => entry),
+};
 
 /**
- * Filters a nested enhancement response to show minimal information: the
- * objects with enhancements, each enhancement short.
+ * A nested enhancement response at medium, written from its own lists:
+ * every object read — one without enhancements too, with its zero count —
+ * each enhancement short, each refused probe whole.
  */
-function filterMinimalNested(response: NestedEnhancements) {
-  const filteredObjects = response.objects
-    .filter((obj) => obj.enhancements.length > 0) // Only objects with enhancements
-    .map((obj) => ({
-      object_name: obj.object_name,
-      object_type: obj.object_type,
-      enhancements: obj.enhancements.map(minimalEnhancement),
-    }));
+export function filterMinimalNested(response: NestedEnhancements) {
+  return writeJson(
+    {
+      main_object: response.main_object,
+      include_nested: response.include_nested,
+      total_objects_analyzed: response.total_objects_analyzed,
+      total_enhancements_found: response.total_enhancements_found,
+    },
+    response,
+    {
+      objects: entries(
+        'objects',
+        (obj: EnhancementResponse) => ({
+          object_name: obj.object_name,
+          object_type: obj.object_type,
+          total_enhancements: obj.enhancements.length,
+        }),
+        { lists: objectLists },
+      ),
+      includes_unread: wholeEntries<IncludeUnread, 'includes_unread'>(
+        'includes_unread',
+      ),
+    },
+    {
+      detailed: false,
+      // The objects that have enhancements, counted; every object is listed.
+      total_objects_with_enhancements: response.objects.filter(
+        (obj) => obj.enhancements.length > 0,
+      ).length,
+    },
+  );
+}
 
+/** One object's enhancement response at medium, written from its own lists. */
+function filterMinimalEnhancements(response: EnhancementResponse) {
+  return writeJson(
+    {
+      object_name: response.object_name,
+      object_type: response.object_type,
+      context: response.context,
+      detailed: false,
+      total_enhancements: response.enhancements.length,
+    },
+    response,
+    objectLists,
+  );
+}
+
+/** What an enhancements read answered: one object, or one with its includes. */
+type EnhancementsRead =
+  | { readonly kind: 'single'; readonly response: EnhancementResponse }
+  | { readonly kind: 'nested'; readonly response: NestedEnhancements };
+
+/** A read and whether the caller asked for every source whole. */
+interface EnhancementsShown {
+  readonly read: EnhancementsRead;
+  readonly detailed: boolean;
+}
+
+/** One object's heads: its `# object`, its context where SAP gave one, and its count. */
+const objectHeads = (response: EnhancementResponse): Head[] => [
+  { head: 'object', value: `${response.object_type} ${response.object_name}` },
+  ...(response.context ? [{ head: 'context', value: response.context }] : []),
+  { head: 'count', value: String(response.enhancements.length) },
+];
+
+/** One object's lists: its enhancements as rows (no source), then each probe that was refused. */
+const objectSchemas: RowSchemas<EnhancementResponse> = {
+  enhancements: about(
+    'for each enhancement',
+    rows('enhancements', {
+      columns: [
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (enh: EnhancementImplementation) => enh.name,
+        },
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (enh: EnhancementImplementation) => enh.type,
+        },
+        {
+          name: 'description',
+          means: 'its description',
+          cell: (enh: EnhancementImplementation) =>
+            (enh.description ?? '').split('\n')[0] ?? '',
+        },
+      ],
+      header: 'when-rows',
+    }),
+  ),
+  unreadable: about(
+    'what SAP answered to each read it refused while finding the kind of an object',
+    marks('unreadable', 'unreadable', (entry: FailureEntry) => [
+      JSON.stringify(entry),
+    ]),
+  ),
+};
+
+/** The lists of a response with its includes: each object's section, then every include not read. */
+const nestedSchemas: RowSchemas<NestedEnhancements> = {
+  objects: sections('objects', objectHeads, objectSchemas),
+  // Each include whose enhancements could not be read, whole: its
+  // failures inside it.
+  includes_unread: about(
+    'the includes whose enhancements SAP refused to read, with what it answered',
+    wholeMarks<IncludeUnread, 'includes_unread'>(
+      'includes_unread',
+      'include_unread',
+    ),
+  ),
+};
+
+/** A read as its terse listing reads it: one object's response, or one with its includes. */
+interface EnhancementsTerse {
+  readonly single?: EnhancementResponse | undefined;
+  readonly nested?: NestedEnhancements | undefined;
+}
+
+/** A read's response under the member its kind names. */
+const terseOf = (read: EnhancementsRead): EnhancementsTerse =>
+  read.kind === 'single'
+    ? { single: read.response }
+    : { nested: read.response };
+
+/** The lists a EnhancementsTerse listing writes: what its description states. */
+const ENHANCEMENTS_LISTS: RowSchemas<EnhancementsTerse> = {
+  single: within<EnhancementResponse, 'single'>('single', objectSchemas),
+  nested: within<NestedEnhancements, 'nested'>('nested', nestedSchemas),
+};
+
+export const TOOL_DEFINITION = {
+  name: 'GetEnhancements',
+  available_in: ['onprem', 'cloud'] as const,
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the enhancement implementations of ABAP programs, includes, function groups or classes at their active version, and of their includes when asked.',
+    ),
+  }),
+  inputSchema: z.object({
+    object_name: z
+      .string()
+      .optional()
+      .describe('Name of the ABAP object (with object_type; or give objects)'),
+    object_type: z
+      .string()
+      .optional()
+      .describe('[read-only] Type of the ABAP object'),
+    objects: z
+      .array(
+        z.object({
+          object_name: z.string().describe('Name of the ABAP object'),
+          object_type: z.string().describe('Type of the ABAP object'),
+        }),
+      )
+      .optional()
+      .describe(
+        '[read-only] Several objects, read together (give this or object_name and object_type)',
+      ),
+    program: z
+      .string()
+      .optional()
+      .describe(
+        "[read-only] An include's main program, when its metadata names none",
+      ),
+    include_nested: z
+      .boolean()
+      .optional()
+      .describe(
+        '[read-only] true: also the enhancements of every include of a program or function group',
+      ),
+    detailed: z
+      .boolean()
+      .optional()
+      .describe(
+        '[read-only] true: every field of each enhancement, as read; false (default): each enhancement by name, type and source. Either way every object read is answered, one without enhancements with total_enhancements 0',
+      ),
+    max_includes: z
+      .number()
+      .int()
+      .optional()
+      .describe(
+        '[read-only] With include_nested: how many includes are read (default 50)',
+      ),
+    ...ASSEMBLED_DETAIL_SHAPE,
+  }),
+} as const;
+
+/**
+ * The terse listing of a read, written from its own lists: one object's
+ * heads and lists, or — with its includes — the total, each object's
+ * section, and every include whose enhancements could not be read.
+ */
+function terseListing(read: EnhancementsTerse): Listing<EnhancementsTerse> {
   return {
-    ...response,
-    detailed: false,
-    total_objects_with_enhancements: filteredObjects.length,
-    total_objects_analyzed: response.total_objects_analyzed,
-    filtered_out: response.total_objects_analyzed - filteredObjects.length,
-    objects: filteredObjects,
+    heads:
+      read.single !== undefined
+        ? objectHeads(read.single)
+        : read.nested !== undefined
+          ? [
+              {
+                head: 'total',
+                value: String(read.nested.total_enhancements_found),
+              },
+            ]
+          : [],
+    reading: read,
+    lists: ENHANCEMENTS_LISTS,
   };
 }
 
-/** Filters one object's enhancement response to show minimal information. */
-function filterMinimalEnhancements(response: EnhancementResponse) {
-  const filteredEnhancements = response.enhancements.map(minimalEnhancement);
+/** The terse text of a read. */
+const terseText = ({ read }: EnhancementsShown): Written<string> =>
+  writeListing(terseListing(terseOf(read)));
 
+/**
+ * What `GetEnhancements` answers at each `detail`, selected before the reads
+ * (`src/lib/detail`): the answer is built from several requests, so each
+ * level is a formatter of what they read. Terse is TSV — each object's
+ * enhancements, name, type and description, no source; medium, full and raw
+ * the JSON answer, every source whole and every object read, one without
+ * enhancements with its zero count (`detailed` adds every field).
+ */
+const ENHANCEMENT_ANSWERS: ListAnswerTable<EnhancementsShown, string | object> =
+  (() => {
+    // Detailed: the reading whole, every field; else every object and
+    // enhancement written short by the JSON writer.
+    const former = ({ read, detailed }: EnhancementsShown): Written<object> =>
+      detailed
+        ? writeWhole<object>({ ...read.response, detailed: true })
+        : read.kind === 'single'
+          ? filterMinimalEnhancements(read.response)
+          : filterMinimalNested(read.response);
+    return {
+      // Every enhancement and every part not read, by the listing writer.
+      terse: terseText,
+      medium: former,
+      full: (shown) => former(shown).answer,
+      raw: (shown) => former(shown).answer,
+    };
+  })();
+
+/** The answer a read is shown as, at the level asked. */
+type EnhancementsAnswerOf = (shown: EnhancementsShown) => string | object;
+
+/**
+ * Each answered read, by the answer it became: a list call writes every
+ * object's terse text from these by the listing writer, never by splicing the
+ * single answers' texts.
+ */
+const readsOf = new WeakMap<McpResult, EnhancementsShown>();
+
+/** A read's answer at the level asked, the read kept for a list call. */
+function shownResult(
+  shown: EnhancementsAnswerOf,
+  read: EnhancementsShown,
+): McpResult {
+  const result = enhancementsResult(shown(read));
+  readsOf.set(result, read);
+  return result;
+}
+
+/** An answer's text: TSV as it is, JSON serialised. */
+function enhancementsResult(answer: string | object): McpResult {
   return {
-    object_name: response.object_name,
-    object_type: response.object_type,
-    context: response.context,
-    detailed: false,
-    total_enhancements: filteredEnhancements.length,
-    enhancements: filteredEnhancements,
-    ...(response.unreadable ? { unreadable: response.unreadable } : {}),
+    isError: false,
+    content: [
+      {
+        type: 'text',
+        text: typeof answer === 'string' ? answer : JSON.stringify(answer),
+      },
+    ],
   };
 }
 
@@ -797,6 +1047,7 @@ function carriedFailures(error: unknown): FailureEntry[] | undefined {
 async function enhancementsOf(
   context: HandlerContext,
   args: GetEnhancementsArgs,
+  shown: EnhancementsAnswerOf,
 ): Promise<McpResult> {
   const { connection, logger } = context;
   try {
@@ -830,20 +1081,10 @@ async function enhancementsOf(
     if (!includeNested) {
       // Return only main object enhancements
       // Apply filtering if not detailed; add the detailed flag for consistency
-      const response = isDetailed
-        ? { ...mainEnhancementResponse, detailed: true }
-        : filterMinimalEnhancements(mainEnhancementResponse);
-
-      const result: McpResult = {
-        isError: false,
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(response),
-          },
-        ],
-      };
-      return result;
+      return shownResult(shown, {
+        read: { kind: 'single', response: mainEnhancementResponse },
+        detailed: isDetailed,
+      });
     }
 
     // If include_nested is true, also get enhancements from all nested includes
@@ -927,25 +1168,21 @@ async function enhancementsOf(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                main_object: {
-                  name: objectName,
-                  type: mainEnhancementResponse.object_type,
-                },
-                include_nested: true,
-                // A refusal: the method's error as it is, with its step; a
-                // throw of our own `client_threw` with the step.
-                error: thrownEntry(error, 'list includes'),
-                partial_result: true,
-                total_objects_analyzed: 1,
-                total_enhancements_found:
-                  mainEnhancementResponse.enhancements.length,
-                objects: [mainEnhancementResponse],
+            text: JSON.stringify({
+              main_object: {
+                name: objectName,
+                type: mainEnhancementResponse.object_type,
               },
-              null,
-              2,
-            ),
+              include_nested: true,
+              // A refusal: the method's error as it is, with its step; a
+              // throw of our own `client_threw` with the step.
+              error: thrownEntry(error, 'list includes'),
+              partial_result: true,
+              total_objects_analyzed: 1,
+              total_enhancements_found:
+                mainEnhancementResponse.enhancements.length,
+              objects: [mainEnhancementResponse],
+            }),
           },
         ],
       };
@@ -968,21 +1205,10 @@ async function enhancementsOf(
       ...(includesUnread.length > 0 ? { includes_unread: includesUnread } : {}),
     };
 
-    // Apply filtering if not detailed; add the detailed flag for consistency
-    const answered = isDetailed
-      ? { ...combinedResponse, detailed: true }
-      : filterMinimalNested(combinedResponse);
-
-    const result: McpResult = {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(answered),
-        },
-      ],
-    };
-    return result;
+    return shownResult(shown, {
+      read: { kind: 'nested', response: combinedResponse },
+      detailed: isDetailed,
+    });
   } catch (error) {
     return return_error(error);
   }
@@ -1131,6 +1357,53 @@ function enhancementAnswers(context: HandlerContext) {
     PhaseResult<IAdtResponse<string, IAdtError>>
   >();
   const nodes = new Map<string, PhaseResult<NodeAnswer>>();
+  /**
+   * The answers of `pending`, kept by read. A credential failure ends the
+   * call, thrown at the first read answering it — except, with `probes`,
+   * a probe's: kept as its answer, so it decides only when the decision
+   * reaches that probe (`pathFromAnswers` throws it there), as the
+   * sequential version, which sends no probe past the one that decides.
+   */
+  const keep = (
+    pending: readonly EnhancementRead[],
+    results: readonly PhaseResult<
+      Awaited<ReturnType<typeof sendEnhancementRead>>
+    >[],
+    probes: boolean,
+  ): void => {
+    results.forEach((result, i) => {
+      const read = pending[i];
+      const key = enhancementKey(read);
+      const deferred = probes && read.kind === 'metadata';
+      if (!result.ok) {
+        if (!deferred && endsTheCall(result.error)) throw result.error;
+        if (read.kind === 'node') nodes.set(key, result);
+        else documents.set(key, result);
+        return;
+      }
+      const answer = result.value;
+      const step = enhancementStep(read);
+      if (
+        !deferred &&
+        answer.response.ok === false &&
+        isCredentialPayload(failureEntry(answer.response.getError(), step))
+      ) {
+        const error = answer.response.getError();
+        throw carryingFailure(
+          read.kind === 'elements'
+            ? new EnhancementInputError(error.message)
+            : new Error(error.message),
+          error,
+          step,
+        );
+      }
+      if (answer.of === 'node') {
+        nodes.set(key, { ok: true, value: answer.response });
+      } else {
+        documents.set(key, { ok: true, value: answer.response });
+      }
+    });
+  };
   return {
     /** The answer to a document's read; `Unanswered` thrown when no phase sent it yet. */
     answered(read: DocumentRead): PhaseResult<IAdtResponse<string, IAdtError>> {
@@ -1144,52 +1417,90 @@ function enhancementAnswers(context: HandlerContext) {
       if (result === undefined) throw new Unanswered(read);
       return result;
     },
-    async phase(reads: readonly EnhancementRead[]): Promise<void> {
+    /**
+     * The reads not answered yet. Reads of two or more objects go in ADT
+     * batch envelopes of at most `READS_PER_ENVELOPE`, each judged as it
+     * answered, so a credential failure sends no later one; an envelope
+     * whose own request answered `404` (the endpoint once served) is every
+     * read's failure, never each read's "not found". Reads of one object
+     * go as single requests, one after another, as the sequential version
+     * sends them. `probes`: the probes' credential failures are kept, not
+     * thrown (`keep`).
+     */
+    async phase(
+      reads: readonly EnhancementRead[],
+      probes = false,
+    ): Promise<void> {
       const asked = new Map<string, EnhancementRead>();
       for (const read of reads) {
         const key = enhancementKey(read);
         if (!documents.has(key) && !nodes.has(key)) asked.set(key, read);
       }
-      if (asked.size === 0) return;
       const pending = [...asked.values()];
-      const results = await runPhase(context, pending, (read, connection) =>
-        sendEnhancementRead(context, connection, read),
-      );
-      results.forEach((result, i) => {
-        const read = pending[i];
-        const key = enhancementKey(read);
-        if (!result.ok) {
-          if (endsTheCall(result.error)) throw result.error;
-          if (read.kind === 'node') nodes.set(key, result);
-          else documents.set(key, result);
-          return;
-        }
-        const answer = result.value;
-        const step = enhancementStep(read);
-        if (
-          answer.response.ok === false &&
-          isCredentialPayload(failureEntry(answer.response.getError(), step))
-        ) {
-          const error = answer.response.getError();
-          throw carryingFailure(
-            read.kind === 'elements'
-              ? new EnhancementInputError(error.message)
-              : new Error(error.message),
-            error,
-            step,
+      if (new Set(pending.map(ownerOf)).size < 2) {
+        for (const read of pending) {
+          const result = await sendEnhancementRead(
+            context,
+            context.connection,
+            read,
+          ).then(
+            (value) => ({ ok: true as const, value }),
+            (error: unknown) => ({ ok: false as const, error }),
           );
+          keep([read], [result], probes);
         }
-        if (answer.of === 'node') {
-          nodes.set(key, { ok: true, value: answer.response });
-        } else {
-          documents.set(key, { ok: true, value: answer.response });
-        }
-      });
+        return;
+      }
+      for (const chunk of chunksOf(pending, READS_PER_ENVELOPE)) {
+        const { results, envelope } = await runPhaseOutcome(
+          context,
+          chunk,
+          (read, connection) => sendEnhancementRead(context, connection, read),
+        );
+        keep(
+          chunk,
+          envelope.failed && envelope.outer === NOT_FOUND
+            ? results.map((result, i) => envelopeFailureOf(result, chunk[i]))
+            : results,
+          probes,
+        );
+      }
     },
   };
 }
 
 type EnhancementAnswers = ReturnType<typeof enhancementAnswers>;
+
+/** The status of an envelope request answered "not found". */
+const NOT_FOUND = 404;
+
+/**
+ * A read's answer when its envelope failed with an outer `404`: the part's
+ * failure (SAP's status, the envelope's request) carried as a thrown
+ * failure, so it is reported as a failure of that read — never read as
+ * the `404` that means "not this kind".
+ */
+function envelopeFailureOf(
+  result: PhaseResult<Awaited<ReturnType<typeof sendEnhancementRead>>>,
+  read: EnhancementRead | undefined,
+): PhaseResult<Awaited<ReturnType<typeof sendEnhancementRead>>> {
+  if (!result.ok || result.value.response.ok || read === undefined) {
+    return result;
+  }
+  const error = result.value.response.getError();
+  return {
+    ok: false,
+    error: carryingFailure(
+      new Error(error.message),
+      error,
+      enhancementStep(read),
+    ),
+  };
+}
+
+/** The object a read is about: the host it names, or the node's parent. */
+const ownerOf = (read: EnhancementRead): string =>
+  read.kind === 'node' ? read.parentName : read.name;
 
 /** A resolved object: what kind it is, and the read of its elements. */
 interface EnhancementPath {
@@ -1205,7 +1516,7 @@ interface EnhancementPath {
  * is thrown as `Unanswered`: the next phase sends it, one probe per object.
  */
 function pathFromAnswers(
-  answers: EnhancementAnswers,
+  answers: Pick<EnhancementAnswers, 'answered'>,
   objectName: string,
   manualProgramContext?: string,
   requestedType?: string,
@@ -1330,17 +1641,70 @@ type Resolved =
   | { ok: true; path: EnhancementPath }
   | { ok: false; error: unknown };
 
+/** What a speculative probe answers: nothing, so the decision asks its next probe. */
+const NOT_ASKED: PhaseResult<IAdtResponse<string, IAdtError>> = {
+  ok: false,
+  error: new Error('not asked'),
+};
+
 /**
- * Every object's path, probe by probe: each phase sends the next probe of
+ * Every probe `pathFromAnswers` may send for `objectName`, in its order:
+ * the probes it asks when each answers nothing (the class, program and
+ * include metadata of an object of no known type; the include metadata of
+ * an include; none for a type that decides alone). Asked of the decision
+ * itself, so the set is the one it reads.
+ */
+function probesOf(
+  objectName: string,
+  manualProgramContext?: string,
+  requestedType?: string,
+): DocumentRead[] {
+  const asked: DocumentRead[] = [];
+  try {
+    pathFromAnswers(
+      {
+        answered(read) {
+          asked.push(read);
+          return NOT_ASKED;
+        },
+      },
+      objectName,
+      manualProgramContext,
+      requestedType,
+    );
+  } catch {
+    // Every probe answered nothing: the object resolves to no path.
+  }
+  return asked;
+}
+
+/**
+ * Every object's path. Two or more objects that probe: every probe of each
+ * (class, program and include metadata — independent reads) goes in one
+ * phase, and each path is decided over those answers as the sequential
+ * version decides it, a probe it never reaches unread by the decision. One
+ * object's probes are not put together: each phase sends the next probe of
  * every object still unresolved (class, then program, then include — each
- * only when the earlier answered none), one per object. One path per object,
- * in the objects' order.
+ * only when the earlier answered none), one per object. One path per
+ * object, in the objects' order.
  */
 async function resolvePaths(
   answers: EnhancementAnswers,
   objects: ReadonlyArray<{ name: string; type?: string | undefined }>,
   manualProgramContext?: string,
+  probesDecide = false,
 ): Promise<Resolved[]> {
+  // Objects counted as the decision reads them: two spellings of one
+  // object ask the same probes, and are one object.
+  const probing = new Map<string, DocumentRead[]>();
+  for (const o of objects) {
+    const probes = probesOf(o.name, manualProgramContext, o.type);
+    if (probes.length > 0)
+      probing.set(probes.map(enhancementKey).join(), probes);
+  }
+  if (probing.size > 1) {
+    await answers.phase([...probing.values()].flat(), probesDecide);
+  }
   const resolved: Array<Resolved | undefined> = objects.map(() => undefined);
   for (;;) {
     const next: EnhancementRead[] = [];
@@ -1361,7 +1725,7 @@ async function resolvePaths(
     if (next.length === 0) {
       return resolved.flatMap((path) => (path === undefined ? [] : [path]));
     }
-    await answers.phase(next);
+    await answers.phase(next, probesDecide);
   }
 }
 
@@ -1397,9 +1761,9 @@ function includesNodeRead(
   if (!root.ok) return undefined;
   const response = root.value;
   if (!response.ok) return undefined;
-  const node = response
-    .getResult()
-    .value.childNodes.find((info) => isIncludesFolder(info.type));
+  const node = childNodesOf(response.getResult().value).find((info) =>
+    isIncludesFolder(info.type),
+  );
   return node === undefined
     ? undefined
     : { kind: 'node', ...parent, nodeId: node.nodeId };
@@ -1453,7 +1817,9 @@ function includesFromAnswers(
       );
     }
     const includeNames = [
-      ...new Set(includesResponse.getResult().value.objects.map((o) => o.name)),
+      ...new Set(
+        nodeItemsOf(includesResponse.getResult().value).map((o) => o.name),
+      ),
     ];
     logger?.info(
       `Found ${includeNames.length} includes for ${objectType} '${objectName}' using SAP ADT API`,
@@ -1519,26 +1885,22 @@ interface EnhancementOptions {
   includeNested: boolean;
   isDetailed: boolean;
   maxIncludes: number;
+  /** The answer at the level asked, selected by the handler. */
+  shown: EnhancementsAnswerOf;
 }
 
-function enhancementOptionsOf(args: GetEnhancementsArgs): EnhancementOptions {
+function enhancementOptionsOf(
+  args: GetEnhancementsArgs,
+  shown: EnhancementsAnswerOf,
+): EnhancementOptions {
   return {
+    shown,
     manualProgram: args.program,
     includeNested: args.include_nested === true,
     isDetailed: args.detailed === true,
     maxIncludes: args.max_includes ? args.max_includes : 50,
   };
 }
-
-/** An enhancements answer: the payload as compact JSON text. */
-const answerText: IAnswerSerializer<McpResult> = {
-  json<P>(payload: P): McpResult {
-    return {
-      isError: false,
-      content: [{ type: 'text', text: JSON.stringify(payload) }],
-    };
-  },
-};
 
 /**
  * One object's answer from the phases' answers — the sequential version's
@@ -1562,11 +1924,10 @@ function enhancementsAnswerFrom(
       resolved,
     );
     if (!options.includeNested) {
-      return answerText.json(
-        options.isDetailed
-          ? { ...mainEnhancementResponse, detailed: true }
-          : filterMinimalEnhancements(mainEnhancementResponse),
-      );
+      return shownResult(options.shown, {
+        read: { kind: 'single', response: mainEnhancementResponse },
+        detailed: options.isDetailed,
+      });
     }
     let allEnhancementResponses: EnhancementResponse[];
     const includesUnread: IncludeUnread[] = [];
@@ -1604,23 +1965,19 @@ function enhancementsAnswerFrom(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                main_object: {
-                  name: objectName,
-                  type: mainEnhancementResponse.object_type,
-                },
-                include_nested: true,
-                error: thrownEntry(error, 'list includes'),
-                partial_result: true,
-                total_objects_analyzed: 1,
-                total_enhancements_found:
-                  mainEnhancementResponse.enhancements.length,
-                objects: [mainEnhancementResponse],
+            text: JSON.stringify({
+              main_object: {
+                name: objectName,
+                type: mainEnhancementResponse.object_type,
               },
-              null,
-              2,
-            ),
+              include_nested: true,
+              error: thrownEntry(error, 'list includes'),
+              partial_result: true,
+              total_objects_analyzed: 1,
+              total_enhancements_found:
+                mainEnhancementResponse.enhancements.length,
+              objects: [mainEnhancementResponse],
+            }),
           },
         ],
       };
@@ -1639,11 +1996,10 @@ function enhancementsAnswerFrom(
       objects: allEnhancementResponses,
       ...(includesUnread.length > 0 ? { includes_unread: includesUnread } : {}),
     };
-    return answerText.json(
-      options.isDetailed
-        ? { ...combinedResponse, detailed: true }
-        : filterMinimalNested(combinedResponse),
-    );
+    return shownResult(options.shown, {
+      read: { kind: 'nested', response: combinedResponse },
+      detailed: options.isDetailed,
+    });
   } catch (error) {
     return return_error(error);
   }
@@ -1651,35 +2007,53 @@ function enhancementsAnswerFrom(
 
 /**
  * Every object's enhancements in ADT batch envelopes (spec §11): (1) the
- * type probes, one per phase for every object still unresolved; (2) every
- * object's enhancements, with `include_nested` beside its root node
- * structure; (3) the includes node of every object that lists one; (4) the
- * metadata of every include, up to `max_includes` per object; (5) the
- * enhancements of every include resolved. Each answer is then the
- * sequential version's assembly over these answers. A credential failure
- * ends the call: thrown.
+ * type probes (`resolvePaths`), a probe's credential refusal deciding only
+ * where the decision reaches it, and ending the list at that object; (2)
+ * every object's enhancements; (3) with `include_nested`, the root node
+ * structure of every object whose enhancements answered; (4) the includes
+ * node of every object that lists one; (5) the metadata of every include,
+ * up to `max_includes` per object; (6) the enhancements of every include
+ * resolved. A phase of one object's reads sends them as single requests.
+ * Each answer is then the sequential version's assembly over these
+ * answers; past a cut, the answer that ended the list is the last. Any
+ * other credential failure ends the call: thrown.
  */
 async function enhancementsInPhases(
   context: HandlerContext,
-  objects: ReadonlyArray<{ name: string; type?: string | undefined }>,
+  every: ReadonlyArray<{ name: string; type?: string | undefined }>,
   options: EnhancementOptions,
 ): Promise<McpResult[]> {
   const answers = enhancementAnswers(context);
-  const paths = await resolvePaths(answers, objects, options.manualProgram);
-  const second: EnhancementRead[] = [];
-  objects.forEach((o, i) => {
-    const resolved = paths[i];
-    if (!resolved.ok) return;
-    second.push(resolved.path.elements);
-    if (options.includeNested && resolved.path.type !== 'class') {
-      second.push({
-        kind: 'node',
-        ...includesParentOf(o.name, resolved.path.type),
-        nodeId: '000000',
-      });
-    }
-  });
-  await answers.phase(second);
+  const resolvedAll = await resolvePaths(
+    answers,
+    every,
+    options.manualProgram,
+    true,
+  );
+  // A credential refusal a probe met ends the list there, as the
+  // sequential version ends it: the objects before it are read whole,
+  // nothing after it.
+  const answerOf = (i: number, resolved: Resolved) =>
+    enhancementsAnswerFrom(
+      context,
+      answers,
+      every[i]?.name ?? '',
+      resolved,
+      undefined,
+      new Map(),
+      options,
+    );
+  const cut = resolvedAll.findIndex(
+    (resolved, i) => !resolved.ok && endsList(answerOf(i, resolved)),
+  );
+  const objects = cut < 0 ? every : every.slice(0, cut);
+  const paths = cut < 0 ? resolvedAll : resolvedAll.slice(0, cut);
+  const ended = cut < 0 ? [] : [answerOf(cut, resolvedAll[cut])];
+  // The enhancements first; an object's includes root only once they
+  // answered — the read the sequential version sends next.
+  await answers.phase(
+    paths.flatMap((resolved) => (resolved.ok ? [resolved.path.elements] : [])),
+  );
 
   const includes: Array<string[] | { thrown: unknown } | undefined> =
     objects.map(() => undefined);
@@ -1695,6 +2069,20 @@ async function enhancementsInPhases(
         return false;
       }
     });
+    await answers.phase(
+      objects.flatMap((o, i): EnhancementRead[] => {
+        const resolved = paths[i];
+        if (!resolved.ok || !answeredMain[i] || resolved.path.type === 'class')
+          return [];
+        return [
+          {
+            kind: 'node',
+            ...includesParentOf(o.name, resolved.path.type),
+            nodeId: '000000',
+          },
+        ];
+      }),
+    );
     const third: EnhancementRead[] = [];
     objects.forEach((o, i) => {
       const resolved = paths[i];
@@ -1736,29 +2124,20 @@ async function enhancementsInPhases(
       resolvedIncludes.flatMap((r) => (r.ok ? [r.path.elements] : [])),
     );
   }
-  return objects.map((o, i) =>
-    enhancementsAnswerFrom(
-      context,
-      answers,
-      o.name,
-      paths[i],
-      includes[i],
-      includePaths,
-      options,
+  return [
+    ...objects.map((o, i) =>
+      enhancementsAnswerFrom(
+        context,
+        answers,
+        o.name,
+        paths[i],
+        includes[i],
+        includePaths,
+        options,
+      ),
     ),
-  );
-}
-
-/** The hosts whose call is one request: the elements, read directly. */
-const ONE_REQUEST_HOSTS: readonly HostSpelling[] = [
-  HOST_SPELLINGS.class,
-  HOST_SPELLINGS.group,
-  HOST_SPELLINGS.program,
-];
-
-/** An answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): JsonValue {
-  return jsonOrText(result.content[0]?.text ?? '');
+    ...ended,
+  ];
 }
 
 /** Whether an answer is a credential failure: it ends a call for several objects. */
@@ -1767,63 +2146,141 @@ function endsList(result: McpResult): boolean {
   return failed !== undefined && isCredentialPayload(failed);
 }
 
-/** A list call's answer: one entry per object, in the order asked. */
+/** What a list call answers from: the entries asked, and each one's answer. */
+interface ListOf {
+  readonly objects: ReadonlyArray<{
+    readonly object_name: string;
+    readonly object_type: string;
+  }>;
+  readonly results: readonly McpResult[];
+}
+
+/**
+ * A list call's answer at each `detail`, selected through the table like
+ * every other answer: terse one text written by the listing writer, the other
+ * levels a JSON array of the entries.
+ */
+const LIST_ANSWERS: ListAnswerTable<ListOf, McpResult> = {
+  terse: terseList,
+  medium: jsonList,
+  full: (list) => jsonList(list).answer,
+  raw: (list) => jsonList(list).answer,
+};
+
+/** A list call's answer: one entry per asked, in the order asked, at the level asked. */
 function listAnswer(
   objects: ReadonlyArray<{
     readonly object_name: string;
     readonly object_type: string;
   }>,
   results: readonly McpResult[],
+  level: DetailLevel,
 ): McpResult {
-  const entries = results.map((result, i) => {
-    const asked = objects[i];
-    return result.isError
-      ? {
-          object_name: asked.object_name,
-          object_type: asked.object_type,
-          error: payloadOfAnswer(result),
-        }
-      : payloadOfAnswer(result);
-  });
-  return {
-    isError: false,
-    content: [{ type: 'text', text: JSON.stringify(entries) }],
-  };
+  return listAnswerAt(LIST_ANSWERS, level)({ objects, results });
 }
 
+/** A list call's terse text. */
+function terseList({ objects, results }: ListOf): Written<TextResult> {
+  // Every object's text written by the listing writer: a failure under its
+  // escaped `# object` line and one `# error` line; an answered one as its
+  // own terse listing.
+  const text = writeListing({
+    heads: [],
+    reading: {
+      answered: results.map((result, i) => ({
+        asked: objects[i],
+        answer: answerPayload(result),
+        read: (() => {
+          const shown = result.isError ? undefined : readsOf.get(result);
+          return shown === undefined ? undefined : terseOf(shown.read);
+        })(),
+      })),
+    },
+    lists: {
+      answered: partsOf(
+        'answered',
+        ({ asked, answer, read }: AnsweredObject): Head[] =>
+          read === undefined
+            ? [
+                {
+                  head: 'object',
+                  value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
+                },
+                {
+                  head: 'error',
+                  value: JSON.stringify(answer),
+                },
+              ]
+            : [],
+        'read',
+        byListing(ENHANCEMENTS_LISTS, terseListing),
+      ),
+    },
+  });
+  return asTextResult(text);
+}
+
+/** One object of a list call: what was asked, its answer, and its read when answered. */
+interface AnsweredObject {
+  readonly asked: ListOf['objects'][number] | undefined;
+  readonly answer: JsonValue;
+  readonly read: EnhancementsTerse | undefined;
+}
+
+/** A list call's entries as a JSON array. */
+function jsonList({ objects, results }: ListOf): Written<TextResult> {
+  // Every answer one entry, written by the listing writer.
+  return asJsonResult(
+    writeJsonList(
+      { answered: results.map(listedAnswer) },
+      values('answered', ({ isError, answer, i }: ListedAnswer) =>
+        ((isError, answer, i) => {
+          const asked = objects[i];
+          return isError
+            ? {
+                object_name: asked.object_name,
+                object_type: asked.object_type,
+                error: answer,
+              }
+            : answer;
+        })(isError, answer, i),
+      ),
+    ),
+  );
+}
+
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetEnhancements(
   context: HandlerContext,
   args: GetEnhancementsArgs,
 ) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetEnhancements',
+        shape: 'assembled',
+      },
+      () => answeredGetEnhancements(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetEnhancements(context, args);
+}
+
+async function answeredGetEnhancements(
+  context: HandlerContext,
+  args: GetEnhancementsArgs,
+) {
   const listed = args?.objects;
+  const shown = listAnswerAt(ENHANCEMENT_ANSWERS, levelOf(args));
   try {
-    if (listed === undefined) {
-      const objectName = args.object_name;
-      if (!objectName) return await enhancementsOf(context, args);
-      const options = enhancementOptionsOf(args);
-      const kind = String(args.object_type ?? '')
-        .trim()
-        .toUpperCase();
-      // The elements of an object named by its type: one request.
-      if (
-        !options.includeNested &&
-        ONE_REQUEST_HOSTS.some((host) => spelledAs(kind, host))
-      ) {
-        return await enhancementsOf(context, args);
-      }
-      return await withSequentialFallback<McpResult>(
-        context,
-        async () =>
-          (
-            await enhancementsInPhases(
-              context,
-              [{ name: objectName, type: args.object_type }],
-              options,
-            )
-          )[0],
-        () => enhancementsOf(context, args),
-      );
-    }
+    // One object — its probes, its enhancements, its includes — is read
+    // in single requests, as the sequential version reads it (an
+    // implementation choice; envelopes would be as correct).
+    if (listed === undefined) return await enhancementsOf(context, args, shown);
     if (
       args.object_name !== undefined ||
       args.object_type !== undefined ||
@@ -1842,7 +2299,26 @@ export async function handleGetEnhancements(
       const { objects: _list, ...rest } = args;
       return { ...rest, ...o };
     };
-    const options = enhancementOptionsOf(args);
+    const options = enhancementOptionsOf(args, shown);
+    const oneByOne = async () => {
+      // One object after another, each as the single call reads it; a
+      // credential failure ends the call, and nothing after it is read.
+      const results: McpResult[] = [];
+      for (const o of objects) {
+        const result = await enhancementsOf(context, single(o), shown);
+        if (endsList(result)) return result;
+        results.push(result);
+      }
+      return listAnswer(objects, results, levelOf(args));
+    };
+    // A list naming one object — two spellings of one name and type are
+    // one — reads as the single call does.
+    const named = new Set(
+      objects.flatMap((o) =>
+        o.object_name ? [objectKeyOf(o.object_name, o.object_type)] : [],
+      ),
+    );
+    if (named.size < 2) return await oneByOne();
     return await withSequentialFallback<McpResult>(
       context,
       async () => {
@@ -1855,25 +2331,18 @@ export async function handleGetEnhancements(
         const results: McpResult[] = [];
         let at = 0;
         for (const o of objects) {
-          results.push(
-            o.object_name
-              ? answered[at++]
-              : await enhancementsOf(context, single(o)),
-          );
-        }
-        return listAnswer(objects, results);
-      },
-      async () => {
-        // One object after another, each as the single call reads it; a
-        // credential failure ends the call, and nothing after it is read.
-        const results: McpResult[] = [];
-        for (const o of objects) {
-          const result = await enhancementsOf(context, single(o));
+          const result = o.object_name
+            ? answered[at++]
+            : await enhancementsOf(context, single(o), shown);
+          if (result === undefined) break;
+          // A credential failure ends the list, as the sequential version
+          // ends it: that answer alone.
           if (endsList(result)) return result;
           results.push(result);
         }
-        return listAnswer(objects, results);
+        return listAnswer(objects, results, levelOf(args));
       },
+      oneByOne,
     );
   } catch (error) {
     return return_error(error);

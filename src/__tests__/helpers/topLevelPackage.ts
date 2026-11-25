@@ -11,19 +11,12 @@ export interface CaseAnswer {
   readonly text: string;
 }
 
-/** The package document a `GetPackage` raw read answered, when it holds one. */
+/**
+ * The package document a `GetPackage` raw read answered, when it is one:
+ * the raw level answers SAP's XML document itself, nothing around it.
+ */
 function documentOf(answerText: string): string | undefined {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(answerText);
-  } catch {
-    return undefined;
-  }
-  const metadata =
-    typeof parsed === 'object' && parsed !== null
-      ? Reflect.get(parsed, 'metadata')
-      : undefined;
-  return typeof metadata === 'string' ? metadata : undefined;
+  return answerText.trimStart().startsWith('<') ? answerText : undefined;
 }
 
 /**

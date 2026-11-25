@@ -24,6 +24,7 @@ import {
   type Fake,
   hitNames,
   isError,
+  keyOf,
   type Model,
   type NodeDoc,
   nodeKey,
@@ -152,7 +153,11 @@ describe('SearchSource on internal batches', () => {
       sources: 8,
       objects_with_hits: 5,
     });
-    assert.equal(batched.directs.length, 0);
+    // A phase of one read goes as a single request.
+    assert.deepStrictEqual(
+      batched.directs.map((r) => keyOf(r.url, r.params)),
+      ['SEARCH ZR*', nodeKey('ZSUB'), nodeKey('ZSUB', '40')],
+    );
     assert.equal(sequential.envelopes.length, 0);
     // Comments dropped: the same both ways too.
     const c = await search(system(), { exclude_comments: true });
@@ -160,14 +165,18 @@ describe('SearchSource on internal batches', () => {
     assert.equal(textOf(c), textOf(d));
   });
 
-  it('phases: masks, walk levels, the sources of every target', async () => {
+  it('phases: masks, walk levels, the sources of every target; a phase of one read alone', async () => {
     const fake = system();
     await search(fake);
+    // (1) the quickSearch of the one mask, and level 2 of the walk (one
+    // node, then its one type node): single requests.
+    assert.deepStrictEqual(
+      fake.directs.map((r) => keyOf(r.url, r.params)),
+      ['SEARCH ZR*', nodeKey('ZSUB'), nodeKey('ZSUB', '40')],
+    );
     assert.deepStrictEqual(fake.envelopes.map(partKeys), [
-      // (1) the quickSearch of every mask
-      ['SEARCH ZR*'],
       // (2) the walk: level 1 roots (exact names first, then the masks'
-      // packages), their type nodes; level 2 likewise
+      // packages), their type nodes
       [nodeKey('ZOTHER'), nodeKey('ZROOT')],
       [
         nodeKey('ZOTHER', '20'),
@@ -175,8 +184,6 @@ describe('SearchSource on internal batches', () => {
         nodeKey('ZROOT', '20'),
         nodeKey('ZROOT', '30'),
       ],
-      [nodeKey('ZSUB')],
-      [nodeKey('ZSUB', '40')],
       // (3) every target's own sources (a class's main source and its four
       // local includes) and the function group structure, then the function
       // group's sources
@@ -203,7 +210,7 @@ describe('SearchSource on internal batches', () => {
   it('orders the targets by (package, type, name): the sources are read in that order', async () => {
     const fake = system();
     await search(fake);
-    assert.deepStrictEqual(partKeys(fake.envelopes[5]), [
+    assert.deepStrictEqual(partKeys(fake.envelopes[2]), [
       'PROGRAM ZPROG_O',
       'STRUCTURE ZFG_A',
       'PROGRAM ZPROG_A',
@@ -279,7 +286,7 @@ describe('SearchSource on internal batches', () => {
     const result = await search(fake);
     assert.equal(isError(result), true);
     // The function group's sources were never asked.
-    assert.equal(fake.envelopes.length, 6);
+    assert.equal(fake.envelopes.length, 3);
     const sequential = await search(system(model), {}, true);
     assert.equal(textOf(result), textOf(sequential));
   });

@@ -30,6 +30,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -45,8 +46,12 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateStructure',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.',
+  description: updateTool({
+    object:
+      'the DDL source of an existing ABAP structure, which defines its components',
+    how: ', activating it when asked',
+    transported: true,
+  }),
   inputSchema: z.object({
     structure_name: z
       .string()

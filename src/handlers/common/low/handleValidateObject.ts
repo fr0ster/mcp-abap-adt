@@ -46,6 +46,7 @@ import {
   createOnPremAdtClient,
   variantOf,
 } from '../../../lib/clients';
+import { validateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseValidation } from '../../../lib/strategies/projections';
@@ -55,8 +56,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'ValidateObjectLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message.',
+  description: validateTool({
+    tag: 'low-level',
+    object: 'the name of a new ABAP object of the type named',
+    how: ', whether it is valid and free',
+  }),
   inputSchema: z.object({
     object_name: z.string().describe('Object name to validate'),
     object_type: z

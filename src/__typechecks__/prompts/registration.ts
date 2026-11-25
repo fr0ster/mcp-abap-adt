@@ -8,7 +8,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
 import type { IHandlersRegistry } from '../../lib/handlers/interfaces';
-import { registerAbapPrompts } from '../../lib/prompts';
+import { registerAbapPrompts } from '../../lib/prompts/register';
 
 export function embedderRegistersPrompts(): void {
   const server = new McpServer({ name: 'embedder', version: '1' });

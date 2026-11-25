@@ -164,6 +164,7 @@ describe('SearchSource Handler Integration', () => {
       const query = String(params?.known_query ?? 'Echo:');
 
       const args = {
+        detail: 'full' as const,
         query,
         packages: [pkg],
         max_hits_per_object: 5,
@@ -195,6 +196,7 @@ describe('SearchSource Handler Integration', () => {
       const q2 = String(params?.known_and_query ?? 'iv_input');
 
       const args = {
+        detail: 'full' as const,
         query: q,
         query2: q2,
         packages: [pkg],
@@ -228,6 +230,7 @@ describe('SearchSource Handler Integration', () => {
       const excl = String(params?.known_exclude ?? 'ev_output');
 
       const args = {
+        detail: 'full' as const,
         query: q,
         exclude: [excl],
         packages: [pkg],
@@ -258,6 +261,7 @@ describe('SearchSource Handler Integration', () => {
       const q = String(params?.known_query ?? 'Echo:');
 
       const args = {
+        detail: 'full' as const,
         query: q,
         packages: [pkg],
         exclude_comments: true,
@@ -290,6 +294,7 @@ describe('SearchSource Handler Integration', () => {
       const q = String(params?.known_query ?? 'Echo:');
 
       const args = {
+        detail: 'full' as const,
         query: q,
         packages: [pkg],
         max_hits_per_object: 1,
@@ -323,6 +328,7 @@ describe('SearchSource Handler Integration', () => {
       const pkg = scanPackageOf(params?.scan_package);
 
       const args = {
+        detail: 'full' as const,
         query: 'ABSOLUTELY_UNLIKELY_SUBSTRING_XYZQ_42',
         packages: [pkg],
         max_hits_per_object: 1,
@@ -358,6 +364,7 @@ describe('SearchSource Handler Integration', () => {
       );
 
       const args = {
+        detail: 'full' as const,
         query: q,
         packages: [pkg],
         object_filter: glob,
@@ -392,6 +399,7 @@ describe('SearchSource Handler Integration', () => {
       const mask = deriveMaskFromPackage(pkg);
 
       const args = {
+        detail: 'full' as const,
         query,
         packages: [mask],
         include_subpackages: true,
@@ -421,6 +429,7 @@ describe('SearchSource Handler Integration', () => {
       const mask = deriveMaskFromPackage(pkg);
 
       const args = {
+        detail: 'full' as const,
         query,
         packages: [mask],
         include_subpackages: false,
@@ -451,6 +460,7 @@ describe('SearchSource Handler Integration', () => {
       const query = String(params?.known_query ?? 'Echo:');
 
       const args = {
+        detail: 'full' as const,
         query,
         packages: ['ZZZ_NONEXISTENT_NAMESPACE_XYZ*'],
       };
@@ -480,6 +490,7 @@ describe('SearchSource Handler Integration', () => {
       const mask = deriveMaskFromPackage(pkg);
 
       const args = {
+        detail: 'full' as const,
         query,
         packages: [pkg, mask],
         include_subpackages: true,

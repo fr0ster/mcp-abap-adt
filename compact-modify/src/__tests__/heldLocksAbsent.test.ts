@@ -11,9 +11,17 @@ import { it } from 'node:test';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { recordingConnection } from '../../../src/__tests__/helpers/recordingConnection';
 import { declareSystemKind } from '../../../src/lib/systemKind';
-import { handleHandlerLock } from '../handlers/handleHandlerLock';
-import { handleHandlerUnlock } from '../handlers/handleHandlerUnlock';
+import {
+  handleHandlerLock,
+  handleHandlerLock as lockOrUnlock,
+} from '../handlers/handleHandlerLock';
 import { handleHandlerUpdate } from '../handlers/handleHandlerUpdate';
+
+/** An unlock, as the merged HandlerLock takes it: `action: 'unlock'`. */
+const handleHandlerUnlock = (
+  context: Parameters<typeof lockOrUnlock>[0],
+  args: Omit<Parameters<typeof lockOrUnlock>[1], 'action'>,
+) => lockOrUnlock(context, { ...args, action: 'unlock' });
 
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 

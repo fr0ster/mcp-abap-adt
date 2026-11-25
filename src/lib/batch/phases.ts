@@ -63,6 +63,34 @@ import { failureOf, readOwn } from '../auth/failures';
 import { withSystemKindOf } from '../connectionFactory';
 import { NO_BATCH_ENDPOINT_STATUS } from './availability';
 
+/**
+ * The most reads one envelope carries where a call's independent reads may
+ * outnumber it: past it, they go in consecutive envelopes of at most this
+ * many (`SearchSource`'s source reads, the function module group checks,
+ * `GetEnhancements`' phases). SAP's own limit is not measured.
+ */
+export const READS_PER_ENVELOPE = 300;
+
+/**
+ * The consecutive slices of `items`, in order: as few as hold at most
+ * `size` each, balanced — their lengths differ by one at most, so past the
+ * bound no slice is a single read beside a full one (301 reads at 300 are
+ * 151 and 150, never 300 and 1).
+ */
+export function chunksOf<I>(items: readonly I[], size: number): I[][] {
+  const count = Math.ceil(items.length / size);
+  const chunks: I[][] = [];
+  let at = 0;
+  for (let i = 0; i < count; i++) {
+    // The first `items.length % count` slices take one more.
+    const length =
+      Math.floor(items.length / count) + (i < items.length % count ? 1 : 0);
+    chunks.push(items.slice(at, at + length));
+    at += length;
+  }
+  return chunks;
+}
+
 /** One item's settlement in a phase. */
 export type PhaseResult<R> =
   | { ok: true; value: R }
@@ -290,7 +318,13 @@ async function correctPhaseParts(
  */
 export interface PhaseOutcome<R> {
   results: PhaseResult<R>[];
-  envelope: { failed: false } | { failed: true; error: unknown };
+  /**
+   * `outer`: the envelope request's own status, when it had one — a `404`
+   * there is the envelope's failure, not each part's "not found".
+   */
+  envelope:
+    | { failed: false }
+    | { failed: true; error: unknown; outer: number | undefined };
 }
 
 export async function runPhase<I, R>(
@@ -388,7 +422,7 @@ export async function runPhaseOutcome<I, R>(
     await Promise.all(settled);
     return {
       results: items.map(() => ({ ok: false, error: refused })),
-      envelope: { failed: true, error: refused },
+      envelope: { failed: true, error: refused, outer: undefined },
     };
   }
   const outer = watch.outer();
@@ -413,8 +447,35 @@ export async function runPhaseOutcome<I, R>(
   const results = await Promise.all(settled);
   return {
     results,
-    envelope: failed ? { failed: true, error } : { failed: false },
+    envelope: failed ? { failed: true, error, outer } : { failed: false },
   };
+}
+
+/**
+ * `runPhaseOutcome`, or — with `alone`, by default when there is only one
+ * item — each item read as single requests on the call's connection, one
+ * after another, rather than an envelope of one part (an implementation
+ * choice; the envelope would be as correct). The settlements in item
+ * order; no envelope, so none
+ * failed.
+ */
+export async function runPhaseOrAlone<I, R>(
+  context: HandlerContext,
+  items: readonly I[],
+  read: (item: I, connection: IAbapConnection) => Promise<R>,
+  alone = items.length < 2,
+): Promise<PhaseOutcome<R>> {
+  if (!alone) return runPhaseOutcome(context, items, read);
+  const results: PhaseResult<R>[] = [];
+  for (const item of items) {
+    results.push(
+      await read(item, context.connection).then(
+        (value): PhaseResult<R> => ({ ok: true, value }),
+        (error: unknown): PhaseResult<R> => ({ ok: false, error }),
+      ),
+    );
+  }
+  return { results, envelope: { failed: false } };
 }
 
 /**

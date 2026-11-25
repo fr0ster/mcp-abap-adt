@@ -9,6 +9,10 @@ import {
   readGuarded,
   ServerRefusal,
 } from '@mcp-abap-adt/lib/auth';
+import type {
+  AbapGitRestrictionSignal,
+  ApprovedEndpoint,
+} from '@mcp-abap-adt/lib/config';
 import {
   BaseMcpServer,
   type IBackgroundRuns,
@@ -34,11 +38,15 @@ import {
 } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { RUNTIME_VERSION } from '../runtimeVersion.js';
 import { destinationFailureOf } from './auth/destinationFailure';
 import type { IDestinations } from './auth/IAuthBrokerFactory.js';
+import {
+  BoundedStdioServerTransport,
+  frameCapOf,
+  STDIO_MESSAGE_LIMIT,
+} from './boundedStdioTransport.js';
 import { destinationSource } from './destinationSource.js';
 
 export interface StdioServerOptions {
@@ -94,6 +102,12 @@ export interface StdioServerOptions {
    */
   deferredLogon?: boolean;
   /**
+   * `--stdio-message-limit`: the most bytes the stdio client buffers for one
+   * message. Absent: the MCP SDK client's default read buffer
+   * (`STDIO_DEFAULT_MAX_BUFFER_SIZE`, 10 MiB).
+   */
+  stdioMessageLimit?: number | undefined;
+  /**
    * `--deferred-logon` with `--restore-session`: the instance's first birth
    * takes up the destination's one leftover session. Absent: `false`.
    */
@@ -105,6 +119,13 @@ export interface StdioServerOptions {
    * the base's default, 10 minutes.
    */
   sessionKeepAliveMs?: number | undefined;
+  /**
+   * The approved git endpoints of the destination (its endpoints file beside
+   * its `.env`, read at the start; spec §5.2). Absent: none.
+   */
+  abapGitEndpoints?: readonly ApprovedEndpoint[] | undefined;
+  /** Which access restrictions the start configured (`restrictedStart`). Absent: none. */
+  abapGitRestrictions?: AbapGitRestrictionSignal | undefined;
 }
 
 /**
@@ -126,6 +147,8 @@ export class StdioServer extends BaseMcpServer {
   private destination: string | undefined;
   /** `--deferred-logon`: a failed build answers `no_connection` (#353). */
   private readonly deferredLogon: boolean;
+  /** `--stdio-message-limit`: what the stdio client buffers at most, in bytes. */
+  private readonly stdioMessageLimit: number;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -165,6 +188,12 @@ export class StdioServer extends BaseMcpServer {
       ...(opts?.sessionKeepAliveMs !== undefined && {
         sessionKeepAliveMs: opts.sessionKeepAliveMs,
       }),
+      ...(opts?.abapGitEndpoints !== undefined && {
+        abapGitEndpoints: opts.abapGitEndpoints,
+      }),
+      ...(opts?.abapGitRestrictions !== undefined && {
+        abapGitRestrictions: opts.abapGitRestrictions,
+      }),
       // The locks the instance took: a write, a delete or an unlock under a
       // lock_handle is sent only under one it holds.
       heldLocks: new HeldLocks(),
@@ -174,6 +203,7 @@ export class StdioServer extends BaseMcpServer {
     });
     this.sentenceFor = opts?.sentenceFor;
     this.deferredLogon = opts?.deferredLogon === true;
+    this.stdioMessageLimit = opts?.stdioMessageLimit ?? STDIO_MESSAGE_LIMIT;
   }
 
   /** The destination layer's failures first, then lib's reader. */
@@ -204,14 +234,24 @@ export class StdioServer extends BaseMcpServer {
   }
 
   /**
+   * The stdio transport this server serves on when no other is passed: no
+   * frame longer than `--stdio-message-limit` less one pipe read.
+   */
+  stdioTransport(): BoundedStdioServerTransport {
+    return new BoundedStdioServerTransport(frameCapOf(this.stdioMessageLimit));
+  }
+
+  /**
    * Serves `destination` (none: inspection-only mode) over `transport` —
    * stdio unless a host passes its own. Its connection is the one
    * `connectAtStart` made, when the launcher called it; otherwise the first
-   * tool call makes it.
+   * tool call makes it. The stdio transport writes no message longer than a
+   * stdio client reads (`BoundedStdioServerTransport`, its cap from
+   * `stdioMessageLimit`).
    */
   async start(
     destination: string | undefined,
-    transport: Transport = new StdioServerTransport(),
+    transport: Transport = this.stdioTransport(),
   ): Promise<void> {
     if (destination !== undefined && this.destinations) {
       this.serve(destination);

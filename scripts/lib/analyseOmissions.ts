@@ -417,6 +417,15 @@ function factoryOf(
  * exported handler — the tool's args reach the selection — and, the other
  * way round, that a tool not declaring `detail` does not hand its args to an
  * adapter that reads it.
+ *
+ * **Out of scope, as the minify scan's alias forms are.** The check reads
+ * the forms the handlers use: a selection (`readingAt` / `answerAt` /
+ * `listAnswerAt` with
+ * `levelOf(args)`) in the function that makes the `answer()` call, or in the
+ * exported handler that hands it on. A selector bound through a closure, a
+ * handler that scans its arguments some other way, or a delegate that
+ * ignores `args` and passes its own are contrived forms in this repository's
+ * own code: none exists, and the check does not chase them.
  */
 export function detailWiring(
   handlers: string[],
@@ -446,7 +455,13 @@ export function detailWiring(
     // No `answer()` at all is the emptiest way to pass: the loop below never
     // runs, so it can report nothing. A tool that declares `detail` and never
     // reaches an adapter has not wired the parameter — it has nowhere to.
-    if (declares && calls.length === 0 && debugCalls.length === 0) {
+    if (
+      declares &&
+      calls.length === 0 &&
+      debugCalls.length === 0 &&
+      !handlerSelectsAnswer(source) &&
+      !handlerDelegatesArgs(source)
+    ) {
       offenders.push(
         `${file} — tool declares detail and the handler never calls answer()`,
       );
@@ -548,11 +563,9 @@ export function detailWiring(
       // alone caught the one corpus defect this migration had only because
       // BOTH of its sites happened to be hardcoded together.
       const projection = call.arguments[2];
-      const projectionResult = classifyProjection(
-        projection,
-        bindingSymbol,
-        checker,
-      );
+      const projectionResult = selectsReadingByLevel(call)
+        ? 'dynamic'
+        : classifyProjection(projection, bindingSymbol, checker);
       if (projectionResult === 'literal' && declares) {
         offenders.push(
           `${file}:${lineOf(source, projection ?? call)} — tool declares detail, the answer() projection does not vary with it`,
@@ -619,6 +632,171 @@ export function toolNameOf(source: ts.SourceFile): string | undefined {
 }
 
 /** Is this expression a call to `detailOf(...)`? */
+/**
+ * Whether the request an `answer()` call answers is given a reading selected
+ * by the level asked for — a `readingAt(<table>, levelOf(…))` call
+ * (`src/lib/detail`): the reading the adt-clients call is given then decides
+ * the answer, so the projection is the reading's value and need not name the
+ * level itself — or, where the answer is built from several requests, its
+ * formatter: `answerAt(<table>, levelOf(…))`.
+ *
+ * The selector must sit in the function that makes this `answer()` call
+ * (its body, closures within it included), so it is the one that call's
+ * request is given: a selector elsewhere in the file — an uncalled function,
+ * another tool's path — does not excuse a request read at a fixed level.
+ */
+function selectsReadingByLevel(call: ts.CallExpression): boolean {
+  let scope: ts.Node | undefined = call.parent;
+  while (
+    scope !== undefined &&
+    !ts.isFunctionDeclaration(scope) &&
+    !ts.isFunctionExpression(scope) &&
+    !ts.isArrowFunction(scope) &&
+    !ts.isMethodDeclaration(scope)
+  ) {
+    scope = scope.parent;
+  }
+  if (scope === undefined) return false;
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (found) return;
+    if (
+      ts.isCallExpression(node) &&
+      (node.expression.getText() === 'readingAt' ||
+        node.expression.getText() === 'answerAt' ||
+        node.expression.getText() === 'listAnswerAt')
+    ) {
+      const level = node.arguments[1];
+      if (
+        level !== undefined &&
+        ts.isCallExpression(level) &&
+        level.expression.getText() === 'levelOf'
+      ) {
+        found = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(scope);
+  return found;
+}
+
+/**
+ * Whether a handler that answers without `answer()` — it builds the answer
+ * from several requests itself (a walk, a scan) — selects that answer's
+ * formatter by the level asked for: `answerAt(<table>, levelOf(…))` in the
+ * body of an exported `handle…` function, or of the function of the same
+ * file it hands its arguments to (`return inner(context, args)`: the raw
+ * wrapper, `src/lib/detail/wire.ts`).
+ */
+function handlerSelectsAnswer(source: ts.SourceFile): boolean {
+  const local = new Map<string, ts.FunctionDeclaration>();
+  for (const statement of source.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name !== undefined) {
+      local.set(statement.name.text, statement);
+    }
+  }
+  const selects = (body: ts.Block): boolean => {
+    let found = false;
+    const visit = (node: ts.Node): void => {
+      if (found) return;
+      if (
+        ts.isCallExpression(node) &&
+        (node.expression.getText() === 'answerAt' ||
+          node.expression.getText() === 'listAnswerAt')
+      ) {
+        const level = node.arguments[1];
+        if (
+          level !== undefined &&
+          ts.isCallExpression(level) &&
+          level.expression.getText() === 'levelOf'
+        ) {
+          found = true;
+          return;
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(body);
+    return found;
+  };
+  for (const statement of source.statements) {
+    if (
+      !ts.isFunctionDeclaration(statement) ||
+      statement.name?.text.startsWith('handle') !== true ||
+      statement.modifiers?.some(
+        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+      ) !== true ||
+      statement.body === undefined
+    ) {
+      continue;
+    }
+    if (selects(statement.body)) return true;
+    const argsParameter = statement.parameters[1]?.name;
+    if (argsParameter === undefined || !ts.isIdentifier(argsParameter)) {
+      continue;
+    }
+    for (const inner of statement.body.statements) {
+      if (
+        !ts.isReturnStatement(inner) ||
+        inner.expression === undefined ||
+        !ts.isCallExpression(inner.expression) ||
+        !ts.isIdentifier(inner.expression.expression) ||
+        !inner.expression.arguments.some(
+          (argument) =>
+            ts.isIdentifier(argument) && argument.text === argsParameter.text,
+        )
+      ) {
+        continue;
+      }
+      const target = local.get(inner.expression.expression.text);
+      if (target?.body !== undefined && selects(target.body)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether the exported handler hands its own arguments, whole, to another
+ * handler and answers what that one answers — `return handleX(context, args,
+ * …)`: the `detail` the tool declares reaches the handler that reads it.
+ */
+function handlerDelegatesArgs(source: ts.SourceFile): boolean {
+  for (const statement of source.statements) {
+    if (
+      !ts.isFunctionDeclaration(statement) ||
+      statement.name?.text.startsWith('handle') !== true ||
+      statement.modifiers?.some(
+        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+      ) !== true ||
+      statement.body === undefined
+    ) {
+      continue;
+    }
+    const argsParameter = statement.parameters[1]?.name;
+    if (argsParameter === undefined || !ts.isIdentifier(argsParameter)) {
+      continue;
+    }
+    for (const inner of statement.body.statements) {
+      if (
+        ts.isReturnStatement(inner) &&
+        inner.expression !== undefined &&
+        ts.isCallExpression(inner.expression) &&
+        ts.isIdentifier(inner.expression.expression) &&
+        inner.expression.expression.text.startsWith('handle') &&
+        inner.expression.arguments.some(
+          (argument) =>
+            ts.isIdentifier(argument) && argument.text === argsParameter.text,
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 function isDetailOfCall(expr: ts.Expression): boolean {
   return ts.isCallExpression(expr) && expr.expression.getText() === 'detailOf';
 }

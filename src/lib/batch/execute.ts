@@ -268,6 +268,6 @@ export function endWithFailure(
 export function batchEndAnswer(summary: BatchSummary): McpResult {
   return {
     isError: false,
-    content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(summary) }],
   };
 }

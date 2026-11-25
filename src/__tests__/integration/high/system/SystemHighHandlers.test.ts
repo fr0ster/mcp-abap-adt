@@ -91,6 +91,7 @@ describe('System High-Level Handlers Integration', () => {
           'GetPackageTree',
           {
             package_name: testPackage,
+            detail: 'full',
             include_subpackages: false,
             max_depth: 0,
             include_descriptions: true,
@@ -102,6 +103,7 @@ describe('System High-Level Handlers Integration', () => {
             });
             return handleGetPackageTree(handlerContext, {
               package_name: testPackage,
+              detail: 'full',
               include_subpackages: false,
               max_depth: 0,
               include_descriptions: true,
@@ -161,6 +163,7 @@ describe('System High-Level Handlers Integration', () => {
           'GetPackageTree',
           {
             package_name: testPackage,
+            detail: 'full',
             include_subpackages: true,
             max_depth: 2,
             include_descriptions: true,
@@ -172,6 +175,7 @@ describe('System High-Level Handlers Integration', () => {
             });
             return handleGetPackageTree(handlerContext, {
               package_name: testPackage,
+              detail: 'full',
               include_subpackages: true,
               max_depth: 2,
               include_descriptions: true,
@@ -226,6 +230,7 @@ describe('System High-Level Handlers Integration', () => {
           'GetPackageTree',
           {
             package_name: testPackage,
+            detail: 'full',
             include_subpackages: true,
             max_depth: 1,
             include_descriptions: false,
@@ -237,6 +242,7 @@ describe('System High-Level Handlers Integration', () => {
             });
             return handleGetPackageTree(handlerContext, {
               package_name: testPackage,
+              detail: 'full',
               include_subpackages: true,
               max_depth: 1,
               include_descriptions: false,

@@ -28,11 +28,14 @@ import { skipSapAnswers } from '../../lib/search-source/readFailure';
 import { createSourceReaderDeps } from '../../lib/search-source/sourceReader';
 import { assertMatchObject, rejectionOf } from '../helpers/assertions';
 import {
+  answerThrough,
   fakeClientOf,
+  fakeClientThroughSet,
   okResponse,
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { levelOf } from '../helpers/nodeLevels';
 import { listing } from '../helpers/sourceReaderFake';
 
 mock.method(clients, 'createAdtClient', () => fakeClient);
@@ -84,14 +87,14 @@ describe('GetEnhancements include_nested: an include whose elements read rejects
     fakeClient = fakeClientOf({
       fetchNodeStructure: async (...args: unknown[]) =>
         (args[2] as { nodeId: string }).nodeId === '000000'
-          ? okResponse({ childNodes: [{ type: 'PROG/I', nodeId: 'N1' }] })
-          : okResponse({
-              objects: [
-                { name: 'ZINC1' },
-                { name: 'ZINC2' },
-                { name: 'ZINC3' },
-              ],
-            }),
+          ? okResponse(levelOf([], [{ type: 'PROG/I', nodeId: '10' }]))
+          : okResponse(
+              levelOf([
+                { name: 'ZINC1', type: 'PROG/I' },
+                { name: 'ZINC2', type: 'PROG/I' },
+                { name: 'ZINC3', type: 'PROG/I' },
+              ]),
+            ),
       readEnhancementElements: async (...args: unknown[]) => {
         const config = args[0] as {
           programName?: string;
@@ -368,11 +371,15 @@ describe("a 401 SAP answered to a cleanup step is the call's credential failure"
   });
 
   it('CreateTransportTask: the task type change answered 401: its error with its step, not a cleanup note', async () => {
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       createTask: async () =>
-        okResponse(reading({ '@': { 'tm:number': 'SIDK907073' } } as never)),
+        answerThrough(
+          set,
+          'createdTask',
+          '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="SIDK907073"/>',
+        ),
       changeTaskType: async () => unauthorized(),
-    });
+    }));
     const result: any = await handleCreateTransportTask(context as any, {
       transport_number: 'SIDK907072',
       target_user: 'DEVELOPER',

@@ -533,20 +533,9 @@ describe('the schema', () => {
       );
       assertNoProperty(properties, 'max_status_polls');
       assert.ok(!declaredRequired(tool.inputSchema).includes('wait'));
-      assert.ok(tool.description.includes('with wait true (default)'));
       assert.ok(
         tool.description.includes(
-          'with wait false the call answers the run_id right after the start',
-        ),
-      );
-      assert.ok(
-        tool.description.includes(
-          'A long run under a client with a request time limit is started with wait false.',
-        ),
-      );
-      assert.ok(
-        tool.description.includes(
-          'a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status',
+          "waiting for the result or giving the run's id at once",
         ),
       );
     });
@@ -559,15 +548,10 @@ describe('the schema', () => {
     assertNoProperty(properties, 'max_status_polls');
   });
 
-  it('GetUnitTestResult says what it answers for a run SAP answers unfinished', () => {
+  it('GetUnitTestResult says it waits while the run goes on', () => {
     assert.ok(
       GetUnitTestResult_Tool.description.includes(
-        'a run SAP answers running is read again by long polling',
-      ),
-    );
-    assert.ok(
-      GetUnitTestResult_Tool.description.includes(
-        'a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once',
+        'waiting while the run goes on',
       ),
     );
   });

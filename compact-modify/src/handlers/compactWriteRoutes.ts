@@ -14,10 +14,14 @@ import type {
 import {
   type CompactHandler,
   type CompactRouterMap,
+  compactCreateParts,
   compactCreateSchema,
+  compactDeleteParts,
   compactDeleteSchema,
+  compactUpdateParts,
   compactUpdateSchema,
   dispatchCompact,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { ToolArgs, ToolResultLike } from '@mcp-abap-adt/lib/handlers';
 import { defineTool } from '@mcp-abap-adt/lib/handlers';
@@ -41,7 +45,8 @@ import {
 const create: CompactHandler = defineTool(
   {
     name: 'HandlerCreate',
-    description: 'The create request alone.',
+    // The route is the tool's own call: it carries the tool's description.
+    description: toolDescription(compactCreateParts('onprem')),
     inputSchema: compactCreateSchema,
   },
   handleCreateOnly,
@@ -54,7 +59,7 @@ const create: CompactHandler = defineTool(
 const update: CompactHandler = defineTool(
   {
     name: 'HandlerUpdate',
-    description: "The one write under the caller's lock.",
+    description: toolDescription(compactUpdateParts('onprem')),
     inputSchema: compactUpdateSchema,
   },
   handleUpdateUnderLock,
@@ -68,7 +73,7 @@ const update: CompactHandler = defineTool(
 const remove: CompactHandler = defineTool(
   {
     name: 'HandlerDelete',
-    description: 'The deletion request alone.',
+    description: toolDescription(compactDeleteParts('onprem')),
     inputSchema: compactDeleteSchema,
   },
   handleDeleteOnly,

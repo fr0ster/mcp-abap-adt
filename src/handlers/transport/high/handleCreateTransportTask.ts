@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { createArguments } from '../../../lib/handlers/createArguments';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { ASSEMBLED_DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTransportTask — a task of your own under a shared request.
  *
@@ -35,39 +35,61 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  */
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  transportCreated,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   answer,
   type FailureEntry,
   failureEntry,
   isCredentialPayload,
+  type McpResult,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
+import {
+  type DetailTable,
+  type LevelReading,
+  readingAt,
+  wireAnswer,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
+import {
+  parseStructure,
+  rawOf,
+  statusOnly,
+} from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { failed, succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
-import {
-  child,
-  childAt,
-  type XmlList,
-  type XmlNode,
-  type XmlRead,
-} from '../../../lib/xml/tree';
+import type { XmlNode } from '../../../lib/xml/node';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
 const TASK_TYPES = ['S', 'R', 'X'] as const;
 type TaskType = (typeof TASK_TYPES)[number];
 
+/** What typing the task came to: the type it carries now, and the refusal when there was one. */
+interface TypedTask {
+  type: TaskType;
+  error?: FailureEntry;
+}
+
 export const TOOL_DEFINITION = {
   name: 'CreateTransportTask',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Creates a task under the existing transport request named by transport_number, owned by the user named by target_user, of the type task_type. The task is itself a request resource — it reads, writes and releases like one — and is what adding and removing an object entry address, since a request's objects live on its tasks. `target_user` is required: it names the task's owner, and an empty owner is refused with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses an added object on premise with SCTS_ADT_MSG 009 / TK127.",
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        'Creates a task of the type asked under an existing transport, owned by the SAP user named.',
+      ),
+    }),
+  ),
   inputSchema: createArguments('CreateTransportTask', {
     transport_number: z
       .string()
@@ -86,26 +108,81 @@ export const TOOL_DEFINITION = {
       .describe(
         'S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).',
       ),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
 type CreateTransportTaskArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
- * The task number, read out of the parsed answer. It arrives the way a created
- * request's does — on the root rather than on a `tm:request` child, which is
- * the shape `parseCreatedTransport` learned in adt-clients 20.0.0.
+ * The task number, as adt-strategies reads the create's answer
+ * (`transportCreated`: the root's own number since 0.28.0, a `tm:request`
+ * beside it the parent); `''` when the answer names none — the answer then
+ * says no task number came back.
  */
-const taskNumberOf = (value: XmlRead): string => {
-  const root = child(value, 'tm:root') ?? value;
-  return String(childAt(root, '@', 'tm:number') ?? '');
-};
+function taskNumberOf(answer: IAdtWireResponse): string {
+  try {
+    return transportCreated(answer).transportNumber;
+  } catch {
+    return '';
+  }
+}
 
+/**
+ * What a task create's reading holds at every level: the task number (the
+ * type change after the create is sent to it) and the level's answer, a pure
+ * function of the type the change settles.
+ */
+interface CreatedTask<A> {
+  number: string;
+  answer: (typed: TypedTask) => A;
+}
+
+/** A level's reading of the create: the parse read once, the answer `shown` makes of it and the document. */
+function createdTaskAt<A>(
+  shown: (
+    number: string,
+    parsed: XmlNode | null,
+    raw: string,
+  ) => (typed: TypedTask) => A,
+): LevelReading<CreatedTask<A>> {
+  return (answer) => {
+    const raw = rawOf(answer);
+    const parsed = parseStructure(raw);
+    const number = taskNumberOf(answer);
+    return {
+      value: { number, answer: shown(number, parsed, raw) },
+      raw,
+      status: answer.status,
+    };
+  };
+}
+
+/**
+ * The tool's answer; at `raw` what ADT sent (`wireAnswer`): it creates the
+ * task and then types it, so its raw is the array of both responses.
+ */
 export async function handleCreateTransportTask(
   context: HandlerContext,
   args: CreateTransportTaskArgs,
-) {
+): Promise<McpResult> {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'CreateTransportTask',
+        shape: 'assembled',
+      },
+      () => answeredCreateTransportTask(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredCreateTransportTask(context, args);
+}
+
+async function answeredCreateTransportTask(
+  context: HandlerContext,
+  args: CreateTransportTaskArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
 
   for (const name of ['transport_number', 'target_user'] as const) {
@@ -130,10 +207,9 @@ export async function handleCreateTransportTask(
   // What typing the task came to: the type it carries now, and the refusal
   // when there was one. The task exists either way, so a refused typing does
   // not fail the creation — it is said in the answer instead.
-  let typed: { type: TaskType; error?: FailureEntry } = { type: 'X' };
+  let typed: TypedTask = { type: 'X' };
 
-  const terseTask = (value: XmlRead) => {
-    const number = taskNumberOf(value);
+  const terseTask = (number: string, typed: TypedTask) => {
     return {
       success: true,
       request: args.transport_number,
@@ -153,12 +229,38 @@ export async function handleCreateTransportTask(
     };
   };
 
+  // What the create answers at each level, selected before the call: every
+  // level reads the task number (the type change is sent to it); terse
+  // answers it with the type the change settles, full the parse, raw the
+  // document as it came.
+  // Terse what the next call needs: the task's number and type, and why it
+  // is untyped when it is; medium the task as created (the former terse).
+  const terseNumbers = (number: string, settled: TypedTask) =>
+    createdTaskNumbers(terseTask(number, settled));
+  const taskReadings: DetailTable<CreatedTask<TaskAnswer>> = {
+    terse: createdTaskAt(
+      (number) => (settled) => terseNumbers(number, settled),
+    ),
+    medium: createdTaskAt((number) => (settled) => terseTask(number, settled)),
+    full: createdTaskAt((_number, parsed, raw) => () => parsed ?? raw),
+    // Never reached: raw is every response, recorded by `wireAnswer` (the
+    // handler, above).
+    raw: createdTaskAt((_number, _parsed, raw) => () => raw),
+  };
+  type TaskAnswer =
+    | ReturnType<typeof terseTask>
+    | ReturnType<typeof terseNumbers>
+    | XmlNode
+    | string;
+
   return answer(
     { tool: 'CreateTransportTask', detail },
     async () => {
-      const request = createAdtClient(connection, logger).getRequest(
-        resultsFor(transportDocuments),
-      );
+      const request = createAdtClient(connection, logger).getRequest({
+        ...resultsFor(transportDocuments),
+        createdTask: readingAt(taskReadings, levelOf(args)),
+        taskTypeChanged: statusOnly,
+      });
       const created = await atStep('create task', () =>
         withAdtHeaders(context, 'request.createTask', (headers) =>
           request.createTask(args.transport_number, {
@@ -168,10 +270,7 @@ export async function handleCreateTransportTask(
           }),
         ),
       )();
-      // A reading, as `project` receives it: the parsed document is its value.
-      const number = created.ok
-        ? taskNumberOf(created.getResult().value.value)
-        : '';
+      const number = created.ok ? created.getResult().value.value.number : '';
       if (number && taskType !== 'X') {
         const changed = await withAdtHeaders(
           context,
@@ -220,6 +319,26 @@ export async function handleCreateTransportTask(
       }
       return created;
     },
-    project(detail, terseTask),
+    // The answer composes the typed facts of several requests — the create,
+    // and the reads and the type change after it — through the level's
+    // reading of the create; it does not reshape one reading.
+    (reading) => reading.value.answer(typed),
   );
+}
+
+/** What a created task answers at terse: its number and type, and why it is untyped when it is. */
+export function createdTaskNumbers(answered: {
+  readonly task_number: string | null;
+  readonly task_type: TaskType;
+  readonly task_type_error?: FailureEntry | undefined;
+  readonly note?: string | undefined;
+}) {
+  return {
+    task_number: answered.task_number,
+    task_type: answered.task_type,
+    ...(answered.task_type_error === undefined
+      ? {}
+      : { task_type_error: answered.task_type_error }),
+    ...(answered.note === undefined ? {} : { note: answered.note }),
+  };
 }

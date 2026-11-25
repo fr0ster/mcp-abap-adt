@@ -26,6 +26,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { adtClientOf } from '../../../lib/clients';
+import { readerParts, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
@@ -33,8 +34,11 @@ import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
 export const TOOL_DEFINITION = {
   name: 'GetTableSettings',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Reads the technical settings of the database table named by table_name, at the version asked: data class, size category, buffering (allowed, type, number of key fields), storage type, sharing type, load unit, translation, logging, and the table's description; on ABAP Cloud also whether AMDP may write to the table.",
+  description: toolDescription(
+    readerParts({
+      object: 'the technical settings of an ABAP database table',
+    }),
+  ),
   inputSchema: z.object({
     table_name: requiredText('table_name is required').describe('Table name.'),
     version: READ_VERSION_FIELD,

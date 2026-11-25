@@ -9,12 +9,21 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { handleReadTransportObjects } from '@mcp-abap-adt/lib/handlers/read';
+import { memberTokens } from '@mcp-abap-adt/lib/compact-shared';
+import { defineTool } from '@mcp-abap-adt/lib/handlers';
 import {
-  assertMatchObject,
-  assertRejects,
-} from '../../../src/__tests__/helpers/assertions';
+  handleGetObjectStructure,
+  handleGetTransport,
+  handleReadTransportObjects,
+} from '@mcp-abap-adt/lib/handlers/read';
+import { assertRejects } from '../../../src/__tests__/helpers/assertions';
 import { listedJson } from '../../../src/__tests__/helpers/listedJson';
+import {
+  PARENT,
+  REQUEST,
+  TASK,
+  TASK_WITH_OBJECTS,
+} from '../../../src/__tests__/helpers/transportTaskDocuments';
 import { TOOL_DEFINITION as FullRead } from '../../../src/handlers/transport/readonly/handleReadTransportObjects';
 import { compactReadOnlyEntries } from '../group';
 import { compactReadRouterMap } from '../handlers/compactReadRoutes';
@@ -80,7 +89,11 @@ describe('HandlerGet with object_type TRANSPORT', () => {
   it('routes to the full set’s ReadTransportObjects, and the matrix says get', () => {
     assert.notEqual(compactReadRouterMap.TRANSPORT.get, undefined);
     assert.notEqual(CompactGet.inputSchema.shape.transport_number, undefined);
-    assert.ok(CompactGet.description.includes('TRANSPORT(transport_number*)'));
+    assert.ok(
+      memberTokens('HandlerGet', 'onprem').includes(
+        'TRANSPORT(transport_number*)',
+      ),
+    );
     assert.deepStrictEqual(listedJson(FullRead.inputSchema).required, [
       'transport_number',
     ]);
@@ -107,20 +120,11 @@ describe('HandlerGet with object_type TRANSPORT', () => {
     assert.deepStrictEqual(compact.sent, full.sent);
     assert.deepStrictEqual(compactAnswer, fullAnswer);
     assert.equal(compactAnswer.isError, false);
-    const body = JSON.parse(compactAnswer.content[0]?.text ?? '{}');
-    assert.equal(body.count, 2);
-    assertMatchObject(body.objects, [
-      {
-        type: 'CLAS',
-        name: 'ZCL_A',
-        position: '000001',
-      },
-      {
-        type: 'TABL',
-        name: 'ZTAB',
-        position: '000002',
-      },
-    ]);
+    // Terse (the default): the entries as TSV, each with its position.
+    const lines = (compactAnswer.content[0]?.text ?? '').split('\n');
+    assert.ok(lines.includes('# count 2'));
+    assert.ok(lines.includes('CLAS\tZCL_A\t000001'));
+    assert.ok(lines.includes('TABL\tZTAB\t000002'));
   });
 
   it('a request answers each task entry once, with its task, as the full read does', async () => {
@@ -137,19 +141,15 @@ describe('HandlerGet with object_type TRANSPORT', () => {
 
     assert.equal(compact.sent.length, 1);
     assert.deepStrictEqual(compactAnswer, fullAnswer);
-    const body = JSON.parse(compactAnswer.content[0]?.text ?? '{}');
-    assert.equal(body.count, 3);
-    assert.deepStrictEqual(
-      body.objects.map(
-        (o: { task?: string; name: string; position: string }) =>
-          `${o.task}|${o.name}|${o.position}`,
+    // Terse (the default): each task's entries under its task line, once.
+    const text = compactAnswer.content[0]?.text ?? '';
+    assert.ok(text.includes('# count 3'));
+    assert.ok(
+      text.includes(
+        '# task SIDK900102\n# pgmid R3TR\nCLAS\tZCL_A\t000001\nTABL\tZTAB\t000002\n# task SIDK900103',
       ),
-      [
-        'SIDK900102|ZCL_A|000001',
-        'SIDK900102|ZTAB|000002',
-        'SIDK900103|ZPROG|000001',
-      ],
     );
+    assert.ok(text.includes('PROG\tZPROG\t000001'));
   });
 
   it('refuses a missing transport_number by the full read’s schema, sending nothing', async () => {
@@ -161,15 +161,108 @@ describe('HandlerGet with object_type TRANSPORT', () => {
     assert.deepStrictEqual(compact.sent, []);
   });
 
-  it('offers no other part: a metadata or urls read is refused naming source', async () => {
+  it('offers source and metadata: a urls read is refused naming them', async () => {
     const compact = recording();
     const refused = (await handleHandlerGet(compact.context, {
       object_type: 'TRANSPORT',
-      part: 'metadata',
+      part: 'urls',
       transport_number: NUMBER,
     })) as { isError: boolean };
     assert.equal(refused.isError, true);
-    assert.match(JSON.stringify(refused), /offers: source/);
+    assert.match(JSON.stringify(refused), /offers: source, metadata/);
     assert.deepStrictEqual(compact.sent, []);
   });
+});
+
+describe('HandlerGet with object_type TRANSPORT and part metadata', () => {
+  for (const [label, document, number, kind] of [
+    ['request', REQUEST, PARENT, 'request'],
+    ['task', TASK_WITH_OBJECTS, TASK, 'task'],
+  ] as const) {
+    it(`answers what the full set's GetTransport answers for a ${label}`, async () => {
+      const compact = recording(document);
+      const full = recording(document);
+
+      const compactAnswer = await handleHandlerGet(compact.context, {
+        object_type: 'TRANSPORT',
+        part: 'metadata',
+        transport_number: number,
+      });
+      const fullAnswer = await handleGetTransport(full.context, {
+        transport_number: number,
+      });
+
+      assert.equal(compact.sent.length, 1);
+      assert.deepStrictEqual(compact.sent, full.sent);
+      assert.deepStrictEqual(compactAnswer, fullAnswer);
+      const body = JSON.parse(
+        (compactAnswer as { content: { text: string }[] }).content[0]?.text ??
+          '{}',
+      );
+      assert.equal(body.kind, kind);
+    });
+  }
+});
+
+/** HandlerGet through its entry, as a client calls it. */
+const compactGetEntry = defineTool(CompactGet, handleHandlerGet).call;
+
+describe('HandlerGet TRANSPORT answers what the full reads answer at every detail', () => {
+  for (const detail of ['terse', 'medium', 'full', 'raw'] as const) {
+    it(`the entries (ReadTransportObjects) at detail ${detail}`, async () => {
+      const compact = recording(WITH_AGGREGATE);
+      const full = recording(WITH_AGGREGATE);
+      // Through its entry: the compact schema is what lets `detail` through.
+      const compactAnswer = await compactGetEntry(compact.context, {
+        object_type: 'TRANSPORT',
+        transport_number: NUMBER,
+        detail,
+      });
+      const fullAnswer = await handleReadTransportObjects(full.context, {
+        transport_number: NUMBER,
+        detail,
+      });
+      assert.deepStrictEqual(compactAnswer, fullAnswer);
+    });
+
+    it(`the document (GetTransport) at detail ${detail}`, async () => {
+      const compact = recording(TASK_WITH_OBJECTS);
+      const full = recording(TASK_WITH_OBJECTS);
+      // Through its entry: the compact schema is what lets `detail` through.
+      const compactAnswer = await compactGetEntry(compact.context, {
+        object_type: 'TRANSPORT',
+        part: 'metadata',
+        transport_number: TASK,
+        detail,
+      });
+      const fullAnswer = await handleGetTransport(full.context, {
+        transport_number: TASK,
+        detail,
+      });
+      assert.deepStrictEqual(compactAnswer, fullAnswer);
+    });
+  }
+});
+
+describe('HandlerGet part object_structure answers what GetObjectStructure answers at every detail', () => {
+  const STRUCTURE = `<?xml version="1.0" encoding="UTF-8"?><projectexplorer:objectstructure xmlns:projectexplorer="http://www.sap.com/adt/projectexplorer"><projectexplorer:node projectexplorer:nodeid="000002" projectexplorer:parentid="000001" projectexplorer:objecttype="CLAS/OM" projectexplorer:objectname="RUN" projectexplorer:description="A method"/></projectexplorer:objectstructure>`;
+  for (const detail of ['terse', 'medium', 'full', 'raw'] as const) {
+    it(`detail ${detail}`, async () => {
+      const compact = recording(STRUCTURE);
+      const full = recording(STRUCTURE);
+      const compactAnswer = await compactGetEntry(compact.context, {
+        object_type: 'CLASS',
+        part: 'object_structure',
+        object_adt_type: 'CLAS/OC',
+        object_name: 'ZCL_A',
+        detail,
+      });
+      const fullAnswer = await handleGetObjectStructure(full.context, {
+        objecttype: 'CLAS/OC',
+        objectname: 'ZCL_A',
+        detail,
+      });
+      assert.deepStrictEqual(compactAnswer, fullAnswer);
+    });
+  }
 });

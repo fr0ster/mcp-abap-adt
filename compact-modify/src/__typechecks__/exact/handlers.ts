@@ -43,10 +43,6 @@ import {
   handleHandlerUnitTestRun,
 } from '../../handlers/handleHandlerUnitTestRun';
 import {
-  TOOL_DEFINITION as HandlerUnlock,
-  handleHandlerUnlock,
-} from '../../handlers/handleHandlerUnlock';
-import {
   TOOL_DEFINITION as HandlerUpdate,
   handleHandlerUpdate,
 } from '../../handlers/handleHandlerUpdate';
@@ -66,7 +62,6 @@ export const pairings = [
   defineTool(HandlerCreate, handleHandlerCreate),
   defineTool(HandlerDelete, handleHandlerDelete),
   defineTool(HandlerLock, handleHandlerLock),
-  defineTool(HandlerUnlock, handleHandlerUnlock),
   defineTool(HandlerProfileRun, handleHandlerProfileRun),
   defineTool(HandlerUpdate, handleHandlerUpdate),
   defineTool(HandlerTransportCreate, handleHandlerTransportCreate),
@@ -116,16 +111,6 @@ export const handlerLockOnprem: Accepts<
 export const handlerLockCloud: Accepts<
   (typeof HandlerLock.variants)['cloud']['inputSchema'],
   typeof handleHandlerLock
-> = true;
-
-export const handlerUnlockOnprem: Accepts<
-  (typeof HandlerUnlock.variants)['onprem']['inputSchema'],
-  typeof handleHandlerUnlock
-> = true;
-
-export const handlerUnlockCloud: Accepts<
-  (typeof HandlerUnlock.variants)['cloud']['inputSchema'],
-  typeof handleHandlerUnlock
 > = true;
 
 export const handlerProfileRunOnprem: Accepts<

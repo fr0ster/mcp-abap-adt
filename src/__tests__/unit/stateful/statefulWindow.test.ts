@@ -52,7 +52,6 @@ beforeEach(async () => {
     'GetWhereUsed',
     'RuntimeRunClass',
     'HandlerLock',
-    'HandlerUnlock',
   ]);
 });
 
@@ -130,7 +129,8 @@ it("compact's HandlerLock leaves the window open until HandlerUnlock: the calls 
 
   const unlocked = toolRequests(
     await s.during(() =>
-      s.call('HandlerUnlock', {
+      s.call('HandlerLock', {
+        action: 'unlock',
         object_type: 'CLASS',
         object_name: NAME,
         lock_handle: 'B92E65858E83454C783181344F429D4BFD8E395D',

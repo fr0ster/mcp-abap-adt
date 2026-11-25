@@ -9,27 +9,32 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { compactToolSet } from '../../../../compact/src/launcher';
+import { completeFrom } from '../../../lib/prompts/completion';
 import {
-  type AbapPrompt,
-  completeFrom,
-  hasProperty,
   jsonLiteral,
-  type ListedPromptTool,
-  longToolStep,
-  matchServed,
-  membersOn,
-  notServedWords,
-  type PromptInstruction,
-  type PromptSource,
-  promptRefusal,
-  promptResult,
   renderInstruction,
-  requiredArgument,
-  requiredArguments,
+} from '../../../lib/prompts/instruction';
+import {
+  notServedWords,
+  promptRefusal,
   requiredWords,
-  toolStep,
   transportTakesWords,
-} from '../../../lib/prompts';
+} from '../../../lib/prompts/refusals';
+import { promptResult } from '../../../lib/prompts/result';
+import { matchServed, requiredArgument } from '../../../lib/prompts/served';
+import {
+  hasProperty,
+  longToolStep,
+  membersOn,
+  requiredArguments,
+  toolStep,
+} from '../../../lib/prompts/source';
+import type {
+  AbapPrompt,
+  ListedPromptTool,
+  PromptInstruction,
+  PromptSource,
+} from '../../../lib/prompts/types';
 import { fullToolSet } from '../../../lib/toolSet';
 import { promptSourceFor } from '../../helpers/promptSources';
 
@@ -111,9 +116,10 @@ describe('renderInstruction', () => {
           stillToFill: [],
         },
         {
-          tool: 'HandlerUnlock',
+          tool: 'HandlerLock',
           lead: 'Unlock it',
           arguments: [
+            ['action', { from: 'user', value: 'unlock' }],
             ['lock_handle', { from: 'step', step: 2, field: 'lock_handle' }],
           ],
           finally: 3,
@@ -135,7 +141,7 @@ describe('renderInstruction', () => {
     );
     assert.ok(
       text.includes(
-        '4. Unlock it: call HandlerUnlock with lock_handle: the lock_handle from step 2 — after step 3, whatever it answered.',
+        '4. Unlock it: call HandlerLock with action: "unlock", lock_handle: the lock_handle from step 2 — after step 3, whatever it answered.',
       ),
     );
     assert.ok(text.endsWith('\nThe change: "add a method"'));

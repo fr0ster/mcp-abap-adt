@@ -42,6 +42,10 @@ import {
 
 const NAME = 'test';
 
+/** A package's metadata document as SAP answers it: its name, no super package. */
+const topPackageDocument = (name: string) =>
+  `<?xml version="1.0" encoding="utf-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${name}" adtcore:type="DEVC/K"><pak:superPackage/></pak:package>`;
+
 afterEach(() => mock.restoreAll());
 
 const allowedPackages = (...entries: string[]) =>
@@ -142,7 +146,9 @@ describe('path 1: a server instance', () => {
   });
 
   it('reads the package tree on the call’s own connection', async () => {
-    const connection = recordingConnection();
+    const connection = recordingConnection([
+      { data: topPackageDocument('ZCHILD') },
+    ]);
     const client = await clientOf(
       instance(
         connection,
@@ -156,7 +162,7 @@ describe('path 1: a server instance', () => {
       package_name: 'ZCHILD',
     });
     await client.close();
-    // The stand-in answers no document: ZCHILD has no super package.
+    // ZCHILD's document names no super package: it is top level.
     assert.equal(answer.body.error, 'package_not_allowed');
     assert.ok(connection.requests.length > 0);
     assert.ok(
@@ -248,7 +254,11 @@ describe('path 1: a server instance', () => {
   ];
   for (const [what, checks, tool, args, code, words] of MATRIX) {
     it(`refuses ${what}: the words, no handler, nothing of the call sent`, async () => {
-      const connection = recordingConnection();
+      // A package create outside the subtree reads its parent, YROOT: a
+      // top-level package.
+      const connection = recordingConnection(
+        tool === 'CreatePackage' ? [{ data: topPackageDocument('YROOT') }] : [],
+      );
       const client = await clientOf(instance(connection, checks));
       const answer = await client.call(tool, args);
       await client.close();
@@ -371,8 +381,13 @@ describe('a package is checked by its own name', () => {
     ],
     [
       'an unlock',
-      'HandlerUnlock',
-      { object_type: 'PACKAGE', object_name: 'YFOO', lock_handle: HELD },
+      'HandlerLock',
+      {
+        action: 'unlock',
+        object_type: 'PACKAGE',
+        object_name: 'YFOO',
+        lock_handle: HELD,
+      },
       OBJECT_WORDS,
     ],
     [

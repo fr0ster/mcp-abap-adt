@@ -2,7 +2,10 @@ import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
 import type { IAccessChecks } from '@mcp-abap-adt/lib';
 import { errorClassOf } from '@mcp-abap-adt/lib/auth';
-import type { TlsConfig } from '@mcp-abap-adt/lib/config';
+import type {
+  AbapGitRestrictionSignal,
+  TlsConfig,
+} from '@mcp-abap-adt/lib/config';
 import type {
   ConnectionContext,
   IBackgroundRuns,
@@ -144,6 +147,8 @@ export interface SseServerOptions {
    * §3.2); one strategy for every instance it makes. Absent: none.
    */
   accessChecks?: IAccessChecks | undefined;
+  /** Which access restrictions the start configured (`restrictedStart`), for every instance. Absent: none. */
+  abapGitRestrictions?: AbapGitRestrictionSignal | undefined;
   /**
    * `SearchSource`'s SAP-answer strategy, handed to every instance (the
    * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
@@ -210,6 +215,7 @@ export class SseServer {
   private readonly stateLogger: StateLogger;
   private readonly backgroundRuns: IBackgroundRuns | undefined;
   private readonly accessChecks: IAccessChecks | undefined;
+  private readonly abapGitRestrictions: AbapGitRestrictionSignal | undefined;
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
   /** The SAP system type every stream's instance builds for. */
@@ -257,6 +263,7 @@ export class SseServer {
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRuns = opts?.backgroundRuns;
     this.accessChecks = opts?.accessChecks;
+    this.abapGitRestrictions = opts?.abapGitRestrictions;
     this.sapAnswerStrategy = opts?.sapAnswerStrategy;
     this.lineMatchStrategy = opts?.lineMatchStrategy;
     this.batchSettings =
@@ -455,6 +462,7 @@ export class SseServer {
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
           accessChecks?: IAccessChecks;
+          abapGitRestrictions?: AbapGitRestrictionSignal;
           backgroundRunOwner?: BackgroundRunOwner;
           sapAnswerStrategy?: SapAnswerStrategy;
           lineMatchStrategy?: LineMatchStrategy;
@@ -502,6 +510,9 @@ export class SseServer {
         }),
         ...(this.accessChecks !== undefined && {
           accessChecks: this.accessChecks,
+        }),
+        ...(this.abapGitRestrictions !== undefined && {
+          abapGitRestrictions: this.abapGitRestrictions,
         }),
         ...(this.backgroundRuns !== undefined && {
           backgroundRuns: this.backgroundRuns,

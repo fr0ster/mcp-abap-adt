@@ -20,7 +20,13 @@ import { holding } from '../../../src/__tests__/helpers/heldLocks';
 import { recordingConnection } from '../../../src/__tests__/helpers/recordingConnection';
 import { LOCK_WENT_WITH_SESSION_WORDS } from '../../../src/lib/strategies/withLock';
 import { declareSystemKind } from '../../../src/lib/systemKind';
-import { handleHandlerUnlock } from '../handlers/handleHandlerUnlock';
+import { handleHandlerLock as lockOrUnlock } from '../handlers/handleHandlerLock';
+
+/** An unlock, as the merged HandlerLock takes it: `action: 'unlock'`. */
+const handleHandlerUnlock = (
+  context: Parameters<typeof lockOrUnlock>[0],
+  args: Omit<Parameters<typeof lockOrUnlock>[1], 'action'>,
+) => lockOrUnlock(context, { ...args, action: 'unlock' });
 
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
@@ -68,7 +74,10 @@ for (const code of ['ADT_SESSION_REPLACED', 'ADT_NOT_CONNECTED']) {
       );
       const answered = await unlock(context);
       assert.ok(!answered.isError);
-      assert.ok(textOf(answered).includes(LOCK_WENT_WITH_SESSION_WORDS));
+      assert.deepStrictEqual(JSON.parse(textOf(answered)), {
+        unlocked: false,
+        reason: LOCK_WENT_WITH_SESSION_WORDS,
+      });
       assert.equal(heldLocks.holds(HANDLE), false);
     },
   );

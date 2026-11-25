@@ -6,6 +6,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  */
 
 import { answer } from '../../../lib/answer';
+import { deleteTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -15,8 +16,11 @@ import { writeClassTests } from '../shared/writeTests';
 export const TOOL_DEFINITION = {
   name: 'DeleteUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Deletes the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are deleted, and the class stays.",
+  description: deleteTool({
+    purpose: purpose(
+      'Deletes the ABAP Unit test classes of an ABAP class, keeping the class.',
+    ),
+  }),
   inputSchema: z.object({
     class_name: z
       .string()

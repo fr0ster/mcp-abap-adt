@@ -7,9 +7,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { compactToolSet } from '../../../../compact/src/launcher';
-import type { PromptSource } from '../../../lib/prompts';
 import { jsonLiteral } from '../../../lib/prompts/instruction';
 import { deletePrompt } from '../../../lib/prompts/objectPrompts';
+import type { PromptSource } from '../../../lib/prompts/types';
 import { updatePrompt } from '../../../lib/prompts/updatePrompt';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import { fullToolSet, type ToolSet } from '../../../lib/toolSet';
@@ -64,7 +64,7 @@ describe('the worked examples', () => {
         '1. Read it: call HandlerGet with object_type: "CLASS", class_name: "SOME_CLASS", background: false.',
         '2. Lock it: call HandlerLock with object_type: "CLASS", object_name: "SOME_CLASS"; keep the lock_handle and the state_handle it answers.',
         '3. Write it: call HandlerUpdate with object_type: "CLASS", class_name: "SOME_CLASS", lock_handle: the lock_handle from step 2, source_code: the whole new source, state_handle: the state_handle from step 2.',
-        '4. Unlock it: call HandlerUnlock with object_type: "CLASS", object_name: "SOME_CLASS", lock_handle: the lock_handle from step 2, state_handle: the state_handle from step 2 — after step 3, whatever it answered.',
+        '4. Unlock it: call HandlerLock with action: "unlock", object_type: "CLASS", object_name: "SOME_CLASS", lock_handle: the lock_handle from step 2, state_handle: the state_handle from step 2 — after step 3, whatever it answered.',
         'CLASS takes CLASS(class_name*, source_code*, transport_request); * marks a required argument.',
         'The change: "add a method"',
       ].join('\n'),
@@ -82,7 +82,7 @@ describe('the worked examples', () => {
         '1. Read it: call HandlerGet with object_type: "CLASS", class_name: "SOME_CLASS", background: false.',
         '2. Lock it: call HandlerLock with object_type: "CLASS", object_name: "SOME_CLASS"; keep the lock_handle it answers.',
         '3. Write it: call HandlerUpdate with object_type: "CLASS", class_name: "SOME_CLASS", lock_handle: the lock_handle from step 2, source_code: the whole new source.',
-        '4. Unlock it: call HandlerUnlock with object_type: "CLASS", object_name: "SOME_CLASS", lock_handle: the lock_handle from step 2 — after step 3, whatever it answered.',
+        '4. Unlock it: call HandlerLock with action: "unlock", object_type: "CLASS", object_name: "SOME_CLASS", lock_handle: the lock_handle from step 2 — after step 3, whatever it answered.',
         'CLASS takes CLASS(class_name*, source_code*, transport_request); * marks a required argument.',
       ].join('\n'),
     );

@@ -5,7 +5,6 @@
  * and a member the variant does not serve is not named.
  */
 import {
-  ACTIVATION_CODES,
   COMPACT_ACTIVATE,
   COMPACT_CHECK,
   COMPACT_CREATE,
@@ -14,34 +13,89 @@ import {
   COMPACT_LOCK,
   COMPACT_PROFILE,
   COMPACT_READ,
-  COMPACT_SINGLE_ACTIVATION,
-  COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
   type ProjectionVariant,
 } from '../adtProjections';
-import { parentedCodesOf } from '../adtTypeCode';
-import { draftPartWords, HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
-import { withLongToolAdvice } from '../longTools';
 import {
-  either,
-  exampleCodes,
-  type Left,
-  leftOf,
-  listed,
-  when,
-} from './memberTexts';
+  type DescriptionParts,
+  lockAnswersStateHandle,
+  longRunning,
+  pairsPurpose,
+  toolDescription,
+  underLock,
+  unlockUnderLock,
+  withArticle,
+} from '../description/index';
+import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
+import type { CompactObjectType } from './compactObjectTypes';
+import { LOCK_ACTIONS } from './compactSchemas';
+import { leftOf } from './memberTexts';
 
 /** Each member as the description names it, with the arguments it takes. */
 type Tokens<M extends string> = { readonly [K in M]: string };
 
-/** The members, each as `token` names it, joined by commas. */
-function named<M extends string>(
-  members: readonly M[],
-  token: (member: M) => string,
-): string {
-  return members.map(token).join(', ');
+/** Each object type in words, as a purpose names it. */
+const TYPE_WORDS: { readonly [K in CompactObjectType]: string } = {
+  PACKAGE: 'package',
+  DOMAIN: 'domain',
+  DATA_ELEMENT: 'data element',
+  TRANSPORT: 'transport',
+  TABLE: 'table',
+  STRUCTURE: 'structure',
+  TABLE_TYPE: 'table type',
+  DDL: 'CDS view',
+  SERVICE_DEFINITION: 'service definition',
+  SERVICE_BINDING: 'service binding',
+  CLASS: 'class',
+  UNIT_TEST: 'the unit tests of a class',
+  CDS_UNIT_TEST: 'the unit tests of a CDS view',
+  LOCAL_TEST_CLASS: 'the local test classes of a class',
+  LOCAL_TYPES: 'the local types of a class',
+  LOCAL_DEFINITIONS: 'the local definitions of a class',
+  LOCAL_MACROS: 'the local macros of a class',
+  PROGRAM: 'program',
+  INCLUDE: 'include',
+  INTERFACE: 'interface',
+  FUNCTION_GROUP: 'function group',
+  FUNCTION_MODULE: 'function module',
+  BEHAVIOR_DEFINITION: 'behavior definition',
+  BEHAVIOR_IMPLEMENTATION: 'behavior implementation',
+  METADATA_EXTENSION: 'metadata extension',
+  RUNTIME_PROFILE: 'profiler trace',
+  RUNTIME_DUMP: 'short dump',
+  PROGRAM_TEXT_ELEMENTS: 'the text elements of a program',
+  FUNCTION_GROUP_TEXT_ELEMENTS: 'the text elements of a function group',
+  CLASS_TEXT_ELEMENTS: 'the text elements of a class',
+  TABLE_SETTINGS: 'the technical settings of a table',
+};
+
+/** One pair per object type: `verb` and the type in words, with its article. */
+function pairsOf(
+  verb: string,
+  members: readonly CompactObjectType[],
+): string[] {
+  return typeWords(members).map((type) => `${verb} ${withArticle(type)}`);
 }
+
+/** The object types `members` names, in words, each once; `own` replaces a member's words. */
+function typeWords(
+  members: readonly CompactObjectType[],
+  own: Partial<Record<CompactObjectType, string>> = {},
+): string[] {
+  return [
+    ...new Set(members.map((member) => own[member] ?? TYPE_WORDS[member])),
+  ];
+}
+
+/**
+ * The members a deletion removes as another object than the type words
+ * say: CDS_UNIT_TEST is the CDS view's global test class, deleted whole
+ * (`deletionTargets.ts`).
+ */
+const DELETION_WORDS: Partial<Record<CompactObjectType, string>> = {
+  CDS_UNIT_TEST: 'the global test class (CLAS) of a CDS view',
+};
 
 type CreateMember = (typeof COMPACT_CREATE.onprem)[number];
 
@@ -77,12 +131,22 @@ export function createToken(member: CreateMember): string {
   return CREATE_TOKENS[member];
 }
 
+/** HandlerCreate's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactCreateParts(
+  variant: ProjectionVariant,
+  members: readonly CreateMember[] = COMPACT_CREATE[variant],
+): DescriptionParts {
+  return {
+    purpose: pairsPurpose(pairsOf('creates', members)),
+  };
+}
+
 /** HandlerCreate's description on `variant`, naming `members` (default: all the variant's). */
 export function compactCreateDescription(
   variant: ProjectionVariant,
   members: readonly CreateMember[] = COMPACT_CREATE[variant],
 ): string {
-  return `Creates the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …): sends the create request for its type with the given parameters, and answers SAP's result. The object is created inactive. object_type required: ${named(members, createToken)}. Optional for every type: description, transport_request.`;
+  return toolDescription(compactCreateParts(variant, members));
 }
 
 type ReadMember = (typeof COMPACT_READ.onprem)[number];
@@ -128,59 +192,82 @@ export function readToken(member: ReadMember): string {
   return READ_TOKENS[member];
 }
 
-/** The parts each kind of type has, the kinds whose members are all removed left out. */
-const PARTS_PER_TYPE: ReadonlyArray<readonly [readonly ReadMember[], string]> =
-  [
-    [['PACKAGE'], 'metadata, contents'],
-    [['DOMAIN', 'DATA_ELEMENT', 'FUNCTION_GROUP', 'TABLE_TYPE'], 'metadata'],
-    [
-      [
-        'LOCAL_TEST_CLASS',
-        'LOCAL_TYPES',
-        'LOCAL_DEFINITIONS',
-        'LOCAL_MACROS',
-        'TRANSPORT',
-        'UNIT_TEST',
-        'CDS_UNIT_TEST',
-      ],
-      'source',
-    ],
-    [['SERVICE_BINDING'], 'source, metadata, urls'],
-    [['TABLE_SETTINGS'], 'source (the technical settings, in one request)'],
-    [['CLASS_TEXT_ELEMENTS'], 'source (the text symbols, in one request)'],
-    [
-      ['PROGRAM_TEXT_ELEMENTS', 'FUNCTION_GROUP_TEXT_ELEMENTS'],
-      'source (symbols, selections and headings, one request each)',
-    ],
-  ];
+/** The members whose word names a part of an object: read as it is, not by its source. */
+const PART_WORDS: readonly ReadMember[] = [
+  'LOCAL_TEST_CLASS',
+  'LOCAL_TYPES',
+  'LOCAL_DEFINITIONS',
+  'LOCAL_MACROS',
+  'TABLE_SETTINGS',
+  'PROGRAM_TEXT_ELEMENTS',
+  'FUNCTION_GROUP_TEXT_ELEMENTS',
+  'CLASS_TEXT_ELEMENTS',
+];
 
-function partsPerType(left: Left): string {
-  return PARTS_PER_TYPE.map(
-    ([types, parts]) => [left.of(types), parts] as const,
-  )
-    .filter(([types]) => types.length > 0)
-    .map(([types, parts]) => `${types.join(', ')} ${parts}; `)
-    .join('');
+/** The members whose one part is their metadata. */
+const METADATA_ONLY: readonly ReadMember[] = [
+  'DOMAIN',
+  'DATA_ELEMENT',
+  'FUNCTION_GROUP',
+  'TABLE_TYPE',
+];
+
+/** What HandlerGet reads of `member`, one pair per part it offers. */
+function readPairs(member: ReadMember): string[] {
+  const word = TYPE_WORDS[member];
+  const of = (part: string) => `reads the ${part} of ${withArticle(word)}`;
+  switch (member) {
+    case 'PACKAGE':
+      return [of('metadata'), of('contents')];
+    case 'TRANSPORT':
+      return [of('objects'), of('header')];
+    case 'SERVICE_BINDING':
+      // Its source part is the binding definition (GetServiceBinding).
+      return [of('binding definition'), of('metadata'), of('URLs')];
+    case 'UNIT_TEST':
+      return ["reads an ABAP Unit run's result"];
+    case 'CDS_UNIT_TEST':
+      return ["reads a CDS unit test run's result"];
+    default:
+      if (PART_WORDS.includes(member)) return [`reads ${withArticle(word)}`];
+      if (METADATA_ONLY.includes(member)) return [of('metadata')];
+      return [of('source code'), of('metadata')];
+  }
 }
 
-/** The sentence on `part: 'draft'`, for the draft types left. */
-function draftPart(variant: ProjectionVariant, left: Left): string {
-  const types = left.of(HANDLER_GET_DRAFT_TYPES[variant]);
-  if (types.length === 0) return '';
-  const timeless = left.of<ReadMember>([
-    'METADATA_EXTENSION',
-    'SERVICE_DEFINITION',
-  ]);
-  return ` draft (${listed(types)}) reads the active, inactive and working versions of each part of the object together (${draftPartWords(variant, types)}) and answers { object_type, object_name, has_draft, parts }: per part draft states whose unactivated change it holds — own (the caller's), other (another user's), undetermined (its three ETags in another pattern), and the active state when its versions are equal — with changed_at (the change's last write, UTC) and age_seconds by the server's clock for own and other${when(timeless.length > 0, ` (null for ${listed(timeless)}, whose ETag carries a constant time)`)}, and the three ETags (active, inactive, workspace); has_draft is true when any part holds a change of a user's.`;
+/** The members left on `variant`. */
+function left(variant: ProjectionVariant, members: readonly ReadMember[]) {
+  return leftOf(COMPACT_READ[variant], members);
 }
 
-/** The sentence on reading a unit-test run's result, for the run types left. */
-function unitTestRuns(left: Left): string {
-  const runs = left.of<ReadMember>(['UNIT_TEST', 'CDS_UNIT_TEST']);
-  if (runs.length === 0) return '';
-  const [read, answer] =
-    runs.length === 1 ? ['reads', 'answers'] : ['read', 'answer'];
-  return ` ${listed(runs)} ${read} the run's result in one request and ${answer} { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime.`;
+/** HandlerGet's parts on `variant`: one pair per object type and part it reads. */
+export function compactGetParts(
+  variant: ProjectionVariant,
+  members: readonly ReadMember[] = COMPACT_READ[variant],
+): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: pairsPurpose([
+      ...members.flatMap(readPairs),
+      ...(variant === 'onprem' && left(variant, members).has('INCLUDE')
+        ? ['reads the main programs of an include']
+        : []),
+      // The draft part, served while a type it reads is left.
+      ...(HANDLER_GET_DRAFT_TYPES[variant].some((type) =>
+        members.some((member) => member === type),
+      )
+        ? [
+            'reads whether a repository object holds an unactivated change, and whose',
+          ]
+        : []),
+      "reads a repository object's structure",
+      'reads a repository browser node',
+      'reads virtual folders',
+      "reads an activation run's status",
+      "reads an activation run's results",
+    ]),
+    notes: [longRunning],
+  };
 }
 
 /** HandlerGet's description on `variant`, naming `members` (default: all the variant's). */
@@ -188,10 +275,7 @@ export function compactGetDescription(
   variant: ProjectionVariant,
   members: readonly ReadMember[] = COMPACT_READ[variant],
 ): string {
-  const left = leftOf(COMPACT_READ[variant], members);
-  return withLongToolAdvice(
-    `[read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls${when(left.has('SERVICE_BINDING'), ' (SERVICE_BINDING)')} the service URL, its $metadata and the browser preview, contents${when(left.has('PACKAGE'), ' (PACKAGE)')} the objects the package holds, its walk read level by level in ADT batch envelopes${when(left.has('PACKAGE'), '; package_names lists several packages, read together, one entry per package in the order given')}. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: ${partsPerType(left)}every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, activated, messages, document }: activated is SAP's verdict as the results state it: true where they say activationExecuted="true" and every message is below error severity, false where they say activationExecuted="false" (a run SAP cancelled, or one whose message list is empty) or carry an error-severity message, null where they leave activationExecuted out; beside the messages the run produced and its results document as SAP answered it. ${when(members.length > 0, `Otherwise object_type required: ${named(members, readToken)}.`)}${when(left.has('TRANSPORT'), " TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position.")}${unitTestRuns(left)}${draftPart(variant, left)}`,
-  );
+  return toolDescription(compactGetParts(variant, members));
 }
 
 type UpdateMember = (typeof COMPACT_UPDATE.onprem)[number];
@@ -247,48 +331,30 @@ export function updateToken(member: UpdateMember): string {
   return UPDATE_TOKENS[member];
 }
 
+/** HandlerUpdate's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactUpdateParts(
+  variant: ProjectionVariant,
+  members: readonly UpdateMember[] = COMPACT_UPDATE[variant],
+): DescriptionParts {
+  return {
+    // A service binding's write is its publication request.
+    purpose: pairsPurpose(
+      members.flatMap((member) =>
+        member === 'SERVICE_BINDING'
+          ? ['publishes or unpublishes a service binding']
+          : pairsOf('updates', [member]),
+      ),
+    ),
+    notes: [underLock],
+  };
+}
+
 /** HandlerUpdate's description on `variant`, naming `members` (default: all the variant's). */
 export function compactUpdateDescription(
   variant: ProjectionVariant,
   members: readonly UpdateMember[] = COMPACT_UPDATE[variant],
 ): string {
-  const left = leftOf(COMPACT_UPDATE[variant], members);
-  const served: readonly string[] = members;
-  const serves = (member: string) => served.includes(member);
-  const metadata = [
-    ...[
-      'PACKAGE',
-      'DOMAIN',
-      'DATA_ELEMENT',
-      'FUNCTION_GROUP',
-      'TABLE_TYPE',
-    ].filter(serves),
-    ...(serves('INCLUDE') ? ['INCLUDE with part metadata'] : []),
-  ];
-  const subResources = [
-    'TABLE_SETTINGS',
-    'PROGRAM_TEXT_ELEMENTS',
-    'FUNCTION_GROUP_TEXT_ELEMENTS',
-    'CLASS_TEXT_ELEMENTS',
-  ].filter(serves);
-  const texts = [
-    'PROGRAM_TEXT_ELEMENTS',
-    'FUNCTION_GROUP_TEXT_ELEMENTS',
-    'CLASS_TEXT_ELEMENTS',
-  ].filter(serves);
-  const classIncludes = left.of<UpdateMember>([
-    'LOCAL_TEST_CLASS',
-    'LOCAL_TYPES',
-    'LOCAL_DEFINITIONS',
-    'LOCAL_MACROS',
-    'UNIT_TEST',
-    'CDS_UNIT_TEST',
-    'BEHAVIOR_IMPLEMENTATION',
-  ]);
-  const parted = serves('INCLUDE')
-    ? ' part is taken by INCLUDE alone: source (when absent) writes its source, metadata its metadata document.'
-    : '';
-  return `Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the write of its type under lock_handle, the lock handle of the object, one request${when(subResources.length > 0, ` (${listed(subResources)}: as their sentences below say)`)}, and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: ${named(members, updateToken)}.${when(metadata.length > 0, ` For ${listed(metadata)}, source_code is the whole metadata document, sent as given.`)}${parted}${classIncludes.length > 0 ? ` For ${listed(classIncludes)}, lock_handle is the class's lock handle.` : ''}${when(serves('TABLE_SETTINGS'), ' For TABLE_SETTINGS, lock_handle is the lock handle of TABLE_SETTINGS; the settings document is read and written back with each setting given, at least one, over the stored one, every other setting keeping its stored value: two requests; is_writable_by_amdp is taken on the cloud.')}${when(texts.length > 0, ` For ${listed(texts)}, lock_handle is the lock handle of the same object_type; each of symbols, selections and headings given, at least one, is written as its whole list, one request each.`)}${when(left.has('SERVICE_BINDING'), ' For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding.')} transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.`;
+  return toolDescription(compactUpdateParts(variant, members));
 }
 
 type DeleteMember = (typeof COMPACT_DELETE.onprem)[number];
@@ -332,23 +398,19 @@ export function deleteToken(member: DeleteMember): string {
   return DELETE_TOKENS[member];
 }
 
-/** The sentence on the class includes a delete writes empty, for those left. */
-function emptiedIncludes(left: Left): string {
-  const locals = left.of<DeleteMember>([
-    'LOCAL_TEST_CLASS',
-    'LOCAL_TYPES',
-    'LOCAL_DEFINITIONS',
-    'LOCAL_MACROS',
-  ]);
-  const parts = [
-    ...(locals.length > 0
-      ? [`${listed(locals)} (the class's local includes)`]
-      : []),
-    ...(left.has('UNIT_TEST') ? ['UNIT_TEST (its test classes include)'] : []),
-  ];
-  return parts.length === 0
-    ? ''
-    : ` For ${parts.join(' and ')} the include is written empty under lock_handle, the class's lock handle.`;
+/** HandlerDelete's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactDeleteParts(
+  variant: ProjectionVariant,
+  members: readonly DeleteMember[] = COMPACT_DELETE[variant],
+): DescriptionParts {
+  return {
+    purpose: pairsPurpose(
+      typeWords(members, DELETION_WORDS).map(
+        (type) => `deletes ${withArticle(type)}`,
+      ),
+    ),
+    notes: [underLock],
+  };
 }
 
 /** HandlerDelete's description on `variant`, naming `members` (default: all the variant's). */
@@ -356,8 +418,7 @@ export function compactDeleteDescription(
   variant: ProjectionVariant,
   members: readonly DeleteMember[] = COMPACT_DELETE[variant],
 ): string {
-  const left = leftOf(COMPACT_DELETE[variant], members);
-  return `Deletes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …): sends the deletion request for its type, and answers SAP's result. object_type required: ${named(members, deleteToken)}.${when(left.has('CDS_UNIT_TEST'), ' CDS_UNIT_TEST deletes its test class.')}${emptiedIncludes(left)} transport_request is sent with the request. Over Streamable HTTP an include write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); it is sent only under a lock the instance it reaches holds.`;
+  return toolDescription(compactDeleteParts(variant, members));
 }
 
 /** `M(rest)` for a member of a lifecycle list, unless `special` names it otherwise. */
@@ -371,7 +432,7 @@ function objectNamed<M extends string>(
 
 type LockMember = (typeof COMPACT_LOCK.onprem)[number];
 
-/** A HandlerLock member with the arguments it takes, as the description names it. */
+/** A HandlerLock member with the arguments it takes, as the member table names it. */
 export function lockToken(member: LockMember): string {
   return objectNamed<LockMember>(
     member,
@@ -380,35 +441,45 @@ export function lockToken(member: LockMember): string {
   );
 }
 
-/** HandlerLock's description on `variant`, naming `members` (default: all the variant's). */
+/** HandlerLock's actions, as its schema states them. */
+type LockAction = (typeof LOCK_ACTIONS)[number];
+
+/**
+ * HandlerLock's parts on `variant`, naming `members` and `actions` (default:
+ * all the variant's, both actions): each action's verb and its own note on
+ * the state handle.
+ */
+export function compactLockParts(
+  variant: ProjectionVariant,
+  members: readonly LockMember[] = COMPACT_LOCK[variant],
+  actions: readonly LockAction[] = LOCK_ACTIONS,
+): DescriptionParts {
+  const locks = actions.includes('lock');
+  const unlocks = actions.includes('unlock');
+  const verb =
+    locks && unlocks ? 'locks or unlocks' : locks ? 'locks' : 'unlocks';
+  return {
+    purpose: pairsPurpose(pairsOf(verb, members), ' for editing.'),
+    notes: [
+      ...(locks ? [lockAnswersStateHandle] : []),
+      ...(unlocks ? [unlockUnderLock] : []),
+    ],
+  };
+}
+
+/** HandlerLock's description on `variant`, naming `members` and `actions` (default: all). */
 export function compactLockDescription(
   variant: ProjectionVariant,
   members: readonly LockMember[] = COMPACT_LOCK[variant],
+  actions: readonly LockAction[] = LOCK_ACTIONS,
 ): string {
-  const left = leftOf(COMPACT_LOCK[variant], members);
-  return `Lock operation. object_type required: ${named(members, lockToken)}. Answers the lock_handle and the state_handle of the server instance that holds the lock${when(left.has('SERVICE_BINDING'), '; a SERVICE_BINDING open in an editing session answers an empty lock_handle, under which its publication runs')}. A write, a delete or an unlock under the lock_handle runs on the instance that holds it. Over Streamable HTTP send it as the state_handle argument of every call under this lock, the write and the unlock (or in the x-mcp-state-handle header).`;
-}
-
-type UnlockMember = (typeof COMPACT_UNLOCK.onprem)[number];
-
-/** A HandlerUnlock member with the arguments it takes, as the description names it. */
-export function unlockToken(member: UnlockMember): string {
-  return objectNamed<UnlockMember>(member, {}, 'object_name*, lock_handle*');
-}
-
-/** HandlerUnlock's description on `variant`, naming `members` (default: all the variant's). */
-export function compactUnlockDescription(
-  variant: ProjectionVariant,
-  members: readonly UnlockMember[] = COMPACT_UNLOCK[variant],
-): string {
-  const left = leftOf(COMPACT_UNLOCK[variant], members);
-  return `Unlock operation. object_type required: ${named(members, unlockToken)}${when(left.has('SERVICE_BINDING'), '; an empty lock_handle of a SERVICE_BINDING answers that the binding is already unlocked')}. The lock_handle is one a lock of this server instance answered; the unlock ends the instance's hold on the lock. Over Streamable HTTP the unlock takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).`;
+  return toolDescription(compactLockParts(variant, members, actions));
 }
 
 type ValidateMember = (typeof COMPACT_VALIDATE.onprem)[number];
 
-/** A HandlerValidate member with the arguments it takes, as the description names it. */
-function validateToken(member: ValidateMember): string {
+/** A HandlerValidate member with the arguments it takes. */
+export function validateToken(member: ValidateMember): string {
   return objectNamed<ValidateMember>(
     member,
     {
@@ -432,13 +503,25 @@ function validateToken(member: ValidateMember): string {
   );
 }
 
+/** HandlerValidate's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactValidateParts(
+  variant: ProjectionVariant,
+  members: readonly ValidateMember[] = COMPACT_VALIDATE[variant],
+): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: pairsPurpose(
+      typeWords(members).map((type) => `validates the name of a new ${type}`),
+    ),
+  };
+}
+
 /** HandlerValidate's description on `variant`, naming `members` (default: all the variant's). */
 export function compactValidateDescription(
   variant: ProjectionVariant,
   members: readonly ValidateMember[] = COMPACT_VALIDATE[variant],
 ): string {
-  const left = leftOf(COMPACT_VALIDATE[variant], members);
-  return `[read-only] Validates a new object named by object_type and object_name before it is created. object_type required: ${named(members, validateToken)}.${when(left.has('SERVICE_BINDING'), " For SERVICE_BINDING the answer is the verdict of SAP's transport check for the binding's name and package: admissible true where SAP answers S, false where it answers E, each with SAP's messages, and any other value as result; creating the binding checks the name, the package and the service definition itself.")}`;
+  return toolDescription(compactValidateParts(variant, members));
 }
 
 type CheckMember = (typeof COMPACT_CHECK.onprem)[number];
@@ -452,38 +535,60 @@ export function checkToken(member: CheckMember): string {
   );
 }
 
+/** HandlerCheckRun's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactCheckRunParts(
+  variant: ProjectionVariant,
+  members: readonly CheckMember[] = COMPACT_CHECK[variant],
+): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: pairsPurpose(pairsOf('checks the syntax of', members)),
+  };
+}
+
 /** HandlerCheckRun's description on `variant`, naming `members` (default: all the variant's). */
 export function compactCheckRunDescription(
   variant: ProjectionVariant,
   members: readonly CheckMember[] = COMPACT_CHECK[variant],
 ): string {
-  const unsaved = leftOf(COMPACT_CHECK[variant], members).of<CheckMember>([
-    'CLASS',
-    'STRUCTURE',
-    'DDL',
-  ]);
-  return `[read-only] Runs a syntax check on the object named by object_type and object_name. object_type required: ${named(members, checkToken)}.${when(unsaved.length > 0, ` source_code checks unsaved source given in the call, for ${listed(unsaved)}.`)}`;
+  return toolDescription(compactCheckRunParts(variant, members));
 }
 
 type DeletionCheckMember = (typeof COMPACT_DELETION_CHECK.onprem)[number];
+
+/** A HandlerDeletionCheck member with what names it. */
+export function deletionCheckToken(member: DeletionCheckMember): string {
+  return member === 'CDS_UNIT_TEST'
+    ? 'CDS_UNIT_TEST (its test class)'
+    : member === 'FUNCTION_MODULE'
+      ? 'FUNCTION_MODULE (object_name GROUP|MODULE)'
+      : member;
+}
+
+/** HandlerDeletionCheck's parts on `variant`, naming `given` (default: all the variant's). */
+export function compactDeletionCheckParts(
+  variant: ProjectionVariant,
+  given: readonly DeletionCheckMember[] = COMPACT_DELETION_CHECK[variant],
+): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: pairsPurpose(
+      typeWords(given, DELETION_WORDS).map(
+        (type) => `checks whether ${withArticle(type)} can be deleted`,
+      ),
+    ),
+  };
+}
 
 /** HandlerDeletionCheck's description on `variant`, naming `given` (default: all the variant's). */
 export function compactDeletionCheckDescription(
   variant: ProjectionVariant,
   given: readonly DeletionCheckMember[] = COMPACT_DELETION_CHECK[variant],
 ): string {
-  const members = given.map((member) =>
-    member === 'CDS_UNIT_TEST'
-      ? 'CDS_UNIT_TEST (its test class)'
-      : member === 'FUNCTION_MODULE'
-        ? 'FUNCTION_MODULE (object_name GROUP|MODULE)'
-        : member,
-  );
-  return `[read-only] Asks SAP whether the object named by object_type and object_name can be deleted: sends the deletion check request for its type, and answers SAP's verdict as it came: deletable true with the object and SAP's message when it carries one, or SAP's refusal with its words. object_type and object_name required: ${members.join(', ')}.`;
+  return toolDescription(compactDeletionCheckParts(variant, given));
 }
 
 type ActivateMember = (typeof COMPACT_ACTIVATE.onprem)[number];
-type ActivationCode = (typeof ACTIVATION_CODES.onprem)[number];
 
 /**
  * A HandlerActivate member as the description's single form names it: the type
@@ -496,26 +601,42 @@ export function activateToken(member: ActivateMember): string {
     : member;
 }
 
-/** The code HandlerActivate's description names as its example. */
-const ACTIVATE_EXAMPLE: readonly ActivationCode[] = ['CLAS/OC'];
+/** HandlerActivate's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactActivateParts(
+  variant: ProjectionVariant,
+  members: readonly ActivateMember[] = COMPACT_ACTIVATE[variant],
+): DescriptionParts {
+  return {
+    purpose: pairsPurpose([
+      ...pairsOf('activates', members),
+      'activates another object by its ADT type',
+      'activates several objects together',
+    ]),
+  };
+}
 
-/**
- * HandlerActivate's description on `variant`, naming `members` and `codes`
- * (default: all the variant's).
- */
+/** HandlerActivate's description on `variant`, naming `members` (default: all the variant's). */
 export function compactActivateDescription(
   variant: ProjectionVariant,
   members: readonly ActivateMember[] = COMPACT_ACTIVATE[variant],
-  codes: readonly ActivationCode[] = ACTIVATION_CODES[variant],
 ): string {
-  const left = leftOf(COMPACT_ACTIVATE[variant], members);
-  const byName = members
-    .filter((member) => member !== 'FUNCTION_MODULE')
-    .map(activateToken);
-  const example = exampleCodes(ACTIVATE_EXAMPLE, codes, 1)
-    .map((code) => `"${code}"`)
-    .join(', ');
-  return `Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): ${when(byName.length > 0, `object_type is enough for ${listed(byName)}; `)}${when(left.has('FUNCTION_MODULE'), `${activateToken('FUNCTION_MODULE')} is activated under its function group; `)}any other type takes object_adt_type (e.g. ${example}), with parentName for a part of a function group (${parentedCodesOf(codes).join(', ')}). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); an object of ${parentedCodesOf(codes).join(', ')} is listed with objects[].parentName set to its function group. One object of ${either(left.of(COMPACT_SINGLE_ACTIVATION[variant]))} (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id. Where the system's discovery leaves out the activation runs (SAP_BASIS 751, 7.40), that call answers SAP's refusal; a group activation there is ActivateObjects (the full set) or ActivateObjectLow (the low handlers group).`;
+  return toolDescription(compactActivateParts(variant, members));
+}
+
+/** HandlerProfileRun's parts on `variant`, naming `members` (default: all the variant's). */
+export function compactProfileRunParts(
+  variant: ProjectionVariant,
+  members: readonly (typeof COMPACT_PROFILE.onprem)[number][] = COMPACT_PROFILE[
+    variant
+  ],
+): DescriptionParts {
+  return {
+    purpose: pairsPurpose(
+      members.map((member) =>
+        member === 'CLASS' ? 'runs an ABAP class' : 'runs an ABAP report',
+      ),
+    ),
+  };
 }
 
 /** HandlerProfileRun's description on `variant`. */
@@ -525,10 +646,49 @@ export function compactProfileRunDescription(
     variant
   ],
 ): string {
-  const names = members.map((member) =>
-    member === 'CLASS' ? 'class_name* for CLASS' : 'program_name* for PROGRAM',
-  );
-  return `Runs ${either(
-    members.map((member) => (member === 'CLASS' ? 'a class' : 'a program')),
-  )} in one request. Required: target_type*(${members.join('|')}) + ${either(names)}. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.`;
+  return toolDescription(compactProfileRunParts(variant, members));
+}
+
+/** The compact tools whose `object_type` picks the object. */
+export const OBJECT_TYPE_TOOLS = [
+  'HandlerCreate',
+  'HandlerGet',
+  'HandlerUpdate',
+  'HandlerDelete',
+  'HandlerLock',
+  'HandlerValidate',
+  'HandlerCheckRun',
+  'HandlerDeletionCheck',
+  'HandlerActivate',
+] as const;
+export type ObjectTypeTool = (typeof OBJECT_TYPE_TOOLS)[number];
+
+/** Whether `name` is a compact tool whose `object_type` picks the object. */
+export function isObjectTypeTool(name: string): name is ObjectTypeTool {
+  return OBJECT_TYPE_TOOLS.some((tool) => tool === name);
+}
+
+/**
+ * The members `tool` takes on `variant`, each with the arguments it needs:
+ * `object_type required: A(a*), B(b*).` — the member table the schema
+ * serves and the prompts quote; a description names no parameter (owner),
+ * so this is the one place the members are written as text.
+ */
+export function memberTokens(
+  tool: ObjectTypeTool,
+  variant: ProjectionVariant,
+): string {
+  const tokens: Record<ObjectTypeTool, () => readonly string[]> = {
+    HandlerCreate: () => COMPACT_CREATE[variant].map(createToken),
+    HandlerGet: () => COMPACT_READ[variant].map(readToken),
+    HandlerUpdate: () => COMPACT_UPDATE[variant].map(updateToken),
+    HandlerDelete: () => COMPACT_DELETE[variant].map(deleteToken),
+    HandlerLock: () => COMPACT_LOCK[variant].map(lockToken),
+    HandlerValidate: () => COMPACT_VALIDATE[variant].map(validateToken),
+    HandlerCheckRun: () => COMPACT_CHECK[variant].map(checkToken),
+    HandlerDeletionCheck: () =>
+      COMPACT_DELETION_CHECK[variant].map(deletionCheckToken),
+    HandlerActivate: () => COMPACT_ACTIVATE[variant].map(activateToken),
+  };
+  return `object_type required: ${tokens[tool]().join(', ')}.`;
 }

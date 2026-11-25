@@ -5,8 +5,8 @@
  * the tool pages' prompt pointers are generated from them.
  */
 import assert from 'node:assert/strict';
-import type { AbapPrompt } from '../../lib/prompts';
-import { abapPrompts } from '../../lib/prompts';
+import { abapPrompts } from '../../lib/prompts/prompts';
+import type { AbapPrompt } from '../../lib/prompts/types';
 import { statedSystemKind } from '../../lib/systemKind';
 import { closedArgumentOf, promptArguments } from './promptArguments';
 import { promptSourceFor } from './promptSources';

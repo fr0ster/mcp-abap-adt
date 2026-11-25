@@ -10,20 +10,26 @@ import {
   breakpointsFromArgs,
   RUN_PROPERTY,
   runFromArgs,
-  SHARED_SET_SENTENCE,
   START_BREAKPOINTS_PROPERTY,
-  START_NEEDS_BREAKPOINTS_SENTENCE,
   START_PROPERTIES,
   startOptionsFromArgs,
-  USER_MODE_SENTENCE,
 } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugStartListener',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. ${START_NEEDS_BREAKPOINTS_SENTENCE} Takes whose requests are caught, the debugging mode and the debugger settings. ${USER_MODE_SENTENCE} ${SHARED_SET_SENTENCE}`,
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Starts an ABAP debug session: arms breakpoints, listens for a debuggee and attaches the first one caught.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     ...START_BREAKPOINTS_PROPERTY,
     ...START_PROPERTIES,

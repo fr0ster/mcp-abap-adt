@@ -19,7 +19,6 @@ import {
   COMPACT_LOCK,
   COMPACT_PROFILE,
   COMPACT_READ,
-  COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
   type ProjectionVariant,
@@ -28,6 +27,14 @@ import {
 } from '../adtProjections';
 import { activationParentDescription } from '../adtTypeCode';
 import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
+import {
+  type DescriptionParts,
+  longRunning,
+  pairsPurpose,
+  purpose,
+  toolDescription,
+} from '../description/index';
+import { DETAIL_LEVELS } from '../detail/levels';
 import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import { dumpFiltersRefusal } from '../dumpFilters';
 import {
@@ -43,7 +50,6 @@ import { READ_VERSION_FIELD } from '../handlers/readVersion';
 import {
   COMPACT_LONG_BACKGROUND_DESCRIPTION,
   COMPACT_LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
 } from '../longTools';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../masterLanguage';
 import { ANSWER_LEVELS } from '../search-source/answerLevel';
@@ -203,7 +209,7 @@ const CREATE_PROPERTIES = {
     .string()
     .optional()
     .describe(
-      'The package this package belongs to (PACKAGE create); a top-level package has none.',
+      'PACKAGE create. Optional: the package this package belongs to, which must exist (SAP creates the package with no super package when the named one is missing). Without one the package is top level, which SAP allows for a structure package or a package in software component LOCAL ($ or TEST names, no transport layer); in an ABAP Cloud software component the top level is a structure package (SAP answers TR 462 to any other).',
     ),
   package_type: z
     .string()
@@ -478,18 +484,23 @@ function getBackground(left: Left) {
 
 const GET_PROPERTIES = {
   part: readPartSchema,
+  // The level of a read a changed full tool answers (compact parity): a
+  // package's contents, an include's main programs, a transport's entries
+  // and its own document, an object's structure.
+  detail: DETAIL_SHAPE.detail,
   package_name: z.string().optional().describe('Package name.'),
   package_names: z
     .array(z.string())
     .optional()
     .describe(
-      'Several package names (part contents), read together: one entry per package, in the order given, each { package_name, contents } or { package_name, error }.',
+      "Several package names (part contents), read together, as GetPackageContents answers them: at detail terse each package's rows under its '# asked' line, else one entry per package, in the order given.",
     ),
   max_results: z
     .number()
-    .default(100)
     .optional()
-    .describe('Maximum number of members listed per package (part contents).'),
+    .describe(
+      'Accepted for compatibility (part contents): every member is answered.',
+    ),
   include_descriptions: z
     .boolean()
     .default(false)
@@ -540,7 +551,7 @@ const GET_PROPERTIES = {
     .string()
     .optional()
     .describe(
-      'Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own.',
+      'Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own. With part metadata: the request or task itself.',
     ),
   run_id: z
     .string()
@@ -678,6 +689,7 @@ export const COMPACT_READ_TAKES = takesOf<
     'facet_order',
     'with_versions',
     'ignore_short_descriptions',
+    'detail',
   ],
   members: {
     PACKAGE: [
@@ -1431,7 +1443,7 @@ export const compactProfileRunSchema = compactProfileRunSchemaFor(
   COMPACT_PROFILE.onprem,
 );
 
-export const compactProfileListSchema = z.object({});
+export const compactProfileListSchema = z.object({ ...DETAIL_SHAPE });
 
 export const compactProfileViewSchema = z.object({
   background: COMPACT_LONG_BACKGROUND_FIELD,
@@ -1468,6 +1480,7 @@ export const compactProfileViewSchema = z.object({
 
 /** `HandlerDumpList`'s arguments but `background`. */
 const DUMP_LIST_FIELDS = {
+  ...DETAIL_SHAPE,
   feed_type: z
     .enum(['dumps', 'system_messages', 'gateway_errors'])
     .default('dumps')
@@ -1603,6 +1616,7 @@ export const compactTransportCreateSchema = z.object({
     .describe(
       "Type given to the request's task: S Development/Correction (default), R Repair, X Unclassified.",
     ),
+  ...DETAIL_SHAPE,
 });
 
 export const compactTransportSortAndCompressSchema = z.object({
@@ -1810,7 +1824,26 @@ export const compactDeletionCheckSchema = compactDeletionCheckSchemaFor(
   COMPACT_DELETION_CHECK.onprem,
 );
 
+/** HandlerLock's actions: a deny entry may close either (`HandlerLock.unlock`). */
+export const LOCK_ACTIONS = ['lock', 'unlock'] as const;
+type LockAction = (typeof LOCK_ACTIONS)[number];
+
+/** The words of an unlock asked with no lock handle. */
+export const UNLOCK_NEEDS_HANDLE_WORDS =
+  'lock_handle is required for action unlock: the handle the lock gave; nothing was sent';
+
 const LOCK_PROPERTIES = {
+  action: z
+    .enum(LOCK_ACTIONS)
+    .default('lock')
+    .optional()
+    .describe(
+      'lock (default): lock the object for editing; unlock: release the lock lock_handle names.',
+    ),
+  lock_handle: z
+    .string()
+    .optional()
+    .describe('unlock: the lock handle the lock gave.'),
   super_package: z
     .string()
     .optional()
@@ -1822,18 +1855,20 @@ const LOCK_PROPERTIES = {
 /** A member of `HandlerLock`'s `object_type`. */
 type LockMember = (typeof COMPACT_LOCK.onprem)[number];
 
-/** What `HandlerLock` takes: the object's type and name; a package also its super package. */
+/**
+ * What `HandlerLock` takes: the action, the object's type and name, the lock
+ * handle an unlock releases; a package also its super package.
+ */
 export const COMPACT_LOCK_TAKES = takesOf<
   keyof ReturnType<typeof lifecycleObjectSchema> | keyof typeof LOCK_PROPERTIES,
   LockMember
 >()({
-  every: ['object_type', 'object_name'],
+  every: ['action', 'object_type', 'object_name', 'lock_handle'],
   members: { PACKAGE: ['super_package'] },
 });
 
-export function compactLockSchemaFor<const M extends readonly LockMember[]>(
-  members: M,
-) {
+/** HandlerLock's fields for `members`, before its rule. */
+function lockObject<const M extends readonly LockMember[]>(members: M) {
   const properties = {
     ...lifecycleObjectSchema(members),
     ...LOCK_PROPERTIES,
@@ -1845,40 +1880,71 @@ export function compactLockSchemaFor<const M extends readonly LockMember[]>(
   });
 }
 
-export const compactLockSchema = compactLockSchemaFor(COMPACT_LOCK.onprem);
+/** An unlock names the lock it releases: without lock_handle it is refused. */
+function unlockNamesItsLock(
+  value: {
+    readonly action?: LockAction | undefined;
+    readonly lock_handle?: string | undefined;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (
+    value.action === 'unlock' &&
+    (value.lock_handle === undefined || value.lock_handle.trim() === '')
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['lock_handle'],
+      message: UNLOCK_NEEDS_HANDLE_WORDS,
+    });
+  }
+}
 
-const UNLOCK_PROPERTIES = {
-  lock_handle: z.string().optional().describe('Lock handle returned by lock.'),
-};
-
-/** A member of `HandlerUnlock`'s `object_type`. */
-type UnlockMember = (typeof COMPACT_UNLOCK.onprem)[number];
-
-/** What `HandlerUnlock` takes: the object's type, name and lock handle, on every call. */
-export const COMPACT_UNLOCK_TAKES = takesOf<
-  | keyof ReturnType<typeof lifecycleObjectSchema>
-  | keyof typeof UNLOCK_PROPERTIES,
-  UnlockMember
->()({ every: ['object_type', 'object_name', 'lock_handle'], members: {} });
-
-export function compactUnlockSchemaFor<const M extends readonly UnlockMember[]>(
+/**
+ * What `HandlerLock` takes for `members`: lock (the default) the object, or
+ * unlock it under the lock_handle the lock gave — required for an unlock,
+ * refused without it before anything is sent.
+ */
+export function compactLockSchemaFor<const M extends readonly LockMember[]>(
   members: M,
 ) {
-  const properties = {
-    ...lifecycleObjectSchema(members),
-    ...UNLOCK_PROPERTIES,
-  } as const;
-  return z.object({
-    ...offered(properties, COMPACT_UNLOCK_TAKES, members),
-    object_type: requiredField(properties.object_type),
-    object_name: requiredField(properties.object_name),
-    lock_handle: requiredField(properties.lock_handle),
+  return lockObject(members).superRefine(unlockNamesItsLock);
+}
+
+/**
+ * HandlerLock's schema with `actions` left by a deny list: the lock alone
+ * takes no lock_handle; the unlock alone states its action and requires its
+ * lock_handle.
+ */
+export function compactLockSchemaOf(
+  members: readonly LockMember[],
+  actions: readonly LockAction[],
+): z.ZodObject {
+  if (actions.includes('lock') && actions.includes('unlock')) {
+    return compactLockSchemaFor(members);
+  }
+  if (actions.includes('lock')) {
+    return lockObject(members)
+      .omit({ lock_handle: true })
+      .extend({
+        action: z
+          .enum(['lock'])
+          .default('lock')
+          .optional()
+          .describe('lock (default): lock the object for editing.'),
+      });
+  }
+  return lockObject(members).extend({
+    action: z
+      .enum(['unlock'])
+      .describe('unlock: release the lock lock_handle names.'),
+    lock_handle: requiredText(UNLOCK_NEEDS_HANDLE_WORDS).describe(
+      'unlock: the lock handle the lock gave.',
+    ),
   });
 }
 
-export const compactUnlockSchema = compactUnlockSchemaFor(
-  COMPACT_UNLOCK.onprem,
-);
+export const compactLockSchema = compactLockSchemaFor(COMPACT_LOCK.onprem);
 
 const CHECK_RUN_PROPERTIES = {
   version: z
@@ -2273,7 +2339,7 @@ function systemProperties(
       .describe(
         said(actions, {
           search_source:
-            'what each hit is answered as: snippets (the default), lines or objects.',
+            'what each hit is answered as: lines (the default at detail terse), snippets (the default at medium and full) or objects.',
         }),
       ),
     version: z
@@ -2322,11 +2388,14 @@ function systemProperties(
         }),
       ),
     detail: z
-      .enum(['terse', 'full', 'raw'])
+      .enum(DETAIL_LEVELS)
       .optional()
       .describe(
         said(actions, {
+          search_source: DETAIL_WORDS,
           search_object: DETAIL_WORDS,
+          where_used: DETAIL_WORDS,
+          package_tree: DETAIL_WORDS,
           transports: DETAIL_WORDS,
           atc_findings: DETAIL_WORDS,
           atc_result: DETAIL_WORDS,
@@ -2514,6 +2583,7 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
       'max_hits',
       'answer',
       'version',
+      'detail',
     ],
     search_object: ['object_name', 'object_type', 'maxResults', 'detail'],
     where_used: [
@@ -2524,6 +2594,7 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
       'enable_all_types',
       'enable_only_types',
       'disable_types',
+      'detail',
     ],
     package_tree: [
       'package_name',
@@ -2532,6 +2603,7 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
       'max_depth',
       'include_descriptions',
       'debug',
+      'detail',
     ],
     transports: ['user', 'modifiable_only', 'detail'],
     atc_findings: ['worklist_id', 'detail'],
@@ -2597,51 +2669,37 @@ function actionTargetRule(variant: ProjectionVariant | undefined) {
   };
 }
 
-/** What each action reads, with the arguments it takes (`*` required). */
-const ACTION_SENTENCES: Readonly<Record<SystemAction, string>> = {
-  search_source:
-    'search_source(query*, packages*, query2, exclude, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, max_hits, answer, version) the source lines of the objects in packages that contain query',
-  search_object:
-    'search_object(object_name*, object_type, maxResults, detail) the objects whose name matches object_name, a name or a mask',
-  where_used:
-    'where_used(object_name* and object_type*, or objects*; container, enable_all_types, enable_only_types, disable_types) every object that uses, calls or references the object named, with its type and package',
-  package_tree:
-    'package_tree(package_name* or package_names*; include_subpackages, max_depth, include_descriptions, debug) the subpackages and objects of a package as a tree',
-  transports:
-    "transports(user, modifiable_only, detail) the transport requests of user, by default the session's user",
-  atc_findings:
-    'atc_findings(worklist_id*, detail) the findings of the ATC run whose worklist is worklist_id',
-  atc_results:
-    'atc_results(created_by*, central_only, age_min, age_max) the stored ATC results, newest first',
-  atc_result:
-    'atc_result(display_id*, detail) the stored ATC result display_id with its findings',
-};
-
-/** What each action answers. */
-const ACTION_ANSWERS: Readonly<Record<SystemAction, string>> = {
-  search_source:
-    'search_source the hits (package, object type, object name, include, line, snippet) with the scanned and truncated counters',
-  search_object: 'search_object the objects found',
-  where_used:
-    'where_used the references with their total (one entry per object for objects)',
-  package_tree:
-    'package_tree the tree (one entry per package for package_names)',
-  transports: 'transports the requests',
-  atc_findings: 'atc_findings the findings with the counts per priority',
-  atc_results: 'atc_results one entry per result',
-  atc_result: 'atc_result the findings with the counts per priority',
+/** What each read gives, in the purpose's words. */
+const SYSTEM_PAIRS: Readonly<Record<SystemAction, string>> = {
+  search_source: 'searches the source code of packages for text',
+  search_object: 'finds repository objects by name',
+  where_used: 'finds where a repository object is used',
+  package_tree: 'reads a package with its subpackages and their objects',
+  transports: "reads a user's transports",
+  atc_findings: "reads an ATC run's findings",
+  atc_results: 'reads the stored ATC results',
+  atc_result: 'reads one stored ATC result with its findings',
 };
 
 /**
- * `HandlerSystem`'s description with `actions`: what each reads, its
- * arguments and its answer, naming only those actions.
+ * `HandlerSystem`'s parts with `actions`: what its actions find and read,
+ * in action words.
  */
+export function handlerSystemParts(
+  actions: readonly SystemAction[] = SYSTEM_ACTIONS,
+): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: pairsPurpose(actions.map((action) => SYSTEM_PAIRS[action])),
+    notes: [longRunning],
+  };
+}
+
+/** `HandlerSystem`'s description with `actions`, naming only those actions. */
 export function handlerSystemDescription(
   actions: readonly SystemAction[] = SYSTEM_ACTIONS,
 ): string {
-  return withLongToolAdvice(
-    `[read-only] Reads across the ABAP system, one read per action: ${actions.map((action) => ACTION_SENTENCES[action]).join('; ')}. Each argument is described with the actions that take it. Response: JSON, per action: ${actions.map((action) => ACTION_ANSWERS[action]).join('; ')}.`,
-  );
+  return toolDescription(handlerSystemParts(actions));
 }
 
 /** `HandlerSystem`'s description with every action. */
@@ -2743,9 +2801,13 @@ export function handlerGetDataDefinition(sql: boolean) {
 /** `HandlerGetData` with `sql_query`: the definition's own statement. */
 export function handlerGetDataWithSqlDefinition() {
   return {
-    description: withLongToolAdvice(
-      '[read-only] Reads the rows of the table or CDS view named by object_name, or the rows sql_query selects: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON.',
-    ),
+    description: toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads the data of an ABAP database table or CDS view, or the data an ABAP SQL SELECT selects, up to the number of records asked.',
+      ),
+      notes: [longRunning],
+    }),
     inputSchema: compactGetDataSchema,
   };
 }
@@ -2753,9 +2815,13 @@ export function handlerGetDataWithSqlDefinition() {
 /** `HandlerGetData` without `sql_query`: the table read alone. */
 export function handlerGetDataWithoutSqlDefinition() {
   return {
-    description: withLongToolAdvice(
-      '[read-only] Reads the rows of the table or CDS view named by object_name: every column of object_name. Required: object_name. Optional: max_rows (default 100). Response: JSON.',
-    ),
+    description: toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads the data of an ABAP database table or CDS view, up to the number of records asked.',
+      ),
+      notes: [longRunning],
+    }),
     inputSchema: withInCallSchema(
       z
         .object({

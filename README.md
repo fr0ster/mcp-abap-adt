@@ -22,6 +22,7 @@ set, onprem an ECC or S/4HANA system, cloud SAP BTP ABAP Cloud. **New in 24.2.0*
 - **Activation**: activate one object or a list together — `ActivateObjects`, compact `HandlerActivate`.
 - **Table settings and text elements**: read and write a table's technical settings, and the text symbols, selection texts and headings of a program, function group or class (onprem and cloud) — [Text elements](docs/user-guide/AVAILABLE_TOOLS.md#high-level-text-elements).
 - **Packages with no super package** (**new in 24.2.0**): a structure package or a local (LOCAL) package can be created, locked and unlocked with no super package — `CreatePackage`, compact `HandlerCreate` `PACKAGE`.
+- **abapGit** (**new in 24.2.0**): find a package's repository, link it, pull, see what changed, stage, commit and push, switch branches and read the run log — on premise and on ABAP Cloud, full and compact, with any git host over HTTPS, the git credential bound to approved endpoints and kept out of every argument, log line and answer — [abapGit](#abapgit-the-git-loop-on-a-package).
 
 **Test and quality**
 - **ATC**: run the ABAP Test Cockpit over several objects, read its findings, and list and read the stored ATC results — [ATC tools](docs/user-guide/AVAILABLE_TOOLS.md#high-level-atc).
@@ -44,6 +45,7 @@ set, onprem an ECC or S/4HANA system, cloud SAP BTP ABAP Cloud. **New in 24.2.0*
 
 **Work with agents**
 - **MCP prompts** (**new in 24.2.0**): nine ready-made requests — `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport` — that a client shows as slash commands, each answering the tools to call in order; every binary on onprem and cloud (the `-ro` ones `get`, `where_used`, `transport`, compact `-ro` also `check`) — [MCP Prompts](docs/user-guide/PROMPTS.md).
+- **Terse answers** (**new in 24.2.0**): every tool answers what the next call needs — TSV for a list, every row answered — and `detail` (`terse`, `medium`, `full`, `raw`) chooses the reading before the call — [Answers](#answers).
 - **Batch mode**: record independent calls and send them to SAP together in one ADT batch request (compact binaries, `-ro` included) — [Batch Mode](docs/user-guide/BATCH_MODE.md).
 - **Background long reads**: where-used, search, package walks and other long reads answer a handle at once and are read or cancelled later, in every binary — [Background runs](docs/user-guide/README.md#background-runs-of-the-long-reads).
 - **Tool search texts**: every tool carries keywords for BM25 and a sentence for vector search beside its description — [Tool Search](docs/user-guide/TOOL_SEARCH.md).
@@ -73,7 +75,7 @@ You can configure MCP clients either manually (JSON/TOML) or via the configurato
 8. [Terminology](#terminology)
 9. [Authorization & Destinations](#authorization--destinations)
 10. [Registries](#registries)
-11. [Features](#features)
+11. [Features](#features) — [abapGit](#abapgit-the-git-loop-on-a-package)
 12. [Documentation](#documentation)
 13. [Dependencies](#dependencies)
 14. [Running the Server](#running-the-server)
@@ -264,7 +266,7 @@ Key examples of high-value workflows and tools:
 - **CDS development**: `CreateDdl`, `UpdateDdl`, `GetDdl`, `DeleteDdl`, `CheckDdl`, `ActivateDdl`
 - **ABAP OO CRUD**: `CreateClass`, `UpdateClass`, `GetClass`, `DeleteClass`, `CreateInterface`, `UpdateInterface`, `GetInterface`, `DeleteInterface`
 - **Function module/group CRUD**: `CreateFunctionGroup`, `UpdateFunctionGroup`, `GetFunctionGroup`, `DeleteFunctionGroup`, `CreateFunctionModule`, `UpdateFunctionModule`, `GetFunctionModule`, `DeleteFunctionModule`
-- **Transport and activation support**: `CreateTransport`, `CreateTransportTask`, `GetTransport`, `ListTransports`, `ReadTransportObjects`, `AddTransportObject`, `MoveTransportObjects`, `ActivateObjects`
+- **Transport and activation support**: `CreateTransport`, `CreateTransportTask`, `GetTransport` (a transport request or a task, by its number: a request's header and tasks, a task's header, parent request and objects with their positions), `ListTransports`, `ReadTransportObjects`, `AddTransportObject`, `MoveTransportObjects`, `ActivateObjects`
 - **Quality and testing**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` (ABAP Test Cockpit — one run over several objects, findings read back by worklist), `ListATCResults`, `GetATCResult` (the stored ATC results — central and users' runs — listed by user, kind and age, one read by its Display ID), ABAP Unit per test carrier — `CreateUnitTest`/`UpdateUnitTest`/`DeleteUnitTest`/`RunUnitTest` for a class, `CreateCdsUnitTest`/`RunCdsUnitTest` for a CDS view, `CreateProgramUnitTest`/`RunProgramUnitTest` for a report, `CreateFunctionGroupUnitTest`/`RunFunctionGroupUnitTest`/`RunFunctionModuleUnitTest` for a function group (`runner: 'async'`, the default, starts the run; with `wait: true`, the default, the call reads the run's status at once and long-polls it while SAP answers it running, and once more when SAP answers that first read `NOT_STARTED` (the run it just started may not have begun yet), and answers the result of a run SAP answers finished, lasting as long as the run, or the `run_id` and `NOT_STARTED` when the long-polled read still answers it; `GetUnitTestResult`, given a `run_id`, answers `NOT_STARTED` at once; with `wait: false` it answers the `run_id` right after the start, which `GetUnitTestResult` reads — the way to start a long run under a client with a request time limit; `runner: 'sync'` is one request to `/abapunit/testruns` answering the finished result — for a system that has that endpoint alone; a function module's synchronous run takes `function_group_name` and covers every test of its group), and `RunAbapUnit` (with the same `wait`) for any ABAP Unit run target: an object of any type of the run registry (`CLAS/OCL`, `DDLS/DF`, …) or a package, with or without its subpackages; a CDS view's tests are assigned tests and execute with `scope.foreign_tests: true` — `CheckClass` and the rest of the `Check*` family
 
 ### Long reads run in the background
@@ -279,6 +281,59 @@ running read cancels it: its session is logged off, and nothing was changed. No 
 alone). A server without background runs (an embedder without a store) lists a long tool without
 `background` and answers its read in the call.
 See [MIGRATION-24.0](docs/MIGRATION-24.0.md#callers-of-the-long-tools-background-by-default-no-timeout).
+
+### Answers
+
+A tool answers what the next call needs. What it answers is the reading the tool hands to its
+adt-clients call, chosen by `detail` before the request is sent; the answer is never cut — every
+row SAP answered is answered. `detail` has four levels:
+
+- `terse` (the default): compact, what the next call needs. A list answers TSV: one header line,
+  one row per item, and a `# <field> <value>` line where a value would repeat on every row (a
+  package, a task, an object). An item's details come from that item's own tool.
+- `medium`: every field the reading read, without the document's leftovers (URIs, namespaces).
+- `full`: the whole parse, the answer as it was before `detail` where a tool did not take it.
+- `raw`: what ADT sent. The shape is the tool's, not the call's, and each tool's `detail`
+  description names it. A tool that reads one document answers that document as is. A tool that
+  assembles reads — package contents and tree, the other repository walks, `SearchSource`,
+  `DescribeByList`, the include, structure and function group lists, `GetEnhancements`,
+  `GetWhereUsed`, `GetUnitTest`, `GetCdsUnitTest`, `GetUnitTestResult`, `GetCdsUnitTestResult`, the
+  unit-test runs, `RuntimeListFeeds`, `CreateTransport`, `CreateTransportTask`, `CreateTableType`,
+  `UpdateTableType`, `ActivateObjectLow` — always answers a JSON array of every response the call got, in read order, each as
+  `{ "status", "body" }` as ADT sent it, an array even when the call read one: no parse, no
+  projection, nothing of ours mixed in. A body the connection hands over as an object is its JSON
+  text, bytes their UTF-8 text. When `full` is an error, or reports a read that failed or could not
+  be read — an `error` member, a non-empty `failures`, `unreadable`, `append_candidates_unread` or
+  `includes_unread`, or `appends_unavailable: true` — `raw` answers `full`'s answer as an error. A
+  parse failure is the one exception: `full` an error while every exchange was answered `2xx` (every
+  part of a batch envelope included) and our reading refused what came — then `raw` still gives the
+  documents. `CreateTransport` answers a read-back that failed — with SAP's response or with none —
+  as `{ "responses", "read_back" }`, the responses beside the same note `full` gives. Otherwise `raw`
+  is the documents, and a failed exchange `full` neither refuses nor reports (the probe of a batch
+  endpoint a destination does not serve) is there as its failed response, never as a gap.
+
+An answer is the complete result or an error, never a partial one. A terse or medium list is
+written from the reading's own lists, by construction: each tool states a column schema for every
+list its reading holds — a list without one does not compile — and the writer takes the lists from
+the reading itself and writes one row (or line, or entry) per item, every cell from that item, so no
+formatter chooses its items. A kind of item the approved answer leaves out by definition (the
+package and container nodes of a where-used tree, a separator line of an action log, a branch
+repeating a transport request already listed, a component's links in an outline) is named with its
+reason in the tool's schemas, every item still visited. What a reading cannot show — a node SAP
+could not load, an include or a probe SAP refused, a read that failed — is a typed list of the
+reading and is written like any other. Every value is escaped: a tab or any line terminator in SAP's
+text adds no column and no line. Terse
+lists what SAP returned: no row says that something asked for is absent — a consumer reads that with
+its own call, or asks `medium` or `full` where a tool states it — while what SAP itself returned stays,
+incomplete objects and nodes SAP could not load included (a node SAP could not load is its
+`not loaded by SAP` row at terse, medium and full; at raw, SAP's XML carries it).
+
+JSON answers are minified. A compact tool answers as the full tool it reads through, at every
+level.
+
+**Migration (24.2.0):** a caller that parsed a tool's default JSON asks for `detail: 'full'`,
+which gives the former shape where the tool had no `detail` before; where it had one, the former
+terse JSON is `detail: 'medium'`. See the [CHANGELOG](CHANGELOG.md).
 
 ### Batch mode
 
@@ -296,7 +351,7 @@ create or update, a fallback after a `404`, a poll. Run such work as phases, eac
 with the single-step tools: create (compact `HandlerCreate`, one request), lock (`HandlerLock`;
 the handles read with `HandlerBatch` `action: 'answers'`), write (`HandlerUpdate` with `lock_handle`, one request;
 the whole metadata document in `source_code` for PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, and for INCLUDE with `part: 'metadata'`), unlock
-(`HandlerUnlock`), read back (`HandlerGet`, one request per part: `source` or `metadata`), activate (`HandlerActivate`, one request; a list, an `object_adt_type` and the types the per-object activation leaves to a run answer `{ run_id }`), and the run's state (`HandlerGet` `part: activation_status`, then `activation_results`, by `run_id`; with `with_long_polling: true` the status read is one request SAP holds until the run ends, without it a read answered at once, as often as you choose); a unit-test run is one request with the synchronous runner (`HandlerUnitTestRun` with `runner: 'sync'`, answering the finished result) or, with the asynchronous runner (`runner: 'async'`, the default), its start (`HandlerUnitTestRun`, answering `run_id`; by `tests`, or by a run `target` — an object of any run type or a package — which takes this runner), its status (`HandlerUnitTestStatus`, as often as you choose, until `FINISHED`) and its result (`HandlerUnitTestResult`, one request); a profiled run is its schedule (`HandlerProfileSchedule`, answering `profiler_id`), the run under it (`HandlerProfileRun` with that `profiler_id`) and its trace (`HandlerProfileList`, as often as you choose, then `HandlerProfileView`); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
+(`HandlerLock` `action: unlock`), read back (`HandlerGet`, one request per part: `source` or `metadata`), activate (`HandlerActivate`, one request; a list, an `object_adt_type` and the types the per-object activation leaves to a run answer `{ run_id }`), and the run's state (`HandlerGet` `part: activation_status`, then `activation_results`, by `run_id`; with `with_long_polling: true` the status read is one request SAP holds until the run ends, without it a read answered at once, as often as you choose); a unit-test run is one request with the synchronous runner (`HandlerUnitTestRun` with `runner: 'sync'`, answering the finished result) or, with the asynchronous runner (`runner: 'async'`, the default), its start (`HandlerUnitTestRun`, answering `run_id`; by `tests`, or by a run `target` — an object of any run type or a package — which takes this runner), its status (`HandlerUnitTestStatus`, as often as you choose, until `FINISHED`) and its result (`HandlerUnitTestResult`, one request); a profiled run is its schedule (`HandlerProfileSchedule`, answering `profiler_id`), the run under it (`HandlerProfileRun` with that `profiler_id`) and its trace (`HandlerProfileList`, as often as you choose, then `HandlerProfileView`); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
 the delete (`HandlerDelete`, the deletion request alone). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
 recorded call decides — so each batch end sends one envelope; a call of another kind is refused
 `batch_other_kind`: record it in the next batch. A transport create (`HandlerTransportCreate`,
@@ -310,7 +365,10 @@ batch mode. Over Streamable HTTP, send the `state_handle` `HandlerBatch` `action
 ## Prompts
 
 Every binary lists MCP prompts beside its tools: ready-made requests an MCP client offers the
-user (Claude Code shows them as `/mcp__<server>__<prompt>`). A prompt answers with an
+user. In [Claude Code's words](https://code.claude.com/docs/en/mcp.md#use-mcp-prompts-as-commands), "Claude Code lists each MCP prompt as
+`/servername:promptname (MCP)`. Typing `/mcp__servername__promptname` also runs it." For a
+server named `abap`: `/abap:get (MCP)` in the list, `/mcp__abap__get class ZCL_DEMO` typed.
+Other clients show prompts in their own pickers. A prompt answers with an
 instruction that names the tools to call, in order, with the user's values filled in; the model
 follows it with the tools of the same binary. Nine prompts, plain names:
 
@@ -322,12 +380,14 @@ follows it with the tools of the same binary. Nine prompts, plain names:
 | `delete` | `object_type`, `name`, `transport_request` | delete the object |
 | `activate` | `object_type`, `name` | activate the object |
 | `check` | `object_type`, `name` | check the object |
-| `unit_test` | `object_type`, `name`, `include_subpackages` | run the unit tests of a class, program, function group, function module, CDS view or package |
+| `unit_test` | `object_type`, `name`, `include_subpackages` | run the unit tests of a class, program, function group, function module (its whole function group's), CDS view or package |
 | `where_used` | `object_type`, `name`, `container` | list the objects that use the object |
-| `transport` | `action`, `number`, `description`, `user`, `object_type`, `name`, `target_number` | work with transport requests: create, create a task, list, get, list objects, read the log, add, remove or move an object, sort and compress |
+| `transport` | `action`, `number`, `description`, `user`, `object_type`, `name`, `target_number` | work with transport requests: create, create a task, list, get a request or a task, list objects, read the log, add, remove or move an object, sort and compress |
 
-`object_type` completes in lower case and is accepted in any case. A function module also takes
-`function_group`. Each binary lists the prompts its tools serve, with the `object_type` values
+`object_type`, `transport`'s `action` and `where_used`'s `container` complete in lower case and
+are accepted in any case. A function module also takes `function_group` (not in `unit_test`: a
+run names the module alone and covers the ABAP Unit tests of its whole function group); given
+for another type, it is refused, not dropped. Each binary lists the prompts its tools serve, with the `object_type` values
 its tools serve on the system kind: the read-only binaries list `get`, `where_used` and
 `transport` (and, compact, `check`); a denied tool or value removes its `object_type` values,
 and a prompt with none left is not listed. [PROMPTS.md](docs/user-guide/PROMPTS.md) lists the
@@ -348,10 +408,24 @@ Get the CLASS "ZCL_DEMO".
 CLASS takes CLASS(class_name*); * marks a required argument.
 ```
 
-`/update class ZCL_DEMO change="add a method that returns the current date"` on a compact
-binary answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`, write
-with `HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerUnlock`. A value the
-user did not give is listed in the instruction as still to fill.
+A value of several words does not fit a slash command, whose arguments Claude Code splits on
+whitespace; a client that asks for the arguments in a form, or a `prompts/get`, takes it whole.
+`update` with these arguments on a compact binary:
+
+```json
+{
+  "name": "update",
+  "arguments": {
+    "object_type": "class",
+    "name": "ZCL_DEMO",
+    "change": "add a method that returns the current date"
+  }
+}
+```
+
+answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`, write with
+`HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerLock` `action: unlock`. A value the user did
+not give is listed in the instruction as still to fill.
 
 A `prompts/get` with an `object_type` the binary does not serve is refused with the protocol's
 invalid-params error and names the types it serves. `BaseMcpServer` and `EmbeddableMcpServer`
@@ -424,6 +498,124 @@ A family on one system kind says so; the rest are onprem and cloud.
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destinations))
 - **💾 Data tools, off unless enabled**: `GetSqlQuery` (freestyle ABAP SQL), `GetTableContents` (the data preview), compact `HandlerGetData` — see [The data tools](#the-data-tools-off-unless-enabled)
 
+- **🌿 abapGit**: `ListAbapGitRepos`, `CheckAbapGitExternalRepo`, `GetAbapGitBranchInfo`, `LinkAbapGitRepo`, `UnlinkAbapGitRepo`, `PullAbapGitRepo`, `GetAbapGitModifiedObjects`, `GetAbapGitStaging`, `PushAbapGitRepo`, `CheckAbapGitRepo`, `GetAbapGitFile`, `SwitchAbapGitBranch`, `GetAbapGitErrorLog`; compact `HandlerAbapGitGet` and `HandlerAbapGit` - The git loop on a package, see [abapGit](#abapgit-the-git-loop-on-a-package)
+
+### abapGit: the git loop on a package
+
+The abapGit tools drive the abapGit service SAP serves through ADT (`/sap/bc/adt/abapgit/…`): on
+ABAP Cloud SAP's own, on premise the open-source abapGit ADT backend installed in the system. Each
+operation is offered where that system's abapGit serves it:
+
+| Operation | Full tool | Compact | On premise | ABAP Cloud | In `-ro` |
+|---|---|---|---|---|---|
+| List the linked repositories (key, package, branch, remote URL; on cloud the run state and its log key) | `ListAbapGitRepos` | `HandlerAbapGitGet` `repos` | yes | yes | yes |
+| Check a remote before linking: access mode and branches | `CheckAbapGitExternalRepo` | `HandlerAbapGitGet` `external_repo` | yes | yes | yes |
+| Read one remote branch for a package (SAP links the repository and removes the link to answer it) | `GetAbapGitBranchInfo` | `HandlerAbapGit` `branch_info` | — | yes | no |
+| Link a package to a remote | `LinkAbapGitRepo` | `HandlerAbapGit` `link` | yes, and imports the branch | yes, the link only | no |
+| Unlink (the objects stay) | `UnlinkAbapGitRepo` | `HandlerAbapGit` `unlink` | yes | yes | no |
+| Pull | `PullAbapGitRepo` | `HandlerAbapGit` `pull` | yes, in the call | yes, as SAP's job | no |
+| The objects a pull would change, with SAP's action for each | `GetAbapGitModifiedObjects` | `HandlerAbapGitGet` `modified_objects` | — | yes | yes |
+| Stage: what changed, with its files, and the proposed author and committer | `GetAbapGitStaging` | `HandlerAbapGitGet` `staging` | yes | yes | yes |
+| Commit and push the chosen objects | `PushAbapGitRepo` | `HandlerAbapGit` `push` | yes, in the call | yes, as SAP's job | no |
+| Check that the system reaches the remote | `CheckAbapGitRepo` | `HandlerAbapGitGet` `checks` | yes (see below) | yes | yes |
+| Read one file, local or remote | `GetAbapGitFile` | `HandlerAbapGitGet` `file` | yes | yes | yes |
+| Switch the branch, or create it in the remote | `SwitchAbapGitBranch` | `HandlerAbapGit` `switch_branch` | yes | — | no |
+| Read a pull's or a push's run log | `GetAbapGitErrorLog` | `HandlerAbapGitGet` `error_log` | — | yes | yes |
+
+- **Always listed; served where the system serves abapGit.** `tools/list` lists the abapGit tools
+  without any request to SAP (no logon, no discovery; `--deferred-logon` included). Whether the
+  system serves abapGit is decided when a tool is called: a system whose discovery does not list
+  `/sap/bc/adt/abapgit/repos` (an on-premise system without the abapGit ADT backend, say) answers
+  the call `abapgit_not_served` and nothing else is sent. Discovery is read once per system and
+  kept for the process; a failed read is not kept, and the next call reads it again.
+- **Any git host over HTTPS** — GitHub, GitLab, Bitbucket, Azure DevOps, Gitea, a self-hosted
+  server on a port of its own. SAP's abapGit connects to the host, not this server: it chooses
+  Basic or Digest from the host's answer and sends a token as the password, and the host's
+  certificate must be trusted in the system.
+- **Git credentials come from approved endpoints, never from a tool argument.** An approved
+  endpoint is an exact remote URL with its user and token, and its optional aliases: over stdio
+  the destination's `<name>.abapgit.yaml` beside its `<name>.env`; over Streamable HTTP the
+  request's `x-abapgit-remote`, `x-abapgit-user` and `x-abapgit-token` headers, for that request
+  only; over SSE the same headers on the stream's opening `GET`, for that stream. A credential is
+  attached only to the remote that matches exactly; any other remote is sent without one. The
+  credential reaches SAP's abapGit request and nothing else: no log line, no answer, no error, no
+  background-run record. See
+  [Authentication: abapGit remotes](docs/user-guide/AUTHENTICATION.md#abapgit-remotes-approved-endpoints).
+- **Answers are facts only.** A tool answers the facts SAP's document states — statuses, object
+  lists, SAP's message class and number — never SAP's message texts, bodies or headers, and
+  nothing is cut. The tools that answer lists (`ListAbapGitRepos`, `CheckAbapGitExternalRepo`,
+  `GetAbapGitBranchInfo`, `GetAbapGitModifiedObjects`, `GetAbapGitStaging`,
+  `GetAbapGitErrorLog`; the compact actions alike) take `detail`: `terse` (the default: TSV of
+  the identifiers and a short description), `medium` (TSV of every fact field) or `full` (the
+  whole facts object as JSON); there is no `raw`. A refusal from SAP is its fixed words and its
+  facts (`status`, `messageClass`, `messageNumber`, on cloud `CheckAbapGitRepo`'s
+  `gitHttpStatus`) as JSON.
+- **Long runs end on SAP's answer; nothing runs on the server's clock.** No abapGit tool takes a
+  timeout. On premise, link, pull and push are SAP's synchronous writes: the call ends on SAP's
+  answer, and the caller's cancel does not cut it; with `background: true` (on premise only; full
+  `LinkAbapGitRepo`, `PullAbapGitRepo`, `PushAbapGitRepo`, compact `HandlerAbapGit` `link`, `pull`,
+  `push`) it runs as a [background run](docs/user-guide/README.md#background-runs-of-a-class-or-a-program)
+  on an ABAP session of its own, which `DiscardBackgroundRun` cannot cut; without a background-run
+  store or a fresh connection `background: true` is refused, never run in the call. On ABAP Cloud,
+  pull and push are SAP's own job: the call answers `accepted` at once, no route cancels the job,
+  `ListAbapGitRepos` shows its run state and `GetAbapGitErrorLog` its log.
+- **A cloud pull can overwrite only the objects it names.** `GetAbapGitModifiedObjects` (compact
+  `modified_objects`) lists what a pull would change: every changed object of the repository, its
+  own package left out, with SAP's action — `2` update (changed only in the remote), `3` overwrite
+  (changed in the system), and add, delete, re-create, package move — and as package warnings the
+  objects whose package in the system differs from the one their path maps to. On ABAP Cloud a pull
+  without a selection hands SAP's job the whole list, and the job brings each object to its remote
+  version, a package warning with action `5` excepted (SAP sets it to not imported whatever is
+  selected). `PullAbapGitRepo` (compact `pull`) takes `overwrite`, on the cloud only: the listed
+  objects to overwrite, each once, by its type and name as the list answers them. The server reads
+  the list and sends the named entries as it answered them. SAP's job then recomputes the list when
+  it runs and selects by **name** alone. Of the objects not named, a remote-only add or update is
+  imported, and every other one keeps its system state: a change in the system, a remote deletion
+  (SAP deletes only selected entries) and an object of another package (SAP leaves every unselected
+  package warning out). A package warning with action `5` (delete and re-create) cannot be selected:
+  SAP sets it to not imported. A change made between the read and the job is judged by SAP the same
+  way, unseen by the server. Refused: `overwrite` on premise (`abapgit_overwrite_not_declared`,
+  nothing sent; SAP's on-premise pull takes no selection and overwrites them all), an object named
+  twice (`abapgit_overwrite_duplicate`, nothing sent), and after the repository list and the
+  modified-objects read, an object the list does not hold (`abapgit_overwrite_not_listed`) or a
+  name it holds under two types, in one list or across both (`abapgit_overwrite_ambiguous`: SAP
+  selects by name within each list, the server refuses any collision).
+- **An on-premise import whose SAP request is lost: unverified.** Closing an SSE stream or a stdio
+  server logs its connections off, a running background run's included. When that loses an
+  on-premise link's or pull's SAP request or its response, what SAP does is **unverified**: it has
+  been neither read in SAP's code nor measured, and the server does not learn the outcome. Do not
+  assume the import finished or was rolled back: read the repository's staging with the tool's own
+  read, `GetAbapGitStaging` (compact `HandlerAbapGitGet` `staging`); it shows the current
+  differences and cannot tell which writes came from the interrupted pull (on ABAP Cloud also
+  `GetAbapGitModifiedObjects` and the run log, `GetAbapGitErrorLog`). On ABAP Cloud a pull or push
+  is SAP's job, accepted before the call answers: closing the connection does not stop it. A
+  Streamable HTTP disconnect leaves calls and runs going.
+- **What an import writes** (read in SAP's code): an on-premise link imports the whole remote
+  branch, and an on-premise pull the branch the repository is linked on, both with every overwrite
+  and every "object of another package" decision set to yes — objects changed in the system are
+  overwritten, subpackages are created as the folder logic derives them, and objects held by other
+  packages are written too. A cloud link writes the link only. A cloud pull imports as inactive objects, and, given a transport request, creates a task in it
+  for the user who has none. A push writes a commit in the remote and nothing in the system;
+  `SwitchAbapGitBranch` with `create: true` creates the branch in the remote. A cloud pull given
+  `overwrite` imports, of the listed objects outside the selection, the remote-only adds and updates
+  only (measured for an update; the rest read in SAP's code); see the entry above.
+- **Link and pull are refused under access restrictions.** While any `allowed-packages` or
+  `allowed-requests` entry is configured, link and pull (full and compact) are refused
+  `abapgit_import_not_allowed`, nothing sent: what they write is not bounded by the packages and
+  requests they name. Push, unlink, branch switch and cloud branch info are checked against the
+  repository's package, read from SAP's repository list first. See
+  [Access restrictions: abapGit](docs/user-guide/ACCESS_RESTRICTIONS.md#abapgit).
+- **The run log is cloud's.** On-premise abapGit keeps no run log in its repository list, so
+  `GetAbapGitErrorLog` (compact `error_log`) is cloud only; its `app_log_key` must be the one the
+  repository list shows for that repository.
+- **On premise, `CheckAbapGitRepo` meets SAP's fault.** The on-premise backend answers the check
+  with SAP's runtime error `SYNTAX_ERROR` (measured); the call returns SAP's answer as it is.
+- **Reads in `-ro`, writes outside it.** `GetAbapGitBranchInfo` is a write: SAP links the
+  repository, reads the branch and removes the link, and commits. Each tool and each compact
+  action can be denied with `--deny-actions` (`HandlerAbapGit.push`).
+- The abapGit tools need the MCP server's admission (the repository-list read, the endpoint
+  binding): an embedder's plain registration (`HandlerExporter`) registers none of them.
+
 > ℹ️ **ABAP Cloud limitation**: Direct ADT data preview of database tables is blocked by SAP BTP backend policies. The server returns a descriptive error when attempting such operations. On-premise systems continue to support data preview.
 
 ## Documentation
@@ -437,6 +629,7 @@ A family on one system kind says so; the rest are onprem and cloud.
 - **[Batch Mode](docs/user-guide/BATCH_MODE.md)** - The compact binaries' `HandlerBatch`: record independent calls, send them together in batch envelopes at the batch's end, read their answers by number; which calls are recorded
 - **[MCP Prompts](docs/user-guide/PROMPTS.md)** - The nine prompts (`create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`) per binary and kind, their `object_type` values, how a client shows them, the refusal
 - **[Tool Search](docs/user-guide/TOOL_SEARCH.md)** - The three texts each listed tool carries — `description` for the model, `keywords` for BM25, `semantic` for vector search — and where a client reads them
+- **[abapGit](#abapgit-the-git-loop-on-a-package)** - The git loop on a package: the tools per system, any git host over HTTPS, approved endpoints per transport ([credentials](docs/user-guide/AUTHENTICATION.md#abapgit-remotes-approved-endpoints)), long runs, what an import writes, the refusal under [access restrictions](docs/user-guide/ACCESS_RESTRICTIONS.md#abapgit)
 - **[Debugger](docs/user-guide/DEBUGGER.md)** - The `debug` set of the write binaries: debug sessions and their handle, the SAP ids, what keeps a session alive on each transport, what ends it
 - **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - The twelve binaries and the tools each serves
 - **Configurator**: `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf)) provides the `mcp-conf` CLI to auto-configure clients
@@ -635,6 +828,7 @@ Inline comments are not parsed, so keep comments on separate lines.
 - `--renewal=<mode>` - `refresh-then-login` (default) or `refresh-only` (never a login)
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
 - `--login-timeout=<seconds>` - Ends a browser login not finished after this many seconds, 1-86400; no default (a login ends on its answer, the IdP's refusal or the end of its session; a cancel ends nothing)
+- `--stdio-message-limit=<bytes>` - The server's assumption about the most bytes the MCP client buffers for one stdio message (`MCP_STDIO_MESSAGE_LIMIT`, YAML `stdio-message-limit`), a whole number from 2097152; not given or blank: the MCP SDK client's default, 10 MiB. Raising it changes nothing in the client: above the client's real buffer the disconnect comes back. No message longer than this less 1 MiB (one client read: verified for Node, Python MCP and the TS SDK on Bun) is written; a longer answer is answered an error naming both sizes
 - `--connection-type=<http|rfc>` - SAP connection transport: `http` or `rfc`; required for a destination unless its `.env`, the environment or YAML states it (no default)
 - `--ashost`, `--sysnr` - RFC to an application server (`SAP_ASHOST`, `SAP_SYSNR` — see above)
 - `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` - RFC through a message server and a logon group (`SAP_MSHOST`, … — see above)

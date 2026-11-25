@@ -153,6 +153,8 @@ const GROUP_LEVELS = {
   BackgroundRunHandlersGroup: 'readonly',
   HighLevelHandlersGroup: 'high',
   RuntimeRunHandlersGroup: 'high',
+  // abapGit's reads sit under readonly/, its writes under high/: the folder decides.
+  AbapGitHandlersGroup: 'high',
   DebugHandlersGroup: 'debug',
   DebugBatchHandlersGroup: 'debug',
   LeftoverSessionHandlersGroup: 'session',
@@ -284,7 +286,23 @@ function documentedTool(definition, groupName, moduleOf) {
   const properties = {};
   for (const [key, stated] of Object.entries(schema.properties || {}))
     properties[key] = listedProperty(stated);
+  const variants = {};
+  for (const [kind, variant] of Object.entries(definition.variants || {})) {
+    const stated = jsonSchemaOf(variant.inputSchema);
+    const variantProperties = {};
+    for (const [key, each] of Object.entries(stated.properties || {}))
+      variantProperties[key] = listedProperty(each);
+    variants[kind] = {
+      description:
+        typeof variant.description === 'string' ? variant.description : '',
+      inputSchema: {
+        properties: variantProperties,
+        required: requiredOf(variant.inputSchema),
+      },
+    };
+  }
   return {
+    variants,
     name: definition.name,
     description:
       typeof definition.description === 'string' ? definition.description : '',
@@ -494,18 +512,18 @@ function generatePromptsMarkdown(listed) {
   let md = `# MCP Prompts - MCP ABAP ADT Server\n\n`;
   md += `Generated from the prompts every binary lists (\`tests/fixtures/tools/listed-prompts.json\`, by \`npm run docs:tools\`), not from docs.\n\n`;
   md += `## What a prompt is\n\n`;
-  md += `A prompt is a ready-made request the MCP client offers the user: a slash command in Claude Code (\`/mcp__<server>__create class ZCL_DEMO package_name=ZPKG\`), an entry in the prompt picker of other clients. The server answers with an instruction that names the tools to call, in order, with the arguments filled from the values the user gave. The model follows the instruction with the tools the same binary serves.\n\n`;
-  md += `Nine prompts: \`create\`, \`get\`, \`update\`, \`delete\`, \`activate\`, \`check\`, \`unit_test\`, \`where_used\`, \`transport\`. The object prompts take \`object_type\` and \`name\` (a function module also takes \`function_group\`); \`object_type\` completes in lower case and is accepted in any case. Each binary lists the prompts its tools serve, and the \`object_type\` values its tools serve on the system kind.\n\n`;
+  md += `A prompt is a ready-made request the MCP client offers the user. Claude Code, in [its own words](https://code.claude.com/docs/en/mcp.md#use-mcp-prompts-as-commands), "lists each MCP prompt as \`/servername:promptname (MCP)\`. Typing \`/mcp__servername__promptname\` also runs it." For a server named \`abap\`, \`get\` is listed as \`/abap:get (MCP)\`, and \`/mcp__abap__get class ZCL_DEMO\` runs it. Other clients show prompts in their own pickers. The server answers with an instruction that names the tools to call, in order, with the arguments filled from the values the user gave. The model follows the instruction with the tools the same binary serves.\n\n`;
+  md += `Nine prompts: \`create\`, \`get\`, \`update\`, \`delete\`, \`activate\`, \`check\`, \`unit_test\`, \`where_used\`, \`transport\`. The object prompts take \`object_type\` and \`name\` (a function module also takes \`function_group\`, except in \`unit_test\`, whose run names the module alone and covers the ABAP Unit tests of its whole function group); \`object_type\`, \`transport\`'s \`action\` and \`where_used\`'s \`container\` complete in lower case and are accepted in any case. Each binary lists the prompts its tools serve, and the \`object_type\` values its tools serve on the system kind.\n\n`;
   md += `## Autocompletion\n\n`;
   md += `A client that supports MCP completion (\`completion/complete\`) completes a prompt's closed arguments with exactly what this binary serves, matching what the user typed without regard to case:\n\n`;
   md += `- \`object_type\` (every object prompt, \`unit_test\`, \`where_used\`): the values this binary's tools serve on the system kind, after \`--deny-actions\`, in lower case.\n`;
   md += `- \`transport\` \`action\`: the actions this binary serves.\n`;
   md += `- \`transport\` \`object_type\`: the transport object types, when the action given takes one (or no action is given yet).\n`;
-  md += `- \`where_used\` \`container\`: the values the where-used tool lists.\n`;
+  md += `- \`where_used\` \`container\`: the values the where-used tool lists, while the \`object_type\` given so far is \`text_elements\` or none is given yet.\n`;
   md += `- \`unit_test\` \`include_subpackages\`: \`true\`, \`false\`.\n\n`;
   md += `The lists per binary and kind below are these completions.\n\n`;
   md += `## Refusal\n\n`;
-  md += `A \`prompts/get\` with an \`object_type\` the binary does not serve (unknown, not served on the system kind, or denied) is refused with the protocol's invalid-params error and no instruction: \`<prompt>: object_type "<value>" is not served by this server; it serves <list>.\` A required argument that is absent or blank is refused the same way: \`<prompt>: <argument> is required.\`\n\n`;
+  md += `A \`prompts/get\` with an \`object_type\` the binary does not serve (unknown, not served on the system kind, or denied) is refused with the protocol's invalid-params error and no instruction: \`<prompt>: object_type "<value>" is not served by this server; it serves <list>.\` A required argument that is absent or blank is refused the same way: \`<prompt>: <argument> is required.\` So is a \`function_group\` given for an \`object_type\` whose steps read none: \`<prompt>: function_group is read with object_type function_module only.\`.\n\n`;
   md += `A prompt whose tools are denied (\`--deny-actions\`, [ACCESS_RESTRICTIONS.md](ACCESS_RESTRICTIONS.md)) loses those \`object_type\` values; a prompt with none left is not listed.\n\n`;
   md += `\`prompts: false\` on \`BaseMcpServer\` or \`EmbeddableMcpServer\` lists none; \`registerAbapPrompts(server, registry)\` adds them to a plain registration ([HANDLER_EXPORTER.md](../architecture/HANDLER_EXPORTER.md)).\n\n`;
   for (const [kind, title] of PROMPT_KINDS) {
@@ -531,6 +549,33 @@ function generatePromptsMarkdown(listed) {
       }
       md += `\n`;
     }
+  }
+  return md;
+}
+
+/** The system kinds a tool's variants are shown for, as the page names them. */
+const VARIANT_KINDS = [
+  ['cloud', 'On ABAP Cloud (`cloud`)'],
+  ['onprem', 'On premise (`onprem`)'],
+];
+
+/**
+ * A kind-specific variant that differs from the entry shown (its description
+ * or its parameters): its own description and parameters, so the page shows
+ * every call shape a tool takes.
+ */
+function variantMarkdown(tool) {
+  let md = '';
+  for (const [kind, title] of VARIANT_KINDS) {
+    const variant = tool.variants?.[kind];
+    if (variant === undefined) continue;
+    const same =
+      variant.description === tool.description &&
+      JSON.stringify(variant.inputSchema) === JSON.stringify(tool.inputSchema);
+    if (same) continue;
+    md += `\n**${title}:** ${variant.description || 'No description'}\n\n`;
+    md += `**Parameters (\`${kind}\`):**\n`;
+    md += renderParams(variant);
   }
   return md;
 }
@@ -708,6 +753,7 @@ function generateMarkdown(tools, surface, listedPrompts) {
         md += optIn(tool);
         md += `**Parameters:**\n`;
         md += renderParams(tool);
+        md += variantMarkdown(tool);
         md += `\n---\n\n`;
       }
     }
@@ -772,6 +818,7 @@ function generateLevelMarkdown(
       md += optIn(tool);
       md += `**Parameters:**\n`;
       md += renderParams(tool);
+      md += variantMarkdown(tool);
       md += `\n---\n\n`;
     }
   }
@@ -844,6 +891,7 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
         md += optIn(tool);
         md += `**Parameters:**\n`;
         md += renderParams(tool);
+        md += variantMarkdown(tool);
         md += `\n---\n\n`;
       }
     }
@@ -954,6 +1002,7 @@ module.exports = {
   servedEntries,
   readOnlySetTools,
   renderParams,
+  variantMarkdown,
   loadToolsFromHandlers,
   generateMarkdown,
   generateLevelMarkdown,

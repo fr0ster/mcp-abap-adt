@@ -14,7 +14,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtCodes } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
-import { type PhaseResult, runPhaseOutcome } from '../batch/phases';
+import { type PhaseResult, runPhaseOrAlone } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import type { ReadVersion } from '../handlers/readVersion';
@@ -753,12 +753,15 @@ export async function readSourcesInPhase(
   ctx: HandlerContext,
   reads: readonly Read[],
   answers: AnsweredReads,
+  alone = reads.length < 2,
 ): Promise<void> {
-  const { results, envelope } = await runPhaseOutcome(
+  // One read, or the reads of one target (`alone`), go as single requests.
+  const { results, envelope } = await runPhaseOrAlone(
     ctx,
     reads,
     (read, connection) =>
       perform(createSourceReaderDeps({ ...ctx, connection }), read),
+    alone,
   );
   // A failed envelope is decided here, once: its parts never reach the
   // per-read classification.

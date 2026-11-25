@@ -162,15 +162,19 @@ const FULL: ReadonlyArray<readonly [readonly string[], readonly string[]]> = [
   [['CheckPackage'], ['package_name']],
   [['ValidateServiceBinding'], ['package_name']],
   [
-    [
-      'CreateTransportTask',
-      'AddTransportObject',
-      'RemoveTransportObject',
-      'SortAndCompressTransportTask',
-    ],
+    ['CreateTransportTask', 'SortAndCompressTransportTask'],
     ['transport_number'],
   ],
-  [['MoveTransportObjects'], ['transport_number', 'target_number']],
+  [
+    ['AddTransportObject', 'RemoveTransportObject'],
+    ['object_name', 'transport_number'],
+  ],
+  [
+    ['MoveTransportObjects'],
+    ['objects[].object_name', 'transport_number', 'target_number'],
+  ],
+  [['RunAbapUnit'], ['target.name']],
+  [['ActivateObjects'], ['objects[].name']],
 ];
 
 const COMPACT: ReadonlyArray<readonly [string, readonly string[]]> = [
@@ -178,16 +182,27 @@ const COMPACT: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['HandlerUpdate', ['package_name', 'transport_request']],
   ['HandlerDelete', ['package_name', 'transport_request']],
   ['HandlerLock', ['object_name']],
-  ['HandlerUnlock', ['object_name']],
-  ['HandlerTransportMoveObjects', ['transport_number', 'target_number']],
+  [
+    'HandlerTransportMoveObjects',
+    ['objects[].object_name', 'transport_number', 'target_number'],
+  ],
   ['HandlerTransportSortAndCompress', ['transport_number']],
+  ['HandlerUnitTestRun', ['target.name']],
+  ['HandlerActivate', ['object_name', 'objects[].name']],
 ];
 
 const argumentsOf = (checked: CheckedArguments): string[] =>
   [
     ...checked.packages,
+    ...(checked.packageTarget === undefined
+      ? []
+      : [`${checked.packageTarget}.name`]),
     ...checked.requests,
     ...(checked.packageObject === undefined ? [] : [checked.packageObject]),
+    ...(checked.activation === undefined ? [] : ['objects[].name']),
+    ...(checked.activation?.single === true ? ['object_name'] : []),
+    ...(checked.transportEntries === 'list' ? ['objects[].object_name'] : []),
+    ...(checked.transportEntries === 'object' ? ['object_name'] : []),
   ].sort();
 
 describe('the checked package and request arguments', () => {
@@ -302,17 +317,23 @@ describe('isPackageCreate', () => {
 describe('accessCallOf', () => {
   const checked: CheckedArguments = {
     packages: ['package_name', 'super_package'],
+    packageTarget: undefined,
     requests: ['transport_request'],
     table: undefined,
     dispatch: 'object_type',
     packageObject: undefined,
+    activation: undefined,
+    transportEntries: undefined,
   };
   const lock: CheckedArguments = {
     packages: ['super_package'],
+    packageTarget: undefined,
     requests: [],
     table: undefined,
     dispatch: 'object_type',
     packageObject: 'object_name',
+    activation: undefined,
+    transportEntries: undefined,
   };
 
   it('names a package lock by its object_name, and its super_package nowhere', () => {
@@ -375,6 +396,37 @@ describe('accessCallOf', () => {
     );
     assert.equal(
       accessCallOf('CreateClass', checked, { package_name: '  ' }),
+      undefined,
+    );
+  });
+});
+
+describe('accessCallOf on a run target', () => {
+  const checked: CheckedArguments = {
+    packages: [],
+    packageTarget: 'target',
+    requests: [],
+    table: undefined,
+    dispatch: undefined,
+    packageObject: undefined,
+    activation: undefined,
+    transportEntries: undefined,
+  };
+
+  it('names a package target as target.name, trimmed and upper-cased', () => {
+    assert.deepEqual(
+      accessCallOf('RunAbapUnit', checked, {
+        target: { kind: 'package', name: ' zfoo ', include_subpackages: true },
+      })?.packages,
+      [{ argument: 'target.name', value: 'ZFOO' }],
+    );
+  });
+
+  it('names nothing for an object target', () => {
+    assert.equal(
+      accessCallOf('RunAbapUnit', checked, {
+        target: { kind: 'object', name: 'YCL_X', type: 'CLAS/OC' },
+      }),
       undefined,
     );
   });

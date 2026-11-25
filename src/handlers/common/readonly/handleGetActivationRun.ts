@@ -26,8 +26,10 @@ import {
   readingOf,
   runStatusOf,
 } from '../../../lib/strategies/activationRun';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 /** The run a read names: HandlerGet's `run_id`, as its schema parses it (the one caller). */
 type ActivationRunArgs = Pick<z.output<typeof compactGetSchema>, 'run_id'>;
@@ -76,13 +78,21 @@ export async function handleGetActivationStatus(
             ? args.with_long_polling
             : undefined,
       }),
-    (value) => ({
-      run_id: runId,
-      part: 'activation_status',
-      status: runStatusOf(value),
-      document: readingOf(value).raw,
-    }),
+    (value) => activationStatusAnswer(runId, value),
   );
+}
+
+/** An activation run's status, as `part: 'activation_status'` answers it. */
+export function activationStatusAnswer(
+  runId: string,
+  value: AdtReading<XmlRead>,
+) {
+  return {
+    run_id: runId,
+    part: 'activation_status' as const,
+    status: runStatusOf(value),
+    document: readingOf(value).raw,
+  };
 }
 
 /** `GET /activation/results/{run_id}`: `{ run_id, part, activated, messages, document }`. */
@@ -98,24 +108,30 @@ export async function handleGetActivationResults(
   return answer(
     { tool: 'HandlerGet', detail: 'raw' },
     () => utils.getActivationResults(runId, { analyse: analyseException }),
-    (value) => {
-      // A run read by its id alone: no references to name objects by.
-      const messages = activationMessagesOf(value, []);
-      const executed = activationExecutedOf(value);
-      return {
-        run_id: runId,
-        part: 'activation_results',
-        // SAP's verdict as the results state it (`activationExecuted`, and
-        // no error-severity message); `null` where they state none — a run
-        // still going, whose results carry no verdict yet.
-        activated:
-          executed === undefined ? null : activationVerdict(executed, messages),
-        ...(executed === false && messages.length === 0
-          ? { nothing_to_activate: true }
-          : {}),
-        messages,
-        document: readingOf(value).raw,
-      };
-    },
+    (value) => activationResultsAnswer(runId, value),
   );
+}
+
+/** An activation run's results, as `part: 'activation_results'` answers them. */
+export function activationResultsAnswer(
+  runId: string,
+  value: AdtReading<XmlRead>,
+) {
+  // A run read by its id alone: no references to name objects by.
+  const messages = activationMessagesOf(value, []);
+  const executed = activationExecutedOf(value);
+  return {
+    run_id: runId,
+    part: 'activation_results' as const,
+    // SAP's verdict as the results state it (`activationExecuted`, and
+    // no error-severity message); `null` where they state none — a run
+    // still going, whose results carry no verdict yet.
+    activated:
+      executed === undefined ? null : activationVerdict(executed, messages),
+    ...(executed === false && messages.length === 0
+      ? { nothing_to_activate: true }
+      : {}),
+    messages,
+    document: readingOf(value).raw,
+  };
 }

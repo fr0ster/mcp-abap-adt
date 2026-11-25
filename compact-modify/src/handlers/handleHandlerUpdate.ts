@@ -2,10 +2,11 @@ import {
   acceptedOf,
   byVariant,
   COMPACT_UPDATE,
-  compactUpdateDescription,
+  compactUpdateParts,
   compactUpdateSchemaFor,
   subResourceRefusal,
   supported,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { return_error } from '@mcp-abap-adt/lib/utils';
@@ -16,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerUpdate',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactUpdateDescription(variant),
+    description: toolDescription(compactUpdateParts(variant)),
     inputSchema: compactUpdateSchemaFor(COMPACT_UPDATE[variant]),
     members: COMPACT_UPDATE[variant],
   })),

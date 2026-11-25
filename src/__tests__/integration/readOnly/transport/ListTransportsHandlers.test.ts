@@ -19,12 +19,25 @@ import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
 
-function extractResultData(result: any): any {
+/**
+ * ListTransports' terse answer (the default) read back: `# count N`, then
+ * one TSV row per request, its number first.
+ */
+function extractResultData(result: any): {
+  count: number;
+  numbers: string[];
+} {
   const textContent = result.content.find((c: any) => c.type === 'text') as any;
-  if (textContent?.text) {
-    return JSON.parse(textContent.text);
-  }
-  throw new Error('No response payload found');
+  const lines = String(textContent?.text ?? '').split('\n');
+  const count = Number(
+    lines.find((line) => line.startsWith('# count '))?.slice(8) ?? NaN,
+  );
+  const rows = lines.filter((line) => line !== '' && !line.startsWith('#'));
+  assert.equal(rows[0]?.split('\t')[0], 'number', lines.join('\n'));
+  return {
+    count,
+    numbers: rows.slice(1).map((row) => row.split('\t')[0] ?? ''),
+  };
 }
 
 /**
@@ -81,13 +94,11 @@ describe('ListTransports Handler Integration', () => {
       assert.ok(result.content !== undefined);
 
       const data = extractResultData(result);
-      assert.equal(data.success, true);
       assert.ok(data.count >= 0);
-      assert.equal(Array.isArray(data.transports), true);
+      assert.equal(data.numbers.length, data.count);
 
       if (data.count > 0) {
-        const first = data.transports[0];
-        assert.ok(first.number);
+        assert.ok(data.numbers[0]);
       }
 
       logger?.info(`Found ${data.count} modifiable transport(s)`);
@@ -115,9 +126,8 @@ describe('ListTransports Handler Integration', () => {
       );
 
       const data = extractResultData(result);
-      assert.equal(data.success, true);
       assert.ok(data.count >= 0);
-      assert.equal(Array.isArray(data.transports), true);
+      assert.equal(data.numbers.length, data.count);
 
       logger?.info(`Found ${data.count} total transport(s)`);
     });

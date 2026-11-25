@@ -15,6 +15,8 @@ import {
 } from '@mcp-abap-adt/compact-readonly-entries';
 import { NARROWINGS } from '../../../lib/access/narrowing';
 import type { ProjectionVariant } from '../../../lib/adtProjections';
+import { TOOL_DEFINITION as abapGit } from '../../../lib/compact/abapGit/handleHandlerAbapGit';
+import { TOOL_DEFINITION as abapGitGet } from '../../../lib/compact/abapGit/handleHandlerAbapGitGet';
 import { TOOL_DEFINITION as batch } from '../../../lib/compact/batch/handleHandlerBatch';
 import { handlerGetDataDefinition } from '../../../lib/compact/compactSchemas';
 import { TOOL_DEFINITION as debugBatch } from '../../../lib/compact/debug/handleHandlerDebugBatch';
@@ -46,6 +48,8 @@ const REGISTERED: ReadonlyMap<string, ToolDefinition> = new Map(
     debugStep,
     debugBreakpoints,
     debugMaintain,
+    abapGitGet,
+    abapGit,
   ].map((definition) => [definition.name, definition]),
 );
 
@@ -56,7 +60,9 @@ function dispatchOf(tool: string): string {
     tool === 'HandlerBatch' ||
     tool === 'HandlerDebugBatch' ||
     tool === 'HandlerSession' ||
-    tool === 'HandlerSystem'
+    tool === 'HandlerSystem' ||
+    tool === 'HandlerAbapGitGet' ||
+    tool === 'HandlerAbapGit'
   ) {
     return 'action';
   }
@@ -116,6 +122,13 @@ const PROSE: ReadonlyArray<readonly [string, string]> = [
   ['answers', 'answers the number of recorded calls'],
   ['answers', 'answers that error'],
   ['answers', 'then answers it'],
+  // A full abapGit tool's words, which a compact action states.
+  ['checks', 'checks an external git repository'],
+  ['checks', 'checks a remote repository'],
+  ['file', 'each ignored file'],
+  ['file', 'each staged file'],
+  ['file', 'each changed file'],
+  ['file', 'its file name'],
 ];
 
 /** Whether `text` names `value` as a token of its own, prose left aside. */

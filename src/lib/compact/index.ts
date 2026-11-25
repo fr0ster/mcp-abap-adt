@@ -22,6 +22,14 @@ export {
   notAccepted,
   sharedMainType,
 } from '../adtTypeCode.js';
+export {
+  assembledParts,
+  compactOf,
+  longRunning,
+  pairsPurpose,
+  purpose,
+  toolDescription,
+} from '../description/index.js';
 export { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes.js';
 export type { ReadVersion } from '../handlers/readVersion.js';
 export { isJsonObject, type JsonValue, jsonAt } from '../json.js';
@@ -93,8 +101,6 @@ export {
   compactUnitTestResultSchema,
   compactUnitTestRunSchema,
   compactUnitTestStatusSchema,
-  compactUnlockSchema,
-  compactUnlockSchemaFor,
   compactUpdateSchema,
   compactUpdateSchemaFor,
   compactValidateSchema,
@@ -109,15 +115,18 @@ export {
   handlerSystemDefinition,
   handlerSystemDefinitionFor,
   handlerSystemDescription,
+  handlerSystemParts,
   SYSTEM_ACTION_TOOLS,
   SYSTEM_ACTIONS,
   type SystemAction,
+  UNLOCK_NEEDS_HANDLE_WORDS,
 } from './compactSchemas.js';
 export { handlerDebugBatchDefinition } from './debug/handleHandlerDebugBatch.js';
 export { handlerDebugBreakpointsDefinition } from './debug/handleHandlerDebugBreakpoints.js';
 export { handlerDebugMaintainDefinition } from './debug/handleHandlerDebugMaintain.js';
 export { handlerDebugSessionDefinition } from './debug/handleHandlerDebugSession.js';
 export { handlerDebugStepDefinition } from './debug/handleHandlerDebugStep.js';
+export type { HeldLockAnswer, NotUnlockedAnswer } from './lockAnswers.js';
 export { handlerSessionDefinition } from './longSession/handleHandlerSession.js';
 export {
   either,

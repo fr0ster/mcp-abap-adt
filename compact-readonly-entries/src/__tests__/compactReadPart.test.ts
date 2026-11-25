@@ -48,9 +48,9 @@ describe('the parts a compact read can answer', () => {
   it('routes metadata for the types whose documents carry one', () => {
     assert.notEqual(compactMetadataRoutes.CLASS, undefined);
     assert.notEqual(compactMetadataRoutes.SERVICE_BINDING, undefined);
-    // A transport and a test run have no metadata document, and the map saying so
-    // is what produces the refusal.
-    assert.equal(compactMetadataRoutes.TRANSPORT, undefined);
+    // A transport's document is GetTransport's read; a test run has no
+    // metadata document, and the map saying so is what produces the refusal.
+    assert.notEqual(compactMetadataRoutes.TRANSPORT, undefined);
     assert.equal(compactMetadataRoutes.UNIT_TEST, undefined);
   });
 
@@ -66,6 +66,7 @@ describe('the parts a compact read can answer', () => {
     ]);
     assert.deepStrictEqual(partsFor('TRANSPORT' as never, true, 'onprem'), [
       'source',
+      'metadata',
     ]);
   });
 

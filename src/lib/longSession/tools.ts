@@ -26,13 +26,7 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import type { McpResult } from '../answer';
 import { ServerRefusal } from '../auth/serverRefusal';
 import { STATE_UNAVAILABLE_WORDS } from '../state/InstanceState';
-
-/**
- * The sentences of open, shared by `SessionOpen` and `HandlerSession`'s
- * `action: 'open'`.
- */
-export const OPEN_SESSION_WORDS =
-  "Opens a long session on this server: the server instance and its SAP connection are kept for every call that carries the session's state_handle, until the session is closed or the server's idle bound passes between two calls. Answers the state_handle: send it as the state_handle argument of every call of the session (or in the x-mcp-state-handle header). Called with the state_handle of an instance that already holds state, or of an open session, answers that same state_handle and keeps what the instance holds. In batch mode it runs at once and the batch stays open.";
+import type { SessionHolding } from '../state/longSession';
 
 /** Open: the long session marked open; answers `{ state_handle }`. */
 export async function openLongSession(
@@ -57,18 +51,11 @@ export async function openLongSession(
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ state_handle: state.handle }, null, 2),
+        text: JSON.stringify(openedSession(state.handle)),
       },
     ],
   };
 }
-
-/**
- * The sentences of close, shared by `SessionClose` and `HandlerSession`'s
- * `action: 'close'`.
- */
-export const CLOSE_SESSION_WORDS =
-  'Closes the long session the state_handle names: once this answer is written the server instance is closed — every SAP session it holds is logged off, which releases the locks taken in it; an open batch and its recorded calls are dropped unsent — and the state_handle ends: a later call carrying it gets the unavailable-state answer. Answers that the session is closed and what it held: its locks, a batch, a debug session. Called with an unknown state_handle, or on a new instance, it gets the unavailable-state answer. In batch mode it runs at once and drops the batch.';
 
 /** Close: the instance's close asked; answers `{ closed, held }`. */
 export async function closeLongSession(
@@ -92,8 +79,18 @@ export async function closeLongSession(
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ closed: true, held }, null, 2),
+        text: JSON.stringify(closedSession(held)),
       },
     ],
   };
+}
+
+/** What an open answers: the state handle every call of the session carries. */
+export function openedSession(stateHandle: string) {
+  return { state_handle: stateHandle };
+}
+
+/** What a close answers: the session closed, and what the instance held. */
+export function closedSession(held: SessionHolding) {
+  return { closed: true, held };
 }

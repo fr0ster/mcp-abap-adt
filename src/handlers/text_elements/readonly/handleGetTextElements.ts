@@ -35,6 +35,7 @@ import type {
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { textElementsClientOf } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
 import { succeeded } from '../../../lib/strategies/stepResponse';
@@ -50,8 +51,12 @@ import {
 export const TOOL_DEFINITION = {
   name: 'GetTextElements',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Reads the text elements of the program, function group or class named by object_kind and object_name, in the object's original language, at the version asked: text symbols (key, text, maximum length), selection texts (name, text, and whether the text is the dictionary's label) and the list and column headings. A class has text symbols only. Reads the parts named by parts, every part of the object by default.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the text elements of an ABAP program, function group or class in its original language at the version asked: text symbols, selection texts and headings.',
+    ),
+  }),
   inputSchema: z
     .object({
       object_kind: z

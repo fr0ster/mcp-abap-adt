@@ -5,10 +5,13 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import type { AdtCodes } from '../../../lib/adtProjections';
 import {
+  answerPayload,
   type FailureEntry,
   failedPayloadOf,
   failureEntry,
   isCredentialPayload,
+  type ListedAnswer,
+  listedAnswer,
   type McpResult,
   thrownEntry,
 } from '../../../lib/answer';
@@ -18,17 +21,46 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  longRunning,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
+  asJsonResult,
+  asTextResult,
+  byListing,
+  type Column,
+  type DetailLevel,
+  type Head,
+  headShape,
+  jsonText,
+  type ListAnswerTable,
+  type Listing,
+  listAnswerAt,
+  marks,
+  node,
+  partsOf,
+  type RowSchemas,
+  rows,
+  sections,
+  type TextResult,
+  values,
+  type Written,
+  wireAnswer,
+  writeJsonList,
+  writeListing,
+  writeWhole,
+} from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
-import { type JsonValue, jsonOrText } from '../../../lib/json';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import type { JsonValue } from '../../../lib/json';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
   afterBlanksAt,
   asciiLower,
@@ -39,6 +71,10 @@ import {
   linesOf,
   wordAt,
 } from '../../../lib/plainText';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { endsTheCall } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
@@ -71,6 +107,7 @@ const FIELDS = {
     .describe(
       '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
     ),
+  ...ASSEMBLED_DETAIL_SHAPE,
 };
 
 /**
@@ -107,23 +144,6 @@ function oneStructureForm(
     });
   }
 }
-
-export const TOOL_DEFINITION = {
-  name: 'GetStructuresList',
-  available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. ' +
-      'Takes structure_name (one structure: its tree) or structure_names (several structures: one entry per structure, in the order given, each its tree answer or { structure_name, error }). ' +
-      'Works on BASIS 7.50 and later, where the DDIC structure/table endpoints it reads exist; ' +
-      'legacy systems (BASIS < 7.50) refuse it (issue #207).',
-  ),
-  inputSchema: withInCallSchema(
-    z
-      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
-      .superRefine(oneStructureForm),
-    z.object(FIELDS).superRefine(oneStructureForm),
-  ),
-} as const;
 
 interface StructureNode {
   structure: string; // the embedded structure's own name (root = the requested structure)
@@ -254,6 +274,187 @@ function extractSource(result: IAdtResponse<string, IAdtError>): string | null {
   return result.ok ? result.getResult().value : null;
 }
 
+/** One structure's tree as read, and what of its appends could not be read. */
+interface StructuresRead {
+  structure_name: string;
+  appends_unavailable: boolean;
+  append_candidates_unread: ReadonlyArray<{
+    candidate: string;
+    step: 'read append candidate';
+    failures: FailureEntry[];
+  }>;
+  tree: StructureNode;
+}
+
+/** What a level answers of one structure's tree. */
+type StructuresShown = (read: StructuresRead) => string;
+
+/**
+ * Each answered structure's read, by the answer it became: a list call
+ * writes every structure's terse text from these by the listing writer, never
+ * by splicing the single answers' texts.
+ */
+const readsOf = new WeakMap<McpResult, StructuresRead>();
+
+/** One structure's answer at its level, its read kept for a list call. */
+function readAnswer(shown: StructuresShown, read: StructuresRead): McpResult {
+  const result = return_response({ data: shown(read) });
+  readsOf.set(result, read);
+  return result;
+}
+
+/** A node's row: its structure, kind and attribute, then `cyclic` or `not read` where it is so. */
+const structureColumns: Column<StructureNode>[] = [
+  { name: 'structure', means: 'its name', cell: (node) => node.structure },
+  {
+    name: 'kind',
+    means: 'whether it is an include or an append',
+    cell: (node) => node.kind,
+  },
+  {
+    name: 'attribute',
+    means: 'the component it is embedded under',
+    cell: (node) => node.attribute ?? '',
+  },
+  {
+    name: 'cyclic',
+    means: 'whether it embeds itself again',
+    cell: () => 'cyclic',
+    when: (node) => node.cyclic === true,
+  },
+  {
+    name: 'not_read',
+    means: 'whether SAP refused to read it',
+    cell: () => 'not read',
+    when: (node) => node.error !== undefined,
+  },
+];
+
+/** Each failure of a read as a `# failure` line, its JSON one cell. */
+const failureMarks = <K extends string>(key: K) =>
+  marks(key, 'failure', (entry: FailureEntry) => [JSON.stringify(entry)]);
+
+/** Every node below a node, one level deeper. */
+const structureSchemas: RowSchemas<StructureNode> = {
+  // A node not read: its `not read` cell, then each failure of its read
+  // (what each endpoint answered, with its step) a line of its own.
+  error: about(
+    'what SAP answered for each structure it refused to read',
+    failureMarks('error'),
+  ),
+  children: about(
+    'for each structure it embeds',
+    rows('children', {
+      columns: structureColumns,
+      header: 'none',
+      get lists() {
+        return structureSchemas;
+      },
+    }),
+  ),
+};
+
+/** The answer before `detail` (full). */
+function fullStructures(read: StructuresRead): string {
+  return JSON.stringify(structuresWhole(read));
+}
+
+/** The answer before `detail`: the tree whole, what could not be read beside it. */
+function structuresWhole(read: StructuresRead) {
+  return {
+    success: true,
+    structure_name: read.structure_name,
+    ...(read.appends_unavailable ? { appends_unavailable: true } : {}),
+    ...(read.append_candidates_unread.length > 0
+      ? { append_candidates_unread: read.append_candidates_unread }
+      : {}),
+    tree: read.tree,
+  };
+}
+
+/**
+ * What GetStructuresList answers of one structure at each `detail`,
+ * selected before the reads (`src/lib/detail`): terse the tree as indented
+ * `structure\tkind\tattribute` rows (a node not read or cyclic marked), with
+ * `# appends_unavailable` when where-used failed and a
+ * `# append_candidate_unread<TAB>NAME` line per candidate SAP refused to read; medium and full the answer
+ * before `detail`. A tree reads many documents, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
+ */
+
+/** The lists a StructuresRead listing writes: what its description states. */
+export const STRUCTURES_LISTS: RowSchemas<StructuresRead> = {
+  // Each candidate SAP refused to read, by name — the one to read again —
+  // then each failure of its read.
+  append_candidates_unread: about(
+    'the appends SAP refused to read are named',
+    sections(
+      'append_candidates_unread',
+      (unread: StructuresRead['append_candidates_unread'][number]) => [
+        { mark: 'append_candidate_unread', words: [unread.candidate] },
+      ],
+      { failures: failureMarks('failures') },
+    ),
+  ),
+  // The tree from its root: the root a row, every node below it.
+  tree: about(
+    'for the structure itself',
+    node('tree', {
+      columns: structureColumns,
+      header: 'none',
+      tree: true,
+      lists: structureSchemas,
+    }),
+  ),
+};
+
+/** The heads a structure's listing opens with. */
+export const STRUCTURES_HEADS = [
+  headShape('structure', 'name of the structure read'),
+  headShape('appends_unavailable', 'whether its appends could be found'),
+];
+
+export const TOOL_DEFINITION = {
+  name: 'GetStructuresList',
+  available_in: ['onprem', 'cloud'] as const,
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the structures embedded in one or more ABAP structures, through their includes and appends, down to the last, at the version asked.',
+    ),
+    notes: [longRunning],
+  }),
+  inputSchema: withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(oneStructureForm),
+    z.object(FIELDS).superRefine(oneStructureForm),
+  ),
+} as const;
+
+/**
+ * A structure's terse text, written from its read: its heads, a mark per
+ * append candidate SAP refused to read, then the tree from its root.
+ */
+const structuresListing = (read: StructuresRead): Listing<StructuresRead> => ({
+  heads: [
+    { head: 'structure', value: read.structure_name },
+    ...(read.appends_unavailable ? [{ head: 'appends_unavailable' }] : []),
+  ],
+  reading: read,
+  lists: STRUCTURES_LISTS,
+});
+
+// Every node and unread candidate written from the read by the listing
+// writer; medium and full write the tree whole.
+const STRUCTURES_ANSWERS: ListAnswerTable<StructuresRead, string> = {
+  terse: (read) => writeListing(structuresListing(read)),
+  // The tree whole, as full gives it: complete by construction.
+  medium: (read) => jsonText(writeWhole(structuresWhole(read))),
+  full: fullStructures,
+  raw: fullStructures,
+};
+
 async function structuresListOf(
   context: HandlerContext,
   args: {
@@ -261,6 +462,7 @@ async function structuresListOf(
     version?: ReadVersion | undefined;
     include_extensions?: boolean | undefined;
   },
+  shown: StructuresShown,
 ): Promise<McpResult> {
   const { connection, logger } = context;
   try {
@@ -430,9 +632,7 @@ async function structuresListOf(
       // Both endpoints failed: each failure as it is, with its step.
       return {
         isError: true,
-        content: [
-          { type: 'text', text: JSON.stringify(root.failures, null, 2) },
-        ],
+        content: [{ type: 'text', text: JSON.stringify(root.failures) }],
       };
     }
     if ('absent' in root) {
@@ -490,24 +690,13 @@ async function structuresListOf(
       children: await buildChildren(rootName, rootSource),
     };
 
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          structure_name: rootName,
-          // True when a where-used lookup failed, so appends could not be
-          // determined and the tree may be missing them (≠ "no appends"). #128
-          ...(includeExtensions && appendsUnavailable
-            ? { appends_unavailable: true }
-            : {}),
-          ...(unreadCandidates.length > 0
-            ? { append_candidates_unread: unreadCandidates }
-            : {}),
-          tree,
-        },
-        null,
-        2,
-      ),
+    return readAnswer(shown, {
+      structure_name: rootName,
+      // True when a where-used lookup failed, so appends could not be
+      // determined and the tree may be missing them (≠ "no appends"). #128
+      appends_unavailable: includeExtensions && appendsUnavailable,
+      append_candidates_unread: unreadCandidates,
+      tree,
     });
   } catch (error) {
     return return_error(error);
@@ -880,6 +1069,7 @@ async function structureTreeFromAnswers(
   rootName: string,
   includeExtensions: boolean,
   reads: StructureReads,
+  shown: StructuresShown,
 ): Promise<McpResult> {
   const { logger } = context;
   try {
@@ -921,9 +1111,7 @@ async function structureTreeFromAnswers(
     if ('failures' in root) {
       return {
         isError: true,
-        content: [
-          { type: 'text', text: JSON.stringify(root.failures, null, 2) },
-        ],
+        content: [{ type: 'text', text: JSON.stringify(root.failures) }],
       };
     }
     if ('absent' in root) {
@@ -974,22 +1162,13 @@ async function structureTreeFromAnswers(
       kind: 'root',
       children: await buildChildren(rootName, root.source),
     };
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          structure_name: rootName,
-          ...(includeExtensions && appendsUnavailable
-            ? { appends_unavailable: true }
-            : {}),
-          ...(unreadCandidates.length > 0
-            ? { append_candidates_unread: unreadCandidates }
-            : {}),
-          tree,
-        },
-        null,
-        2,
-      ),
+    return readAnswer(shown, {
+      structure_name: rootName,
+      // True when a where-used lookup failed, so appends could not be
+      // determined and the tree may be missing them (≠ "no appends"). #128
+      appends_unavailable: includeExtensions && appendsUnavailable,
+      append_candidates_unread: unreadCandidates,
+      tree,
     });
   } catch (error) {
     return return_error(error);
@@ -1013,6 +1192,7 @@ async function structureTrees(
   rootNames: readonly string[],
   version: ReadVersion,
   includeExtensions: boolean,
+  shown: StructuresShown,
 ) {
   const reads = structureReads(context, version);
   const walks = rootNames.map((name) => ({
@@ -1075,15 +1255,11 @@ async function structureTrees(
         rootName,
         includeExtensions,
         reads,
+        shown,
       ),
     );
   }
   return trees;
-}
-
-/** An answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): JsonValue {
-  return jsonOrText(result.content[0]?.text ?? '');
 }
 
 /** Whether an answer is a credential failure: it ends a call for several structures. */
@@ -1092,23 +1268,115 @@ function endsList(result: McpResult): boolean {
   return failed !== undefined && isCredentialPayload(failed);
 }
 
-/** A list call's answer: one entry per structure, in the order asked. */
+/** What a list call answers from: the entries asked, and each one's answer. */
+interface ListOf {
+  readonly names: readonly string[];
+  readonly results: readonly McpResult[];
+}
+
+/**
+ * A list call's answer at each `detail`, selected through the table like
+ * every other answer: terse one text written by the listing writer, the other
+ * levels a JSON array of the entries.
+ */
+const LIST_ANSWERS: ListAnswerTable<ListOf, McpResult> = {
+  terse: terseList,
+  medium: jsonList,
+  full: (list) => jsonList(list).answer,
+  raw: (list) => jsonList(list).answer,
+};
+
+/** A list call's answer: one entry per asked, in the order asked, at the level asked. */
 function listAnswer(
   names: readonly string[],
   results: readonly McpResult[],
+  level: DetailLevel,
 ): McpResult {
-  const entries = results.map((result, i) =>
-    result.isError
-      ? { structure_name: names[i], error: payloadOfAnswer(result) }
-      : payloadOfAnswer(result),
-  );
-  return {
-    isError: false,
-    content: [{ type: 'text', text: JSON.stringify(entries, null, 2) }],
-  };
+  return listAnswerAt(LIST_ANSWERS, level)({ names, results });
 }
 
+/** A list call's terse text. */
+function terseList({ names, results }: ListOf): Written<TextResult> {
+  // Every structure's text written by the listing writer: a failure under
+  // its escaped `# structure` line and one `# error` line; an answered one
+  // as its own terse listing.
+  const text = writeListing({
+    heads: [],
+    reading: {
+      answered: results.map((result, i) => ({
+        name: names[i] ?? '',
+        answer: answerPayload(result),
+        read: result.isError ? undefined : readsOf.get(result),
+      })),
+    },
+    lists: {
+      answered: partsOf(
+        'answered',
+        ({ name, answer, read }: AnsweredStructure): Head[] =>
+          read === undefined
+            ? [
+                { head: 'structure', value: name },
+                {
+                  head: 'error',
+                  value: JSON.stringify(answer),
+                },
+              ]
+            : [],
+        'read',
+        byListing(STRUCTURES_LISTS, structuresListing),
+      ),
+    },
+  });
+  return asTextResult(text);
+}
+
+/** One structure of a list call: its name, its answer, and its read when answered. */
+interface AnsweredStructure {
+  readonly name: string;
+  readonly answer: JsonValue;
+  readonly read: StructuresRead | undefined;
+}
+
+/** A list call's entries as a JSON array. */
+function jsonList({ names, results }: ListOf): Written<TextResult> {
+  // Every answer one entry, written by the listing writer.
+  return asJsonResult(
+    writeJsonList(
+      { answered: results.map(listedAnswer) },
+      values('answered', ({ isError, answer, i }: ListedAnswer) =>
+        ((isError, answer, i) =>
+          isError ? { structure_name: names[i], error: answer } : answer)(
+          isError,
+          answer,
+          i,
+        ),
+      ),
+    ),
+  );
+}
+
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetStructuresList(
+  context: HandlerContext,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetStructuresList',
+        shape: 'assembled',
+      },
+      () => answeredGetStructuresList(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetStructuresList(context, args);
+}
+
+async function answeredGetStructuresList(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
@@ -1117,9 +1385,11 @@ export async function handleGetStructuresList(
   const listed = args?.structure_names;
   const version = args?.version ?? 'active';
   const includeExtensions = args?.include_extensions !== false;
+  const level = levelOf(args);
+  const shown = listAnswerAt(STRUCTURES_ANSWERS, levelOf(args));
   const sequential = (structure_name: string) => {
     const { structure_names: _list, ...rest } = args;
-    return structuresListOf(context, { ...rest, structure_name });
+    return structuresListOf(context, { ...rest, structure_name }, shown);
   };
   try {
     if (listed === undefined) {
@@ -1133,6 +1403,7 @@ export async function handleGetStructuresList(
               [structure_name.toUpperCase()],
               version,
               includeExtensions,
+              shown,
             )
           )[0],
         () => sequential(structure_name),
@@ -1144,7 +1415,14 @@ export async function handleGetStructuresList(
       async () =>
         listAnswer(
           names,
-          await structureTrees(context, names, version, includeExtensions),
+          await structureTrees(
+            context,
+            names,
+            version,
+            includeExtensions,
+            shown,
+          ),
+          level,
         ),
       async () => {
         // One structure after another, each as the single call reads it; a
@@ -1155,7 +1433,7 @@ export async function handleGetStructuresList(
           if (endsList(result)) return result;
           results.push(result);
         }
-        return listAnswer(names, results);
+        return listAnswer(names, results, level);
       },
     );
   } catch (error) {

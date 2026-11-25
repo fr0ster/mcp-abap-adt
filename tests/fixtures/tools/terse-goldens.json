@@ -1,0 +1,840 @@
+{
+  "GetPackageContents one package, a subpackage @terse": {
+    "isError": false,
+    "parts": [
+      "type\tname\ttech_name\turi\n# package ZPKG\nDEVC/K\tnot loaded by SAP\t\t\nCLAS/OC\tZCL_A\t\t\nDEVC/K\tZSUB\t\t\nPROG/P\t\t\t/sap/bc/adt/programs/programs/nameless"
+    ]
+  },
+  "GetPackageContents one package, a subpackage @medium": {
+    "isError": false,
+    "parts": [
+      "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"package_name\":\"ZPKG\",\"not_loaded\":true},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\",\"package_name\":\"ZPKG\",\"tech_name\":\"ZCL_A\"},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"package_name\":\"ZPKG\",\"tech_name\":\"ZSUB\"},{\"name\":\"\",\"type\":\"PROG/P\",\"package_name\":\"ZPKG\",\"uri\":\"/sap/bc/adt/programs/programs/nameless\"}]"
+    ]
+  },
+  "GetPackageContents one package, a subpackage @full": {
+    "isError": false,
+    "parts": [
+      "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"notLoaded\":true},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\",\"kind\":\"class\",\"packageName\":\"ZPKG\",\"isPackage\":false},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true},{\"name\":\"\",\"type\":\"PROG/P\",\"kind\":\"program\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/programs/programs/nameless\"}]"
+    ]
+  },
+  "GetPackageContents two packages, one refused @terse": {
+    "isError": false,
+    "parts": [
+      "# asked ZSUB\ntype\tname\ttech_name\turi\n# package ZSUB\nPROG/P\tZPROG\t\t\n# asked ZGONE\n# error {\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}"
+    ]
+  },
+  "GetPackageContents two packages, one refused @medium": {
+    "isError": false,
+    "parts": [
+      "[{\"package_name\":\"ZSUB\",\"objects\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"package_name\":\"ZSUB\",\"tech_name\":\"ZPROG\"}]},{\"package_name\":\"ZGONE\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "GetPackageContents two packages, one refused @full": {
+    "isError": false,
+    "parts": [
+      "[{\"package_name\":\"ZSUB\",\"objects\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"kind\":\"program\",\"packageName\":\"ZSUB\",\"isPackage\":false}]},{\"package_name\":\"ZGONE\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "GetPackageContents one package, a subpackage, descriptions @terse": {
+    "isError": false,
+    "parts": [
+      "type\tname\ttech_name\turi\tdescription\n# package ZPKG\nDEVC/K\tnot loaded by SAP\t\t\t\nCLAS/OC\tZCL_A\t\t\tClass A\nDEVC/K\tZSUB\t\t\tSub\nPROG/P\t\t\t/sap/bc/adt/programs/programs/nameless\t"
+    ]
+  },
+  "GetPackageContents one package, a subpackage, descriptions @medium": {
+    "isError": false,
+    "parts": [
+      "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"package_name\":\"ZPKG\",\"not_loaded\":true},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\",\"package_name\":\"ZPKG\",\"description\":\"Class A\",\"tech_name\":\"ZCL_A\"},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"package_name\":\"ZPKG\",\"description\":\"Sub\",\"tech_name\":\"ZSUB\"},{\"name\":\"\",\"type\":\"PROG/P\",\"package_name\":\"ZPKG\",\"uri\":\"/sap/bc/adt/programs/programs/nameless\"}]"
+    ]
+  },
+  "GetPackageContents one package, a subpackage, descriptions @full": {
+    "isError": false,
+    "parts": [
+      "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"notLoaded\":true},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\",\"kind\":\"class\",\"description\":\"Class A\",\"packageName\":\"ZPKG\",\"isPackage\":false},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"description\":\"Sub\",\"packageName\":\"ZPKG\",\"isPackage\":true},{\"name\":\"\",\"type\":\"PROG/P\",\"kind\":\"program\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/programs/programs/nameless\"}]"
+    ]
+  },
+  "GetPackageContents two packages, one refused, descriptions @terse": {
+    "isError": false,
+    "parts": [
+      "# asked ZSUB\ntype\tname\ttech_name\turi\tdescription\n# package ZSUB\nPROG/P\tZPROG\t\t\tProgram\n# asked ZGONE\n# error {\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}"
+    ]
+  },
+  "GetPackageContents two packages, one refused, descriptions @medium": {
+    "isError": false,
+    "parts": [
+      "[{\"package_name\":\"ZSUB\",\"objects\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"package_name\":\"ZSUB\",\"description\":\"Program\",\"tech_name\":\"ZPROG\"}]},{\"package_name\":\"ZGONE\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "GetPackageContents two packages, one refused, descriptions @full": {
+    "isError": false,
+    "parts": [
+      "[{\"package_name\":\"ZSUB\",\"objects\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"kind\":\"program\",\"description\":\"Program\",\"packageName\":\"ZSUB\",\"isPackage\":false}]},{\"package_name\":\"ZGONE\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "GetPackageTree one package, a subpackage @terse": {
+    "isError": false,
+    "parts": [
+      "DEVC/K\tZPKG\n  DEVC/K\tnot loaded by SAP\n  CLAS/OC\tZCL_A\n  DEVC/K\tZSUB\n    PROG/P\tZPROG\n  PROG/P\t\t\t/sap/bc/adt/programs/programs/nameless"
+    ]
+  },
+  "GetPackageTree one package, a subpackage @medium": {
+    "isError": false,
+    "parts": [
+      "{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"not_loaded\":true},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\"},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\"}]},{\"name\":\"\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/nameless\"}]}"
+    ]
+  },
+  "GetPackageTree one package, a subpackage @full": {
+    "isError": false,
+    "parts": [
+      "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\",\"kind\":\"class\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/programs/programs/nameless\",\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}"
+    ]
+  },
+  "GetPackageTree two packages, one refused @terse": {
+    "isError": false,
+    "parts": [
+      "# asked ZSUB\nDEVC/K\tZSUB\n  PROG/P\tZPROG\n# asked ZGONE\n# error {\"package_name\":\"ZGONE\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package metadata\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}}"
+    ]
+  },
+  "GetPackageTree two packages, one refused @medium": {
+    "isError": false,
+    "parts": [
+      "[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\"}]},{\"package_name\":\"ZGONE\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package metadata\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "GetPackageTree two packages, one refused @full": {
+    "isError": false,
+    "parts": [
+      "[{\"package_name\":\"ZSUB\",\"tree\":{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}},{\"package_name\":\"ZGONE\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package metadata\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "GetPackageTree one package, a subpackage, descriptions @terse": {
+    "isError": false,
+    "parts": [
+      "DEVC/K\tZPKG\t\n  DEVC/K\tnot loaded by SAP\t\n  CLAS/OC\tZCL_A\tClass A\n  DEVC/K\tZSUB\tSub\n    PROG/P\tZPROG\tProgram\n  PROG/P\t\t\t/sap/bc/adt/programs/programs/nameless\t"
+    ]
+  },
+  "GetPackageTree one package, a subpackage, descriptions @medium": {
+    "isError": false,
+    "parts": [
+      "{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"not_loaded\":true},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\",\"description\":\"Class A\"},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"description\":\"Sub\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"description\":\"Program\"}]},{\"name\":\"\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/nameless\"}]}"
+    ]
+  },
+  "GetPackageTree one package, a subpackage, descriptions @full": {
+    "isError": false,
+    "parts": [
+      "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\",\"kind\":\"class\",\"description\":\"Class A\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"description\":\"Sub\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"kind\":\"program\",\"description\":\"Program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/programs/programs/nameless\",\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":true}}"
+    ]
+  },
+  "GetPackageTree two packages, one refused, descriptions @terse": {
+    "isError": false,
+    "parts": [
+      "# asked ZSUB\n# error {\"package_name\":\"ZSUB\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}}\n# asked ZGONE\nDEVC/K\tZGONE\t"
+    ]
+  },
+  "GetPackageTree two packages, one refused, descriptions @medium": {
+    "isError": false,
+    "parts": [
+      "[{\"package_name\":\"ZSUB\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}},{\"name\":\"ZGONE\",\"type\":\"DEVC/K\"}]"
+    ]
+  },
+  "GetPackageTree two packages, one refused, descriptions @full": {
+    "isError": false,
+    "parts": [
+      "[{\"package_name\":\"ZSUB\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}},{\"package_name\":\"ZGONE\",\"tree\":{\"name\":\"ZGONE\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":true}}]"
+    ]
+  },
+  "GetObjectsList one parent @terse": {
+    "isError": false,
+    "parts": [
+      "# parent FUGR/F ZFG\n# total 4\ntype\tname\ttech_name\turi\nFUGR/FF\tZ_FM\t\t\nFUGR/I\tZFG_TOP\tLZFGTOP\t\nFUGR/I\t\t\t/sap/bc/adt/functions/groups/zfg/includes/nameless\nFUGR/F\tnot loaded by SAP\t\t"
+    ]
+  },
+  "GetObjectsList one parent @medium": {
+    "isError": false,
+    "parts": [
+      "{\"parent_name\":\"ZFG\",\"parent_type\":\"FUGR/F\",\"total_objects\":4,\"objects\":[{\"type\":\"FUGR/FF\",\"name\":\"Z_FM\",\"tech_name\":\"Z_FM\",\"description\":\"Module\"},{\"type\":\"FUGR/I\",\"name\":\"ZFG_TOP\",\"tech_name\":\"LZFGTOP\",\"description\":\"Top\"},{\"type\":\"FUGR/I\",\"name\":\"\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\",\"description\":\"Nameless\"},{\"type\":\"FUGR/F\",\"name\":\"not loaded by SAP\",\"not_loaded\":true}]}"
+    ]
+  },
+  "GetObjectsList one parent @full": {
+    "isError": false,
+    "parts": [
+      "{\"parent_name\":\"ZFG\",\"parent_tech_name\":\"ZFG\",\"parent_type\":\"FUGR/F\",\"total_objects\":4,\"objects\":[{\"OBJECT_TYPE\":\"FUGR/FF\",\"OBJECT_NAME\":\"Z_FM\",\"TECH_NAME\":\"Z_FM\",\"OBJECT_URI\":\"/sap/bc/adt/functions/groups/zfg/fmodules/z_fm\",\"DESCRIPTION\":\"Module\"},{\"OBJECT_TYPE\":\"FUGR/I\",\"OBJECT_NAME\":\"ZFG_TOP\",\"TECH_NAME\":\"LZFGTOP\",\"OBJECT_URI\":\"/sap/bc/adt/functions/groups/zfg/includes/lzfgtop\",\"DESCRIPTION\":\"Top\"},{\"OBJECT_TYPE\":\"FUGR/I\",\"OBJECT_NAME\":\"\",\"OBJECT_URI\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\",\"DESCRIPTION\":\"Nameless\"},{\"OBJECT_TYPE\":\"FUGR/F\",\"OBJECT_NAME\":\"not loaded by SAP\",\"NOT_LOADED\":true}]}"
+    ]
+  },
+  "GetObjectsList two parents, one refused @terse": {
+    "isError": false,
+    "parts": [
+      "# parent FUGR/F ZFG\n# total 4\ntype\tname\ttech_name\turi\nFUGR/FF\tZ_FM\t\t\nFUGR/I\tZFG_TOP\tLZFGTOP\t\nFUGR/I\t\t\t/sap/bc/adt/functions/groups/zfg/includes/nameless\nFUGR/F\tnot loaded by SAP\t\t\n# parent FUGR/F ZGONE\n# error {\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read node structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}"
+    ]
+  },
+  "GetObjectsList two parents, one refused @medium": {
+    "isError": false,
+    "parts": [
+      "[{\"parent_name\":\"ZFG\",\"parent_type\":\"FUGR/F\",\"total_objects\":4,\"objects\":[{\"type\":\"FUGR/FF\",\"name\":\"Z_FM\",\"tech_name\":\"Z_FM\",\"description\":\"Module\"},{\"type\":\"FUGR/I\",\"name\":\"ZFG_TOP\",\"tech_name\":\"LZFGTOP\",\"description\":\"Top\"},{\"type\":\"FUGR/I\",\"name\":\"\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\",\"description\":\"Nameless\"},{\"type\":\"FUGR/F\",\"name\":\"not loaded by SAP\",\"not_loaded\":true}]},{\"parent_name\":\"ZGONE\",\"parent_type\":\"FUGR/F\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read node structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "GetObjectsList two parents, one refused @full": {
+    "isError": false,
+    "parts": [
+      "[{\"parent_name\":\"ZFG\",\"parent_type\":\"FUGR/F\",\"total_objects\":4,\"objects\":[{\"OBJECT_TYPE\":\"FUGR/FF\",\"OBJECT_NAME\":\"Z_FM\",\"TECH_NAME\":\"Z_FM\",\"OBJECT_URI\":\"/sap/bc/adt/functions/groups/zfg/fmodules/z_fm\",\"DESCRIPTION\":\"Module\"},{\"OBJECT_TYPE\":\"FUGR/I\",\"OBJECT_NAME\":\"ZFG_TOP\",\"TECH_NAME\":\"LZFGTOP\",\"OBJECT_URI\":\"/sap/bc/adt/functions/groups/zfg/includes/lzfgtop\",\"DESCRIPTION\":\"Top\"},{\"OBJECT_TYPE\":\"FUGR/I\",\"OBJECT_NAME\":\"\",\"OBJECT_URI\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\",\"DESCRIPTION\":\"Nameless\"},{\"OBJECT_TYPE\":\"FUGR/F\",\"OBJECT_NAME\":\"not loaded by SAP\",\"NOT_LOADED\":true}]},{\"parent_name\":\"ZGONE\",\"parent_type\":\"FUGR/F\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read node structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "ListFunctionModules a group's children @terse": {
+    "isError": false,
+    "parts": [
+      "# function_group ZFG\n# total 4\nname\turi\tdescription\nZ_FM\t\tA module\nZFG_TOP\t\t\n\t/sap/bc/adt/functions/groups/zfg/includes/nameless\t\nnot loaded by SAP\t\t"
+    ]
+  },
+  "ListFunctionModules a group's children @medium": {
+    "isError": false,
+    "parts": [
+      "{\"function_group_name\":\"ZFG\",\"total\":4,\"function_modules\":[{\"name\":\"Z_FM\",\"type\":\"FUGR/FF\",\"description\":\"A module\",\"techName\":\"Z_FM\"},{\"name\":\"ZFG_TOP\",\"type\":\"FUGR/I\",\"techName\":\"LZFGTOP\"},{\"name\":\"\",\"type\":\"FUGR/I\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\"},{\"type\":\"FUGR/FF\",\"name\":\"not loaded by SAP\",\"notLoaded\":true}]}"
+    ]
+  },
+  "ListFunctionModules a group's children @full": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"function_group_name\":\"ZFG\",\"total\":4,\"function_modules\":[\"Z_FM\",\"ZFG_TOP\",\"\",\"not loaded by SAP\"],\"objects\":[{\"name\":\"Z_FM\",\"type\":\"FUGR/FF\",\"description\":\"A module\",\"techName\":\"Z_FM\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/fmodules/z_fm\"},{\"name\":\"ZFG_TOP\",\"type\":\"FUGR/I\",\"techName\":\"LZFGTOP\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/lzfgtop\"},{\"name\":\"\",\"type\":\"FUGR/I\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\"},{\"type\":\"FUGR/FF\",\"name\":\"not loaded by SAP\",\"notLoaded\":true}]}"
+    ]
+  },
+  "ListFunctionGroupIncludes a group's children @terse": {
+    "isError": false,
+    "parts": [
+      "# function_group ZFG\n# total 4\nname\turi\tdescription\nZ_FM\t\tA module\nZFG_TOP\t\t\n\t/sap/bc/adt/functions/groups/zfg/includes/nameless\t\nnot loaded by SAP\t\t"
+    ]
+  },
+  "ListFunctionGroupIncludes a group's children @medium": {
+    "isError": false,
+    "parts": [
+      "{\"function_group_name\":\"ZFG\",\"total\":4,\"includes\":[{\"name\":\"Z_FM\",\"type\":\"FUGR/FF\",\"description\":\"A module\",\"techName\":\"Z_FM\"},{\"name\":\"ZFG_TOP\",\"type\":\"FUGR/I\",\"techName\":\"LZFGTOP\"},{\"name\":\"\",\"type\":\"FUGR/I\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\"},{\"type\":\"FUGR/I\",\"name\":\"not loaded by SAP\",\"notLoaded\":true}]}"
+    ]
+  },
+  "ListFunctionGroupIncludes a group's children @full": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"function_group_name\":\"ZFG\",\"total\":4,\"includes\":[\"Z_FM\",\"ZFG_TOP\",\"\",\"not loaded by SAP\"],\"objects\":[{\"name\":\"Z_FM\",\"type\":\"FUGR/FF\",\"description\":\"A module\",\"techName\":\"Z_FM\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/fmodules/z_fm\"},{\"name\":\"ZFG_TOP\",\"type\":\"FUGR/I\",\"techName\":\"LZFGTOP\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/lzfgtop\"},{\"name\":\"\",\"type\":\"FUGR/I\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\"},{\"type\":\"FUGR/I\",\"name\":\"not loaded by SAP\",\"notLoaded\":true}]}"
+    ]
+  },
+  "GetIncludesList a program, one include read, one refused @terse": {
+    "isError": false,
+    "parts": [
+      "# object PROG/P ZPROG\n# unreadable\tZINC_C\nZPROG\n  ZINC_A\n    ZINC_C\n  ZINC_B"
+    ]
+  },
+  "GetIncludesList a program, one include read, one refused @medium": {
+    "isError": false,
+    "parts": [
+      "{\"object_name\":\"ZPROG\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZPROG\",\"children\":[{\"name\":\"ZINC_A\",\"children\":[{\"name\":\"ZINC_C\"}]},{\"name\":\"ZINC_B\"}]},\"unreadable\":[{\"name\":\"ZINC_C\",\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read source\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}"
+    ]
+  },
+  "GetIncludesList a program, one include read, one refused @full": {
+    "isError": false,
+    "parts": [
+      "{\"object_name\":\"ZPROG\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZPROG\",\"children\":[{\"name\":\"ZINC_A\",\"children\":[{\"name\":\"ZINC_C\",\"children\":[]}]},{\"name\":\"ZINC_B\",\"children\":[]}]},\"unreadable\":[{\"name\":\"ZINC_C\",\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read source\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}"
+    ]
+  },
+  "GetIncludesList two programs, one refused @terse": {
+    "isError": false,
+    "parts": [
+      "# object PROG/P ZPROG\nZPROG\n  ZINC_A\n# object PROG/P ZGONE\n# unreadable\tprogram ZGONE\nZGONE"
+    ]
+  },
+  "GetIncludesList two programs, one refused @medium": {
+    "isError": false,
+    "parts": [
+      "[{\"object_name\":\"ZPROG\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZPROG\",\"children\":[{\"name\":\"ZINC_A\"}]}},{\"object_name\":\"ZGONE\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZGONE\"},\"unreadable\":[{\"name\":\"program ZGONE\",\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read source\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}]"
+    ]
+  },
+  "GetIncludesList two programs, one refused @full": {
+    "isError": false,
+    "parts": [
+      "[{\"object_name\":\"ZPROG\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZPROG\",\"children\":[{\"name\":\"ZINC_A\",\"children\":[]}]}},{\"object_name\":\"ZGONE\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZGONE\",\"children\":[]},\"unreadable\":[{\"name\":\"program ZGONE\",\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read source\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}]"
+    ]
+  },
+  "GetStructuresList a structure, an include, one not read @terse": {
+    "isError": false,
+    "parts": [
+      "# structure ZS\nZS\troot\t\n  ZINC\tinclude\t\n    ZS\tinclude\t\tcyclic\n  ZGONE\tinclude\t\tnot read\n# failure\t{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}\n# failure\t{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read table\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}"
+    ]
+  },
+  "GetStructuresList a structure, an include, one not read @medium": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"structure_name\":\"ZS\",\"tree\":{\"structure\":\"ZS\",\"attribute\":null,\"kind\":\"root\",\"children\":[{\"structure\":\"ZINC\",\"attribute\":null,\"kind\":\"include\",\"children\":[{\"structure\":\"ZS\",\"attribute\":null,\"kind\":\"include\",\"children\":[],\"cyclic\":true}]},{\"structure\":\"ZGONE\",\"attribute\":null,\"kind\":\"include\",\"children\":[],\"error\":[{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"},{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read table\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}]}}"
+    ]
+  },
+  "GetStructuresList a structure, an include, one not read @full": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"structure_name\":\"ZS\",\"tree\":{\"structure\":\"ZS\",\"attribute\":null,\"kind\":\"root\",\"children\":[{\"structure\":\"ZINC\",\"attribute\":null,\"kind\":\"include\",\"children\":[{\"structure\":\"ZS\",\"attribute\":null,\"kind\":\"include\",\"children\":[],\"cyclic\":true}]},{\"structure\":\"ZGONE\",\"attribute\":null,\"kind\":\"include\",\"children\":[],\"error\":[{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"},{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read table\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}]}}"
+    ]
+  },
+  "GetStructuresList two structures, one refused @terse": {
+    "isError": false,
+    "parts": [
+      "# structure ZS\nZS\troot\t\n# structure ZGONE\n# error [{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"},{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read table\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}]"
+    ]
+  },
+  "GetStructuresList two structures, one refused @medium": {
+    "isError": false,
+    "parts": [
+      "[{\"success\":true,\"structure_name\":\"ZS\",\"tree\":{\"structure\":\"ZS\",\"attribute\":null,\"kind\":\"root\",\"children\":[]}},{\"structure_name\":\"ZGONE\",\"error\":[{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"},{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read table\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}]"
+    ]
+  },
+  "GetStructuresList two structures, one refused @full": {
+    "isError": false,
+    "parts": [
+      "[{\"success\":true,\"structure_name\":\"ZS\",\"tree\":{\"structure\":\"ZS\",\"attribute\":null,\"kind\":\"root\",\"children\":[]}},{\"structure_name\":\"ZGONE\",\"error\":[{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"},{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read table\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}]"
+    ]
+  },
+  "GetEnhancements a class with two enhancements @terse": {
+    "isError": false,
+    "parts": [
+      "# object class ZCL_E\n# count 2\nname\ttype\tdescription\nZ_FIRST\tENHO/XHH\t\nZ_SECOND\tENHO/XHH\t"
+    ]
+  },
+  "GetEnhancements a class with two enhancements @medium": {
+    "isError": false,
+    "parts": [
+      "{\"object_name\":\"ZCL_E\",\"object_type\":\"class\",\"detailed\":false,\"total_enhancements\":2,\"enhancements\":[{\"name\":\"Z_FIRST\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_first.\\nENDENHANCEMENT.\"},{\"name\":\"Z_SECOND\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_second.\"}]}"
+    ]
+  },
+  "GetEnhancements a class with two enhancements @full": {
+    "isError": false,
+    "parts": [
+      "{\"object_name\":\"ZCL_E\",\"object_type\":\"class\",\"detailed\":false,\"total_enhancements\":2,\"enhancements\":[{\"name\":\"Z_FIRST\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_first.\\nENDENHANCEMENT.\"},{\"name\":\"Z_SECOND\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_second.\"}]}"
+    ]
+  },
+  "GetEnhancements two classes, one refused @terse": {
+    "isError": false,
+    "parts": [
+      "# object class ZCL_E\n# count 0\n# object class ZCL_GONE\n# error {\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read enhancements\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}"
+    ]
+  },
+  "GetEnhancements two classes, one refused @medium": {
+    "isError": false,
+    "parts": [
+      "[{\"object_name\":\"ZCL_E\",\"object_type\":\"class\",\"detailed\":false,\"total_enhancements\":0,\"enhancements\":[]},{\"object_name\":\"ZCL_GONE\",\"object_type\":\"class\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read enhancements\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "GetEnhancements two classes, one refused @full": {
+    "isError": false,
+    "parts": [
+      "[{\"object_name\":\"ZCL_E\",\"object_type\":\"class\",\"detailed\":false,\"total_enhancements\":0,\"enhancements\":[]},{\"object_name\":\"ZCL_GONE\",\"object_type\":\"class\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read enhancements\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "DescribeByList a described object, one not found, one refused @terse": {
+    "isError": false,
+    "parts": [
+      "name\ttype\tdescription\tpackage\nZCL_A\tCLAS/OC\tone & only\tZPKG\nZCL_A2\tCLAS/OC\t\t"
+    ]
+  },
+  "DescribeByList a described object, one not found, one refused @medium": {
+    "isError": false,
+    "parts": [
+      "{\"name\":\"ZCL_A\",\"results\":[{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"adtcore:objectReferences\":{\"adtcore:objectReference\":[{\"@\":{\"adtcore:uri\":\"/sap/bc/adt/oo/classes/zcl_a\",\"adtcore:type\":\"CLAS/OC\",\"adtcore:name\":\"ZCL_A\",\"adtcore:packageName\":\"ZPKG\",\"adtcore:description\":\"one & only\"}},{\"@\":{\"adtcore:uri\":\"/sap/bc/adt/oo/classes/zcl_a2\",\"adtcore:type\":\"CLAS/OC\",\"adtcore:name\":\"ZCL_A2\",\"adtcore:description\":\"\"}}],\"@\":{\"xmlns:adtcore\":\"http://www.sap.com/adt/core\"}}}]}",
+      "{\"name\":\"ZNONE\",\"type\":\"CLAS/OC\",\"found\":false}",
+      "{\"name\":\"ZREF\",\"type\":\"CLAS/OC\",\"found\":false}"
+    ]
+  },
+  "DescribeByList a described object, one not found, one refused @full": {
+    "isError": false,
+    "parts": [
+      "{\"name\":\"ZCL_A\",\"results\":[{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"adtcore:objectReferences\":{\"adtcore:objectReference\":[{\"@\":{\"adtcore:uri\":\"/sap/bc/adt/oo/classes/zcl_a\",\"adtcore:type\":\"CLAS/OC\",\"adtcore:name\":\"ZCL_A\",\"adtcore:packageName\":\"ZPKG\",\"adtcore:description\":\"one & only\"}},{\"@\":{\"adtcore:uri\":\"/sap/bc/adt/oo/classes/zcl_a2\",\"adtcore:type\":\"CLAS/OC\",\"adtcore:name\":\"ZCL_A2\",\"adtcore:description\":\"\"}}],\"@\":{\"xmlns:adtcore\":\"http://www.sap.com/adt/core\"}}}]}",
+      "{\"name\":\"ZNONE\",\"type\":\"CLAS/OC\",\"found\":false}",
+      "{\"name\":\"ZREF\",\"type\":\"CLAS/OC\",\"found\":false}"
+    ]
+  },
+  "GetWhereUsed one object @terse": {
+    "isError": false,
+    "parts": [
+      "# total 4\ntype\tname\turi\tusage\n# package ZPKG\nCLAS/OC\tZCL_USER\t\t\nPROG/P\tZPROG\t\tgradeDirect,includeTest\n# package ZOTHER\nINTF/OI\tZIF_X\t\t\nCLAS/OC\t\t/sap/bc/adt/oo/classes/nameless\tgradeDirect"
+    ]
+  },
+  "GetWhereUsed one object @medium": {
+    "isError": false,
+    "parts": [
+      "{\"total_references\":4,\"result_description\":\"Where-Used List: ZCL_X (Class)\",\"references\":[{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\"},{\"name\":\"ZCL_USER\",\"type\":\"CLAS/OC\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeProductive\"},{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeTest\"},{\"name\":\"ZIF_X\",\"type\":\"INTF/OI\",\"package_name\":\"ZOTHER\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"\"},{\"name\":\"\",\"type\":\"CLAS/OC\",\"package_name\":\"ZOTHER\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect\",\"uri\":\"/sap/bc/adt/oo/classes/nameless\"}]}"
+    ]
+  },
+  "GetWhereUsed one object @full": {
+    "isError": false,
+    "parts": [
+      "{\"object_name\":\"ZCL_X\",\"object_type\":\"CLAS/OC\",\"enable_all_types\":false,\"total_references\":4,\"result_description\":\"Where-Used List: ZCL_X (Class)\",\"references\":[{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"uri\":\"/sap/bc/adt/packages/zpkg\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\"},{\"name\":\"ZCL_USER\",\"type\":\"CLAS/OC\",\"uri\":\"/sap/bc/adt/oo/classes/zcl_user\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeProductive\"},{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/zprog\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeTest\"},{\"name\":\"ZIF_X\",\"type\":\"INTF/OI\",\"uri\":\"/sap/bc/adt/oo/interfaces/zif_x\",\"package_name\":\"ZOTHER\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"\"},{\"name\":\"\",\"type\":\"CLAS/OC\",\"uri\":\"/sap/bc/adt/oo/classes/nameless\",\"package_name\":\"ZOTHER\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect\"}]}"
+    ]
+  },
+  "GetWhereUsed two objects, one refused @terse": {
+    "isError": false,
+    "parts": [
+      "# object CLAS/OC ZCL_X\n# total 4\ntype\tname\turi\tusage\n# package ZPKG\nCLAS/OC\tZCL_USER\t\t\nPROG/P\tZPROG\t\tgradeDirect,includeTest\n# package ZOTHER\nINTF/OI\tZIF_X\t\t\nCLAS/OC\t\t/sap/bc/adt/oo/classes/nameless\tgradeDirect\n# object CLAS/OC ZCL_GONE\n# error {\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read where-used\",\"status\":403,\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}"
+    ]
+  },
+  "GetWhereUsed two objects, one refused @medium": {
+    "isError": false,
+    "parts": [
+      "[{\"total_references\":4,\"result_description\":\"Where-Used List: ZCL_X (Class)\",\"references\":[{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\"},{\"name\":\"ZCL_USER\",\"type\":\"CLAS/OC\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeProductive\"},{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeTest\"},{\"name\":\"ZIF_X\",\"type\":\"INTF/OI\",\"package_name\":\"ZOTHER\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"\"},{\"name\":\"\",\"type\":\"CLAS/OC\",\"package_name\":\"ZOTHER\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect\",\"uri\":\"/sap/bc/adt/oo/classes/nameless\"}]},{\"object_name\":\"ZCL_GONE\",\"object_type\":\"CLAS/OC\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read where-used\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "GetWhereUsed two objects, one refused @full": {
+    "isError": false,
+    "parts": [
+      "[{\"object_name\":\"ZCL_X\",\"object_type\":\"CLAS/OC\",\"enable_all_types\":false,\"total_references\":4,\"result_description\":\"Where-Used List: ZCL_X (Class)\",\"references\":[{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"uri\":\"/sap/bc/adt/packages/zpkg\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\"},{\"name\":\"ZCL_USER\",\"type\":\"CLAS/OC\",\"uri\":\"/sap/bc/adt/oo/classes/zcl_user\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeProductive\"},{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/zprog\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeTest\"},{\"name\":\"ZIF_X\",\"type\":\"INTF/OI\",\"uri\":\"/sap/bc/adt/oo/interfaces/zif_x\",\"package_name\":\"ZOTHER\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"\"},{\"name\":\"\",\"type\":\"CLAS/OC\",\"uri\":\"/sap/bc/adt/oo/classes/nameless\",\"package_name\":\"ZOTHER\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect\"}]},{\"object_name\":\"ZCL_GONE\",\"object_type\":\"CLAS/OC\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read where-used\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+    ]
+  },
+  "GetMainPrograms two programs and a group @terse": {
+    "isError": false,
+    "parts": [
+      "# include ZINC\ntype\tname\nPROG/P\tZPROG\nPROG/P\t#ZPROG2\nFUGR/F\tZFG"
+    ]
+  },
+  "GetMainPrograms two programs and a group @medium": {
+    "isError": false,
+    "parts": [
+      "{\"include_name\":\"ZINC\",\"main_programs\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\"},{\"name\":\"#ZPROG2\",\"type\":\"PROG/P\"},{\"name\":\"ZFG\",\"type\":\"FUGR/F\"}]}"
+    ]
+  },
+  "GetMainPrograms two programs and a group @full": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"include_name\":\"ZINC\",\"main_programs\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/zprog\"},{\"name\":\"#ZPROG2\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/zprog2\"},{\"name\":\"ZFG\",\"type\":\"FUGR/F\",\"uri\":\"/sap/bc/adt/functions/groups/zfg\"}]}"
+    ]
+  },
+  "RuntimeListFeeds descriptors through the handler @terse": {
+    "isError": false,
+    "parts": [
+      "# feed descriptors\n# count 2\nid\ttitle\tcategory\n/sap/bc/adt/runtime/dumps\tABAP Runtime Errors\t\n/sap/bc/adt/runtime/traces\tTraces\\ttabbed\t"
+    ]
+  },
+  "RuntimeListFeeds descriptors through the handler @medium": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"feed_type\":\"descriptors\",\"count\":2,\"entries\":[{\"id\":\"/sap/bc/adt/runtime/dumps\",\"title\":\"ABAP Runtime Errors\",\"url\":\"/sap/bc/adt/runtime/dumps\"},{\"id\":\"/sap/bc/adt/runtime/traces\",\"title\":\"Traces\\ttabbed\",\"url\":\"/sap/bc/adt/runtime/traces\"}]}"
+    ]
+  },
+  "RuntimeListFeeds descriptors through the handler @full": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"feed_type\":\"descriptors\",\"count\":2,\"entries\":[{\"id\":\"/sap/bc/adt/runtime/dumps\",\"title\":\"ABAP Runtime Errors\",\"url\":\"/sap/bc/adt/runtime/dumps\"},{\"id\":\"/sap/bc/adt/runtime/traces\",\"title\":\"Traces\\ttabbed\",\"url\":\"/sap/bc/adt/runtime/traces\"}]}"
+    ]
+  },
+  "ReadTransportActionLog lines and separators @terse": {
+    "isError": false,
+    "parts": [
+      "# transport SIDK900012\n# count 3\nentry\nExport started\nObject ZCL_A\\texported\n\\#Done"
+    ]
+  },
+  "ReadTransportActionLog lines and separators @medium": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"transport_number\":\"SIDK900012\",\"count\":5,\"entries\":[\"========\",\"Export started\",\"--------\",\"Object ZCL_A\\texported\",\"#Done\"]}"
+    ]
+  },
+  "ReadTransportActionLog lines and separators @full": {
+    "isError": false,
+    "parts": [
+      "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"log:log\":{\"log:entry\":[{\"log:message\":{\"log:messageText\":{\"#text\":\"========\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"Export started\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"--------\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"Object ZCL_A\\texported\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"#Done\",\"@\":{\"key\":\"TK(188)\"}}}}],\"@\":{\"xmlns:log\":\"http://www.sap.com/cts/adt/log\"}}}"
+    ]
+  },
+  "ListTransports a repeat, a number repeated with other content, a request without a number @terse": {
+    "isError": false,
+    "parts": [
+      "# count 4\nnumber\ttype\tstatus\towner\ttarget\tdescription\nSIDK900001\tK\tD\tSAPUSER01\t/QAS/\tOne\n\tK\tD\tSAPUSER01\t\tWithout a number\nSIDK900002\tK\tD\tSAPUSER01\t\tTwo\nSIDK900002\tK\tD\tSAPUSER02\t\tTwo, another text"
+    ]
+  },
+  "ListTransports a repeat, a number repeated with other content, a request without a number @medium": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"count\":4,\"transports\":[{\"number\":\"SIDK900001\",\"description\":\"One\",\"type\":\"K\",\"status\":\"D\",\"owner\":\"SAPUSER01\",\"target\":\"/QAS/\"},{\"number\":\"\",\"description\":\"Without a number\",\"type\":\"K\",\"status\":\"D\",\"owner\":\"SAPUSER01\",\"target\":\"\"},{\"number\":\"SIDK900002\",\"description\":\"Two\",\"type\":\"K\",\"status\":\"D\",\"owner\":\"SAPUSER01\",\"target\":\"\"},{\"number\":\"SIDK900002\",\"description\":\"Two, another text\",\"type\":\"K\",\"status\":\"D\",\"owner\":\"SAPUSER02\",\"target\":\"\"}]}"
+    ]
+  },
+  "ListTransports a repeat, a number repeated with other content, a request without a number @full": {
+    "isError": false,
+    "parts": [
+      "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"tm:workbench\":[{\"tm:modifiable\":{\"tm:request\":[{\"@\":{\"tm:number\":\"SIDK900001\",\"tm:desc\":\"One\",\"tm:type\":\"K\",\"tm:status\":\"D\",\"tm:owner\":\"SAPUSER01\",\"tm:target\":\"/QAS/\"}},{\"@\":{\"tm:desc\":\"Without a number\",\"tm:type\":\"K\",\"tm:status\":\"D\",\"tm:owner\":\"SAPUSER01\"}},{\"tm:task\":[{\"@\":{\"tm:number\":\"SIDK900003\",\"tm:owner\":\"SAPUSER01\"}}],\"@\":{\"tm:number\":\"SIDK900002\",\"tm:desc\":\"Two\",\"tm:type\":\"K\",\"tm:status\":\"D\",\"tm:owner\":\"SAPUSER01\"}}],\"@\":{\"tm:parent_name\":\"\"}},\"@\":{\"tm:parent_name\":\"\"}},{\"tm:modifiable\":{\"tm:request\":[{\"@\":{\"tm:number\":\"SIDK900001\",\"tm:desc\":\"One\",\"tm:type\":\"K\",\"tm:status\":\"D\",\"tm:owner\":\"SAPUSER01\",\"tm:target\":\"/QAS/\"}},{\"tm:task\":[{\"@\":{\"tm:number\":\"SIDK900004\",\"tm:owner\":\"SAPUSER02\"}}],\"@\":{\"tm:number\":\"SIDK900002\",\"tm:desc\":\"Two, another text\",\"tm:type\":\"K\",\"tm:status\":\"D\",\"tm:owner\":\"SAPUSER02\"}}],\"@\":{\"tm:parent_name\":\"\"}},\"@\":{\"tm:parent_name\":\"\"}}],\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\",\"tm:useraction\":\"\"}}}"
+    ]
+  },
+  "GetATCFindings a recorded worklist @terse": {
+    "isError": false,
+    "parts": [
+      "# worklist 2AAA2806861E1FD1AD9BD28DCA5C37ED\n# objects_checked 21\n# finding_count 6\n# priority 2 4\n# priority 3 2\nobject\tobject_type\tlocation\tline\tcolumn\tpriority\tcheck\tmessage\nZMCP_BLD_SHR_FGR\tFUGR\t/sap/bc/adt/functions/groups/zmcp_bld_shr_fgr/fmodules/z_mcp_bld_shr_fm/source/main\t9\t0\t3\tExtended Program Check (SLIN)\tStrings without text elements are not translated: |Echo: |\nZMCP_BLD_SHR_FGR\tFUGR\t/sap/bc/adt/functions/groups/zmcp_bld_shr_fgr/fmodules/z_mcp_bld_shr_fm/source/main\t10\t0\t2\tSlow parameter passing\tParameter contains strings and is passed by VALUE\nZMCP_BLD_SHR_FGR\tFUGR\t/sap/bc/adt/functions/groups/zmcp_bld_shr_fgr/fmodules/z_mcp_bld_shr_fm/source/main\t10\t0\t2\tSlow parameter passing\tParameter contains strings, is passed by VALUE, and is not changed\nZMCP_SHR_FGRP\tFUGR\t/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\t9\t0\t3\tExtended Program Check (SLIN)\tStrings without text elements are not translated: |Echo: |\nZMCP_SHR_FGRP\tFUGR\t/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\t10\t0\t2\tSlow parameter passing\tParameter contains strings and is passed by VALUE\nZMCP_SHR_FGRP\tFUGR\t/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\t10\t0\t2\tSlow parameter passing\tParameter contains strings, is passed by VALUE, and is not changed"
+    ]
+  },
+  "GetATCFindings a recorded worklist @medium": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"worklist_id\":\"2AAA2806861E1FD1AD9BD28DCA5C37ED\",\"objects_checked\":21,\"finding_count\":6,\"by_priority\":{\"2\":4,\"3\":2},\"findings\":[{\"object\":\"ZMCP_BLD_SHR_FGR\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_bld_shr_fgr/fmodules/z_mcp_bld_shr_fm/source/main\",\"line\":9,\"column\":0,\"priority\":3,\"check\":\"Extended Program Check (SLIN)\",\"message\":\"Strings without text elements are not translated: |Echo: |\",\"check_id\":\"F8607CD40A0F8B30BDF8590205B306E8\",\"check_class\":\"CL_CI_TEST_EXTENDED_CHECK\",\"message_id\":\"1713\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A64EB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_BLD_SHR_FGR\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_bld_shr_fgr/fmodules/z_mcp_bld_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings and is passed by VALUE\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A60EB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_BLD_SHR_FGR\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_bld_shr_fgr/fmodules/z_mcp_bld_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings, is passed by VALUE, and is not changed\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR_INNOWR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A62EB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":9,\"column\":0,\"priority\":3,\"check\":\"Extended Program Check (SLIN)\",\"message\":\"Strings without text elements are not translated: |Echo: |\",\"check_id\":\"F8607CD40A0F8B30BDF8590205B306E8\",\"check_class\":\"CL_CI_TEST_EXTENDED_CHECK\",\"message_id\":\"1713\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A6AEB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings and is passed by VALUE\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A66EB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings, is passed by VALUE, and is not changed\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR_INNOWR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A68EB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}}]}"
+    ]
+  },
+  "GetATCFindings a recorded worklist @full": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"worklist_id\":\"2AAA2806861E1FD1AD9BD28DCA5C37ED\",\"objects_checked\":21,\"finding_count\":6,\"by_priority\":{\"2\":4,\"3\":2},\"findings\":[{\"object\":\"ZMCP_BLD_SHR_FGR\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_bld_shr_fgr/fmodules/z_mcp_bld_shr_fm/source/main\",\"line\":9,\"column\":0,\"priority\":3,\"check\":\"Extended Program Check (SLIN)\",\"message\":\"Strings without text elements are not translated: |Echo: |\",\"check_id\":\"F8607CD40A0F8B30BDF8590205B306E8\",\"check_class\":\"CL_CI_TEST_EXTENDED_CHECK\",\"message_id\":\"1713\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A64EB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_BLD_SHR_FGR\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_bld_shr_fgr/fmodules/z_mcp_bld_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings and is passed by VALUE\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A60EB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_BLD_SHR_FGR\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_bld_shr_fgr/fmodules/z_mcp_bld_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings, is passed by VALUE, and is not changed\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR_INNOWR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A62EB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":9,\"column\":0,\"priority\":3,\"check\":\"Extended Program Check (SLIN)\",\"message\":\"Strings without text elements are not translated: |Echo: |\",\"check_id\":\"F8607CD40A0F8B30BDF8590205B306E8\",\"check_class\":\"CL_CI_TEST_EXTENDED_CHECK\",\"message_id\":\"1713\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A6AEB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings and is passed by VALUE\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A66EB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings, is passed by VALUE, and is not changed\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR_INNOWR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E2882D9BE21A1FD1AD9BCCF1C1A68EB9/index/1426\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}}]}"
+    ]
+  },
+  "GetATCResult a recorded result @terse": {
+    "isError": false,
+    "parts": [
+      "# result E6AC99B2161F1FE1B5A1E9B68E5CD628\n# title ZMCP_SHR_FGRP\n# check_variant DEFAULT\n# created_at 2026-10-31T09:41:53Z\n# objects_checked 1\n# finding_count 3\n# priority 2 2\n# priority 3 1\nobject\tobject_type\tlocation\tline\tcolumn\tpriority\tcheck\tmessage\nZMCP_SHR_FGRP\tFUGR\t/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\t10\t0\t2\tSlow parameter passing\tParameter contains strings and is passed by VALUE\nZMCP_SHR_FGRP\tFUGR\t/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\t10\t0\t2\tSlow parameter passing\tParameter contains strings, is passed by VALUE, and is not changed\nZMCP_SHR_FGRP\tFUGR\t/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\t9\t0\t3\tExtended Program Check (SLIN)\tText element is missing in a character string in a string template"
+    ]
+  },
+  "GetATCResult a recorded result @medium": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"display_id\":\"E6AC99B2161F1FE1B5A1E9B68E5CD628\",\"title\":\"ZMCP_SHR_FGRP\",\"check_variant\":\"DEFAULT\",\"created_at\":\"2026-10-31T09:41:53Z\",\"objects_checked\":1,\"finding_count\":3,\"by_priority\":{\"2\":2,\"3\":1},\"findings\":[{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings and is passed by VALUE\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E6AC99B2161F1FE1B5A1EB214045D628/index/1569\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings, is passed by VALUE, and is not changed\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR_INNOWR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E6AC99B2161F1FE1B5A1EB214045F628/index/1569\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":9,\"column\":0,\"priority\":3,\"check\":\"Extended Program Check (SLIN)\",\"message\":\"Text element is missing in a character string in a string template\",\"check_id\":\"F8607CD40A0F8B30BDF8590205B306E8\",\"check_class\":\"CL_CI_TEST_EXTENDED_CHECK\",\"message_id\":\"1713\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E6AC99B2161F1FE1B5A1EB2140461628/index/1569\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}}]}"
+    ]
+  },
+  "GetATCResult a recorded result @full": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"display_id\":\"E6AC99B2161F1FE1B5A1E9B68E5CD628\",\"title\":\"ZMCP_SHR_FGRP\",\"check_variant\":\"DEFAULT\",\"created_at\":\"2026-10-31T09:41:53Z\",\"objects_checked\":1,\"finding_count\":3,\"by_priority\":{\"2\":2,\"3\":1},\"findings\":[{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings and is passed by VALUE\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E6AC99B2161F1FE1B5A1EB214045D628/index/1569\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":10,\"column\":0,\"priority\":2,\"check\":\"Slow parameter passing\",\"message\":\"Parameter contains strings, is passed by VALUE, and is not changed\",\"check_id\":\"39FF2335F3EC6805BE6624A4C2FC818C\",\"check_class\":\"CL_CI_TEST_VALUE_PARAMETER\",\"message_id\":\"STR_INNOWR\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E6AC99B2161F1FE1B5A1EB214045F628/index/1569\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}},{\"object\":\"ZMCP_SHR_FGRP\",\"object_type\":\"FUGR\",\"location\":\"/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main\",\"line\":9,\"column\":0,\"priority\":3,\"check\":\"Extended Program Check (SLIN)\",\"message\":\"Text element is missing in a character string in a string template\",\"check_id\":\"F8607CD40A0F8B30BDF8590205B306E8\",\"check_class\":\"CL_CI_TEST_EXTENDED_CHECK\",\"message_id\":\"1713\",\"documentation_uri\":\"/sap/bc/adt/documentation/atc/documents/itemid/E6AC99B2161F1FE1B5A1EB2140461628/index/1569\",\"exemption_approval\":\"-\",\"quickfixes\":{\"manual\":false,\"automatic\":false,\"pseudo\":false,\"ai_based\":false,\"ai_enabled\":false}}]}"
+    ]
+  },
+  "GetObjectOutline a class @terse": {
+    "isError": false,
+    "parts": [
+      "# object CLAS/OC ZCL_MCP_SHR\n# source /sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\nname\ttype\tvisibility\tline\tsource\nZMCP_D1_9E25_CL\tCLAS/OC\tpublic\t1\t\n  ZMCP_D1_9E25_IF\tCLAS/OR\t\t3\t\n  TY_ROW\tCLAS/OT\tpublic\t4\t\n  ATTR\tCLAS/OA\tpublic\t8\t\n  COUNTER\tCLAS/OA\tpublic\t9\t\n  C_MAX\tCLAS/OA\tpublic\t10\t\n  DONE\tCLAS/OE\tpublic\t11\t\n  PUB\tCLAS/OM\tpublic\t12\t\n  PROT\tCLAS/OM\tprotected\t18\t\n  PRIV_ATTR\tCLAS/OA\tprivate\t20\t\n  PRIV\tCLAS/OM\tprivate\t21\t\n  ZMCP_D1_9E25_IF~RUN\tCLAS/OM\tpublic\t3\t\n  ZMCP_D1_9E25_CL\tCLAS/OCX\t\t\t/sap/bc/adt/textelements/classes/zmcp_d1_9e25_cl"
+    ]
+  },
+  "GetObjectOutline a class @medium": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"object_type\":\"CLAS/OC\",\"object_name\":\"ZCL_MCP_SHR\",\"version\":\"active\",\"outline\":{\"name\":\"ZMCP_D1_9E25_CL\",\"type\":\"CLAS/OC\",\"visibility\":\"public\",\"final\":true,\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":1,\"column\":6},\"end\":{\"line\":1,\"column\":21}},{\"rel\":\"implementationIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":24,\"column\":6},\"end\":{\"line\":24,\"column\":21}},{\"rel\":\"definitionBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":1,\"column\":0},\"end\":{\"line\":22,\"column\":8}},{\"rel\":\"implementationBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":24,\"column\":0},\"end\":{\"line\":37,\"column\":8}}],\"children\":[{\"name\":\"ZMCP_D1_9E25_IF\",\"type\":\"CLAS/OR\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":3,\"column\":15},\"end\":{\"line\":3,\"column\":30}},{\"rel\":\"implementationIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":34,\"column\":9},\"end\":{\"line\":34,\"column\":28},\"type\":\"CLAS/OM\"},{\"rel\":\"definitionBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":3,\"column\":4},\"end\":{\"line\":3,\"column\":30}}],\"children\":[]},{\"name\":\"TY_ROW\",\"type\":\"CLAS/OT\",\"visibility\":\"public\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":4,\"column\":20},\"end\":{\"line\":4,\"column\":26}},{\"rel\":\"definitionBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":4,\"column\":4},\"end\":{\"line\":7,\"column\":24}}],\"children\":[]},{\"name\":\"ATTR\",\"type\":\"CLAS/OA\",\"visibility\":\"public\",\"level\":\"instance\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":8,\"column\":9},\"end\":{\"line\":8,\"column\":13}},{\"rel\":\"definitionBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":8,\"column\":4},\"end\":{\"line\":8,\"column\":25}}],\"children\":[]},{\"name\":\"COUNTER\",\"type\":\"CLAS/OA\",\"visibility\":\"public\",\"level\":\"static\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":9,\"column\":15},\"end\":{\"line\":9,\"column\":22}},{\"rel\":\"definitionBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":9,\"column\":4},\"end\":{\"line\":9,\"column\":29}}],\"children\":[]},{\"name\":\"C_MAX\",\"type\":\"CLAS/OA\",\"visibility\":\"public\",\"level\":\"static\",\"constant\":true,\"read_only\":true,\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":10,\"column\":14},\"end\":{\"line\":10,\"column\":19}},{\"rel\":\"definitionBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":10,\"column\":4},\"end\":{\"line\":10,\"column\":35}}],\"children\":[]},{\"name\":\"DONE\",\"type\":\"CLAS/OE\",\"visibility\":\"public\",\"level\":\"instance\",\"clif_name\":\"ZMCP_D1_9E25_CL\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":11,\"column\":11},\"end\":{\"line\":11,\"column\":15}},{\"rel\":\"definitionBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":11,\"column\":4},\"end\":{\"line\":11,\"column\":45}}],\"children\":[]},{\"name\":\"PUB\",\"type\":\"CLAS/OM\",\"visibility\":\"public\",\"level\":\"instance\",\"clif_name\":\"ZMCP_D1_9E25_CL\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":12,\"column\":12},\"end\":{\"line\":12,\"column\":15},\"type\":\"CLAS/OM\"},{\"rel\":\"implementationIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":25,\"column\":9},\"end\":{\"line\":25,\"column\":12}},{\"rel\":\"definitionBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":12,\"column\":4},\"end\":{\"line\":16,\"column\":32}},{\"rel\":\"implementationBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":25,\"column\":2},\"end\":{\"line\":28,\"column\":11}}],\"children\":[]},{\"name\":\"PROT\",\"type\":\"CLAS/OM\",\"visibility\":\"protected\",\"level\":\"instance\",\"clif_name\":\"ZMCP_D1_9E25_CL\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":18,\"column\":12},\"end\":{\"line\":18,\"column\":16},\"type\":\"CLAS/OM\"},{\"rel\":\"implementationIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":29,\"column\":9},\"end\":{\"line\":29,\"column\":13}},{\"rel\":\"definitionBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":18,\"column\":4},\"end\":{\"line\":18,\"column\":16}},{\"rel\":\"implementationBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":29,\"column\":2},\"end\":{\"line\":30,\"column\":11}}],\"children\":[]},{\"name\":\"PRIV_ATTR\",\"type\":\"CLAS/OA\",\"visibility\":\"private\",\"level\":\"instance\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":20,\"column\":9},\"end\":{\"line\":20,\"column\":18}},{\"rel\":\"definitionBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":20,\"column\":4},\"end\":{\"line\":20,\"column\":25}}],\"children\":[]},{\"name\":\"PRIV\",\"type\":\"CLAS/OM\",\"visibility\":\"private\",\"level\":\"instance\",\"clif_name\":\"ZMCP_D1_9E25_CL\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":21,\"column\":12},\"end\":{\"line\":21,\"column\":16},\"type\":\"CLAS/OM\"},{\"rel\":\"implementationIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":31,\"column\":9},\"end\":{\"line\":31,\"column\":13}},{\"rel\":\"definitionBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":21,\"column\":4},\"end\":{\"line\":21,\"column\":40}},{\"rel\":\"implementationBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":31,\"column\":2},\"end\":{\"line\":33,\"column\":11}}],\"children\":[]},{\"name\":\"ZMCP_D1_9E25_IF~RUN\",\"type\":\"CLAS/OM\",\"visibility\":\"public\",\"level\":\"instance\",\"clif_name\":\"ZMCP_D1_9E25_CL\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":3,\"column\":15},\"end\":{\"line\":3,\"column\":30},\"type\":\"CLAS/OR\"},{\"rel\":\"implementationIdentifier\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":34,\"column\":9},\"end\":{\"line\":34,\"column\":28},\"type\":\"CLAS/OM\"},{\"rel\":\"implementationBlock\",\"source\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main\",\"start\":{\"line\":34,\"column\":2},\"end\":{\"line\":36,\"column\":11}}],\"children\":[]},{\"name\":\"ZMCP_D1_9E25_CL\",\"type\":\"CLAS/OCX\",\"description\":\"Text Elements\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/textelements/classes/zmcp_d1_9e25_cl\"}],\"children\":[]}]}}"
+    ]
+  },
+  "GetObjectOutline a class @full": {
+    "isError": false,
+    "parts": [
+      "{\"base\":\"/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/objectstructure\",\"root\":{\"type\":\"CLAS/OC\",\"name\":\"ZMCP_D1_9E25_CL\",\"visibility\":\"public\",\"constant\":false,\"readOnly\":false,\"final\":true,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=1,6;end=1,21\",\"source\":\"./source/main\",\"fragment\":\"start=1,6;end=1,21\",\"start\":{\"line\":1,\"column\":6},\"end\":{\"line\":1,\"column\":21}},{\"rel\":\"implementationIdentifier\",\"href\":\"./source/main#start=24,6;end=24,21\",\"source\":\"./source/main\",\"fragment\":\"start=24,6;end=24,21\",\"start\":{\"line\":24,\"column\":6},\"end\":{\"line\":24,\"column\":21}},{\"rel\":\"definitionBlock\",\"href\":\"./source/main#start=1,0;end=22,8\",\"source\":\"./source/main\",\"fragment\":\"start=1,0;end=22,8\",\"start\":{\"line\":1,\"column\":0},\"end\":{\"line\":22,\"column\":8}},{\"rel\":\"implementationBlock\",\"href\":\"./source/main#start=24,0;end=37,8\",\"source\":\"./source/main\",\"fragment\":\"start=24,0;end=37,8\",\"start\":{\"line\":24,\"column\":0},\"end\":{\"line\":37,\"column\":8}}],\"children\":[{\"unknownType\":\"CLAS/OR\",\"name\":\"ZMCP_D1_9E25_IF\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=3,15;end=3,30\",\"source\":\"./source/main\",\"fragment\":\"start=3,15;end=3,30\",\"start\":{\"line\":3,\"column\":15},\"end\":{\"line\":3,\"column\":30}},{\"rel\":\"implementationIdentifier\",\"href\":\"./source/main#start=34,9;end=34,28\",\"source\":\"./source/main\",\"fragment\":\"start=34,9;end=34,28\",\"start\":{\"line\":34,\"column\":9},\"end\":{\"line\":34,\"column\":28},\"type\":\"CLAS/OM\"},{\"rel\":\"definitionBlock\",\"href\":\"./source/main#start=3,4;end=3,30\",\"source\":\"./source/main\",\"fragment\":\"start=3,4;end=3,30\",\"start\":{\"line\":3,\"column\":4},\"end\":{\"line\":3,\"column\":30}}],\"children\":[]},{\"unknownType\":\"CLAS/OT\",\"name\":\"TY_ROW\",\"visibility\":\"public\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=4,20;end=4,26\",\"source\":\"./source/main\",\"fragment\":\"start=4,20;end=4,26\",\"start\":{\"line\":4,\"column\":20},\"end\":{\"line\":4,\"column\":26}},{\"rel\":\"definitionBlock\",\"href\":\"./source/main#start=4,4;end=7,24\",\"source\":\"./source/main\",\"fragment\":\"start=4,4;end=7,24\",\"start\":{\"line\":4,\"column\":4},\"end\":{\"line\":7,\"column\":24}}],\"children\":[]},{\"unknownType\":\"CLAS/OA\",\"name\":\"ATTR\",\"visibility\":\"public\",\"level\":\"instance\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=8,9;end=8,13\",\"source\":\"./source/main\",\"fragment\":\"start=8,9;end=8,13\",\"start\":{\"line\":8,\"column\":9},\"end\":{\"line\":8,\"column\":13}},{\"rel\":\"definitionBlock\",\"href\":\"./source/main#start=8,4;end=8,25\",\"source\":\"./source/main\",\"fragment\":\"start=8,4;end=8,25\",\"start\":{\"line\":8,\"column\":4},\"end\":{\"line\":8,\"column\":25}}],\"children\":[]},{\"unknownType\":\"CLAS/OA\",\"name\":\"COUNTER\",\"visibility\":\"public\",\"level\":\"static\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=9,15;end=9,22\",\"source\":\"./source/main\",\"fragment\":\"start=9,15;end=9,22\",\"start\":{\"line\":9,\"column\":15},\"end\":{\"line\":9,\"column\":22}},{\"rel\":\"definitionBlock\",\"href\":\"./source/main#start=9,4;end=9,29\",\"source\":\"./source/main\",\"fragment\":\"start=9,4;end=9,29\",\"start\":{\"line\":9,\"column\":4},\"end\":{\"line\":9,\"column\":29}}],\"children\":[]},{\"unknownType\":\"CLAS/OA\",\"name\":\"C_MAX\",\"visibility\":\"public\",\"level\":\"static\",\"constant\":true,\"readOnly\":true,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=10,14;end=10,19\",\"source\":\"./source/main\",\"fragment\":\"start=10,14;end=10,19\",\"start\":{\"line\":10,\"column\":14},\"end\":{\"line\":10,\"column\":19}},{\"rel\":\"definitionBlock\",\"href\":\"./source/main#start=10,4;end=10,35\",\"source\":\"./source/main\",\"fragment\":\"start=10,4;end=10,35\",\"start\":{\"line\":10,\"column\":4},\"end\":{\"line\":10,\"column\":35}}],\"children\":[]},{\"unknownType\":\"CLAS/OE\",\"name\":\"DONE\",\"visibility\":\"public\",\"level\":\"instance\",\"clifName\":\"ZMCP_D1_9E25_CL\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=11,11;end=11,15\",\"source\":\"./source/main\",\"fragment\":\"start=11,11;end=11,15\",\"start\":{\"line\":11,\"column\":11},\"end\":{\"line\":11,\"column\":15}},{\"rel\":\"definitionBlock\",\"href\":\"./source/main#start=11,4;end=11,45\",\"source\":\"./source/main\",\"fragment\":\"start=11,4;end=11,45\",\"start\":{\"line\":11,\"column\":4},\"end\":{\"line\":11,\"column\":45}}],\"children\":[]},{\"unknownType\":\"CLAS/OM\",\"name\":\"PUB\",\"visibility\":\"public\",\"level\":\"instance\",\"clifName\":\"ZMCP_D1_9E25_CL\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=12,12;end=12,15\",\"source\":\"./source/main\",\"fragment\":\"start=12,12;end=12,15\",\"start\":{\"line\":12,\"column\":12},\"end\":{\"line\":12,\"column\":15},\"type\":\"CLAS/OM\"},{\"rel\":\"implementationIdentifier\",\"href\":\"./source/main#start=25,9;end=25,12\",\"source\":\"./source/main\",\"fragment\":\"start=25,9;end=25,12\",\"start\":{\"line\":25,\"column\":9},\"end\":{\"line\":25,\"column\":12}},{\"rel\":\"definitionBlock\",\"href\":\"./source/main#start=12,4;end=16,32\",\"source\":\"./source/main\",\"fragment\":\"start=12,4;end=16,32\",\"start\":{\"line\":12,\"column\":4},\"end\":{\"line\":16,\"column\":32}},{\"rel\":\"implementationBlock\",\"href\":\"./source/main#start=25,2;end=28,11\",\"source\":\"./source/main\",\"fragment\":\"start=25,2;end=28,11\",\"start\":{\"line\":25,\"column\":2},\"end\":{\"line\":28,\"column\":11}}],\"children\":[]},{\"unknownType\":\"CLAS/OM\",\"name\":\"PROT\",\"visibility\":\"protected\",\"level\":\"instance\",\"clifName\":\"ZMCP_D1_9E25_CL\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=18,12;end=18,16\",\"source\":\"./source/main\",\"fragment\":\"start=18,12;end=18,16\",\"start\":{\"line\":18,\"column\":12},\"end\":{\"line\":18,\"column\":16},\"type\":\"CLAS/OM\"},{\"rel\":\"implementationIdentifier\",\"href\":\"./source/main#start=29,9;end=29,13\",\"source\":\"./source/main\",\"fragment\":\"start=29,9;end=29,13\",\"start\":{\"line\":29,\"column\":9},\"end\":{\"line\":29,\"column\":13}},{\"rel\":\"definitionBlock\",\"href\":\"./source/main#start=18,4;end=18,16\",\"source\":\"./source/main\",\"fragment\":\"start=18,4;end=18,16\",\"start\":{\"line\":18,\"column\":4},\"end\":{\"line\":18,\"column\":16}},{\"rel\":\"implementationBlock\",\"href\":\"./source/main#start=29,2;end=30,11\",\"source\":\"./source/main\",\"fragment\":\"start=29,2;end=30,11\",\"start\":{\"line\":29,\"column\":2},\"end\":{\"line\":30,\"column\":11}}],\"children\":[]},{\"unknownType\":\"CLAS/OA\",\"name\":\"PRIV_ATTR\",\"visibility\":\"private\",\"level\":\"instance\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=20,9;end=20,18\",\"source\":\"./source/main\",\"fragment\":\"start=20,9;end=20,18\",\"start\":{\"line\":20,\"column\":9},\"end\":{\"line\":20,\"column\":18}},{\"rel\":\"definitionBlock\",\"href\":\"./source/main#start=20,4;end=20,25\",\"source\":\"./source/main\",\"fragment\":\"start=20,4;end=20,25\",\"start\":{\"line\":20,\"column\":4},\"end\":{\"line\":20,\"column\":25}}],\"children\":[]},{\"unknownType\":\"CLAS/OM\",\"name\":\"PRIV\",\"visibility\":\"private\",\"level\":\"instance\",\"clifName\":\"ZMCP_D1_9E25_CL\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=21,12;end=21,16\",\"source\":\"./source/main\",\"fragment\":\"start=21,12;end=21,16\",\"start\":{\"line\":21,\"column\":12},\"end\":{\"line\":21,\"column\":16},\"type\":\"CLAS/OM\"},{\"rel\":\"implementationIdentifier\",\"href\":\"./source/main#start=31,9;end=31,13\",\"source\":\"./source/main\",\"fragment\":\"start=31,9;end=31,13\",\"start\":{\"line\":31,\"column\":9},\"end\":{\"line\":31,\"column\":13}},{\"rel\":\"definitionBlock\",\"href\":\"./source/main#start=21,4;end=21,40\",\"source\":\"./source/main\",\"fragment\":\"start=21,4;end=21,40\",\"start\":{\"line\":21,\"column\":4},\"end\":{\"line\":21,\"column\":40}},{\"rel\":\"implementationBlock\",\"href\":\"./source/main#start=31,2;end=33,11\",\"source\":\"./source/main\",\"fragment\":\"start=31,2;end=33,11\",\"start\":{\"line\":31,\"column\":2},\"end\":{\"line\":33,\"column\":11}}],\"children\":[]},{\"unknownType\":\"CLAS/OM\",\"name\":\"ZMCP_D1_9E25_IF~RUN\",\"visibility\":\"public\",\"level\":\"instance\",\"clifName\":\"ZMCP_D1_9E25_CL\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"./source/main#start=3,15;end=3,30\",\"source\":\"./source/main\",\"fragment\":\"start=3,15;end=3,30\",\"start\":{\"line\":3,\"column\":15},\"end\":{\"line\":3,\"column\":30},\"type\":\"CLAS/OR\"},{\"rel\":\"implementationIdentifier\",\"href\":\"./source/main#start=34,9;end=34,28\",\"source\":\"./source/main\",\"fragment\":\"start=34,9;end=34,28\",\"start\":{\"line\":34,\"column\":9},\"end\":{\"line\":34,\"column\":28},\"type\":\"CLAS/OM\"},{\"rel\":\"implementationBlock\",\"href\":\"./source/main#start=34,2;end=36,11\",\"source\":\"./source/main\",\"fragment\":\"start=34,2;end=36,11\",\"start\":{\"line\":34,\"column\":2},\"end\":{\"line\":36,\"column\":11}}],\"children\":[]},{\"type\":\"CLAS/OCX\",\"name\":\"ZMCP_D1_9E25_CL\",\"description\":\"Text Elements\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/textelements/classes/zmcp_d1_9e25_cl\",\"source\":\"/sap/bc/adt/textelements/classes/zmcp_d1_9e25_cl\"}],\"children\":[]}]}}"
+    ]
+  },
+  "GetObjectOutline a program @terse": {
+    "isError": false,
+    "parts": [
+      "# object PROG/P ZMCP_SHR_PROG\n# source /sap/bc/adt/programs/programs/zmcp_d1_9e25_pr\nname\ttype\tvisibility\tline\tsource\nZMCP_D1_9E25_PR\tPROG/P\t\t\t\n  LCL_LOCAL\tPROG/PL\t\t\t/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\n    GO\tPROG/PLM\tpublic\t\t/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\n  TY_NUM\tPROG/PY\t\t\t/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\n  GV_TEXT\tPROG/PD\t\t\t/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\n  START-OF-SELECTION\tPROG/PE\t\t\t/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\n  INC_FORM\tPROG/PU\t\t\t/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr\n  MAIN_FORM\tPROG/PU\t\t\t/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\n  ZMCP_D1_9E25_I01\tPROG/I\t\t\t/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr\n  ZMCP_D1_9E25_PR\tPROG/PX\t\t\t/sap/bc/adt/textelements/programs/zmcp_d1_9e25_pr/source/symbols"
+    ]
+  },
+  "GetObjectOutline a program @medium": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"object_type\":\"PROG/P\",\"object_name\":\"ZMCP_SHR_PROG\",\"version\":\"active\",\"outline\":{\"name\":\"ZMCP_D1_9E25_PR\",\"type\":\"PROG/P\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr\"}],\"children\":[{\"name\":\"LCL_LOCAL\",\"type\":\"PROG/PL\",\"include\":\"ZMCP_D1_9E25_PR\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPL;name=LCL_LOCAL\"}],\"children\":[{\"name\":\"GO\",\"type\":\"PROG/PLM\",\"visibility\":\"public\",\"clif_name\":\"LCL_LOCAL\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPLM;name=LCL_LOCAL%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20GO\"},{\"rel\":\"implementationIdentifier\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPLM;name=LCL_LOCAL%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20GO\"}],\"children\":[]}]},{\"name\":\"TY_NUM\",\"type\":\"PROG/PY\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPY;name=TY_NUM\"}],\"children\":[]},{\"name\":\"GV_TEXT\",\"type\":\"PROG/PD\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPD;name=GV_TEXT\"}],\"children\":[]},{\"name\":\"START-OF-SELECTION\",\"type\":\"PROG/PE\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPE;name=START-OF-SELECTION\"}],\"children\":[]},{\"name\":\"INC_FORM\",\"type\":\"PROG/PU\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr\",\"fragment\":\"type=PROG%2FPU;name=INC_FORM\"}],\"children\":[]},{\"name\":\"MAIN_FORM\",\"type\":\"PROG/PU\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPU;name=MAIN_FORM\"}],\"children\":[]},{\"name\":\"ZMCP_D1_9E25_I01\",\"type\":\"PROG/I\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr\"}],\"children\":[]},{\"name\":\"ZMCP_D1_9E25_PR\",\"type\":\"PROG/PX\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/textelements/programs/zmcp_d1_9e25_pr/source/symbols\"}],\"children\":[]}]}}"
+    ]
+  },
+  "GetObjectOutline a program @full": {
+    "isError": false,
+    "parts": [
+      "{\"base\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"root\":{\"type\":\"PROG/P\",\"name\":\"ZMCP_D1_9E25_PR\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr\"}],\"children\":[{\"unknownType\":\"PROG/PL\",\"name\":\"LCL_LOCAL\",\"include\":\"ZMCP_D1_9E25_PR\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPL;name=LCL_LOCAL\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPL;name=LCL_LOCAL\"}],\"children\":[{\"unknownType\":\"PROG/PLM\",\"name\":\"GO\",\"visibility\":\"public\",\"clifName\":\"LCL_LOCAL\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPLM;name=LCL_LOCAL%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20GO\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPLM;name=LCL_LOCAL%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20GO\"},{\"rel\":\"implementationIdentifier\",\"href\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPLM;name=LCL_LOCAL%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20GO\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPLM;name=LCL_LOCAL%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20GO\"}],\"children\":[]}]},{\"unknownType\":\"PROG/PY\",\"name\":\"TY_NUM\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPY;name=TY_NUM\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPY;name=TY_NUM\"}],\"children\":[]},{\"unknownType\":\"PROG/PD\",\"name\":\"GV_TEXT\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPD;name=GV_TEXT\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPD;name=GV_TEXT\"}],\"children\":[]},{\"unknownType\":\"PROG/PE\",\"name\":\"START-OF-SELECTION\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPE;name=START-OF-SELECTION\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPE;name=START-OF-SELECTION\"}],\"children\":[]},{\"unknownType\":\"PROG/PU\",\"name\":\"INC_FORM\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr#type=PROG%2FPU;name=INC_FORM\",\"source\":\"/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr\",\"fragment\":\"type=PROG%2FPU;name=INC_FORM\"}],\"children\":[]},{\"unknownType\":\"PROG/PU\",\"name\":\"MAIN_FORM\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPU;name=MAIN_FORM\",\"source\":\"/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main\",\"fragment\":\"type=PROG%2FPU;name=MAIN_FORM\"}],\"children\":[]},{\"type\":\"PROG/I\",\"name\":\"ZMCP_D1_9E25_I01\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr\",\"source\":\"/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr\"}],\"children\":[]},{\"type\":\"PROG/PX\",\"name\":\"ZMCP_D1_9E25_PR\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/textelements/programs/zmcp_d1_9e25_pr/source/symbols\",\"source\":\"/sap/bc/adt/textelements/programs/zmcp_d1_9e25_pr/source/symbols\"}],\"children\":[]}]}}"
+    ]
+  },
+  "GetObjectOutline a function group @terse": {
+    "isError": false,
+    "parts": [
+      "# object FUGR/F ZMCP_SHR_FGRP\n# source /sap/bc/adt/functions/groups/zmcp_d19e25/source/main\nname\ttype\tvisibility\tline\tsource\nZMCP_D19E25\tFUGR/F\t\t\t\n  LZMCP_D19E25TOP\tFUGR/I\t\t\t/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25top/source/main\n  LZMCP_D19E25UXX\tFUGR/I\t\t\t/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25uxx/source/main\n  SAPLZMCP_D19E25\tFUGR/PX\t\t\t/sap/bc/adt/textelements/functiongroups/zmcp_d19e25/source/symbols\n  Z_MCP_D1_9E25\tFUGR/FF\t\t\t/sap/bc/adt/functions/groups/zmcp_d19e25/fmodules/z_mcp_d1_9e25/source/main"
+    ]
+  },
+  "GetObjectOutline a function group @medium": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"object_type\":\"FUGR/F\",\"object_name\":\"ZMCP_SHR_FGRP\",\"version\":\"active\",\"outline\":{\"name\":\"ZMCP_D19E25\",\"type\":\"FUGR/F\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/source/main\"}],\"children\":[{\"name\":\"LZMCP_D19E25TOP\",\"type\":\"FUGR/I\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25top/source/main\"}],\"children\":[]},{\"name\":\"LZMCP_D19E25UXX\",\"type\":\"FUGR/I\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25uxx/source/main\"}],\"children\":[]},{\"name\":\"SAPLZMCP_D19E25\",\"type\":\"FUGR/PX\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/textelements/functiongroups/zmcp_d19e25/source/symbols\"}],\"children\":[]},{\"name\":\"Z_MCP_D1_9E25\",\"type\":\"FUGR/FF\",\"links\":[{\"rel\":\"definitionIdentifier\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/fmodules/z_mcp_d1_9e25/source/main\"}],\"children\":[]}]}}"
+    ]
+  },
+  "GetObjectOutline a function group @full": {
+    "isError": false,
+    "parts": [
+      "{\"base\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/source/main\",\"root\":{\"type\":\"FUGR/F\",\"name\":\"ZMCP_D19E25\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/source/main\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/source/main\"}],\"children\":[{\"type\":\"FUGR/I\",\"name\":\"LZMCP_D19E25TOP\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25top/source/main\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25top/source/main\"}],\"children\":[]},{\"type\":\"FUGR/I\",\"name\":\"LZMCP_D19E25UXX\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25uxx/source/main\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25uxx/source/main\"}],\"children\":[]},{\"unknownType\":\"FUGR/PX\",\"name\":\"SAPLZMCP_D19E25\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/textelements/functiongroups/zmcp_d19e25/source/symbols\",\"source\":\"/sap/bc/adt/textelements/functiongroups/zmcp_d19e25/source/symbols\"}],\"children\":[]},{\"type\":\"FUGR/FF\",\"name\":\"Z_MCP_D1_9E25\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/fmodules/z_mcp_d1_9e25/source/main\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/fmodules/z_mcp_d1_9e25/source/main\"}],\"children\":[]}]}}"
+    ]
+  },
+  "GetObjectStructure a class @terse": {
+    "isError": false,
+    "parts": [
+      "tree:\n- CLAS/OC: ZCL_X\n  - CLAS/OA [Attributes]\n    - CLAS/OA: ATTR\n  - CLAS/OM [Methods]\n    - CLAS/OM: RUN\n- CLAS/OC: ZCL_OTHER\n"
+    ]
+  },
+  "GetObjectStructure a class @medium": {
+    "isError": false,
+    "parts": [
+      "tree:\n- CLAS/OC: ZCL_X\n  - CLAS/OA [Attributes]\n    - CLAS/OA: ATTR\n  - CLAS/OM [Methods]\n    - CLAS/OM: RUN (ZCL_X========CM001)\n- CLAS/OC: ZCL_OTHER\n"
+    ]
+  },
+  "GetObjectStructure a class @full": {
+    "isError": false,
+    "parts": [
+      "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"projectexplorer:objectstructure\":{\"projectexplorer:node\":[{\"@\":{\"nodeid\":\"000002\",\"parentid\":\"000001\",\"objecttype\":\"CLAS/OA\",\"isfolder\":\"true\",\"description\":\"Attributes\"}},{\"@\":{\"nodeid\":\"000003\",\"parentid\":\"000002\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"ATTR\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000004\",\"parentid\":\"000001\",\"objecttype\":\"CLAS/OM\",\"isfolder\":\"true\",\"description\":\"Methods\"}},{\"@\":{\"nodeid\":\"000005\",\"parentid\":\"000004\",\"objecttype\":\"CLAS/OM\",\"objectname\":\"ZCL_X========CM001\",\"description\":\"RUN\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000006\",\"objecttype\":\"CLAS/OC\",\"objectname\":\"ZCL_OTHER\",\"isfolder\":\"false\"}}],\"@\":{\"xmlns:projectexplorer\":\"http://www.sap.com/adt/projectexplorer\"}}}"
+    ]
+  },
+  "GetObjectStructure an empty structure @terse": {
+    "isError": false,
+    "parts": ["No nodes found in object structure response."]
+  },
+  "GetObjectStructure an empty structure @medium": {
+    "isError": false,
+    "parts": ["No nodes found in object structure response."]
+  },
+  "GetObjectStructure an empty structure @full": {
+    "isError": false,
+    "parts": [
+      "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"projectexplorer:objectstructure\":{\"@\":{\"xmlns:projectexplorer\":\"http://www.sap.com/adt/projectexplorer\"}}}"
+    ]
+  },
+  "GetObjectStructure a cycle of parents and a repeated id @terse": {
+    "isError": false,
+    "parts": [
+      "tree:\n- CLAS/OA: B\n  - CLAS/OA: A\n- CLAS/OA: C\n- CLAS/OA: D\n"
+    ]
+  },
+  "GetObjectStructure a cycle of parents and a repeated id @medium": {
+    "isError": false,
+    "parts": [
+      "tree:\n- CLAS/OA: B\n  - CLAS/OA: A\n- CLAS/OA: C\n- CLAS/OA: D\n"
+    ]
+  },
+  "GetObjectStructure a cycle of parents and a repeated id @full": {
+    "isError": false,
+    "parts": [
+      "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"projectexplorer:objectstructure\":{\"projectexplorer:node\":[{\"@\":{\"nodeid\":\"000010\",\"parentid\":\"000011\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"A\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000011\",\"parentid\":\"000010\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"B\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000012\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"C\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000012\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"D\",\"isfolder\":\"false\"}}],\"@\":{\"xmlns:projectexplorer\":\"http://www.sap.com/adt/projectexplorer\"}}}"
+    ]
+  },
+  "GetPackage a recorded package @terse": {
+    "isError": false,
+    "parts": [
+      "# package ZMCP_SHR_PKG\n# description Shared test dependencies package\n# package_type development\n# super_package ZADT_BLD_PKG03\n# software_component ZLOCAL\n# language_version 5\n# responsible SAPUSER01\nsub_package\tdescription"
+    ]
+  },
+  "GetPackage a recorded package @medium": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"package_name\":\"ZMCP_SHR_PKG\",\"version\":\"active\",\"part\":\"metadata\",\"metadata\":{\"name\":\"ZMCP_SHR_PKG\",\"description\":\"Shared test dependencies package\",\"package_type\":\"development\",\"super_package\":\"ZADT_BLD_PKG03\",\"software_component\":\"ZLOCAL\",\"language_version\":\"5\",\"responsible\":\"SAPUSER01\",\"sub_package_count\":0,\"sub_packages\":[]}}"
+    ]
+  },
+  "GetPackage a recorded package @full": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"package_name\":\"ZMCP_SHR_PKG\",\"version\":\"active\",\"part\":\"metadata\",\"metadata\":{\"name\":\"ZMCP_SHR_PKG\",\"description\":\"Shared test dependencies package\",\"package_type\":\"development\",\"super_package\":\"ZADT_BLD_PKG03\",\"software_component\":\"ZLOCAL\",\"language_version\":\"5\",\"responsible\":\"SAPUSER01\",\"sub_package_count\":0,\"sub_packages\":[]}}"
+    ]
+  },
+  "GetEnhancements include_nested, the object holding only refused probes @terse": {
+    "isError": false,
+    "parts": [
+      "# total 2\n# object program ZPROG\n# count 0\n# unreadable\t{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read class metadata\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}\n# object include ZINC_OK\n# context /sap/bc/adt/programs/programs/zprog\n# count 2\nname\ttype\tdescription\nZ_FIRST\tENHO/XHH\t\nZ_SECOND\tENHO/XHH\t"
+    ]
+  },
+  "GetEnhancements include_nested, the object holding only refused probes @medium": {
+    "isError": false,
+    "parts": [
+      "{\"main_object\":{\"name\":\"ZPROG\",\"type\":\"program\"},\"include_nested\":true,\"total_objects_analyzed\":2,\"total_enhancements_found\":2,\"objects\":[{\"object_name\":\"ZPROG\",\"object_type\":\"program\",\"total_enhancements\":0,\"enhancements\":[],\"unreadable\":[{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read class metadata\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]},{\"object_name\":\"ZINC_OK\",\"object_type\":\"include\",\"total_enhancements\":2,\"enhancements\":[{\"name\":\"Z_FIRST\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_first.\\nENDENHANCEMENT.\"},{\"name\":\"Z_SECOND\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_second.\"}]}],\"detailed\":false,\"total_objects_with_enhancements\":1}"
+    ]
+  },
+  "GetEnhancements include_nested, the object holding only refused probes @full": {
+    "isError": false,
+    "parts": [
+      "{\"main_object\":{\"name\":\"ZPROG\",\"type\":\"program\"},\"include_nested\":true,\"total_objects_analyzed\":2,\"total_enhancements_found\":2,\"objects\":[{\"object_name\":\"ZPROG\",\"object_type\":\"program\",\"total_enhancements\":0,\"enhancements\":[],\"unreadable\":[{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read class metadata\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]},{\"object_name\":\"ZINC_OK\",\"object_type\":\"include\",\"total_enhancements\":2,\"enhancements\":[{\"name\":\"Z_FIRST\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_first.\\nENDENHANCEMENT.\"},{\"name\":\"Z_SECOND\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_second.\"}]}],\"detailed\":false,\"total_objects_with_enhancements\":1}"
+    ]
+  },
+  "ListAbapGitRepos two repositories @terse": {
+    "isError": false,
+    "parts": [
+      "key\tpackage\tbranch_name\turl\trun_status\n000001\tZPKG_GIT\trefs/heads/feature-run\thttps://git.example.invalid/team/repo.git\tS\n000002\tZPKG_OTHER\trefs/heads/main\thttps://git.example.invalid/team/other.git\t"
+    ]
+  },
+  "ListAbapGitRepos two repositories @medium": {
+    "isError": false,
+    "parts": [
+      "key\tpackage\tbranch_name\turl\trun_status\tstatus_text\tapp_log_key\n000001\tZPKG_GIT\trefs/heads/feature-run\thttps://git.example.invalid/team/repo.git\tS\tPull finished\t0123456789ABCDEF0123456789ABCDEF\n000002\tZPKG_OTHER\trefs/heads/main\thttps://git.example.invalid/team/other.git\t\t\t"
+    ]
+  },
+  "ListAbapGitRepos two repositories @full": {
+    "isError": false,
+    "parts": [
+      "{\"repos\":[{\"key\":\"000001\",\"package\":\"ZPKG_GIT\",\"url\":\"https://git.example.invalid/team/repo.git\",\"branchName\":\"refs/heads/feature-run\",\"runStatus\":\"S\",\"statusText\":\"Pull finished\",\"appLogKey\":\"0123456789ABCDEF0123456789ABCDEF\"},{\"key\":\"000002\",\"package\":\"ZPKG_OTHER\",\"url\":\"https://git.example.invalid/team/other.git\",\"branchName\":\"refs/heads/main\"}]}"
+    ]
+  },
+  "CheckAbapGitExternalRepo its branches @terse": {
+    "isError": false,
+    "parts": ["# access_mode PRIVATE\nname\tis_head\nrefs/heads/main\tX"]
+  },
+  "CheckAbapGitExternalRepo its branches @medium": {
+    "isError": false,
+    "parts": [
+      "# access_mode PRIVATE\nname\ttype\tis_head\tsha1\nrefs/heads/main\tHD\tX\t0123456789abcdef0123456789abcdef01234567"
+    ]
+  },
+  "CheckAbapGitExternalRepo its branches @full": {
+    "isError": false,
+    "parts": [
+      "{\"accessMode\":\"PRIVATE\",\"branches\":[{\"sha1\":\"0123456789abcdef0123456789abcdef01234567\",\"name\":\"refs/heads/main\",\"type\":\"HD\",\"isHead\":true}]}"
+    ]
+  },
+  "GetAbapGitBranchInfo a branch with its folder logic @terse": {
+    "isError": false,
+    "parts": [
+      "# access_mode PRIVATE\nname\tfolder_logic\nrefs/heads/main\tFULL"
+    ]
+  },
+  "GetAbapGitBranchInfo a branch with its folder logic @medium": {
+    "isError": false,
+    "parts": [
+      "# access_mode PRIVATE\nname\ttype\tis_head\tsha1\tfolder_logic\nrefs/heads/main\tHD\tX\t0123456789abcdef0123456789abcdef01234567\tFULL"
+    ]
+  },
+  "GetAbapGitBranchInfo a branch with its folder logic @full": {
+    "isError": false,
+    "parts": [
+      "{\"accessMode\":\"PRIVATE\",\"branches\":[{\"sha1\":\"0123456789abcdef0123456789abcdef01234567\",\"name\":\"refs/heads/main\",\"type\":\"HD\",\"isHead\":true,\"folderLogic\":\"FULL\"}]}"
+    ]
+  },
+  "GetAbapGitModifiedObjects what a pull would overwrite @terse": {
+    "isError": false,
+    "parts": [
+      "# list overwrite\ntype\tname\tpackage_name\nCLAS/OC\tZCL_DEMO\tZPKG\n# list package_warning\ntype\tname\tpackage_name\nPROG/P\tZDEMO\tZOTHER"
+    ]
+  },
+  "GetAbapGitModifiedObjects what a pull would overwrite @medium": {
+    "isError": false,
+    "parts": [
+      "# list overwrite\ntype\tname\tpackage_name\taction\turi\nCLAS/OC\tZCL_DEMO\tZPKG\t2\t/sap/bc/adt/oo/classes/zcl_demo\n# list package_warning\ntype\tname\tpackage_name\taction\turi\nPROG/P\tZDEMO\tZOTHER\t3\t/sap/bc/adt/programs/programs/zdemo"
+    ]
+  },
+  "GetAbapGitModifiedObjects what a pull would overwrite @full": {
+    "isError": false,
+    "parts": [
+      "{\"overwriteObjects\":[{\"uri\":\"/sap/bc/adt/oo/classes/zcl_demo\",\"type\":\"CLAS/OC\",\"name\":\"ZCL_DEMO\",\"packageName\":\"ZPKG\",\"action\":2}],\"packageWarningObjects\":[{\"uri\":\"/sap/bc/adt/programs/programs/zdemo\",\"type\":\"PROG/P\",\"name\":\"ZDEMO\",\"packageName\":\"ZOTHER\",\"action\":3}]}"
+    ]
+  },
+  "GetAbapGitStaging the staging @terse": {
+    "isError": false,
+    "parts": [
+      "# author Ada Author <ada@example.invalid>\n# committer Carl Committer <carl@example.invalid>\n# list unstaged\ntype\tname\tpackage_name\tfile\tlocal_state\tremote_state\nCLAS/OC\tZCL_DEMO\tZPKG\tzcl_demo.clas.abap\tM\t\n# list staged\n# list ignored"
+    ]
+  },
+  "GetAbapGitStaging the staging @medium": {
+    "isError": false,
+    "parts": [
+      "# author Ada Author <ada@example.invalid>\n# committer Carl Committer <carl@example.invalid>\n# list unstaged\nwbkey\tversion\turi\ttype\tname\tpackage_name\tfile\tpath\tlocal_state\tremote_state\nCLASZCL_DEMO\tactive\t/sap/bc/adt/oo/classes/zcl_demo\tCLAS/OC\tZCL_DEMO\tZPKG\tzcl_demo.clas.abap\t/src/\tM\t\n# list staged\n# list ignored"
+    ]
+  },
+  "GetAbapGitStaging the staging @full": {
+    "isError": false,
+    "parts": [
+      "{\"unstaged\":[{\"wbkey\":\"CLASZCL_DEMO\",\"version\":\"active\",\"uri\":\"/sap/bc/adt/oo/classes/zcl_demo\",\"type\":\"CLAS/OC\",\"name\":\"ZCL_DEMO\",\"packageName\":\"ZPKG\",\"files\":[{\"name\":\"zcl_demo.clas.abap\",\"path\":\"/src/\",\"localState\":\"M\",\"remoteState\":\"\"}]}],\"staged\":[],\"ignored\":[],\"author\":{\"name\":\"Ada Author\",\"email\":\"ada@example.invalid\"},\"committer\":{\"name\":\"Carl Committer\",\"email\":\"carl@example.invalid\"}}"
+    ]
+  },
+  "GetAbapGitStaging every list filled @terse": {
+    "isError": false,
+    "parts": [
+      "# author Ada Author <ada@example.invalid>\n# committer Carl Committer <carl@example.invalid>\n# list unstaged\ntype\tname\tpackage_name\tfile\tlocal_state\tremote_state\nCLAS/OC\tZCL_DEMO\tZPKG\tzcl_demo.clas.abap\tM\t\n# list staged\ntype\tname\tpackage_name\tfile\tlocal_state\tremote_state\nPROG/P\tZSTAGED\tZPKG\tzstaged.prog.abap\tM\t\nPROG/P\tZSTAGED\tZPKG\tzstaged.prog.xml\tA\tD\n# list ignored\ntype\tname\tpackage_name\tfile\tlocal_state\tremote_state\nDEVC/K\tZIGNORED\tZPKG\t\t\t"
+    ]
+  },
+  "GetAbapGitStaging every list filled @medium": {
+    "isError": false,
+    "parts": [
+      "# author Ada Author <ada@example.invalid>\n# committer Carl Committer <carl@example.invalid>\n# list unstaged\nwbkey\tversion\turi\ttype\tname\tpackage_name\tfile\tpath\tlocal_state\tremote_state\nCLASZCL_DEMO\tactive\t/sap/bc/adt/oo/classes/zcl_demo\tCLAS/OC\tZCL_DEMO\tZPKG\tzcl_demo.clas.abap\t/src/\tM\t\n# list staged\nwbkey\tversion\turi\ttype\tname\tpackage_name\tfile\tpath\tlocal_state\tremote_state\nPROGZSTAGED\tactive\t/sap/bc/adt/programs/programs/zstaged\tPROG/P\tZSTAGED\tZPKG\tzstaged.prog.abap\t/src/\tM\t\nPROGZSTAGED\tactive\t/sap/bc/adt/programs/programs/zstaged\tPROG/P\tZSTAGED\tZPKG\tzstaged.prog.xml\t/src/\tA\tD\n# list ignored\nwbkey\tversion\turi\ttype\tname\tpackage_name\tfile\tpath\tlocal_state\tremote_state\nDEVCZIGNORED\tactive\t/sap/bc/adt/packages/zignored\tDEVC/K\tZIGNORED\tZPKG\t\t\t\t"
+    ]
+  },
+  "GetAbapGitStaging every list filled @full": {
+    "isError": false,
+    "parts": [
+      "{\"unstaged\":[{\"wbkey\":\"CLASZCL_DEMO\",\"version\":\"active\",\"uri\":\"/sap/bc/adt/oo/classes/zcl_demo\",\"type\":\"CLAS/OC\",\"name\":\"ZCL_DEMO\",\"packageName\":\"ZPKG\",\"files\":[{\"name\":\"zcl_demo.clas.abap\",\"path\":\"/src/\",\"localState\":\"M\",\"remoteState\":\"\"}]}],\"staged\":[{\"wbkey\":\"PROGZSTAGED\",\"version\":\"active\",\"uri\":\"/sap/bc/adt/programs/programs/zstaged\",\"type\":\"PROG/P\",\"name\":\"ZSTAGED\",\"packageName\":\"ZPKG\",\"files\":[{\"name\":\"zstaged.prog.abap\",\"path\":\"/src/\",\"localState\":\"M\",\"remoteState\":\"\"},{\"name\":\"zstaged.prog.xml\",\"path\":\"/src/\",\"localState\":\"A\",\"remoteState\":\"D\"}]}],\"ignored\":[{\"wbkey\":\"DEVCZIGNORED\",\"version\":\"active\",\"uri\":\"/sap/bc/adt/packages/zignored\",\"type\":\"DEVC/K\",\"name\":\"ZIGNORED\",\"packageName\":\"ZPKG\",\"files\":[]}],\"author\":{\"name\":\"Ada Author\",\"email\":\"ada@example.invalid\"},\"committer\":{\"name\":\"Carl Committer\",\"email\":\"carl@example.invalid\"}}"
+    ]
+  },
+  "GetAbapGitErrorLog a run's log @terse": {
+    "isError": false,
+    "parts": ["type\tname\tmessage_type\nCLAS\tZCL_DEMO\tE"]
+  },
+  "GetAbapGitErrorLog a run's log @medium": {
+    "isError": false,
+    "parts": [
+      "type\tname\tpackage\tstatus\tmessage_type\nCLAS\tZCL_DEMO\tZPKG\tE\tE"
+    ]
+  },
+  "GetAbapGitErrorLog a run's log @full": {
+    "isError": false,
+    "parts": [
+      "{\"objects\":[{\"type\":\"CLAS\",\"name\":\"ZCL_DEMO\",\"package\":\"ZPKG\",\"status\":\"E\",\"messageType\":\"E\"}]}"
+    ]
+  },
+  "GetObjectsByType objects, a nameless one, two nodes not loaded, descriptions": {
+    "isError": false,
+    "parts": [
+      "# parent DEVC/K ZPKG\n# node_id 000029\n# count 5\ntype\tname\ttech_name\turi\tdescription\nCLAS/OC\tZCL_A\t\t\tFirst\\ttab\nFUGR/FF\tZ_FM\tSAPLZFG\t\t\nCLAS/OC\t\t\t/sap/bc/adt/oo/classes/nameless\t\n# not loaded by SAP\n# not loaded by SAP"
+    ]
+  },
+  "GetObjectsByType objects without descriptions": {
+    "isError": false,
+    "parts": [
+      "# parent DEVC/K ZPKG\n# node_id 000029\n# count 1\ntype\tname\ttech_name\turi\nCLAS/OC\t#ZCL_B\t\t"
+    ]
+  },
+  "GetObjectsByType an empty level": {
+    "isError": false,
+    "parts": [
+      "# parent DEVC/K ZPKG\n# node_id 000029\n# count 0\ntype\tname\ttech_name\turi\tdescription"
+    ]
+  },
+  "SearchSource rows at objects": {
+    "isError": false,
+    "parts": [
+      "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\thits\n# object ZPKG PROG ZPROG\nZPROG\t2\n# object ZPKG PROG ZPROG2\nZPROG2\t1"
+    ]
+  },
+  "SearchSource rows at lines": {
+    "isError": false,
+    "parts": [
+      "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\tline\n# object ZPKG PROG ZPROG\nZPROG\t1\nZPROG\t3\n# object ZPKG PROG ZPROG2\nZPROG2\t1"
+    ]
+  },
+  "SearchSource rows at snippets": {
+    "isError": false,
+    "parts": [
+      "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\tline\tsnippet\n# object ZPKG PROG ZPROG\nZPROG\t1\tone hit\nZPROG\t3\thit\\ttwo\n# object ZPKG PROG ZPROG2\nZPROG2\t1\thit"
+    ]
+  },
+  "RuntimeListFeeds terse descriptors": {
+    "isError": false,
+    "parts": [
+      "# feed descriptors\n# count 2\nid\ttitle\tcategory\ndumps\tShort Dumps\truntime\nmessages\tSystem\\tMessages\t"
+    ]
+  },
+  "RuntimeListFeeds terse variants": {
+    "isError": false,
+    "parts": [
+      "# feed variants\n# count 2\nfeed\ttitle\tquery\tis_default\ndumps\tMine\tq1\ttrue\ndumps\tAll\tq2\tfalse\nmessages\t\t\t"
+    ]
+  },
+  "RuntimeListFeeds terse dumps": {
+    "isError": false,
+    "parts": [
+      "# feed dumps\n# count 2\n# next_to 20261122100000\n# incomplete_second 20261122110000\ndump_id\tupdated\ttitle\nID1\t2026-11-22T10:00:00Z\tDBSQL_SQL_ERROR\nID2\t2026-11-22T11:00:00Z\t#RAISE"
+    ]
+  },
+  "RuntimeListFeeds terse system_messages": {
+    "isError": false,
+    "parts": [
+      "# feed system_messages\n# count 2\nid\tcreatedOn\tauthor\ttitle\nM1\t2026-11-22\tSAPUSER01\tDowntime\nM2\t\tSAPUSER02\t"
+    ]
+  },
+  "RuntimeListFeeds terse gateway_errors": {
+    "isError": false,
+    "parts": [
+      "# feed gateway_errors\n# count 1\nopid\tdetail_kind\tdateTime\ttype\tshortText\tusername\nOP1\t\t2026-11-22T10:00:00Z\tE\tfailed\tSAPUSER01"
+    ]
+  },
+  "assembleTree an object of a package the tree does not reach": {
+    "isError": false,
+    "parts": [
+      "{\"name\":\"P\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"SUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZA\",\"type\":\"CLAS/OC\",\"kind\":\"class\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"ZORPHAN\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]}"
+    ]
+  },
+  "CheckAbapGitRepo the check": {
+    "isError": false,
+    "parts": ["{\"status\":200,\"result\":\"done\"}"]
+  },
+  "LinkAbapGitRepo a link with its objects": {
+    "isError": false,
+    "parts": [
+      "{\"status\":200,\"result\":\"done\",\"objects\":[{\"type\":\"CLAS\",\"name\":\"ZCL_DEMO\",\"package\":\"ZPKG\",\"status\":\"E\",\"messageType\":\"E\"}]}"
+    ]
+  },
+  "PullAbapGitRepo a pull without objects": {
+    "isError": false,
+    "parts": ["{\"status\":200,\"result\":\"done\"}"]
+  }
+}

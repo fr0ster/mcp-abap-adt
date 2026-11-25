@@ -23,6 +23,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { ServerRefusal, systemTypeConflictWords } from './auth/serverRefusal';
+import { carryConnectionKind } from './connectionKind';
 import { asciiLower } from './plainText';
 import {
   type AbapSystemKind,
@@ -32,6 +33,7 @@ import {
   stateSystemKind,
 } from './systemKind';
 import { child, childAt, entries } from './thrownValue';
+import { decodeResponseBytes } from './wireResponse';
 import { wireValueOf } from './wireValue';
 
 export type { AbapSystemKind } from './systemKind';
@@ -239,7 +241,40 @@ function safeHeaders(headers: Readonly<Record<string, string>>): string {
  * untouched when the switch is off — no wrapper, no cost, no behaviour to
  * explain in production.
  */
-function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
+/**
+ * Every body the connection answers as text: bytes (a `Buffer`) decoded as
+ * UTF-8 before anything reads them — an analyser, a reading, the raw
+ * recorder — so an `exc:exception` on a `200` is refused whether it came as
+ * bytes or as a string (Codex round 8). A refusal the connection throws
+ * carries its response's body decoded too.
+ */
+export function withDecodedBodies<T extends IAbapConnection>(connection: T): T {
+  const original = connection.makeAdtRequest.bind(connection);
+  connection.makeAdtRequest = async (
+    options: IAbapRequestOptions,
+  ): Promise<IAdtWireResponse> => {
+    try {
+      const answer = await original(options);
+      return answer.data instanceof Uint8Array
+        ? { ...answer, data: new TextDecoder().decode(answer.data) }
+        : answer;
+    } catch (thrown) {
+      // A thrown value is outside the type system: its response read as a
+      // wire answer, and its bytes decoded in place on the thrown object.
+      decodeThrownBody(thrown);
+      throw thrown;
+    }
+  };
+  return connection;
+}
+
+/** A thrown request failure's response body decoded to UTF-8 in place, when it is bytes. */
+function decodeThrownBody(thrown: unknown): void {
+  if (typeof thrown !== 'object' || thrown === null) return;
+  decodeResponseBytes(Reflect.get(thrown, 'response'));
+}
+
+export function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
   const { logWire, bodyChars } = httpWireOptions();
   if (!logWire) return connection;
   const original = connection.makeAdtRequest.bind(connection);
@@ -249,6 +284,10 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
   ): Promise<IAdtWireResponse> => {
     n += 1;
     const id = n;
+    // `noLog` (spec §3.4): the method, the path without its query, the
+    // integer status and the byte count — nothing of the request or the
+    // answer beside, on either branch.
+    if (options.noLog === true) return quietExchange(id, options, original);
     process.stderr.write(
       `[WIRE ${id}] ${String(options.method ?? '?')} ${String(options.url ?? '?')}\n`,
     );
@@ -291,6 +330,68 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
     }
   };
   return connection;
+}
+
+/** A `noLog` exchange's wire lines: method and path, then the integer status and the bytes. */
+async function quietExchange(
+  id: number,
+  options: IAbapRequestOptions,
+  send: (options: IAbapRequestOptions) => Promise<IAdtWireResponse>,
+): Promise<IAdtWireResponse> {
+  process.stderr.write(
+    `[WIRE ${id}] ${String(options.method ?? '?')} ${pathnameOf(String(options.url ?? ''))}\n`,
+  );
+  try {
+    const answer = await send(options);
+    const count = byteCountOf(answer.data);
+    const bytes = count === undefined ? '' : ` ${count} bytes`;
+    process.stderr.write(
+      `[WIRE ${id}] → ${integerOr(answer.status)}${bytes}\n`,
+    );
+    return answer;
+  } catch (error: unknown) {
+    process.stderr.write(
+      `[WIRE ${id}] → threw ${integerOr(childAt(error, 'response', 'status'))}\n`,
+    );
+    throw error;
+  }
+}
+
+/**
+ * The pathname of a request URL, parsed (a relative one against a dummy
+ * base): never its authority, userinfo, query or fragment; `?` when it is
+ * no URL.
+ */
+function pathnameOf(url: string): string {
+  try {
+    return new URL(url, 'http://wire.invalid').pathname;
+  } catch {
+    return '?';
+  }
+}
+
+/**
+ * An answer body's byte count: a text's UTF-8 length, the byte length of an
+ * `ArrayBuffer`, a `DataView` or any typed-array view; `undefined` for
+ * anything else. The body itself is read for nothing more.
+ * A byte length that throws leaves the line without a count; the request's own result is untouched.
+ */
+function byteCountOf(data: unknown): number | undefined {
+  try {
+    if (typeof data === 'string') return Buffer.byteLength(data);
+    if (ArrayBuffer.isView(data)) return data.byteLength;
+    if (data instanceof ArrayBuffer) return data.byteLength;
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+/** A status as an integer, else `?`. */
+function integerOr(status: unknown): string {
+  return typeof status === 'number' && Number.isInteger(status)
+    ? String(status)
+    : '?';
 }
 
 /** How a connection was built, so a sibling can be opened exactly like it. */
@@ -376,11 +477,17 @@ export function admitOnKind(
 
 /**
  * Gives `view` — a connection built over `outer` (a batch connection, a
- * forwarding or recording view) — the system kind `outer` has
+ * forwarding or recording view) — the system kind and the transport kind
+ * (`carryConnectionKind`) `outer` has
  * (`systemKindOf`). An `outer` with no kind gives the view none, and nothing
  * (`SAP_SYSTEM_TYPE` above all) is read for the view later. Answers `view`.
  */
-export function withSystemKindOf<V extends object>(view: V, outer: object): V {
+export function withSystemKindOf<V extends object>(
+  view: V,
+  outer: IAbapConnection,
+): V {
+  // The transport kind travels with the system kind (`isRfcConnection`).
+  carryConnectionKind(view, outer);
   const kind = systemKindOf(outer);
   if (kind !== undefined) declareSystemKind(view, kind);
   else stateSystemKind(view, undefined);
@@ -484,6 +591,7 @@ export function createAbapConnection(
     );
   })();
 
+  withDecodedBodies(built);
   records.set(built, {
     settings,
     credential,

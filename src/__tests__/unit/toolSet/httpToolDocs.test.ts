@@ -21,6 +21,7 @@ import {
 import { compactToolSet as compactHttpSet } from '../../../../compact-http/src/launcher';
 import { readOnlyToolSet as compactHttpRoSet } from '../../../../compact-http-ro/src/launcher';
 import { compactModifyEntries } from '../../../../compact-modify/src/group';
+import { compactAbapGitEntries } from '../../../lib/compact/abapGit/group';
 import { compactBackgroundRunEntries } from '../../../lib/compact/backgroundRuns/group';
 import { compactBatchEntries } from '../../../lib/compact/batch/group';
 import {
@@ -105,6 +106,17 @@ describe('the surface a Streamable HTTP binary adds', () => {
 });
 
 describe('the full tool pages (npm run docs:tools)', () => {
+  it('a kind variant that differs is on the page: the cloud pull with overwrite', () => {
+    const pull = generator
+      .loadToolsFromHandlers()
+      .find((tool: { name: string }) => tool.name === 'PullAbapGitRepo');
+    assert.ok(pull);
+    const shown: string = generator.variantMarkdown(pull);
+    assert.ok(shown.includes('**Parameters (`cloud`):**'), shown);
+    assert.ok(shown.includes('- `overwrite` (array, optional)'), shown);
+    for (const page of [ALL, HIGH]) assert.ok(page.includes(shown));
+  });
+
   it('AVAILABLE_TOOLS.md carries the Streamable HTTP section of mcp-abap-adt-http, as generated now', () => {
     const section = generator.httpSectionMarkdown(
       streamableHttpSurface(fullToolSet, { dataTools: true }),
@@ -212,6 +224,7 @@ describe('the compact tool page (compact docs:tools)', () => {
         background: { compactBackgroundRunEntries },
         session: { compactLeftoverSessionEntries },
         batch: { compactBatchEntries },
+        abapGit: { compactAbapGitEntries },
         toolSet: {
           compactToolSetOf,
           compactReadOnlyToolSetOf,

@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.fr0ster/mcp-abap-adt-compact",
-  "description": "Compact SAP ABAP ADT, onprem and BTP: CRUD, where-used, ATC, unit tests, transports, debugger, batch",
+  "description": "Compact SAP ABAP ADT, onprem and BTP: CRUD, where-used, ATC, unit tests, transports, batch, abapGit",
   "repository": {
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"

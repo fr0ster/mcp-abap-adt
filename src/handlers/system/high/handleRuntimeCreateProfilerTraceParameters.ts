@@ -21,11 +21,12 @@
  */
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import type { compactProfileScheduleSchema } from '../../../lib/compact/compactSchemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { profilerTraceParameters } from '../../../lib/profilerTraceParameters';
 import { ourClassExecutor } from '../../../lib/strategies/resultSets';
@@ -36,8 +37,13 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'RuntimeCreateProfilerTraceParameters',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.',
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        'Creates the parameters of an ABAP profiler trace, scheduling it for a later profiled run of a class or a report.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     description: z.string().describe('Human-readable trace description.'),
     all_misc_abap_statements: z.boolean().optional(),
@@ -84,10 +90,7 @@ export async function handleRuntimeCreateProfilerTraceParameters(
           headers,
         }),
       ),
-    (profilerId) => ({
-      success: true,
-      profiler_id: profilerId,
-    }),
+    (profilerId) => scheduledTraceAnswer(profilerId),
   );
 }
 
@@ -146,9 +149,11 @@ export async function handleScheduleProfilerTraceOnce(
       }
       return succeededWith(profilerId);
     },
-    (profilerId: string) => ({
-      success: true,
-      profiler_id: profilerId,
-    }),
+    (profilerId: string) => scheduledTraceAnswer(profilerId),
   );
+}
+
+/** What a scheduled trace answers: the profiler id a profiled run names. */
+export function scheduledTraceAnswer(profilerId: string) {
+  return { success: true, profiler_id: profilerId };
 }

@@ -32,6 +32,15 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
+import {
+  about,
+  type Column,
+  headShape,
+  type RowSchemas,
+  rows,
+  type Written,
+  writeListing,
+} from '../detail';
 import { fragmentStart, hrefParts } from '../sourceHref';
 import { parseXml } from '../xml/node';
 
@@ -101,6 +110,94 @@ export interface AtcFindingFull extends AtcFinding {
 }
 
 /** The terse fields of a finding, in the order they were always answered. */
+/** The terse rows' columns of a finding. */
+export const FINDING_COLUMNS = [
+  'object',
+  'object_type',
+  'location',
+  'line',
+  'column',
+  'priority',
+  'check',
+  'message',
+] as const;
+
+/** A finding's cells in a terse row, in {@link FINDING_COLUMNS}' order. */
+export function findingCells(finding: AtcFindingFull): string[] {
+  return [
+    finding.object,
+    finding.object_type,
+    finding.location ?? '',
+    finding.line === undefined ? '' : String(finding.line),
+    finding.column === undefined ? '' : String(finding.column),
+    finding.priority === undefined ? '' : String(finding.priority),
+    finding.check ?? '',
+    finding.message ?? '',
+  ];
+}
+
+/** What each terse column of a finding tells, in domain words. */
+const FINDING_MEANS: Readonly<
+  Record<(typeof FINDING_COLUMNS)[number], string>
+> = {
+  object: 'its object',
+  object_type: "its object's type",
+  location: 'the part of the source it is in',
+  line: 'its position in that source',
+  column: 'its offset at that position',
+  priority: 'its priority',
+  check: 'the check that found it',
+  message: 'what the check says',
+};
+
+/** The lists a findings listing writes: what its description states. */
+export const FINDINGS_LISTS: RowSchemas<{
+  findings: readonly AtcFindingFull[];
+}> = {
+  findings: about(
+    'for each finding',
+    rows('findings', {
+      columns: FINDING_COLUMNS.map(
+        (name, index): Column<AtcFindingFull> => ({
+          name,
+          means: FINDING_MEANS[name],
+          cell: (finding) => findingCells(finding)[index] ?? '',
+        }),
+      ),
+      header: 'always',
+    }),
+  ),
+};
+
+/** The head of the counts per priority every findings listing writes. */
+export const PRIORITY_HEAD = headShape(
+  'priority',
+  'how many findings each priority has',
+);
+
+/**
+ * Findings as terse lines: the run's facts as `#` lines (the counts per
+ * priority as `priority N count` lines), then a row per finding — every
+ * finding, by the listing writer.
+ */
+export function findingsText(
+  heads: readonly { head: string; value?: string | undefined }[],
+  byPriority: Record<string, number>,
+  findings: readonly AtcFindingFull[],
+): Written<string> {
+  return writeListing({
+    heads: [
+      ...heads,
+      ...Object.entries(byPriority).map(([priority, count]) => ({
+        head: 'priority',
+        value: `${priority} ${count}`,
+      })),
+    ],
+    reading: { findings },
+    lists: FINDINGS_LISTS,
+  });
+}
+
 export function terseFinding(finding: AtcFindingFull): AtcFinding {
   return {
     object: finding.object,

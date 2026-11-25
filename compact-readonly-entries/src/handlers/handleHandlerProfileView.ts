@@ -1,6 +1,8 @@
 import {
   compactProfileViewSchema,
-  withLongToolAdvice,
+  longRunning,
+  pairsPurpose,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -12,9 +14,14 @@ import type * as z from 'zod';
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileView',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Reads the ABAP profiler trace named by trace_id_or_uri in the view given (hit list, statements or database accesses), raw or analysed. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: mode(raw|analyze, default raw), top(analyze only), with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON.',
-  ),
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: pairsPurpose([
+      'reads a profiler trace view',
+      'analyzes a profiler trace view',
+    ]),
+    notes: [longRunning],
+  }),
   inputSchema: compactProfileViewSchema,
 } as const;
 

@@ -5,7 +5,8 @@
  * first, with no read; a package create's `package_name` takes its parent
  * from the call's `super_package`, so the package to be created is never
  * read. A read that fails, or a package met twice on the way up, refuses
- * the call `package_tree_unreadable`.
+ * the call `package_tree_unreadable`, and so does a package create's given
+ * parent that cannot be read (`readableParent`).
  */
 
 import type {
@@ -19,6 +20,7 @@ import type { AccessLists, NameEntry, PackageEntry } from './accessLists.js';
 import {
   entryNames,
   listedAccessChecks,
+  readableParent,
   requestsAndTables,
 } from './listedAccessChecks.js';
 
@@ -90,6 +92,8 @@ export function packageTreeAccessChecks(lists: AccessLists): IAccessChecks {
           const verdict = await packageVerdict(named, call, entries, sap);
           if (verdict !== undefined) return verdict;
         }
+        const unread = await readableParent(call, sap);
+        if (unread !== undefined) return unread;
       }
       return requestsAndTables(call, own);
     },

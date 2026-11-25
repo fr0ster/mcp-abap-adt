@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateFunctionInclude Handler - Write a function group include's source
@@ -48,7 +49,11 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateFunctionInclude',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'Update source code of an existing ABAP function group include.',
+  description: toolDescription({
+    purpose: purpose(
+      'Updates the source code of an existing include of an ABAP function group, activating it when asked.',
+    ),
+  }),
   inputSchema: z.object({
     function_group_name: z
       .string()

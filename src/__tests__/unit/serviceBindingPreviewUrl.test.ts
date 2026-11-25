@@ -757,13 +757,5 @@ describe('GetServiceBindingPreviewUrl', () => {
       assert.equal(payload.origin, undefined);
       assert.ok(!(payload.note ?? '').includes(NO_ORIGIN_NOTE));
     });
-
-    it('the description says how the URLs are answered over RFC', () => {
-      assert.ok(
-        TOOL_DEFINITION.description.includes(
-          'Over RFC, the URLs are answered as their paths and query',
-        ),
-      );
-    });
   });
 });

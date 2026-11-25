@@ -181,6 +181,7 @@ function expectHitsWithin(
  */
 async function treeOf(root: string): Promise<string[]> {
   const answer = await livePrepare('GetPackageContents', {
+    detail: 'full',
     package_name: root,
     include_subpackages: true,
   });
@@ -455,6 +456,7 @@ liveSuite(['onprem'], 'SearchSource package masks', () => {
     assert.ok(named.length > 1);
     assert.ok(named.includes(shared));
     const answer = await liveCall('SearchSource', {
+      detail: 'full',
       packages: [mask],
       include_subpackages: false,
       object_types: ['FUGR'],
@@ -469,6 +471,7 @@ liveSuite(['onprem'], 'SearchSource package masks', () => {
     const named = await quickSearchPackages(mask);
     assert.ok(named.includes(sharedPackage()));
     const answer = await liveCall('SearchSource', {
+      detail: 'full',
       packages: [mask],
       include_subpackages: false,
       object_types: ['FUGR'],
@@ -483,6 +486,7 @@ liveSuite(['onprem'], 'SearchSource package masks', () => {
     const named = await quickSearchPackages(mask);
     assert.ok(named.includes(sharedPackage()));
     const answer = await liveCall('SearchSource', {
+      detail: 'full',
       packages: [mask],
       include_subpackages: false,
       object_types: ['FUGR'],
@@ -498,6 +502,7 @@ liveSuite(['onprem'], 'SearchSource package masks', () => {
     const named = await quickSearchPackages(exact);
     assertEquals(named, [exact]);
     const answer = await liveCall('SearchSource', {
+      detail: 'full',
       packages: [exact],
       include_subpackages: false,
       object_types: ['FUGR'],
@@ -517,6 +522,7 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
       );
     }
     const answer = await liveCall('SearchSource', {
+      detail: 'full',
       packages: [hitPackage()],
       object_types: ['FUGR'],
       query: sharedModule(),
@@ -559,6 +565,7 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
 
   it('a package that does not exist yields no hit', async () => {
     const both = await liveCall('SearchSource', {
+      detail: 'full',
       packages: [sharedPackage(), MISSING],
       include_subpackages: false,
       object_types: ['FUGR'],
@@ -571,6 +578,7 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
     expectHitsWithin(results, [sharedPackage()]);
 
     const alone = await liveCall('SearchSource', {
+      detail: 'full',
       packages: [MISSING],
       include_subpackages: false,
       object_types: ['FUGR'],
@@ -588,6 +596,7 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
 
   it('answer objects names each object with its hit count', async () => {
     const answer = await liveCall('SearchSource', {
+      detail: 'full',
       packages: [sharedPackage()],
       include_subpackages: false,
       object_types: ['FUGR'],
@@ -615,6 +624,7 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
 
   it('answer lines carries line numbers and no snippets', async () => {
     const answer = await liveCall('SearchSource', {
+      detail: 'full',
       packages: [sharedPackage()],
       include_subpackages: false,
       object_types: ['FUGR'],
@@ -636,6 +646,7 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
 
   it('answer snippets carries line and snippet', async () => {
     const answer = await liveCall('SearchSource', {
+      detail: 'full',
       packages: [sharedPackage()],
       include_subpackages: false,
       object_types: ['FUGR'],
@@ -657,6 +668,7 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
 
   it('max_hits stops the scan with truncated.by_max_hits', async () => {
     const answer = await liveCall('SearchSource', {
+      detail: 'full',
       packages: [sharedPackage()],
       include_subpackages: false,
       object_types: ['FUGR'],
@@ -686,6 +698,7 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem search_source', () => {
     it('background false answers the hits in the call', async () => {
       const answer = await liveCall('HandlerSystem', {
         action: 'search_source',
+        detail: 'full',
         packages: [sharedPackage()],
         include_subpackages: false,
         object_types: ['FUGR'],
@@ -698,6 +711,7 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem search_source', () => {
     it('without background it starts a run, whose answer HandlerBackgroundRunGet reads once', async () => {
       const started = await liveCall('HandlerSystem', {
         action: 'search_source',
+        detail: 'full',
         packages: [sharedPackage()],
         include_subpackages: false,
         object_types: ['FUGR'],

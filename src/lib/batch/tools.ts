@@ -54,15 +54,18 @@ export function communicationBatch(logger?: ILogger): OpenBatch {
   return { connection, target, envelopes, recorded: [] };
 }
 
+/** What the batch's start answers: it is on, and the handle its calls carry. */
+export type BatchBegun = { batch: 'on'; state_handle?: string };
+
 /** The batch begin: a communication batch opened; answers `{ batch: 'on', state_handle }`. */
 export async function beginBatch(context: HandlerContext): Promise<McpResult> {
   const owner = ownerOf(context);
   owner.begin('communication', communicationBatch(context.logger));
-  const answer: { batch: 'on'; state_handle?: string } = { batch: 'on' };
+  const answer: BatchBegun = { batch: 'on' };
   if (context.state !== undefined) answer.state_handle = context.state.handle;
   return {
     isError: false,
-    content: [{ type: 'text', text: JSON.stringify(answer, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(answer) }],
   };
 }
 
@@ -109,13 +112,13 @@ export async function beginDebugBatch(
     debuggee = 'amdp';
   }
   owner.begin('debugger', { connection, envelopes, recorded: [], debuggee });
-  const answer: { debug_batch: 'on'; state_handle?: string } = {
+  const answer: DebugBatchBegun = {
     debug_batch: 'on',
   };
   if (context.state !== undefined) answer.state_handle = context.state.handle;
   return {
     isError: false,
-    content: [{ type: 'text', text: JSON.stringify(answer, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(answer) }],
   };
 }
 
@@ -135,3 +138,6 @@ export async function answersOf(
 ): Promise<McpResult> {
   return batchAnswersAnswer(await readAnswers(ownerOf(context), ask));
 }
+
+/** What the debugger batch's start answers: it is on, and the handle its calls carry. */
+export type DebugBatchBegun = { debug_batch: 'on'; state_handle?: string };

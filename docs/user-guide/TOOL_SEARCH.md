@@ -166,6 +166,6 @@ changes nothing in the system, the meaning of the `-ro` binaries — reads, chec
 the ATC run and its readers, the debugger's reads and the batch tools included;
 a repository change, a run of code (a test, class or program run), a trace
 scheduled, a debug session opened, changed or ended and a session logoff carry
-none — (beside a `[runtime]`, `[debug]` or `[session]` marker where the tool has
-one), a first sentence no other tool of its set shares, and no vague subject
+none — a tool's tag is the one its typed flag gives (`[read-only]`,
+`[low-level]` or `[debug]`), written by the description builder —, a first sentence no other tool of its set shares, and no vague subject
 ("an ABAP object") in it; and a `-ro` set serves only marked tools.

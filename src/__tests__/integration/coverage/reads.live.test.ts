@@ -106,8 +106,17 @@ function expectDomainUsed(answer: LiveAnswer): void {
 liveSuite(['onprem', 'cloud'], 'Repository reads', () => {
   it('GetTransaction reads SE80', async () => {
     const read = await liveCall('GetTransaction', { transaction_name: 'SE80' });
+    // Terse, the default: the transaction named, then its facets as TSV.
+    const lines = succeeded('GetTransaction', read).text.split('\n');
+    assert.equal(lines[0], '# transaction SE80', read.text);
+    assert.ok(lines.includes('facet\tname\ttext'), read.text);
+    // SAP's object, at full: the transaction SE80, of type TRAN/T.
+    const full = await liveCall('GetTransaction', {
+      transaction_name: 'SE80',
+      detail: 'full',
+    });
     const object = member(
-      payloadOf(succeeded('GetTransaction', read)),
+      payloadOf(succeeded('GetTransaction full', full)),
       'object',
     );
     assert.equal(member(object, 'name'), 'SE80');
@@ -128,7 +137,11 @@ liveSuite(['onprem', 'cloud'], 'Repository reads', () => {
 
   it('GetPackage reads the shared package', async () => {
     const name = sharedPackage();
-    const read = await liveCall('GetPackage', { package_name: name });
+    // The metadata fields read below: the JSON of detail medium.
+    const read = await liveCall('GetPackage', {
+      package_name: name,
+      detail: 'medium',
+    });
     const metadata = member(
       payloadOf(succeeded('GetPackage', read)),
       'metadata',

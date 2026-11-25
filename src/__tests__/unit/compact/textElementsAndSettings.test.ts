@@ -31,11 +31,8 @@ import {
 import {
   TOOL_DEFINITION as HandlerLock,
   handleHandlerLock,
+  handleHandlerLock as lockOrUnlock,
 } from '../../../../compact-modify/src/handlers/handleHandlerLock';
-import {
-  TOOL_DEFINITION as HandlerUnlock,
-  handleHandlerUnlock,
-} from '../../../../compact-modify/src/handlers/handleHandlerUnlock';
 import {
   TOOL_DEFINITION as HandlerUpdate,
   handleHandlerUpdate,
@@ -44,6 +41,11 @@ import {
   TOOL_DEFINITION as HandlerGet,
   handleHandlerGet,
 } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
+import {
+  memberTokens,
+  readToken,
+  updateToken,
+} from '../../../lib/compact/compactDescriptions';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { readOnlyToolNames } from '../../../lib/toolSet';
@@ -55,6 +57,12 @@ import {
   SETTINGS_ETAG,
   settingsDocument,
 } from '../tableSettings/settingsStandIn';
+
+/** An unlock, as the merged HandlerLock takes it: `action: 'unlock'`. */
+const handleHandlerUnlock = (
+  context: Parameters<typeof lockOrUnlock>[0],
+  args: Omit<Parameters<typeof lockOrUnlock>[1], 'action'>,
+) => lockOrUnlock(context, { ...args, action: 'unlock' });
 
 const RUN_ID = 'RUN0001';
 const ACTIVATED =
@@ -334,9 +342,9 @@ describe("HandlerUpdate: the sub-resources under the caller's lock", () => {
   });
 });
 
-describe('HandlerLock and HandlerUnlock: the sub-resources', () => {
+describe('HandlerLock, lock and unlock: the sub-resources', () => {
   it("offers a program's text elements on premise and not on the cloud, as HandlerUpdate", () => {
-    for (const definition of [HandlerLock, HandlerUnlock]) {
+    for (const definition of [HandlerLock]) {
       assert.ok(
         (definition.variants.onprem.members ?? []).includes(
           'PROGRAM_TEXT_ELEMENTS',
@@ -423,18 +431,27 @@ describe('HandlerLock and HandlerUnlock: the sub-resources', () => {
 });
 
 describe('the compact descriptions of the sub-resources', () => {
-  it('HandlerGet names source as the part of each, with its requests', () => {
-    const words = HandlerGet.variants.onprem.description;
-    assert.match(
-      words,
-      /PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS source \(symbols, selections and headings, one request each\)/,
-    );
-    assert.match(words, /TABLE_SETTINGS source \(the technical settings/);
+  it("HandlerGet's member table names each sub-resource it reads, with its arguments", () => {
+    const words = memberTokens('HandlerGet', 'onprem');
+    for (const member of [
+      'TABLE_SETTINGS',
+      'PROGRAM_TEXT_ELEMENTS',
+      'FUNCTION_GROUP_TEXT_ELEMENTS',
+      'CLASS_TEXT_ELEMENTS',
+    ] as const) {
+      assert.ok(words.includes(readToken(member)), member);
+    }
   });
 
-  it('HandlerUpdate states the requests of the settings and of the text parts', () => {
-    const words = HandlerUpdate.variants.onprem.description;
-    assert.match(words, /two requests/);
-    assert.match(words, /whole list, one request each/);
+  it("HandlerUpdate's member table names the settings and the text parts it writes, with their arguments", () => {
+    const words = memberTokens('HandlerUpdate', 'onprem');
+    for (const member of [
+      'TABLE_SETTINGS',
+      'PROGRAM_TEXT_ELEMENTS',
+      'FUNCTION_GROUP_TEXT_ELEMENTS',
+      'CLASS_TEXT_ELEMENTS',
+    ] as const) {
+      assert.ok(words.includes(updateToken(member)), member);
+    }
   });
 });

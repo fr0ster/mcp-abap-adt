@@ -146,7 +146,7 @@ describe('the compact capability split holds across the packages', () => {
     const read = handlersOf('compact-readonly-entries');
     const write = handlersOf('compact-modify');
     assert.equal(read.length, 16);
-    assert.equal(write.length, 12);
+    assert.equal(write.length, 11);
     assert.deepStrictEqual(
       read.filter((name) => write.includes(name)),
       [],

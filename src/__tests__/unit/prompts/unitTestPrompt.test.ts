@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { compactToolSet } from '../../../../compact/src/launcher';
 import { readOnlyToolSet as compactReadOnlyToolSet } from '../../../../compact-ro/src/launcher';
-import type { PromptSource } from '../../../lib/prompts';
+import type { PromptSource } from '../../../lib/prompts/types';
 import { unitTestPrompt } from '../../../lib/prompts/unitTestPrompt';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import {

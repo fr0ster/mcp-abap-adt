@@ -24,6 +24,7 @@ import {
   isCredentialFailure,
   thrownEntry,
 } from '../answer';
+import { type AnswerTable, answerAt, type DetailLevel } from '../detail/levels';
 import type { ReadVersion } from '../handlers/readVersion';
 import {
   child,
@@ -158,4 +159,43 @@ export async function readStoredDefinition<T>(
     };
   }
   return { stored_version: version, stored_definition: stored };
+}
+
+/** What a table-type write answers of the stored definition, at one level. */
+type StoredShown =
+  | StoredDefinitionAnswer
+  | { readonly stored_version: ReadVersion }
+  | undefined;
+
+/** The version a definition was read at alone; a failed read as it is. */
+const versionAlone = (
+  stored: StoredDefinitionAnswer | undefined,
+): StoredShown =>
+  stored === undefined || !('stored_definition' in stored)
+    ? stored
+    : { stored_version: stored.stored_version };
+
+/**
+ * What a table-type write answers of the stored definition at each `detail`
+ * (terse answers, step 5), one entry per level: at full the definition SAP
+ * stored; at the other levels the version it was read at alone — the
+ * definition is a read of its own (`GetTableType`). A read that failed is
+ * answered at every level: the caller must know the definition was not read.
+ */
+const STORED_ANSWERS: AnswerTable<
+  StoredDefinitionAnswer | undefined,
+  StoredShown
+> = {
+  terse: versionAlone,
+  medium: versionAlone,
+  full: (stored) => stored,
+  raw: versionAlone,
+};
+
+/** The stored definition's answer at `level` (`STORED_ANSWERS`). */
+export function storedAt(
+  level: DetailLevel,
+  stored: StoredDefinitionAnswer | undefined,
+): StoredShown {
+  return answerAt(STORED_ANSWERS, level)(stored);
 }

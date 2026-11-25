@@ -22,12 +22,23 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it, mock } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
-import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
+import { handleGetStructuresList as handleGetStructuresListOf } from '../../handlers/structure/readonly/handleGetStructuresList';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import * as clients from '../../lib/clients';
 import { assertMatchObject } from '../helpers/assertions';
-import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
+import {
+  okResponse,
+  reading,
+  refusedResponse,
+  whereUsedAnswer,
+} from '../helpers/fakeClient';
+
+/** handleGetStructuresList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetStructuresList = (
+  context: Parameters<typeof handleGetStructuresListOf>[0],
+  args: Parameters<typeof handleGetStructuresListOf>[1],
+) => handleGetStructuresListOf(context, { detail: 'full', ...args });
 
 const mockStructRead = mock.fn<(...args: any[]) => any>();
 const mockTableRead = mock.fn<(...args: any[]) => any>();
@@ -54,7 +65,7 @@ function payload(result: any) {
 }
 
 /** An empty, successfully-parsed where-used result: no references. */
-const emptyWhereUsed = () => okResponse(reading({}));
+const emptyWhereUsed = () => whereUsedAnswer();
 
 describe('GetStructuresList append handling (#128)', () => {
   beforeEach(() => {
@@ -210,5 +221,17 @@ describe('GetStructuresList append handling (#128)', () => {
     assert.equal(mockGetWhereUsedScope.mock.callCount(), 0);
     assert.equal(mockGetWhereUsed.mock.callCount(), 0);
     assert.equal(payload(result).appends_unavailable, undefined);
+  });
+
+  it('terse, by default: the tree as indented structure and kind rows', async () => {
+    const result = await handleGetStructuresListOf(ctx, {
+      structure_name: 'ZS',
+      include_extensions: false,
+    });
+    assert.equal(result.isError, false);
+    const text = (result.content[0] as { text: string }).text;
+    const lines = text.split('\n');
+    assert.equal(lines[0], '# structure ZS');
+    assert.equal(lines[1], 'ZS\troot\t');
   });
 });

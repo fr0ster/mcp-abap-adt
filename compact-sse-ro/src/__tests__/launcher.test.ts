@@ -82,7 +82,7 @@ describe('mcp-abap-adt-compact-sse-ro', () => {
     assert.ok(!stderr.join('\n').includes('--exposition=<'));
   });
 
-  it('serves the read-only set without the data tool: 19 tools (HandlerBatch among them), the background-run tools, none of a leftover session', () => {
+  it('serves the read-only set without the data tool: 20 tools (HandlerAbapGitGet, HandlerBatch among them), the background-run tools, none of a leftover session', () => {
     assert.deepStrictEqual(
       shape(readOnlyToolSet),
       shape(
@@ -92,7 +92,7 @@ describe('mcp-abap-adt-compact-sse-ro', () => {
         }),
       ),
     );
-    assert.equal(shape(readOnlyToolSet).flatMap((g) => g.tools).length, 19);
+    assert.equal(shape(readOnlyToolSet).flatMap((g) => g.tools).length, 20);
     assert.equal(readOnlyToolSet.backgroundRuns, true);
     // The leftover-session tools are stdio's.
     assert.deepStrictEqual(

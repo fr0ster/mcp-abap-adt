@@ -11,8 +11,8 @@
  * collection the table gives the value's API (its address, in the URL, the
  * parameters or the body).
  *
- * The compact tools' arguments are read from their own descriptions on that
- * variant (`MEMBER(arg*, …)`): what the description promises is what is sent.
+ * The compact tools' arguments are read from their member tables on that
+ * variant (`memberTokens`, `MEMBER(arg*, …)`): what the table promises is what is sent.
  */
 
 import assert from 'node:assert/strict';
@@ -39,9 +39,9 @@ import {
 import {
   TOOL_DEFINITION as HandlerLock,
   handleHandlerLock,
+  handleHandlerLock as lockOrUnlock,
 } from '../../../../compact-modify/src/handlers/handleHandlerLock';
 import { handleHandlerProfileRun } from '../../../../compact-modify/src/handlers/handleHandlerProfileRun';
-import { handleHandlerUnlock } from '../../../../compact-modify/src/handlers/handleHandlerUnlock';
 import {
   TOOL_DEFINITION as HandlerUpdate,
   handleHandlerUpdate,
@@ -102,6 +102,10 @@ import {
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
 } from '../../../lib/adtProjections';
+import {
+  isObjectTypeTool,
+  memberTokens,
+} from '../../../lib/compact/compactDescriptions';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
@@ -112,6 +116,12 @@ import {
   type RecordedRequest,
   recordingConnection,
 } from '../../helpers/recordingConnection';
+
+/** An unlock, as the merged HandlerLock takes it: `action: 'unlock'`. */
+const handleHandlerUnlock = (
+  context: Parameters<typeof lockOrUnlock>[0],
+  args: Omit<Parameters<typeof lockOrUnlock>[1], 'action'>,
+) => lockOrUnlock(context, { ...args, action: 'unlock' });
 
 const TABLES: { readonly [V in ProjectionVariant]: AdtApiTable<string> } = {
   onprem: ADT_TYPES_ONPREM,
@@ -341,15 +351,15 @@ function walk<M extends string>(spec: {
   };
 }
 
-/** The description a compact tool states on `variant`. */
+/** The members a compact tool takes on `variant`, with their arguments. */
 const stated = (
-  definition: {
-    readonly variants: {
-      readonly [V in ProjectionVariant]: { readonly description: string };
-    };
-  },
+  definition: { readonly name: string },
   variant: ProjectionVariant,
-) => definition.variants[variant].description;
+) => {
+  const tool = definition.name;
+  if (!isObjectTypeTool(tool)) throw new Error(`${tool} takes no object_type`);
+  return memberTokens(tool, variant);
+};
 
 const versionContent = (kind: string, variant: ProjectionVariant) => {
   const route = Object.entries(VERSIONED_ROUTES).find(
@@ -441,7 +451,8 @@ const WALKS: Readonly<Record<string, Walk>> = {
       }),
     routes: routesOf(COMPACT_LOCK_ROUTES),
   }),
-  'HandlerUnlock.object_type': walk({
+  // HandlerLock's action unlock: its own routes, walked beside the lock's.
+  'HandlerLock unlock.object_type': walk({
     values: COMPACT_UNLOCK,
     send: (context, value) =>
       handleHandlerUnlock(context, {
@@ -670,7 +681,8 @@ describe('every projected value reaches a served path', () => {
         );
       }
     }
-    assert.equal(Object.keys(WALKS).length, PROJECTED_ARGUMENTS.length);
+    // Every projected argument walked, and the unlock action of HandlerLock.
+    assert.equal(Object.keys(WALKS).length, PROJECTED_ARGUMENTS.length + 1);
     assert.ok(cases.length > 400);
   });
 

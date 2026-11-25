@@ -1,8 +1,13 @@
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type IRepositoryIncompleteNode,
+  type IRepositoryNodeContents,
+  type IRepositoryObjectNode,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   AdtTypeCode,
+  IAdtAnsweredObject,
   IAdtError,
-  IAdtFailure,
   IAdtHeaders,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -19,16 +24,17 @@ import {
 } from '../adtHeaders/withAdtHeaders';
 import type { AdtCodes } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
-import {
-  failureEntry,
-  isCredentialFailure,
-  isCredentialPayload,
-} from '../answer';
+import { isCredentialFailure } from '../answer';
 import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
-import { type PhaseResult, runPhase } from '../batch/phases';
+import {
+  chunksOf,
+  type PhaseResult,
+  READS_PER_ENVELOPE,
+  runPhase,
+} from '../batch/phases';
 import { createAdtClient } from '../clients';
-import { bodyTextOf } from '../wireValue';
+import { readsInFlight } from '../connectionKind';
 import { parseXml, type XmlNode } from '../xml/node';
 import {
   childAt as nodeAt,
@@ -69,7 +75,7 @@ export interface NodeStructureSourceOf<R> {
 /** A source of node structure reads, each answer read as a `NodeAnswer`. */
 export type NodeStructureSource = NodeStructureSourceOf<NodeAnswer>;
 
-/** What one node structure read answers: the level, as our `node` reading (`nodeLevel`) read it. */
+/** What one node structure read answers: the level, as `utilNodeContents` reads it. */
 export type NodeAnswer = IAdtResponse<NodeLevel, IAdtError>;
 
 /** The options a node structure read takes, beside its header pair. */
@@ -125,14 +131,23 @@ export type LevelReader<I, R> = ((
 ) => Promise<PhaseResult<R>[]>) & { readonly ownAnswers?: boolean };
 
 /**
- * One level's reads in one ADT batch envelope (spec §11): `read(item,
- * connection)` for every item, on the phase's batch connection (`runPhase`).
+ * One level's reads in ADT batch envelopes (spec §11): `read(item,
+ * connection)` for every item, on the phase's batch connection (`runPhase`),
+ * in consecutive envelopes of at most `READS_PER_ENVELOPE` (`chunksOf`);
+ * each item's settlement, in item order. A failure that ends the call is
+ * thrown at its envelope, and no later envelope is sent.
  */
 export function batchReader<I, R>(
   context: HandlerContext,
   read: (item: I, connection: IAbapConnection) => Promise<R>,
 ): LevelReader<I, R> {
-  return (items) => runPhase(context, items, read);
+  return async (items) => {
+    const results: PhaseResult<R>[] = [];
+    for (const chunk of chunksOf(items, READS_PER_ENVELOPE)) {
+      results.push(...(await runPhase(context, chunk, read)));
+    }
+    return results;
+  };
 }
 
 /** How many node structure requests `concurrentReader` keeps open at once. */
@@ -140,7 +155,8 @@ export const NODE_READ_CONCURRENCY = 8;
 
 /**
  * One level's reads as requests sent alone, `NODE_READ_CONCURRENCY` at a
- * time, on the call's connection: `read(item, connection)` for every item;
+ * time over HTTP and one at a time over RFC (`readsInFlight`), on the
+ * call's connection: `read(item, connection)` for every item;
  * each item's settlement, in item order. Every answer is its own request's
  * (`ownAnswers`), so a node structure's `DESCRIPTION` is the object's own —
  * which an envelope part's is not (measured on an on-premise system: inside
@@ -176,7 +192,13 @@ export function concurrentReader<I, R>(
         }
       }
     };
-    const pumps = Math.max(1, Math.min(NODE_READ_CONCURRENCY, items.length));
+    const pumps = Math.max(
+      1,
+      Math.min(
+        readsInFlight(context.connection, NODE_READ_CONCURRENCY),
+        items.length,
+      ),
+    );
     await Promise.all(Array.from({ length: pumps }, pump));
     if (ended !== undefined) throw ended.error;
     return stopped ? out.slice(0, next) : out;
@@ -239,73 +261,76 @@ export function readNode<R>(
 }
 
 /**
- * One level of the tree, as our `node` result strategy reads it.
- *
- * The shipped `nodeContents` answers `objectType`, `objectName`, `techName` and
- * `objectUri` — and no description. A package listing shows descriptions, so
- * this repository supplies its own reading of the same one answer. That is the
- * injection point working as intended: one request, one reading, ours — but
- * the trade was ADDING the description, never dropping `techName`/`objectUri`
- * (a mistake this file shipped with and task 12 then perpetuated in two
- * handlers before it was caught in review; see the task's own report). Every
- * `SEU_ADT_REPOSITORY_OBJ_NODE` in all seven captured `read-object-tree-
- * structure` fixtures under `tests/fixtures/adt/` carries both `TECH_NAME`
- * and `OBJECT_URI` — fixture 05's function group is the one that actually
- * exercises the distinction (`OBJECT_NAME: ZMCP_SHR_FGRP`,
- * `TECH_NAME: SAPLZMCP_SHR_FGRP`) — so both are read here, from the same
- * element `name`/`type`/`description` already come from.
+ * One level of the tree, as adt-strategies reads it (`utilNodeContents`,
+ * 0.28.1): the complete objects, the object nodes SAP listed without a name,
+ * technical name or URI (`incompleteObjects`), each node SAP could not load
+ * (`notLoaded`), and the typed child nodes to ask for next.
  */
-export interface NodeLevel {
-  objects: Array<{
-    name: string;
-    type: string;
-    description?: string | undefined;
-    techName?: string | undefined;
-    uri?: string | undefined;
-  }>;
-  childNodes: Array<{ type: string; nodeId: string }>;
+export type NodeLevel = IRepositoryNodeContents;
+
+/**
+ * An object of a level as the tools answer it: its name, its code (as the
+ * tables know it, or as SAP sent it), and its description, technical name
+ * and URI where the node carries them.
+ */
+export interface NodeItem {
+  name: string;
+  type: string;
+  description?: string | undefined;
+  techName?: string | undefined;
+  uri?: string | undefined;
 }
 
-/** Our `node` strategy: one answer in, one level out, descriptions kept. */
-export function nodeLevel(
-  answer: Partial<Pick<IAdtWireResponse, 'data'>>,
-): NodeLevel {
-  // The wire's body, from outside the type system, as text.
-  return nodeLevelOf(bodyTextOf(answer));
+/** A code as the tables know it, or as SAP sent it. */
+function codeOf(object: IAdtAnsweredObject): string {
+  return object.type ?? object.unknownType;
 }
 
-/** One level of a node-structure document's text, descriptions kept. */
-export function nodeLevelOf(xml: string): NodeLevel {
-  const data = nodeAt(parseXml(parser, xml), 'asx:abap', 'asx:values', 'DATA');
-  return {
-    objects: nodeList(
-      nodeAt(data, 'TREE_CONTENT', 'SEU_ADT_REPOSITORY_OBJ_NODE'),
-    )
-      .map((n) => ({
-        name: textOf(nodeChild(n, 'OBJECT_NAME')),
-        type: textOf(nodeChild(n, 'OBJECT_TYPE')),
-        description: textOf(nodeChild(n, 'DESCRIPTION')) || undefined,
-        techName: textOf(nodeChild(n, 'TECH_NAME')) || undefined,
-        uri: textOf(nodeChild(n, 'OBJECT_URI')) || undefined,
-      }))
-      // Every object has a type. An entry without one is SAP's message for
-      // a node it could not load ("Error loading node:", on premise 2026-09-25),
-      // not an object.
-      .filter((o) => o.name && o.type),
-    childNodes: nodeList(
-      nodeAt(data, 'OBJECT_TYPES', 'SEU_ADT_OBJECT_TYPE_INFO'),
-    )
-      .map((t) => ({
-        type: textOf(nodeChild(t, 'OBJECT_TYPE')),
-        // The document writes the id padded — `000031` — and the request the
-        // corpus recorded sends `31`. The system accepts both, verified
-        // live, but sending what ADT itself sends keeps the wire comparable
-        // with the fixtures and with a trace.
-        nodeId: String(Number(textOf(nodeChild(t, 'NODE_ID')))),
-      }))
-      .filter((c) => c.nodeId && c.nodeId !== 'NaN'),
-  };
+/**
+ * Every object a level lists, as the tools answer it: the complete ones,
+ * then those SAP listed incomplete — listed, never dropped.
+ */
+export function nodeItemsOf(level: NodeLevel): NodeItem[] {
+  const listed: ReadonlyArray<
+    IRepositoryObjectNode | IRepositoryIncompleteNode
+  > = [...level.objects, ...(level.incompleteObjects ?? [])];
+  return listed.map((object) => ({
+    name: object.objectName ?? '',
+    type: codeOf(object),
+    description: object.description || undefined,
+    techName: object.techName || undefined,
+    uri: object.objectUri || undefined,
+  }));
 }
+
+/**
+ * The child nodes a level lists, each its code and the id to ask for it by.
+ * The document writes the id padded — `000031` — and the request the corpus
+ * recorded sends `31`. The system accepts both, verified live, but sending
+ * what ADT itself sends keeps the wire comparable with the fixtures and with
+ * a trace.
+ */
+export function childNodesOf(
+  level: NodeLevel,
+): Array<{ type: string; nodeId: string }> {
+  return level.childNodes
+    .map((child) => ({
+      type: codeOf(child),
+      nodeId: String(Number(child.nodeId)),
+    }))
+    .filter((child) => child.nodeId !== 'NaN');
+}
+
+/** Whether SAP answered a level with a node it could not load. */
+export function isNotLoaded(level: NodeLevel): boolean {
+  return (level.notLoaded ?? []).length > 0;
+}
+
+/**
+ * The row a walk answers for a type node SAP could not load, beside the
+ * node's type: fixed words, nothing of SAP's message.
+ */
+export const NOT_LOADED_BY_SAP = 'not loaded by SAP';
 
 /** `fetchNodeStructure` answers an IAdtResponse; this is the level inside it. */
 function levelOf(
@@ -388,6 +413,14 @@ export interface PackageItem {
   description?: string | undefined;
   packageName: string;
   isPackage: boolean;
+  /** A type node SAP could not load: its row (`NOT_LOADED_BY_SAP`). */
+  notLoaded?: true;
+  /**
+   * An object SAP listed without a name: the technical name and URI it
+   * carries, all that tells it apart (present only then).
+   */
+  techName?: string;
+  uri?: string;
 }
 
 /** The code of a package, the root of every tree. */
@@ -402,6 +435,14 @@ export interface PackageNode {
   isPackage: boolean;
   codeFormat?: CodeFormat;
   restoreStatus?: 'ok' | 'not-implemented';
+  /** A type node SAP could not load: its row (`NOT_LOADED_BY_SAP`). */
+  notLoaded?: true;
+  /**
+   * An object SAP listed without a name: the technical name and URI it
+   * carries, all that tells it apart (present only then).
+   */
+  techName?: string;
+  uri?: string;
   children?: PackageNode[];
 }
 
@@ -566,12 +607,65 @@ interface PackageWalk {
  * envelope can carry another part's `DESCRIPTION` (measured, 2026-10-18), so
  * a walk that answers descriptions reads its levels with `concurrentReader`.
  */
-function undescribed(
-  object: NodeLevel['objects'][number],
-  packageName: string,
-): WalkedItem {
+function undescribed(object: NodeItem, packageName: string): WalkedItem {
   const { description: _part, ...rest } = object;
   return { ...rest, packageName };
+}
+
+/**
+ * An object's identity within one package: every identity field it carries —
+ * its type, its name, its technical name and its URI — so objects SAP lists
+ * without a name stay apart; every field read as SAP's repository reads it,
+ * in any case.
+ */
+function listedKeyOf(object: WalkedItem): string {
+  return [
+    object.type.toUpperCase(),
+    object.name.toUpperCase(),
+    (object.techName ?? '').toUpperCase(),
+    (object.uri ?? '').toLowerCase(),
+  ].join(' ');
+}
+
+/**
+ * `objects` appended to `found`, each one `found` does not list yet (the same
+ * type and name). A package root that has subpackages answers them in its own
+ * `TREE_CONTENT`, and the subpackages type node it lists answers them again
+ * (measured on premise, 2026-11-22, BASIS 816): each is listed once. A node
+ * SAP could not load is pushed beside it, never through this: two such nodes
+ * are two rows, and their rows carry the same words.
+ */
+function appendUnlisted(
+  found: WalkedItem[],
+  objects: readonly WalkedItem[],
+): void {
+  const listed = new Set(found.map(listedKeyOf));
+  for (const object of objects) {
+    const key = listedKeyOf(object);
+    if (listed.has(key)) continue;
+    listed.add(key);
+    found.push(object);
+  }
+}
+
+/**
+ * The row for a type node SAP could not load: the node's type, the fixed
+ * words {@link NOT_LOADED_BY_SAP}, the package; none for a level it loaded.
+ */
+function notLoadedRow(
+  level: NodeLevel,
+  type: string,
+  packageName: string,
+): WalkedItem[] {
+  // Each node SAP could not load is its own row: two stay two.
+  return (level.notLoaded ?? []).map(
+    (): WalkedItem => ({
+      name: NOT_LOADED_BY_SAP,
+      type,
+      packageName,
+      notLoaded: true,
+    }),
+  );
 }
 
 function flatten(walk: PackageWalk): WalkedItem[] {
@@ -608,7 +702,7 @@ export async function walkPackages(
   // where each answer is its request's own.
   const withShortDescriptions =
     options.includeDescriptions === true && read.ownAnswers === true;
-  const objectOf = (o: NodeLevel['objects'][number], packageName: string) =>
+  const objectOf = (o: NodeItem, packageName: string) =>
     withShortDescriptions ? { ...o, packageName } : undescribed(o, packageName);
   const limit = options.maxDepth ?? Number.POSITIVE_INFINITY;
   const failures: Map<number, unknown> = new Map<number, unknown>();
@@ -685,11 +779,14 @@ export async function walkPackages(
     level.forEach((walk, i) => {
       const root = settle(walk, rootAnswers[i]);
       if (root === undefined) return;
-      appendAll(
+      // A package's own level SAP could not load is a row, never an empty
+      // package.
+      walk.found.push(...notLoadedRow(root, PACKAGE_CODE, walk.name));
+      appendUnlisted(
         walk.found,
-        root.objects.map((o) => objectOf(o, walk.name)),
+        nodeItemsOf(root).map((o) => objectOf(o, walk.name)),
       );
-      for (const child of root.childNodes) {
+      for (const child of childNodesOf(root)) {
         typeNodes.push({ walk, nodeId: child.nodeId, type: child.type });
       }
     });
@@ -706,9 +803,10 @@ export async function walkPackages(
       typeNodes.forEach(({ walk, nodeId, type }, i) => {
         const typed = settle(walk, typeAnswers[i], { id: nodeId, type });
         if (typed === undefined) return;
-        appendAll(
+        walk.found.push(...notLoadedRow(typed, type, walk.name));
+        appendUnlisted(
           walk.found,
-          typed.objects.map((o) => objectOf(o, walk.name)),
+          nodeItemsOf(typed).map((o) => objectOf(o, walk.name)),
         );
       });
     }
@@ -718,7 +816,15 @@ export async function walkPackages(
     for (const walk of level) {
       if (!alive(walk) || walk.depth >= limit) continue;
       for (const item of walk.found) {
-        if (kindOf(item.type) !== 'package') continue;
+        // A not-loaded row, or a package SAP listed without a name, is
+        // reported, never walked into: no request names it.
+        if (
+          item.notLoaded === true ||
+          item.name === '' ||
+          kindOf(item.type) !== 'package'
+        ) {
+          continue;
+        }
         const name = item.name.toUpperCase();
         const own = seen[walk.root];
         if (own.has(name)) continue;
@@ -786,8 +892,12 @@ export async function walkPackage(
       ? { ...rest, description, packageName: pkg }
       : { ...rest, packageName: pkg };
   };
-  const found: WalkedItem[] = root.objects.map(owned);
-  for (const child of root.childNodes) {
+  const found: WalkedItem[] = [];
+  // A package's own level SAP could not load is a row, never an empty
+  // package.
+  found.push(...notLoadedRow(root, PACKAGE_CODE, pkg));
+  appendUnlisted(found, nodeItemsOf(root).map(owned));
+  for (const child of childNodesOf(root)) {
     const level = await underBranchRule(
       options,
       {
@@ -804,7 +914,10 @@ export async function walkPackage(
           options.missingLevel,
         ),
     );
-    if (level !== undefined) appendAll(found, level.objects.map(owned));
+    if (level !== undefined) {
+      found.push(...notLoadedRow(level, child.type, pkg));
+      appendUnlisted(found, nodeItemsOf(level).map(owned));
+    }
   }
 
   if (!options.includeSubpackages) return found;
@@ -812,7 +925,15 @@ export async function walkPackage(
   const limit = options.maxDepth ?? Number.POSITIVE_INFINITY;
   const out = [...found];
   for (const item of found) {
-    if (kindOf(item.type) !== 'package') continue;
+    // A not-loaded row, or a package SAP listed without a name, is reported,
+    // never walked into: no request names it.
+    if (
+      item.notLoaded === true ||
+      item.name === '' ||
+      kindOf(item.type) !== 'package'
+    ) {
+      continue;
+    }
     if (depth >= limit) continue;
     appendAll(
       out,
@@ -850,14 +971,58 @@ async function underBranchRule<T>(
 export type WalkedItem = {
   name: string;
   type: string;
+  /** A type node SAP could not load: its row, not an object (`NOT_LOADED_BY_SAP`). */
+  notLoaded?: true;
   description?: string | undefined;
   packageName?: string;
   techName?: string | undefined;
   uri?: string | undefined;
 };
 
+/**
+ * A walked item's identity, for the completeness guard
+ * (`src/lib/detail/complete.ts`): its type and name, a nameless one's
+ * technical name and URI, and whether SAP could not load it.
+ */
+export function walkedIdentity(item: {
+  type: string;
+  name: string;
+  techName?: string | undefined;
+  uri?: string | undefined;
+  notLoaded?: boolean | undefined;
+}): string {
+  // A named row is its type and name; a nameless one its technical name
+  // and URI, the fields that tell it apart.
+  const nameless = item.name === '';
+  return [
+    item.type.toUpperCase(),
+    item.name.toUpperCase(),
+    nameless ? (item.techName ?? '').toUpperCase() : '',
+    nameless ? (item.uri ?? '').toLowerCase() : '',
+    item.notLoaded === true ? 'not-loaded' : '',
+  ].join('|');
+}
+
 /** The step of a failed object metadata read. */
 export const METADATA_STEP = 'read object metadata';
+
+/** The `adtcore:type` of a metadata document's root element: what an object SAP listed without a type is. */
+export function metadataTypeOf(xml: string): string | undefined {
+  let doc: XmlNode | undefined;
+  try {
+    doc = parseXml(parser, xml);
+  } catch {
+    return undefined;
+  }
+  for (const [name, root] of nodeEntries(doc)) {
+    if (name.startsWith('?') || typeof root !== 'object') {
+      continue;
+    }
+    const type = nodeChild(root, 'adtcore:type');
+    return typeof type === 'string' ? type.trim() || undefined : undefined;
+  }
+  return undefined;
+}
 
 /** The `adtcore:description` of a metadata document's root element. */
 export function metadataDescriptionOf(xml: string): string | undefined {
@@ -891,22 +1056,24 @@ function rawOf(value: AdtReading<string> | string): string {
 export interface MetadataDescriptions {
   /** Each object's description, by `metadataKeyOf`. */
   descriptions: Map<string, string | undefined>;
-  /** A metadata read SAP refused with a credential failure, with its step. */
-  refused?: IAdtFailure;
 }
 
 /**
- * The description of every object of `targets`, read in one ADT batch
- * envelope (`runPhase`): one metadata read per distinct object, the one its
- * type's `Get<Type>` handler sends (`metadataReadOf`), keyed by
- * `metadataKeyOf`. An object of a type with no metadata read, or whose read
- * failed, has no entry. A failure the server's reader answers ends the call,
- * thrown as it came; a read SAP refused with a credential failure is
- * answered as `refused`, the method's error with its step.
+ * The description of every object of `targets`: one metadata read per
+ * distinct object, the one its type's `Get<Type>` handler sends
+ * (`metadataReadOf`), keyed by `metadataKeyOf`. Metadata reads do not
+ * cross-talk inside an envelope, so two or more go in ADT batch envelopes
+ * (`runPhase`) of at most `READS_PER_ENVELOPE`, balanced (`chunksOf`); one
+ * read, or `alone` (the sequential version), goes as single requests, one
+ * after another. A read SAP refused — any status, a `401` included — is
+ * that object's: it has no entry, the others theirs, on both paths alike.
+ * A failure the server's reader answers (a thrown credential refusal) ends
+ * the call, thrown as it came.
  */
 export async function metadataDescriptions(
   context: HandlerContext,
   targets: readonly MetadataTarget[],
+  alone = false,
 ): Promise<MetadataDescriptions> {
   const reads = new Map<string, MetadataRead>();
   for (const target of targets) {
@@ -916,15 +1083,11 @@ export async function metadataDescriptions(
       reads.set(key, read);
     }
   }
-  const keyed = [...reads];
-  const keys = keyed.map(([key]) => key);
   const descriptions = new Map<string, string | undefined>();
-  if (keys.length === 0) return { descriptions };
-  const results = await runPhase(context, keyed, ([, read], connection) =>
-    atStep(METADATA_STEP, read)(createAdtClient(connection, context.logger)),
-  );
-  let refused: IAdtFailure | undefined;
-  results.forEach((result, i) => {
+  const keep = (
+    key: string,
+    result: PhaseResult<Awaited<ReturnType<MetadataRead>>>,
+  ) => {
     if (!result.ok) {
       if (endsTheCall(result.error)) throw result.error;
       return;
@@ -932,19 +1095,37 @@ export async function metadataDescriptions(
     const response = result.value;
     if (response.ok) {
       descriptions.set(
-        keys[i],
+        key,
         metadataDescriptionOf(rawOf(response.getResult().value)),
       );
-      return;
     }
-    if (
-      refused === undefined &&
-      isCredentialPayload(failureEntry(response.getError(), METADATA_STEP))
-    ) {
-      refused = response;
+  };
+  if (alone || reads.size < 2) {
+    const client = createAdtClient(context.connection, context.logger);
+    for (const [key, read] of reads) {
+      keep(
+        key,
+        await atStep(
+          METADATA_STEP,
+          read,
+        )(client).then(
+          (value) => ({ ok: true as const, value }),
+          (error: unknown) => ({ ok: false as const, error }),
+        ),
+      );
     }
-  });
-  return refused === undefined ? { descriptions } : { descriptions, refused };
+    return { descriptions };
+  }
+  for (const keyed of chunksOf([...reads], READS_PER_ENVELOPE)) {
+    const results = await runPhase(context, keyed, ([, read], connection) =>
+      atStep(METADATA_STEP, read)(createAdtClient(connection, context.logger)),
+    );
+    results.forEach((result, i) => {
+      const key = keyed[i]?.[0];
+      if (key !== undefined) keep(key, result);
+    });
+  }
+  return { descriptions };
 }
 
 /** The flat listing. */
@@ -961,6 +1142,11 @@ export function assembleList(
       ...(o.description ? { description: o.description } : {}),
       packageName: (o.packageName ?? packageName).toUpperCase(),
       isPackage: kind === 'package',
+      ...(o.notLoaded === true ? { notLoaded: true as const } : {}),
+      ...(o.name === '' && o.techName !== undefined
+        ? { techName: o.techName }
+        : {}),
+      ...(o.name === '' && o.uri !== undefined ? { uri: o.uri } : {}),
     };
   });
 }
@@ -979,8 +1165,13 @@ export function assembleTree(
     byOwner.set(owner, [...(byOwner.get(owner) ?? []), o]);
   }
   const seen = new Set<string>([rootName]);
-  const childrenOf = (owner: string): PackageNode[] =>
-    (byOwner.get(owner) ?? []).map((o) => nodeOf(o));
+  // The owners whose objects the tree placed: every other owner's objects
+  // go under the root, so the tree holds every object walked (plan 9.3).
+  const placed = new Set<string>();
+  const childrenOf = (owner: string): PackageNode[] => {
+    placed.add(owner);
+    return (byOwner.get(owner) ?? []).map((o) => nodeOf(o));
+  };
   const nodeOf = (o: WalkedItem): PackageNode => {
     const kind = kindOf(o.type);
     const codeFormat = codeFormatOf(o.type);
@@ -990,6 +1181,11 @@ export function assembleTree(
       ...(kind ? { kind } : {}),
       ...(o.description ? { description: o.description } : {}),
       isPackage: kind === 'package',
+      ...(o.notLoaded === true ? { notLoaded: true as const } : {}),
+      ...(o.name === '' && o.techName !== undefined
+        ? { techName: o.techName }
+        : {}),
+      ...(o.name === '' && o.uri !== undefined ? { uri: o.uri } : {}),
       ...(codeFormat ? { codeFormat } : {}),
       restoreStatus:
         kind && RESTORABLE.has(kind)
@@ -1001,12 +1197,40 @@ export function assembleTree(
       // what was found in it; `seen` keeps a package that lists itself from
       // recursing.
       children:
-        kind === 'package' && !seen.has(o.name.toUpperCase())
+        kind === 'package' &&
+        o.notLoaded !== true &&
+        o.name !== '' &&
+        !seen.has(o.name.toUpperCase()) &&
+        !placed.has(o.name.toUpperCase())
           ? (seen.add(o.name.toUpperCase()), childrenOf(o.name.toUpperCase()))
           : [],
     };
   };
 
+  const children = childrenOf(rootName);
+  // The owners the walk did not reach from the root go under it, each once:
+  // first those no other unplaced owner lists as its package (the top of a
+  // chain whose parent is missing), so a package listed in such a chain
+  // brings its own objects with it, whatever order the walk found them in;
+  // then whatever is left (a chain of owners listing each other).
+  const listedPackages = new Set(
+    [...byOwner]
+      .filter(([owner]) => !placed.has(owner))
+      .flatMap(([, owned]) =>
+        owned
+          .filter((o) => kindOf(o.type) === 'package' && o.name !== '')
+          .map((o) => o.name.toUpperCase()),
+      ),
+  );
+  const attach = (owner: string, owned: WalkedItem[]) => {
+    if (placed.has(owner)) return;
+    placed.add(owner);
+    children.push(...owned.map((o) => nodeOf(o)));
+  };
+  for (const [owner, owned] of byOwner) {
+    if (!listedPackages.has(owner)) attach(owner, owned);
+  }
+  for (const [owner, owned] of byOwner) attach(owner, owned);
   return {
     name: rootName,
     type: PACKAGE_CODE,
@@ -1014,6 +1238,6 @@ export function assembleTree(
     isPackage: true,
     codeFormat: 'xml',
     restoreStatus: 'ok',
-    children: childrenOf(rootName),
+    children,
   };
 }

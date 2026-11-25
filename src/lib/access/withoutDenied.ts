@@ -23,11 +23,36 @@ import {
   type DeniedActions,
   type DeniedEntry,
   namesText,
+  UNLOCK_TOOL,
 } from './deniedActions.js';
 import { NarrowedHandlerGroup } from './NarrowedHandlerGroup.js';
 import { NARROWINGS, type Narrowing } from './narrowing.js';
 
 const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];
+
+/**
+ * `denied` with each entry that names the 23.x unlock tool (`HandlerUnlock`,
+ * `HandlerUn*`) read as HandlerLock's action unlock too: denying the old
+ * tool closes the action it became, never leaving it open.
+ */
+function withUnlockAction(denied: DeniedActions): DeniedActions {
+  const unlocks = denied
+    .filter(
+      (entry) =>
+        entry.value === undefined &&
+        namesText(entry.tool, entry.toolIsPrefix, UNLOCK_TOOL),
+    )
+    .map(
+      (entry): DeniedEntry => ({
+        text: entry.text,
+        tool: 'HandlerLock',
+        toolIsPrefix: false,
+        value: 'unlock',
+        valueIsPrefix: false,
+      }),
+    );
+  return unlocks.length === 0 ? denied : [...denied, ...unlocks];
+}
 
 /** Whether a `Tool` / `Prefix*` entry names the tool `name`. */
 function deniesTool(entry: DeniedEntry, name: string): boolean {
@@ -66,6 +91,8 @@ interface LeftOn {
   readonly values: readonly string[];
   /** The codes left, `undefined` when none was denied. */
   readonly codes: readonly string[] | undefined;
+  /** The actions left, where the tool's actions are narrowed (HandlerLock). */
+  readonly actions: readonly string[] | undefined;
   /** Whether nothing callable is left on the variant. */
   readonly empty: boolean;
 }
@@ -77,6 +104,10 @@ function leftOn(
 ): LeftOn {
   const all = narrowing.values(variant);
   const values = leftOf(all, entries);
+  const actions =
+    narrowing.actions === undefined
+      ? undefined
+      : leftOf(narrowing.actions, entries);
   const allCodes = narrowing.codes?.(variant);
   const codes = allCodes === undefined ? undefined : leftOf(allCodes, entries);
   const codesDenied =
@@ -88,12 +119,14 @@ function leftOn(
   const keepsUnnamed =
     narrowing.tool === 'HandlerGet' || narrowing.tool === 'HandlerGetData';
   const empty =
-    !keepsUnnamed &&
-    values.length === 0 &&
-    (codes === undefined || codes.length === 0);
+    (actions !== undefined && actions.length === 0) ||
+    (!keepsUnnamed &&
+      values.length === 0 &&
+      (codes === undefined || codes.length === 0));
   return {
     values,
     codes: codesDenied ? codes : undefined,
+    actions,
     empty,
   };
 }
@@ -126,7 +159,12 @@ function narrowed(
   // The narrowed listing keeps the tool's own rules on that variant (its
   // routes' checks, `HandlerGet`'s), where its builder states none.
   const stated = (variant: ProjectionVariant, left: LeftOn) => {
-    const narrowed = narrowing.definition(variant, left.values, left.codes);
+    const narrowed = narrowing.definition(
+      variant,
+      left.values,
+      left.codes,
+      left.actions,
+    );
     return {
       ...narrowed,
       inputSchema: withRulesOf(
@@ -180,8 +218,9 @@ function narrowed(
 /** One group's entries with the deny list applied; `undefined`: unchanged. */
 function narrowedEntries(
   entries: readonly HandlerEntry[],
-  denied: DeniedActions,
+  deniedActions: DeniedActions,
 ): HandlerEntry[] | undefined {
+  const denied = withUnlockAction(deniedActions);
   let changed = false;
   const out: HandlerEntry[] = [];
   for (const entry of entries) {
@@ -240,6 +279,8 @@ function matches(entry: DeniedEntry, tools: readonly HandlerEntry[]): boolean {
   ) {
     return false;
   }
+  const actions = narrowing.actions ?? [];
+  if (leftOf(actions, [entry]).length < actions.length) return true;
   return VARIANTS.some(
     (variant) =>
       leftOf(narrowing.values(variant), [entry]).length <
@@ -255,7 +296,16 @@ export function unmatchedEntries(
   denied: DeniedActions,
 ): readonly string[] {
   const tools = groups.flatMap((group) => group.getHandlers());
+  // An entry naming the 23.x unlock tool matches through the action it
+  // became.
+  const unlocks = withUnlockAction(denied).slice(denied.length);
   return denied
-    .filter((entry) => !matches(entry, tools))
+    .filter(
+      (entry) =>
+        !matches(entry, tools) &&
+        !unlocks.some(
+          (unlock) => unlock.text === entry.text && matches(unlock, tools),
+        ),
+    )
     .map((entry) => entry.text);
 }

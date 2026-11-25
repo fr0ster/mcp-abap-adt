@@ -4,9 +4,9 @@ Generated from the prompts every binary lists (`tests/fixtures/tools/listed-prom
 
 ## What a prompt is
 
-A prompt is a ready-made request the MCP client offers the user: a slash command in Claude Code (`/mcp__<server>__create class ZCL_DEMO package_name=ZPKG`), an entry in the prompt picker of other clients. The server answers with an instruction that names the tools to call, in order, with the arguments filled from the values the user gave. The model follows the instruction with the tools the same binary serves.
+A prompt is a ready-made request the MCP client offers the user. Claude Code, in [its own words](https://code.claude.com/docs/en/mcp.md#use-mcp-prompts-as-commands), "lists each MCP prompt as `/servername:promptname (MCP)`. Typing `/mcp__servername__promptname` also runs it." For a server named `abap`, `get` is listed as `/abap:get (MCP)`, and `/mcp__abap__get class ZCL_DEMO` runs it. Other clients show prompts in their own pickers. The server answers with an instruction that names the tools to call, in order, with the arguments filled from the values the user gave. The model follows the instruction with the tools the same binary serves.
 
-Nine prompts: `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`. The object prompts take `object_type` and `name` (a function module also takes `function_group`); `object_type` completes in lower case and is accepted in any case. Each binary lists the prompts its tools serve, and the `object_type` values its tools serve on the system kind.
+Nine prompts: `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`. The object prompts take `object_type` and `name` (a function module also takes `function_group`, except in `unit_test`, whose run names the module alone and covers the ABAP Unit tests of its whole function group); `object_type`, `transport`'s `action` and `where_used`'s `container` complete in lower case and are accepted in any case. Each binary lists the prompts its tools serve, and the `object_type` values its tools serve on the system kind.
 
 ## Autocompletion
 
@@ -22,7 +22,7 @@ The lists per binary and kind below are these completions.
 
 ## Refusal
 
-A `prompts/get` with an `object_type` the binary does not serve (unknown, not served on the system kind, or denied) is refused with the protocol's invalid-params error and no instruction: `<prompt>: object_type "<value>" is not served by this server; it serves <list>.` A required argument that is absent or blank is refused the same way: `<prompt>: <argument> is required.`
+A `prompts/get` with an `object_type` the binary does not serve (unknown, not served on the system kind, or denied) is refused with the protocol's invalid-params error and no instruction: `<prompt>: object_type "<value>" is not served by this server; it serves <list>.` A required argument that is absent or blank is refused the same way: `<prompt>: <argument> is required.` So is a `function_group` given for an `object_type` whose steps read none: `<prompt>: function_group is read with object_type function_module only.`.
 
 A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCESS_RESTRICTIONS.md)) loses those `object_type` values; a prompt with none left is not listed.
 
@@ -58,14 +58,14 @@ A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCE
 - `check` - `object_type`: `class`, `program`, `interface`, `function_group`, `function_module`, `table`, `structure`, `table_type`, `ddl`, `domain`, `data_element`, `package`, `behavior_definition`, `metadata_extension`
 - `unit_test` - `object_type`: `class`, `program`, `function_group`, `function_module`, `ddl`, `package`; `include_subpackages`: `true`, `false`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `create`, `list`, `objects`, `move_objects`, `sort_compress`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
+- `transport` - `action`: `create`, `list`, `get`, `objects`, `move_objects`, `sort_compress`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
 
 ### `mcp-abap-adt-compact-ro`, `mcp-abap-adt-compact-http-ro`, `mcp-abap-adt-compact-sse-ro`
 
 - `get` - `object_type`: `package`, `domain`, `data_element`, `table`, `structure`, `table_type`, `ddl`, `service_definition`, `service_binding`, `class`, `local_test_class`, `local_types`, `local_definitions`, `local_macros`, `program`, `include`, `interface`, `function_group`, `function_module`, `behavior_definition`, `behavior_implementation`, `metadata_extension`
 - `check` - `object_type`: `class`, `program`, `interface`, `function_group`, `function_module`, `table`, `structure`, `table_type`, `ddl`, `domain`, `data_element`, `package`, `behavior_definition`, `metadata_extension`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `list`, `objects`
+- `transport` - `action`: `list`, `get`, `objects`
 
 ## Cloud system (`cloud`)
 
@@ -97,14 +97,14 @@ A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCE
 - `check` - `object_type`: `class`, `program`, `interface`, `function_group`, `function_module`, `table`, `structure`, `table_type`, `ddl`, `domain`, `data_element`, `package`, `behavior_definition`, `metadata_extension`
 - `unit_test` - `object_type`: `class`, `program`, `function_group`, `function_module`, `ddl`, `package`; `include_subpackages`: `true`, `false`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `create`, `list`, `objects`, `move_objects`, `sort_compress`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
+- `transport` - `action`: `create`, `list`, `get`, `objects`, `move_objects`, `sort_compress`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
 
 ### `mcp-abap-adt-compact-ro`, `mcp-abap-adt-compact-http-ro`, `mcp-abap-adt-compact-sse-ro`
 
 - `get` - `object_type`: `package`, `domain`, `data_element`, `table`, `structure`, `table_type`, `ddl`, `service_definition`, `service_binding`, `class`, `local_test_class`, `local_types`, `local_definitions`, `local_macros`, `program`, `include`, `interface`, `function_group`, `function_module`, `behavior_definition`, `behavior_implementation`, `metadata_extension`
 - `check` - `object_type`: `class`, `program`, `interface`, `function_group`, `function_module`, `table`, `structure`, `table_type`, `ddl`, `domain`, `data_element`, `package`, `behavior_definition`, `metadata_extension`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `list`, `objects`
+- `transport` - `action`: `list`, `get`, `objects`
 
 ## No system kind stated (stdio inspection mode, an embedder that states none)
 
@@ -136,14 +136,14 @@ A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCE
 - `check` - `object_type`: `class`, `program`, `interface`, `function_group`, `function_module`, `table`, `structure`, `table_type`, `ddl`, `domain`, `data_element`, `package`, `behavior_definition`, `metadata_extension`
 - `unit_test` - `object_type`: `class`, `program`, `function_group`, `function_module`, `ddl`, `package`; `include_subpackages`: `true`, `false`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `create`, `list`, `objects`, `move_objects`, `sort_compress`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
+- `transport` - `action`: `create`, `list`, `get`, `objects`, `move_objects`, `sort_compress`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
 
 ### `mcp-abap-adt-compact-ro`, `mcp-abap-adt-compact-http-ro`, `mcp-abap-adt-compact-sse-ro`
 
 - `get` - `object_type`: `package`, `domain`, `data_element`, `table`, `structure`, `table_type`, `ddl`, `service_definition`, `service_binding`, `class`, `local_test_class`, `local_types`, `local_definitions`, `local_macros`, `program`, `include`, `interface`, `function_group`, `function_module`, `behavior_definition`, `behavior_implementation`, `metadata_extension`
 - `check` - `object_type`: `class`, `program`, `interface`, `function_group`, `function_module`, `table`, `structure`, `table_type`, `ddl`, `domain`, `data_element`, `package`, `behavior_definition`, `metadata_extension`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `list`, `objects`
+- `transport` - `action`: `list`, `get`, `objects`
 
 ## Legacy system (`legacy`)
 

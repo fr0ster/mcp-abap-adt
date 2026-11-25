@@ -633,45 +633,18 @@ describe('descriptions, positive', () => {
   );
   const description = (name: string) => byName.get(name)!.description as string;
 
-  it("a step answers SAP's step result and the stopped position is read from the stack", () => {
-    assert.ok(
-      description('HandlerDebugStep').includes(
-        "a step answers SAP's step result, or ended when SAP reports the program's end, and the stopped position is read from the stack.",
-      ),
-    );
-  });
-
-  it('terminate answers 500 when it succeeds', () => {
-    assert.ok(
-      description('HandlerDebugSession').includes(
-        "terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger; each answers SAP's answer as it came, which is a 500 when it succeeded, and the next answer shows the success (noSessionAttached, or the program's end);",
-      ),
-    );
-  });
-
-  it('detach releases the debuggee on the attaching session', () => {
-    assert.ok(
-      description('HandlerDebugSession').includes(
-        'detachDebugger sends detachDebugger on the attaching session, which releases the debuggee, and the program runs on;',
-      ),
-    );
-  });
-
-  it("listen holds for the caller's hold_seconds", () => {
-    assert.ok(
-      description('HandlerDebugSession').includes(
-        "listen waits for a debuggee for exactly hold_seconds, SAP's hold,",
-      ),
-    );
-  });
-
-  it('end logs off: an attached debuggee runs on, an AMDP debug session ends, the breakpoints stay set until stopListener removes them', () => {
-    assert.ok(
-      description('HandlerDebugSession').includes(
-        "end, for either kind, takes state_handle and logs off each connection the debug state opened, one logoff each: an attached debuggee runs on, an AMDP debug session ends, and the user's breakpoints stay set until stopListener removes them;",
-      ),
-    );
-  });
+  // Each operation by its function: what SAP does at it is the parameters'.
+  for (const [tool, words] of [
+    ['HandlerDebugStep', 'runs to a source position'],
+    ['HandlerDebugSession', 'terminates the ABAP debuggee'],
+    ['HandlerDebugSession', 'detaches the debugger from the debuggee'],
+    ['HandlerDebugSession', 'listens for an ABAP debuggee'],
+    ['HandlerDebugSession', 'ends the debug state'],
+  ] as const) {
+    it(`${tool} states "${words}" as one of its pairs`, () => {
+      assert.ok(description(tool).includes(words), description(tool));
+    });
+  }
 
   it('no description and no parameter description names another tool or states a negation', () => {
     const NEGATION =

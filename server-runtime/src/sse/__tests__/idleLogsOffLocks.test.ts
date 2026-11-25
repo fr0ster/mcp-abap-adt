@@ -135,8 +135,9 @@ it('the idle bound of an SSE instance holding a lock logs its session off; the n
   // any connection is taken — nothing sent, no logon either.
   const before = s.standIn.requests.length;
   await connection.call(
-    'HandlerUnlock',
+    'HandlerLock',
     {
+      action: 'unlock',
       object_type: 'CLASS',
       object_name: 'ZCL_IDLE',
       lock_handle: 'B92E65858E83454C783181344F429D4BFD8E395D',
@@ -170,8 +171,9 @@ it('the idle bound of an SSE instance holding nothing it lets go of keeps the se
   );
   assert.equal((await connection.answer(1)).isError, false);
   await connection.call(
-    'HandlerUnlock',
+    'HandlerLock',
     {
+      action: 'unlock',
       object_type: 'CLASS',
       object_name: 'ZCL_IDLE',
       lock_handle: 'B92E65858E83454C783181344F429D4BFD8E395D',

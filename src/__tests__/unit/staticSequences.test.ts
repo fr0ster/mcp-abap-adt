@@ -58,6 +58,7 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { levelOf } from '../helpers/nodeLevels';
 
 // The declared variant the boundary checks a type argument against.
 mock.method(clients, 'createAdtClient', () => fakeClient);
@@ -192,24 +193,22 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
         // `AdtReading`-wrapped one; `nodeLevel` is a bare `IResultStrategy`,
         // never passed through `reading.ts`'s `reading()` helper.
         if (!options?.nodeId) {
-          return okResponse({
-            objects: [],
-            childNodes: [
-              { type: 'FUGR/FF', nodeId: '1' },
-              { type: 'FUGR/I', nodeId: '2' },
-            ],
-          });
+          return okResponse(
+            levelOf(
+              [],
+              [
+                { type: 'FUGR/FF', nodeId: '1' },
+                { type: 'FUGR/I', nodeId: '2' },
+              ],
+            ),
+          );
         }
         if (options.nodeId === '1') {
-          return okResponse({
-            objects: [{ name: 'Z_FM_ONLY', type: 'FUGR/FF' }],
-            childNodes: [],
-          });
+          return okResponse(
+            levelOf([{ name: 'Z_FM_ONLY', type: 'FUGR/FF' }], []),
+          );
         }
-        return okResponse({
-          objects: [{ name: 'LFGTOP', type: 'FUGR/I' }],
-          childNodes: [],
-        });
+        return okResponse(levelOf([{ name: 'LFGTOP', type: 'FUGR/I' }], []));
       },
     });
   }
@@ -218,6 +217,7 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
     fakeClient = fakeFunctionGroupClient();
     const result: any = await handleListFunctionModules(context as any, {
       function_group_name: 'ZFG',
+      detail: 'full',
     });
     assert.deepStrictEqual(
       JSON.parse(result.content[0].text).function_modules,
@@ -225,14 +225,65 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
     );
   });
 
+  it('ListFunctionModules terse, by default: the group and total, then one name per row', async () => {
+    fakeClient = fakeFunctionGroupClient();
+    const result: any = await handleListFunctionModules(context as any, {
+      function_group_name: 'ZFG',
+    });
+    assert.equal(
+      result.content[0].text,
+      '# function_group ZFG\n# total 1\nname\turi\tdescription\nZ_FM_ONLY\t\t',
+    );
+  });
+
+  // Full carries no less than medium (Codex P2): every field medium answers
+  // is in full too.
+  it('ListFunctionModules full holds every field medium answers', async () => {
+    fakeClient = fakeFunctionGroupClient();
+    const medium = JSON.parse(
+      (
+        (await handleListFunctionModules(context as any, {
+          function_group_name: 'ZFG',
+          detail: 'medium',
+        })) as any
+      ).content[0].text,
+    );
+    fakeClient = fakeFunctionGroupClient();
+    const full = JSON.parse(
+      (
+        (await handleListFunctionModules(context as any, {
+          function_group_name: 'ZFG',
+          detail: 'full',
+        })) as any
+      ).content[0].text,
+    );
+    for (const [i, object] of medium.function_modules.entries()) {
+      for (const [key, value] of Object.entries(object)) {
+        assert.deepStrictEqual(full.objects[i][key], value, key);
+      }
+    }
+  });
+
   it('ListFunctionGroupIncludes reads the FUGR/I child, not FUGR/FF', async () => {
     fakeClient = fakeFunctionGroupClient();
     const result: any = await handleListFunctionGroupIncludes(context as any, {
       function_group_name: 'ZFG',
+      detail: 'full',
     });
     assert.deepStrictEqual(JSON.parse(result.content[0].text).includes, [
       'LFGTOP',
     ]);
+  });
+
+  it('ListFunctionGroupIncludes terse, by default: one name per row', async () => {
+    fakeClient = fakeFunctionGroupClient();
+    const result: any = await handleListFunctionGroupIncludes(context as any, {
+      function_group_name: 'ZFG',
+    });
+    assert.equal(
+      result.content[0].text,
+      '# function_group ZFG\n# total 1\nname\turi\tdescription\nLFGTOP\t\t',
+    );
   });
 
   for (const [_n, handler] of [
@@ -273,7 +324,7 @@ describe('SHAPE 2 — the lib files: no MCP result, and no removed member', () =
         walked.push(String(name));
         // Plain `NodeLevel`, not `AdtReading`-wrapped — see the comment in
         // the FUGR/FF-vs-FUGR/I describe block above for why.
-        return okResponse({ objects: [], childNodes: [] });
+        return okResponse(levelOf([], []));
       },
       // If the handler still named `getPackageContentsList` this would be
       // reached instead of the walk above, and the assertion below would

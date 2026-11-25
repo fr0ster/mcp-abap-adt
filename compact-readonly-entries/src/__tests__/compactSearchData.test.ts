@@ -40,7 +40,10 @@ mock.method(
 
 import { defineTool } from '@mcp-abap-adt/lib/handlers';
 import { assertRejects } from '../../../src/__tests__/helpers/assertions';
-import { handleHandlerGet } from '../handlers/handleHandlerGet';
+import {
+  TOOL_DEFINITION as CompactGet,
+  handleHandlerGet,
+} from '../handlers/handleHandlerGet';
 import {
   TOOL_DEFINITION as GetData_Tool,
   handleHandlerGetData,
@@ -108,70 +111,37 @@ describe('HandlerGet PACKAGE part contents', () => {
     assert.equal(calls[0].args.package_name, 'ZPKG');
   });
 
-  it('answers one line per member: name, type, description', async () => {
-    contentsAnswer = {
-      isError: false,
-      content: [
+  // Compact parity: the contents part is GetPackageContents' answer as it
+  // came, at the level asked; nothing is reshaped or cut.
+  for (const detail of ['terse', 'medium', 'full', 'raw'] as const) {
+    it(`answers what GetPackageContents answers at detail ${detail}, every member`, async () => {
+      const read = {
+        isError: false,
+        content: [
+          {
+            type: 'text',
+            text: `# package ZPKG ${detail}\n${Array.from(
+              { length: 150 },
+              (_, i) => `DEVC/K\tZ${i}`,
+            ).join('\n')}`,
+          },
+        ],
+      };
+      contentsAnswer = read;
+      const answered: any = await defineTool(CompactGet, handleHandlerGet).call(
+        context,
         {
-          type: 'text',
-          text: JSON.stringify([
-            {
-              name: 'ZCL_A',
-              type: 'CLAS/OC',
-              description: 'A',
-              packageName: 'ZPKG',
-              kind: 'class',
-              isPackage: false,
-            },
-            {
-              name: 'ZSUB',
-              type: 'DEVC/K',
-              description: 'Sub',
-              packageName: 'ZPKG',
-              kind: 'package',
-              isPackage: true,
-            },
-          ]),
+          object_type: 'PACKAGE',
+          part: 'contents',
+          package_name: 'ZPKG',
+          max_results: 3,
+          detail,
         },
-      ],
-    };
-    const answered: any = await handleHandlerGet(context, {
-      object_type: 'PACKAGE',
-      part: 'contents',
-      package_name: 'ZPKG',
-    } as never);
-    assert.equal(
-      answered.content[0].text,
-      'name\ttype\tdescription\nZCL_A\tCLAS/OC\tA\nZSUB\tDEVC/K\tSub',
-    );
-  });
-
-  it('caps the list and says how many there are', async () => {
-    contentsAnswer = {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            Array.from({ length: 7 }, (_, i) => ({
-              name: `Z${i}`,
-              type: 'DEVC/K',
-              description: '',
-            })),
-          ),
-        },
-      ],
-    };
-    const answered: any = await handleHandlerGet(context, {
-      object_type: 'PACKAGE',
-      part: 'contents',
-      package_name: 'ZPKG',
-      max_results: 3,
-    } as never);
-    const lines = answered.content[0].text.split('\n');
-    assert.equal(lines.length, 5);
-    assert.equal(lines.at(-1), '(3 of 7 shown; raise max_results for more)');
-  });
+      );
+      assert.deepStrictEqual(answered, read);
+      assert.equal(calls[0]?.args.detail, detail);
+    });
+  }
 
   it('is refused for a type that has no contents, naming what it offers', async () => {
     const answered: any = await handleHandlerGet(context, {

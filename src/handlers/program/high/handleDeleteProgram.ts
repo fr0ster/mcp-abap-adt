@@ -12,6 +12,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
+import { deleteTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { detailOf } from '../../../lib/strategies/detail';
@@ -22,8 +23,10 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'DeleteProgram',
   available_in: ['onprem'] as const,
-  description:
-    'Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for local objects.',
+  description: deleteTool({
+    object: 'an ABAP program or report',
+    transported: true,
+  }),
   inputSchema: z.object({
     program_name: z.string().describe('Program name.'),
     transport_request: z

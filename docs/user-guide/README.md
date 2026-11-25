@@ -69,7 +69,7 @@ mcp-abap-adt-http --port=3000 --system-type=<onprem|cloud>
 - **[Compact tools](../../compact/docs/AVAILABLE_TOOLS.md)** - the compact set, which does what the low set did (auto-generated)
 - **Compact facade tools** — moved to `@mcp-abap-adt/compact` and documented there (`compact/docs/AVAILABLE_TOOLS.md`) (auto-generated)
 - **[AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md)** - Full combined tools reference (auto-generated)
-- **[AUTHENTICATION.md](AUTHENTICATION.md)** - The three stdio authentications, destinations, service key locations, and header-based auth
+- **[AUTHENTICATION.md](AUTHENTICATION.md)** - The supported authentications, destinations, service key locations, header-based auth, and the abapGit remotes' approved endpoints
 - **[CLI_OPTIONS.md](CLI_OPTIONS.md)** - Each binary's command-line options with their environment and YAML forms
 - **[TERMINOLOGY.md](TERMINOLOGY.md)** - Project-specific terminology
 - **[HANDLERS_MANAGEMENT.md](HANDLERS_MANAGEMENT.md)** - The twelve binaries and the tools each serves
@@ -78,6 +78,8 @@ mcp-abap-adt-http --port=3000 --system-type=<onprem|cloud>
 - **[BATCH_MODE.md](BATCH_MODE.md)** - Batch mode (the compact binaries, `HandlerBatch`): independent calls recorded, sent together at the batch's end, answered by number; which calls are recorded
 - **[TOOL_SEARCH.md](TOOL_SEARCH.md)** - Tool search: the three texts per tool (`description`, `keywords` for BM25, `semantic` for vectors), where a client reads them
 - **[DEBUGGER.md](DEBUGGER.md)** - The debugger (the write binaries; no `-ro` one): debug sessions, the SAP ids, transports, what ends a session
+- **abapGit** - The git loop on a package, full and compact, on premise and on ABAP Cloud: the tools per system, long runs, what an import writes ([README](../../README.md#abapgit-the-git-loop-on-a-package)); git credentials bound to approved endpoints — stdio's `<name>.abapgit.yaml`, the `x-abapgit-*` headers over HTTP and SSE — for any git host over HTTPS ([AUTHENTICATION.md](AUTHENTICATION.md#abapgit-remotes-approved-endpoints)); link and pull refused under access restrictions ([ACCESS_RESTRICTIONS.md](ACCESS_RESTRICTIONS.md#abapgit))
+- **[ACCESS_RESTRICTIONS.md](ACCESS_RESTRICTIONS.md)** - Denied actions, allowed packages and requests, denied and allowed tables, the abapGit checks
 
 ## Getting Started
 
@@ -220,7 +222,7 @@ elements in `still_inactive` (measured on premise). Name both: `PROG/PX` is a pr
 elements, or with `parentName` a function group's; `CLAS/OCX` is a class's. Compact
 `HandlerActivate` names them `PROGRAM_TEXT_ELEMENTS`, `FUNCTION_GROUP_TEXT_ELEMENTS` and
 `CLASS_TEXT_ELEMENTS`; in compact the sequence is `HandlerLock`, `HandlerUpdate` (under the
-handle), `HandlerUnlock`, `HandlerActivate`, the same for `TABLE_SETTINGS` with the table
+handle), `HandlerLock` `action: unlock`, `HandlerActivate`, the same for `TABLE_SETTINGS` with the table
 activated as `TABLE`. `UpdateTextElements` with `activate: true` names both itself. Where-used of
 text elements is `GetWhereUsed` with `object_type: PROG/PX` and `container` (`program` or
 `function_group`).

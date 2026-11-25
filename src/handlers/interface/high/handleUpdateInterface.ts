@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { updateTool } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateInterface Handler - Update existing ABAP Interface source code
@@ -43,8 +44,11 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateInterface',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.',
+  description: updateTool({
+    object: 'the source code of an existing ABAP interface',
+    how: ', activating it when asked',
+    transported: true,
+  }),
   inputSchema: z.object({
     interface_name: z
       .string()

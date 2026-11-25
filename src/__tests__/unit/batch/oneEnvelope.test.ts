@@ -60,7 +60,7 @@ function sap(inner: InnerRequest): PartAnswer {
   };
 }
 
-const TOOLS = ['HandlerGet', 'HandlerLock', 'HandlerUnlock'];
+const TOOLS = ['HandlerGet', 'HandlerLock'];
 
 const lock = (name: string) => ({ object_type: 'CLASS', object_name: name });
 const unlock = (name: string) => ({
@@ -129,8 +129,8 @@ for (const set of SETS) {
         'LOCK',
       );
       refusedOtherKind(
-        await s.call('HandlerUnlock', unlock('CLAS_A')),
-        'HandlerUnlock',
+        await s.call('HandlerLock', { action: 'unlock', ...unlock('CLAS_A') }),
+        'HandlerLock',
         'UNLOCK',
         'LOCK',
       );
@@ -194,8 +194,8 @@ for (const set of SETS) {
         'stateless',
       );
       refusedOtherKind(
-        await s.call('HandlerUnlock', unlock('CLAS_A')),
-        'HandlerUnlock',
+        await s.call('HandlerLock', { action: 'unlock', ...unlock('CLAS_A') }),
+        'HandlerLock',
         'UNLOCK',
         'stateless',
       );
@@ -233,9 +233,12 @@ for (const set of SETS) {
         part: sap,
       });
       await set.begin(s);
-      assert.deepStrictEqual(await s.call('HandlerUnlock', unlock('CLAS_A')), {
-        content: [],
-      });
+      assert.deepStrictEqual(
+        await s.call('HandlerLock', { action: 'unlock', ...unlock('CLAS_A') }),
+        {
+          content: [],
+        },
+      );
       assert.equal(s.owner.kind(), 'unlock');
       refusedOtherKind(
         await s.call('HandlerLock', lock('CLAS_B')),
@@ -252,9 +255,12 @@ for (const set of SETS) {
         'stateless',
         'UNLOCK',
       );
-      assert.deepStrictEqual(await s.call('HandlerUnlock', unlock('CLAS_B')), {
-        content: [],
-      });
+      assert.deepStrictEqual(
+        await s.call('HandlerLock', { action: 'unlock', ...unlock('CLAS_B') }),
+        {
+          content: [],
+        },
+      );
       assert.deepStrictEqual(await set.end(s), {
         recorded: 2,
         sent: 2,
@@ -304,9 +310,12 @@ for (const set of SETS) {
         received: 1,
       });
       await set.begin(s);
-      assert.deepStrictEqual(await s.call('HandlerUnlock', unlock('CLAS_A')), {
-        content: [],
-      });
+      assert.deepStrictEqual(
+        await s.call('HandlerLock', { action: 'unlock', ...unlock('CLAS_A') }),
+        {
+          content: [],
+        },
+      );
       assert.deepStrictEqual(await set.end(s), {
         recorded: 1,
         sent: 1,

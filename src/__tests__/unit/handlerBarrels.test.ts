@@ -93,8 +93,10 @@ describe("lib's read and write handler barrels", () => {
     // compact `HandlerSystem` calls beside SearchObject and GetWhereUsed:
     // SearchSource, GetPackageTree, ListTransports and the three ATC reads
     // (68). A table's technical settings and the text elements: their reads
-    // (70).
-    assert.equal(read.length, 70);
+    // (70). GetTransport, for `HandlerGet` TRANSPORT part `metadata` (71).
+    // The parts compact reads state from their full tools' descriptions:
+    // one page of a feed and a run's result read once (73).
+    assert.equal(read.length, 73);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the
@@ -125,7 +127,11 @@ describe("lib's read and write handler barrels", () => {
     // `DeleteInclude` (97); and table types: `CreateTableType` (98),
     // `UpdateTableType` (99), `DeleteTableType` (100). A table's technical
     // settings and the text elements: their writes (102).
-    assert.equal(write.length, 102);
+    // 24.2.0: a lock answered from its typed handle, for compact's
+    // `HandlerLock` (`lockObjectAnswering`, 103).
+    // The parts compact writes state from their full tools' descriptions:
+    // the write tools' definitions and the started unit-test run (105).
+    assert.equal(write.length, 105);
   });
 
   it('share not one symbol', () => {

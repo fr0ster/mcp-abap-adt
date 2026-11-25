@@ -79,7 +79,7 @@ replaces nothing. Over Streamable HTTP the held connection takes each request's 
 (a renewed token, a new basic pair: the same user) and keeps its SAP session; it is replaced only
 when SAP ended that session.
 
-- **Compact's `HandlerLock`** leaves the lock in the session until `HandlerUnlock`
+- **Compact's `HandlerLock`** leaves the lock in the session until `HandlerLock` `action: unlock`
   (the consumer's choice) where the connection lives across calls — stdio and SSE —
   with every call between them stateless; the instance's logoff ends it at the
   latest. Over Streamable HTTP the lock is the pooled instance's state: a request on

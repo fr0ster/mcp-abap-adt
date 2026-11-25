@@ -128,6 +128,7 @@ export const METADATA_REFUSALS: Partial<
   BEHAVIOR_DEFINITION: of(D.GetBehaviorDefinition),
   BEHAVIOR_IMPLEMENTATION: of(D.GetBehaviorImplementation),
   METADATA_EXTENSION: of(D.GetMetadataExtension),
+  TRANSPORT: of(D.GetTransport),
 };
 
 /** `part: 'urls'` (`compactUrlRoutes`). */

@@ -1,11 +1,13 @@
-import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
+import type { NotUnlockedAnswer } from '@mcp-abap-adt/lib/compact-shared';
+/**
+ * `HandlerLock` with `action: 'unlock'`: the release of a lock this server
+ * instance holds, under its lock handle — one UNLOCK request, or none where
+ * there is nothing to release.
+ */
 import {
   acceptedOf,
-  byVariant,
+  COMPACT_LOCK,
   COMPACT_LOCK_KINDS,
-  COMPACT_UNLOCK,
-  compactUnlockDescription,
-  compactUnlockSchemaFor,
   LOCK_WENT_WITH_SESSION_WORDS,
   lockHeldHere,
   lockNotHeldWords,
@@ -16,31 +18,27 @@ import {
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { unlockObject } from '@mcp-abap-adt/lib/handlers/write';
 import { return_error } from '@mcp-abap-adt/lib/utils';
-import type * as z from 'zod';
 
-export const TOOL_DEFINITION = {
-  name: 'HandlerUnlock',
-  available_in: ['onprem', 'cloud'] as const,
-  ...byVariant((variant) => ({
-    description: compactUnlockDescription(variant),
-    inputSchema: compactUnlockSchemaFor(COMPACT_UNLOCK[variant]),
-    members: COMPACT_UNLOCK[variant],
-  })),
-} as const;
+/** An unlock that released nothing, and why. */
+function notUnlocked(reason: string): NotUnlockedAnswer {
+  return { unlocked: false, reason };
+}
 
-type HandlerUnlockArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+/** What an unlock takes: the object, and the handle its lock gave. */
+export interface UnlockArgs {
+  readonly object_type: string;
+  readonly object_name: string;
+  readonly lock_handle: string;
+}
 
-export async function handleHandlerUnlock(
-  context: HandlerContext,
-  args: HandlerUnlockArgs,
-) {
+export async function unlockAction(context: HandlerContext, args: UnlockArgs) {
   // The boundary of object_type: one of the declared variant's members
-  // (`COMPACT_UNLOCK`); past it, the kind is typed (`COMPACT_LOCK_KINDS`).
+  // (`COMPACT_LOCK`); past it, the kind is typed (`COMPACT_LOCK_KINDS`).
   const variant = variantOf(context.connection);
-  const member = acceptedOf(args.object_type, COMPACT_UNLOCK[variant]);
+  const member = acceptedOf(args.object_type, COMPACT_LOCK[variant]);
   if (member === undefined) {
     throw new Error(
-      `Unlock is not supported for object_type: ${args.object_type}. ${supported(COMPACT_UNLOCK[variant])}`,
+      `Unlock is not supported for object_type: ${args.object_type}. ${supported(COMPACT_LOCK[variant])}`,
     );
   }
 
@@ -53,16 +51,9 @@ export async function handleHandlerUnlock(
         {
           type: 'text' as const,
           text: JSON.stringify(
-            {
-              success: true,
-              object_name: String(args.object_name ?? '').toUpperCase(),
-              object_type: 'service_binding',
-              unlocked: false,
-              message:
-                'Nothing to unlock: the service binding holds no lock handle.',
-            },
-            null,
-            2,
+            notUnlocked(
+              'Nothing to unlock: the service binding holds no lock handle.',
+            ),
           ),
         },
       ],
@@ -94,17 +85,7 @@ export async function handleHandlerUnlock(
       content: [
         {
           type: 'text' as const,
-          text: JSON.stringify(
-            {
-              success: true,
-              object_name: String(args.object_name ?? '').toUpperCase(),
-              object_type: COMPACT_LOCK_KINDS[member],
-              unlocked: false,
-              message: LOCK_WENT_WITH_SESSION_WORDS,
-            },
-            null,
-            2,
-          ),
+          text: JSON.stringify(notUnlocked(LOCK_WENT_WITH_SESSION_WORDS)),
         },
       ],
     };

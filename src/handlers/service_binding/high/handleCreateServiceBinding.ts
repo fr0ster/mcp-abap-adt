@@ -31,7 +31,6 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * the caller can activate it, delete it, or leave it.
  */
 
-import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
@@ -45,11 +44,12 @@ import {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
+import { ourServiceBindingWrites } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import type { XmlRead } from '../../../lib/xml/tree';
@@ -58,8 +58,10 @@ import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils'
 export const TOOL_DEFINITION = {
   name: 'CreateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Create an OData service binding (V2 or V4, UI or Web API) for a service definition, in initial state.',
+  description: createTool({
+    object: 'an OData V2 or V4 service binding, UI or Web API,',
+    how: 'for a service definition, with its service name and version',
+  }),
   inputSchema: createArguments('CreateServiceBinding', {
     service_binding_name: z.string().describe('Service binding name.'),
     service_definition_name: z
@@ -157,7 +159,7 @@ export async function handleCreateServiceBinding(
     { tool: 'CreateServiceBinding', detail },
     async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getServiceBinding(
-        resultsFor(serviceDocuments),
+        ourServiceBindingWrites,
       );
 
       const created = await atStep('create', () =>

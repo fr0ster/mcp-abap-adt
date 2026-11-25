@@ -20,7 +20,7 @@ import {
   requiredWords,
   transportTakesWords,
 } from './refusals.js';
-import { matchServed, requiredArgument } from './served.js';
+import { lowercaseKeyed, matchServed, requiredArgument } from './served.js';
 import { longToolStep, toolStep } from './source.js';
 import {
   ENTRY_ARGUMENT,
@@ -171,7 +171,7 @@ function compactEntryRead(source: PromptSource): EntryRead | undefined {
 }
 
 const NULL_POSITION =
-  'An entry whose position is null is named to the user and left out of the call.';
+  'An entry the read answers without a position is named to the user and left out of the call.';
 
 /** The words that pick the entry of `object` named `name` from the read. */
 function pickWords(object: TransportObjectType, name: string): string {
@@ -347,8 +347,21 @@ export const TRANSPORT_ACTIONS = {
     rows: [
       oneCall(
         'GetTransport',
-        (given) => `Get the transport request ${jsonLiteral(given.number)}.`,
+        (given) =>
+          `Get the transport request or task ${jsonLiteral(given.number)}.`,
         numberArgument,
+      ),
+      memberCall(
+        'HandlerGet',
+        'TRANSPORT',
+        [
+          ['object_type', userValue('TRANSPORT')],
+          ['part', userValue('metadata')],
+        ],
+        (given) =>
+          `Get the transport request or task ${jsonLiteral(given.number)}.`,
+        numberArgument,
+        true,
       ),
     ],
   },
@@ -581,9 +594,7 @@ export function transportPrompt(source: PromptSource): AbapPrompt | undefined {
   const served = servedActions(source);
   if (served.size === 0) return undefined;
   const actions = ACTION_NAMES.filter((action) => served.has(action));
-  const actionByName: ReadonlyMap<string, ActionName> = new Map(
-    actions.map((action) => [action, action]),
-  );
+  const actionByName = lowercaseKeyed(actions);
   const objectTypes = new Map(
     TRANSPORT_OBJECT_TYPES.map((type) => [type.toLowerCase(), type]),
   );
@@ -593,7 +604,9 @@ export function transportPrompt(source: PromptSource): AbapPrompt | undefined {
   );
   const readsObjectType = (action: string | undefined): boolean => {
     const named =
-      action === undefined ? undefined : actionByName.get(action.trim());
+      action === undefined
+        ? undefined
+        : matchServed(action.trim(), actionByName);
     return action === undefined || action.trim() === ''
       ? true
       : named !== undefined && readsOf(named).includes('object_type');
@@ -627,7 +640,7 @@ export function transportPrompt(source: PromptSource): AbapPrompt | undefined {
       if (given === undefined) {
         throw promptRefusal(requiredWords('transport', 'action'));
       }
-      const action = actionByName.get(given);
+      const action = matchServed(given, actionByName);
       const row = action === undefined ? undefined : served.get(action);
       if (action === undefined || row === undefined) {
         throw promptRefusal(

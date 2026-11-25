@@ -140,8 +140,10 @@ describe('the coverage ledger guard', () => {
     // BatchAnswers left the full sets, three fewer; DebugBatchAnswers, one
     // more; compact HandlerSearch and HandlerWhereUsed left for
     // HandlerSystem (D25), one fewer. A table's technical settings and the
-    // text elements: their reads and writes, four more.
-    assert.equal(new Set(served.map((tool) => tool.name)).size, 315);
+    // text elements: their reads and writes, four more. abapGit, always
+    // listed: thirteen full tools and two compact ones, fifteen more.
+    // HandlerUnlock is HandlerLock's action unlock: one fewer.
+    assert.equal(new Set(served.map((tool) => tool.name)).size, 329);
     assertEquals(of(findings, 'served-mismatch'), []);
   });
 
@@ -198,6 +200,18 @@ describe('the coverage ledger guard', () => {
     // Adding one is a deliberate change: it is a key served on a system
     // where no live case runs, for the reason stated.
     assertEquals(reasonRows(readJson(LEDGER)), [
+      {
+        key: 'CheckAbapGitRepo',
+        kind: 'onprem',
+        reason:
+          'on the onprem system named by abapgit.check_repo_fault_system, whose abapGit cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); there the live case asserts that refusal whole, 500 with no T100 key, and on any other system it must answer — the ledger cannot name a system, so this row stands for every onprem run',
+      },
+      {
+        key: 'HandlerAbapGitGet#checks',
+        kind: 'onprem',
+        reason:
+          'on the onprem system named by abapgit.check_repo_fault_system, whose abapGit cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); there the live case asserts that refusal whole, 500 with no T100 key, and on any other system it must answer — the ledger cannot name a system, so this row stands for every onprem run',
+      },
       {
         key: 'HandlerActivate#PROGRAM_TEXT_ELEMENTS',
         kind: 'cloud',

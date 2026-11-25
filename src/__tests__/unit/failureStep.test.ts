@@ -13,10 +13,10 @@ import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
-import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
-import { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents';
-import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
-import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
+import { handleGetEnhancements as handleGetEnhancementsOf } from '../../handlers/enhancement/readonly/handleGetEnhancements';
+import { handleGetPackageContents as handleGetPackageContentsOf } from '../../handlers/package/readonly/handleGetPackageContents';
+import { handleGetStructuresList as handleGetStructuresListOf } from '../../handlers/structure/readonly/handleGetStructuresList';
+import { handleDescribeByList as handleDescribeByListOf } from '../../handlers/system/readonly/handleDescribeByList';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import * as clients from '../../lib/clients';
 import { substringLineMatch } from '../../lib/search-source/lineScanner';
@@ -38,9 +38,35 @@ import {
   okResponse,
   reading,
   refusedResponse,
+  whereUsedAnswer,
 } from '../helpers/fakeClient';
+import { levelOf } from '../helpers/nodeLevels';
 import { exactPackages, listing } from '../helpers/sourceReaderFake';
 import { stateSystemKind } from '../helpers/systemKind';
+
+/** handleGetEnhancements at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleGetEnhancements = (
+  context: Parameters<typeof handleGetEnhancementsOf>[0],
+  args: Parameters<typeof handleGetEnhancementsOf>[1],
+) => handleGetEnhancementsOf(context, { detail: 'full', ...args });
+
+/** handleDescribeByList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleDescribeByList = (
+  context: Parameters<typeof handleDescribeByListOf>[0],
+  args: Parameters<typeof handleDescribeByListOf>[1],
+) => handleDescribeByListOf(context, { detail: 'full', ...args });
+
+/** handleGetStructuresList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetStructuresList = (
+  context: Parameters<typeof handleGetStructuresListOf>[0],
+  args: Parameters<typeof handleGetStructuresListOf>[1],
+) => handleGetStructuresListOf(context, { detail: 'full', ...args });
+
+/** handleGetPackageContents at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetPackageContents = (
+  context: Parameters<typeof handleGetPackageContentsOf>[0],
+  args: Parameters<typeof handleGetPackageContentsOf>[1],
+) => handleGetPackageContentsOf(context, { detail: 'full', ...args });
 
 // The declared variant the boundary checks a type argument against.
 stateSystemKind('onprem');
@@ -380,8 +406,13 @@ describe('GetEnhancements include_nested lists an include SAP refused', () => {
     fakeClientOf({
       fetchNodeStructure: async (...args: unknown[]) =>
         (args[2] as { nodeId: string }).nodeId === '000000'
-          ? okResponse({ childNodes: [{ type: 'PROG/I', nodeId: 'N1' }] })
-          : okResponse({ objects: [{ name: 'ZINC1' }, { name: 'ZINC2' }] }),
+          ? okResponse(levelOf([], [{ type: 'PROG/I', nodeId: '10' }]))
+          : okResponse(
+              levelOf([
+                { name: 'ZINC1', type: 'PROG/I' },
+                { name: 'ZINC2', type: 'PROG/I' },
+              ]),
+            ),
       readEnhancementElements: async (...args: unknown[]) =>
         refusedInclude !== undefined &&
         (args[0] as { includeName?: string }).includeName ===
@@ -405,7 +436,9 @@ describe('GetEnhancements include_nested lists an include SAP refused', () => {
   it('the refused include is listed with its name, the method error and the step, beside the others', async () => {
     fakeClient = walk({ name: 'ZINC2', status: 403 });
     const body = payloadOf(await run());
-    assert.equal(body.objects.length, 0); // the others answered (none holds an enhancement)
+    // Every object read is listed (Codex round 10), the two that answered.
+    assert.equal(body.objects.length, 2);
+    assert.equal(body.total_objects_with_enhancements, 0);
     assert.equal(body.total_objects_analyzed, 2); // the main object and ZINC1
     // One unread include, its one failure checked for the fields named.
     const [unread, ...more] = body.includes_unread;
@@ -545,18 +578,8 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
 
 describe('GetStructuresList: an append candidate SAP refused to read is listed', () => {
   const whereUsedNaming = (...names: string[]) =>
-    okResponse(
-      reading({
-        'usagereferences:usageReferenceResult': {
-          'usagereferences:referencedObjects': {
-            'usagereferences:referencedObject': names.map((name) => ({
-              'usagereferences:adtObject': {
-                '@': { 'adtcore:name': name, 'adtcore:type': 'TABL/DS' },
-              },
-            })),
-          },
-        },
-      }),
+    whereUsedAnswer(
+      ...names.map((name): [string, string] => [name, 'TABL/DS']),
     );
 
   const clientWith = (candidates: Record<string, () => unknown>) =>
@@ -598,6 +621,21 @@ describe('GetStructuresList: an append candidate SAP refused to read is listed',
     assert.deepStrictEqual(
       answer.tree.children.map((c: any) => c.structure),
       ['ZAPP'],
+    );
+  });
+
+  it('terse names each candidate SAP refused to read', async () => {
+    fakeClient = clientWith({
+      ZREFUSED: () => forbidden(),
+      ZAPP: () => okResponse('extend type zs with zapp { }'),
+    });
+    const result: any = await handleGetStructuresListOf(context as any, {
+      structure_name: 'ZS',
+    });
+    const lines = result.content[0].text.split('\n');
+    assert.ok(
+      lines.includes('# append_candidate_unread\tZREFUSED'),
+      lines.join('\n'),
     );
   });
 

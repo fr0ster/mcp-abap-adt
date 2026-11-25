@@ -16,8 +16,12 @@ import type { ToolArgs, ToolArgValue } from '@mcp-abap-adt/lib/handlers';
 const text = (value: ToolArgValue): string | undefined =>
   typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 
-/** `HandlerUnlock`: its handle, except a service binding's empty one (nothing to unlock). */
-export function unlockHeldLockOf(args: ToolArgs): string | undefined {
+/**
+ * `HandlerLock`: an unlock's handle, except a service binding's empty one
+ * (nothing to unlock); a lock is sent under none.
+ */
+export function lockHeldLockOf(args: ToolArgs): string | undefined {
+  if (args.action !== 'unlock') return undefined;
   const handle = args.lock_handle;
   if (typeof handle !== 'string') return undefined;
   const type =

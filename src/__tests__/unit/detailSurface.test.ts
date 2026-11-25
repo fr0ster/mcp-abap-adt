@@ -132,6 +132,7 @@ const JSON_ANSWERING: readonly string[] = [
   'ActivateInclude',
   'ActivateInterface',
   'ActivateMetadataExtension',
+  'ActivateObjects',
   'ActivateProgram',
   'ActivateServiceBinding',
   'ActivateServiceDefinition',
@@ -146,6 +147,7 @@ const JSON_ANSWERING: readonly string[] = [
   'AmdpDebugStep',
   'AmdpDebugStop',
   'AmdpDebugWait',
+  'CheckAbapGitExternalRepo',
   'CreateBehaviorDefinition',
   'CreateBehaviorImplementation',
   'CreateCdsUnitTest',
@@ -218,18 +220,36 @@ const JSON_ANSWERING: readonly string[] = [
   'DeleteTable',
   'DeleteTableType',
   'DeleteUnitTest',
+  'DescribeByList',
   'GetATCFindings',
   'GetATCResult',
+  'GetAbapGitBranchInfo',
+  'GetAbapGitErrorLog',
+  'GetAbapGitModifiedObjects',
+  'GetAbapGitStaging',
   'GetAdtTypes',
+  'GetEnhancements',
   'GetInactiveObjects',
+  'GetIncludesList',
+  'GetMainPrograms',
   'GetMessageClassMessage',
   'GetObjectOutline',
   'GetObjectStructure',
+  'GetObjectVersions',
+  'GetObjectsList',
   'GetPackage',
+  'GetPackageContents',
+  'GetPackageTree',
   'GetSqlQuery',
+  'GetStructuresList',
   'GetTableContents',
   'GetTransaction',
+  'GetTransport',
   'GetUnitTestResult',
+  'GetWhereUsed',
+  'ListAbapGitRepos',
+  'ListFunctionGroupIncludes',
+  'ListFunctionModules',
   'ListTransports',
   'MemorySnapshotDelta',
   'MemorySnapshotGet',
@@ -244,7 +264,12 @@ const JSON_ANSWERING: readonly string[] = [
   'RunFunctionModuleUnitTest',
   'RunProgramUnitTest',
   'RunUnitTest',
+  'RuntimeGetGatewayErrorLog',
+  'RuntimeListFeeds',
+  'RuntimeListProfilerTraceFiles',
+  'RuntimeListSystemMessages',
   'SearchObject',
+  'SearchSource',
   'SortAndCompressTransportTask',
   'UpdateBehaviorDefinition',
   'UpdateBehaviorImplementation',
@@ -404,6 +429,9 @@ for (const [fixture, declaring] of [
   // report — indistinguishable from correct.
   ['declares-no-answer-call', ['FixtureDeclaresNoAnswerCall']],
   ['declares-debug-fixed-level', ['FixtureDebugFixedLevel']],
+  ['declares-reading-at-fixed-level', ['FixtureReadingAtFixedLevel']],
+  ['declares-uncalled-selector', ['FixtureUncalledSelector']],
+  ['declares-inner-unselected', ['FixtureInnerUnselected']],
   ['undeclared-debug-reads-args', []],
 ] as const) {
   it(format('reports %s rather than skipping it', fixture), () => {
@@ -416,6 +444,46 @@ for (const [fixture, declaring] of [
     );
   });
 }
+
+it('accepts a tool without answer() whose handler selects its formatter by the level asked for', () => {
+  assert.deepStrictEqual(
+    detailWiring(
+      ['src/__tests__/fixtures/detail/declares-answer-selected.ts'],
+      new Set(['FixtureAnswerSelected']),
+    ),
+    [],
+  );
+});
+
+it('accepts a tool whose handler hands its arguments to a function of its file that selects by level', () => {
+  assert.deepStrictEqual(
+    detailWiring(
+      ['src/__tests__/fixtures/detail/declares-answer-selected-inner.ts'],
+      new Set(['FixtureAnswerSelectedInner']),
+    ),
+    [],
+  );
+});
+
+it('accepts a tool that hands its arguments, whole, to the handler that reads detail', () => {
+  assert.deepStrictEqual(
+    detailWiring(
+      ['src/__tests__/fixtures/detail/declares-delegates-args.ts'],
+      new Set(['FixtureDelegatesArgs']),
+    ),
+    [],
+  );
+});
+
+it('accepts a tool that selects its reading by the level asked for', () => {
+  assert.deepStrictEqual(
+    detailWiring(
+      ['src/__tests__/fixtures/detail/declares-reading-by-level.ts'],
+      new Set(['FixtureReadingByLevel']),
+    ),
+    [],
+  );
+});
 
 it('accepts a debug tool that hands its arguments to the adapters', () => {
   assert.deepStrictEqual(

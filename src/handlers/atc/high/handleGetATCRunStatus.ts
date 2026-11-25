@@ -1,7 +1,12 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type IAtcRunStatus,
+} from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -28,8 +33,14 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetATCRunStatus',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Answers whether the ATC run named by run_id has ended (a run started with wait=false answers its run_id). Answers the status the server reports and whether it is finished — finished means ended, whatever the checks found. The run's findings are read by its worklist_id.",
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads the status of an ATC run by its id, and whether it has ended.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     run_id: z
       .string()
@@ -58,15 +69,20 @@ export async function handleGetATCRunStatus(
   return answer(
     { tool: 'GetATCRunStatus', detail: 'terse' },
     () => atc.getRunStatus(runId, { analyse: analyseException }),
-    (status) => ({
-      success: true,
-      run_id: runId,
-      status: status.status,
-      is_finished: status.isFinished,
-      // Both are absent on some answers, and an id invented where the server
-      // sent none would send the next call somewhere that does not exist.
-      ...(status.worklistId ? { worklist_id: status.worklistId } : {}),
-      ...(status.resultId ? { result_id: status.resultId } : {}),
-    }),
+    (status) => atcRunStatusAnswer(runId, status),
   );
+}
+
+/** What a status read answers: SAP's status, whether the run ended, its worklist and result. */
+export function atcRunStatusAnswer(runId: string, status: IAtcRunStatus) {
+  return {
+    success: true,
+    run_id: runId,
+    status: status.status,
+    is_finished: status.isFinished,
+    // Both are absent on some answers, and an id invented where the server
+    // sent none would send the next call somewhere that does not exist.
+    ...(status.worklistId ? { worklist_id: status.worklistId } : {}),
+    ...(status.resultId ? { result_id: status.resultId } : {}),
+  };
 }

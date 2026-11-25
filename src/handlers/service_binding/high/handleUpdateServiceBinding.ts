@@ -98,6 +98,7 @@ import {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analysePublicationLockAnswer } from '../../../lib/strategies/lockAnswer';
@@ -114,8 +115,10 @@ type DesiredPublicationStateInput = 'published' | 'unpublished' | 'unchanged';
 export const TOOL_DEFINITION = {
   name: 'UpdateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Update publication state of an existing ABAP service binding. On premise the change is done when the call answers (result SUCCESS, completion 'done'). On ABAP Cloud SAP runs it as a background job: the call answers result STARTED, completion 'background', with SAP's severity and short text, and the service becomes usable (or stops being usable) once that job ends.",
+  description: updateTool({
+    object: 'the publication state of an existing OData service binding',
+    how: ', publishing or unpublishing its service',
+  }),
   inputSchema: z.object({
     service_binding_name: z
       .string()

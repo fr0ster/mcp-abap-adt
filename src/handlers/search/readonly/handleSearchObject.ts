@@ -1,8 +1,32 @@
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type ISearchResult,
+  utilSearchHits,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtSearchObjectsParamsOf } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
-import { answer } from '../../../lib/answer';
+import { answer, type McpResult } from '../../../lib/answer';
 import { adtClientOf, type ServerAdtClient } from '../../../lib/clients';
+import {
+  longRunning,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
+  answered,
+  type Column,
+  fullLevel,
+  type ListDetailTable,
+  type RowSchemas,
+  rawLevel,
+  readingAt,
+  rows,
+  type Written,
+  whole,
+  writeListing,
+  written,
+} from '../../../lib/detail';
 import {
   onEveryVariant,
   type RuleVariant,
@@ -10,27 +34,20 @@ import {
   withInCallSchema,
 } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
   notASearchType,
   SEARCH_TYPE_DESCRIPTION,
   searchNameOf,
 } from '../../../lib/searchTypes';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import {
-  attr,
-  child,
-  isList,
-  type XmlList,
-  type XmlNode,
-  type XmlRead,
-} from '../../../lib/xml/tree';
+import type { XmlNode } from '../../../lib/xml/node';
 
 /** SearchObject's arguments but `background`. */
 const FIELDS = {
@@ -84,73 +101,71 @@ function schemaOn(variant: RuleVariant) {
   );
 }
 
+/** What each object a search found is written with: what its description states. */
+export const SEARCH_HIT_COLUMNS: readonly Column<ISearchResult>[] = [
+  { name: 'name', means: 'its name', cell: (h) => h.name },
+  { name: 'type', means: 'its type', cell: (h) => h.type ?? h.unknownType },
+  { name: 'description', means: 'its description', cell: (h) => h.description },
+  { name: 'package', means: 'its package', cell: (h) => h.packageName ?? '' },
+];
+
+/** The lists a search's listing writes: what its description states. */
+export const SEARCH_HITS_LISTS: RowSchemas<{
+  hits: readonly ISearchResult[];
+}> = {
+  hits: about(
+    'for each object found',
+    rows('hits', { columns: [...SEARCH_HIT_COLUMNS], header: 'when-rows' }),
+  ),
+};
+
 export const TOOL_DEFINITION = {
   name: 'SearchObject',
   available_in: ['onprem', 'cloud'] as const,
   ...onEveryVariant(
-    withLongToolAdvice(
-      '[read-only] Search ABAP repository by object name or wildcard pattern (e.g. \'Z*\'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system\'s object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.).',
-    ),
+    toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Finds ABAP repository objects by name or name pattern, of any type or of one: classes, programs, tables, interfaces and every other kind.',
+      ),
+      notes: [longRunning],
+    }),
     schemaOn,
   ),
 } as const;
 
-export interface SearchHit {
-  name: string;
-  type: string;
-  description: string;
-  packageName?: string | undefined;
-  /** The object's address (`adtcore:uri`), when the hit names one. */
-  uri?: string;
+/**
+ * The hits as the tab-separated lines this tool answered before the
+ * migration: a header and one line per hit, the code as SAP sent it, known
+ * or not; no hit answers nothing.
+ */
+function hitLines(hits: readonly ISearchResult[]): Written<string> {
+  return writeListing({
+    heads: [],
+    reading: { hits },
+    lists: SEARCH_HITS_LISTS,
+  });
 }
 
 /**
- * `adtcore:objectReferences/adtcore:objectReference`, attributes only — the
- * same field set `@mcp-abap-adt/adt-clients`' own (unexported)
- * `parseSearchResults` reads out of the identical document (see
- * `core/shared/search.js`). `search`'s injected reading here is the generic
- * `structured` parse (`resultSets.ts`'s `READING_BY_SLOT`), so this walks that
- * tree directly rather than re-running a parser of its own.
+ * What `SearchObject` answers at each `detail`: the reading the search is
+ * read with, selected before the call (`src/lib/detail`) — terse the hits
+ * as adt-strategies reads them (`utilSearchHits`, which decodes character
+ * references since 0.28.0), written as lines.
  */
-export function parseSearchHits(value: XmlRead): SearchHit[] {
-  const root =
-    child(value, 'adtcore:objectReferences') ??
-    child(value, 'objectReferences');
-  if (!root) return [];
-  const refsRaw =
-    child(root, 'adtcore:objectReference') ?? child(root, 'objectReference');
-  const refs = isList(refsRaw) ? refsRaw : refsRaw ? [refsRaw] : [];
-  const hits: SearchHit[] = [];
-  for (const ref of refs) {
-    const a = child(ref, '@');
-    const name = attr(a, 'adtcore:name') ?? attr(a, 'name');
-    const type = attr(a, 'adtcore:type') ?? attr(a, 'type');
-    if (!name || !type) continue;
-    const uri = attr(a, 'adtcore:uri') ?? attr(a, 'uri');
-    hits.push({
-      name,
-      type,
-      description:
-        attr(a, 'adtcore:description') ?? attr(a, 'description') ?? '',
-      packageName: attr(a, 'adtcore:packageName') ?? attr(a, 'packageName'),
-      ...(uri === undefined ? {} : { uri }),
-    });
-  }
-  return hits;
-}
+const SEARCH_READINGS: ListDetailTable<XmlNode | string> = {
+  // Every hit, written by the listing writer.
+  terse: written(utilSearchHits, hitLines),
+  // The parse whole, as it is.
+  medium: whole(fullLevel),
+  full: fullLevel,
+  raw: rawLevel,
+};
 
-/** The same tab-separated shape this tool answered before the migration. */
-function objectReferenceLines(value: XmlRead): string {
-  const hits = parseSearchHits(value);
-  if (hits.length === 0) return '';
-  const lines = ['name\ttype\tdescription\tpackage'];
-  for (const h of hits) {
-    lines.push(
-      `${h.name}\t${h.type}\t${h.description}\t${h.packageName ?? ''}`,
-    );
-  }
-  return lines.join('\n');
-}
+/** The utilities' result set a search is given: its `search` reading selected per level. */
+type SearchResults = typeof ourUtils & {
+  search: ReturnType<typeof readingAt<XmlNode | string>>;
+};
 
 /**
  * The search `served`'s variant sends for `query`: its filter the search name
@@ -162,6 +177,7 @@ function searchOn(
   query: string,
   maxResults: number,
   objectType: string | undefined,
+  results: SearchResults,
 ) {
   if (served.variant === 'onprem') {
     const name =
@@ -176,7 +192,7 @@ function searchOn(
     };
     return () =>
       served.client
-        .getUtils(ourUtils)
+        .getUtils(results)
         .search(params, { analyse: analyseException });
   }
   const name =
@@ -191,24 +207,69 @@ function searchOn(
   };
   return () =>
     served.client
-      .getUtils(ourUtils)
+      .getUtils(results)
       .search(params, { analyse: analyseException });
+}
+
+/** SearchObject's arguments, as its schema parses them. */
+type SearchArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/**
+ * A search's answer, and the hits its typed reading read at terse
+ * (`utilSearchHits`): what a tool describing objects by their search reads,
+ * never the answer's text. No hits at another level or on a failure.
+ */
+export interface SearchedObjects {
+  readonly result: McpResult;
+  readonly hits: readonly ISearchResult[];
+}
+
+/** The search of `args`, its typed hits beside its answer. */
+export async function searchObjects(
+  context: HandlerContext,
+  args: SearchArgs,
+): Promise<SearchedObjects> {
+  let hits: readonly ISearchResult[] = [];
+  const result = await searchWith(context, args, {
+    ...SEARCH_READINGS,
+    terse: written((wire) => {
+      hits = utilSearchHits(wire);
+      return hits;
+    }, hitLines),
+  });
+  return { result, hits };
 }
 
 export async function handleSearchObject(
   context: HandlerContext,
-  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
-) {
+  args: SearchArgs,
+): Promise<McpResult> {
+  return searchWith(context, args, SEARCH_READINGS);
+}
+
+/** The search of `args`, read with `readings` at the level asked. */
+async function searchWith(
+  context: HandlerContext,
+  args: SearchArgs,
+  readings: ListDetailTable<XmlNode | string>,
+): Promise<McpResult> {
   const { connection, logger } = context;
   // The schema holds the rules: a name, not blank; the type of the list.
   const { object_name, object_type, maxResults } = args;
 
   const served = adtClientOf(connection, logger);
+  const detail = detailOf(args);
+  // The reading the search is given, selected by the level asked for.
+  const results: SearchResults = {
+    ...ourUtils,
+    search: readingAt(readings, levelOf(args)),
+  };
   const search = searchOn(
     served,
     object_name,
     maxResults || 100,
     object_type || undefined,
+    results,
   );
   if (typeof search === 'string') return return_error(search);
 
@@ -216,11 +277,5 @@ export async function handleSearchObject(
     `Searching objects: query=${object_name}${object_type ? ` type=${object_type}` : ''}`,
   );
 
-  const detail = detailOf(args);
-
-  return answer(
-    { tool: 'SearchObject', detail },
-    search,
-    project(detail, (value) => objectReferenceLines(value)),
-  );
+  return answer({ tool: 'SearchObject', detail }, search, answered);
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.fr0ster/mcp-abap-adt-compact-ro",
-  "description": "Read-only compact SAP ABAP ADT for onprem and BTP: reads, where-used, checks, transports, batch",
+  "description": "Read-only compact SAP ABAP ADT for onprem and BTP: reads, where-used, checks, transports, abapGit",
   "repository": {
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"

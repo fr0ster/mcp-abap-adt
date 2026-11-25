@@ -7,6 +7,7 @@
 import type { HandlerContext } from '../../handlers/interfaces';
 import type { IAnswerSerializer } from '../answerSerializer';
 import { ServerRefusal } from '../auth/serverRefusal';
+import type { BackgroundRunListing } from './contract';
 import type { BackgroundRunTools } from './port';
 import type { StartedBackgroundRun } from './run';
 import { runToolsOf } from './tools';
@@ -20,7 +21,7 @@ export interface BackgroundAnswer {
 const answers: IAnswerSerializer<BackgroundAnswer> = {
   json<P>(payload: P): BackgroundAnswer {
     return {
-      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify(payload) }],
     };
   },
 };
@@ -87,7 +88,7 @@ export async function answerBackgroundGet(
 export async function answerBackgroundList(
   context: HandlerContext,
 ): Promise<BackgroundAnswer> {
-  return answers.json({ runs: await portOf(context).list() });
+  return answers.json(backgroundRunList(await portOf(context).list()));
 }
 
 export async function answerBackgroundDiscard(
@@ -95,4 +96,9 @@ export async function answerBackgroundDiscard(
   handle: string,
 ): Promise<BackgroundAnswer> {
   return answers.json(await portOf(context).discard(handle));
+}
+
+/** What the list answers: each of the caller's runs. */
+export function backgroundRunList(runs: BackgroundRunListing[]) {
+  return { runs };
 }

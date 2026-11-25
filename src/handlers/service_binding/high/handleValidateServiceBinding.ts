@@ -46,6 +46,7 @@ import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { validateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import {
@@ -58,8 +59,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'ValidateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint. The answer is the verdict of SAP's transport check for the binding's name and package: admissible true where SAP answers S, false where it answers E, each with SAP's messages, and any other value as result; creating the binding checks the name, the package and the service definition itself.",
+  description: validateTool({
+    tag: 'read-only',
+    object: 'a new OData service binding for a service definition',
+    how: ", in the package and version given, by SAP's transport check of its name and package",
+  }),
   inputSchema: z.object({
     service_binding_name: z
       .string()

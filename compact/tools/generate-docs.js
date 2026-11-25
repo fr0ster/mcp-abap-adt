@@ -143,11 +143,36 @@ function parametersOf(schema) {
 
 const HTTP_HEADING = 'Streamable HTTP Binaries';
 
-/** `- name (required) — description` per parameter. */
-function parameterLines(schema) {
+/** The system kinds a tool's variants are shown for, as the page names them. */
+const VARIANT_KINDS = [
+  ['cloud', 'On ABAP Cloud (`cloud`)'],
+  ['onprem', 'On premise (`onprem`)'],
+];
+
+/**
+ * A kind-specific variant that differs from the entry shown (its
+ * description or its parameters): its own description and parameters, so
+ * the page shows every call shape and action a tool takes.
+ */
+function variantLines(tool) {
+  let md = '';
+  for (const [kind, title] of VARIANT_KINDS) {
+    const variant = tool.variants?.[kind];
+    if (variant === undefined) continue;
+    const shown = JSON.stringify(parametersOf(tool.inputSchema));
+    const own = JSON.stringify(parametersOf(variant.inputSchema));
+    if (variant.description === tool.description && own === shown) continue;
+    md += `**${title}:** ${variant.description}\n\n`;
+    md += parameterLines(variant.inputSchema, `**Parameters (\`${kind}\`):**`);
+  }
+  return md;
+}
+
+/** `- name (required) — description` per parameter, under `heading`. */
+function parameterLines(schema, heading = '**Parameters:**') {
   const parameters = parametersOf(schema);
-  if (parameters.length === 0) return '**Parameters:** none\n\n';
-  let md = '**Parameters:**\n\n';
+  if (parameters.length === 0) return `${heading} none\n\n`;
+  let md = `${heading}\n\n`;
   for (const parameter of parameters) {
     md += `- \`${parameter.name}\`${parameter.required ? ' (required)' : ''} — ${parameter.description}\n`;
   }
@@ -227,11 +252,13 @@ function page(entries, surfaces) {
             ? '**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both)\n\n'
             : half === 'batch'
               ? '**Half:** batch mode of `@mcp-abap-adt/lib`, in every compact binary\n\n'
-              : half === 'readonly'
-                ? '**Half:** `@mcp-abap-adt/compact-readonly-entries`\n\n'
-                : half === 'data'
-                  ? "**Half:** `@mcp-abap-adt/compact-readonly-entries` (`compactDataEntries`). **Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.\n\n"
-                  : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
+              : half === 'abapgit'
+                ? '**Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), always listed; a call on a system whose discovery does not list abapGit is refused `abapgit_not_served`\n\n'
+                : half === 'readonly'
+                  ? '**Half:** `@mcp-abap-adt/compact-readonly-entries`\n\n'
+                  : half === 'data'
+                    ? "**Half:** `@mcp-abap-adt/compact-readonly-entries` (`compactDataEntries`). **Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.\n\n"
+                    : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
     md += `**Description:** ${tool.description}\n\n`;
     const available = tool.available_in
       ? [...tool.available_in].sort().join(', ')
@@ -247,6 +274,7 @@ function page(entries, surfaces) {
       md += `- \`${parameter.name}\`${parameter.required ? ' (required)' : ''} — ${parameter.description}\n`;
     }
     md += '\n';
+    md += variantLines(tool);
   }
   void context;
   md += httpSection(surfaces);
@@ -259,8 +287,16 @@ function page(entries, surfaces) {
  * in the test that pins this page (`httpToolDocs.test.ts`).
  */
 function compactPage(modules) {
-  const { readOnly, modify, debug, background, session, batch, toolSet } =
-    modules;
+  const {
+    readOnly,
+    modify,
+    debug,
+    background,
+    session,
+    batch,
+    abapGit,
+    toolSet,
+  } = modules;
   const context = () => ({});
   const entries = [
     ...readOnly
@@ -292,6 +328,12 @@ function compactPage(modules) {
     // Batch mode lives in lib (`src/lib/compact/batch`), served by every
     // compact binary.
     ...batch.compactBatchEntries().map((entry) => ({ half: 'batch', entry })),
+    // abapGit lives in lib (`src/lib/compact/abapGit`): HandlerAbapGitGet in
+    // every compact binary, HandlerAbapGit in the write binaries; listed
+    // where the system's discovery serves abapGit.
+    ...abapGit
+      .compactAbapGitEntries('all')
+      .map((entry) => ({ half: 'abapgit', entry })),
   ];
   // The Streamable HTTP surface of both compact sets, from the registration
   // the HTTP server uses (lib's `streamableHttpSurface`).
@@ -337,6 +379,10 @@ function main() {
       path.join('lib', 'compact', 'session', 'group.js'),
     ),
     batch: requireFresh('.', path.join('lib', 'compact', 'batch', 'group.js')),
+    abapGit: requireFresh(
+      '.',
+      path.join('lib', 'compact', 'abapGit', 'group.js'),
+    ),
     toolSet: requireFresh('.', path.join('lib', 'toolSet.js')),
   });
   fs.mkdirSync(path.dirname(OUT), { recursive: true });

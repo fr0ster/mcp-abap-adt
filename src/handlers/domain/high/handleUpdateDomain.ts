@@ -47,6 +47,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { domainChanges } from '../../../lib/strategies/documentChanges';
@@ -65,8 +66,11 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'UpdateDomain',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
+  description: updateTool({
+    object:
+      'the data type, length, decimals, conversion exit, value table and fixed values of an existing ABAP domain',
+    how: ', replacing them whole',
+  }),
   inputSchema: z.object({
     domain_name: z.string().describe('Domain name to update'),
     description: z

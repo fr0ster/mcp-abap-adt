@@ -9,8 +9,12 @@
  * says `FINISHED` is whatever SAP answers for it, and a finished run's result
  * carries `executionTime` on each test method.
  */
+
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
+import { unitTestRead } from '../../../lib/description/runs';
+import { type AnswerTable, answerAt } from '../../../lib/detail';
+import type { DetailLevel } from '../../../lib/detail/levels';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { atStep } from '../../../lib/strategies/step';
@@ -21,7 +25,7 @@ export interface ResultOnceArgs {
   run_id?: string | undefined;
   with_navigation_uris?: boolean | undefined;
   format?: 'abapunit' | 'junit' | undefined;
-  detail?: 'terse' | 'full' | 'raw' | undefined;
+  detail?: DetailLevel | undefined;
 }
 
 /**
@@ -49,10 +53,35 @@ export async function readResultOnce(
         format: args.format,
       }),
     ),
-    (result) => ({
-      success: true,
-      run_id: runId,
-      run_result: detail === 'raw' ? result.raw : result.value,
-    }),
+    answerAt(RESULT_ANSWERS(runId), detail),
   );
 }
+
+/** The result read once, at every level but raw: the run's id and its result. */
+export function resultOnceAnswer<T>(runId: string, value: T) {
+  return { success: true as const, run_id: runId, run_result: value };
+}
+
+/** A unit-test run's result read once, by its id: what the compact reads state. */
+export const RESULT_ONCE_PARTS = {
+  abap: unitTestRead('the result', 'an ABAP Unit test run'),
+  cds: unitTestRead('the result', 'a CDS unit test run'),
+} as const;
+
+/**
+ * The result read once, per level: `raw` the result document as SAP sent
+ * it, nothing of ours around it (one read, one document); every other level
+ * `{ success, run_id, run_result }`, the parse.
+ */
+const RESULT_ANSWERS = <T>(
+  runId: string,
+): AnswerTable<{ raw: string; value: T }, string | object> => {
+  const parsed = (result: { value: T }) =>
+    resultOnceAnswer(runId, result.value);
+  return {
+    terse: parsed,
+    medium: parsed,
+    full: parsed,
+    raw: (result) => result.raw,
+  };
+};

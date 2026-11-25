@@ -1,13 +1,21 @@
 import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugBatchEnd.ts
 import { endDebugBatch } from '../../../lib/batch/tools';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugBatchEnd',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[debug] Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.",
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        "Ends the recording of debugger calls, sending them together on the session they were recorded on, and splits SAP's answer by call.",
+      ),
+    }),
+  ),
   inputSchema: z.object({}),
 } as const;
 

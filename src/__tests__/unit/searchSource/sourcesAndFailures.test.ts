@@ -78,6 +78,7 @@ import {
   type Repository,
   searchesOf,
   searchOn,
+  sentInOrder,
   sentUrls,
   standOn,
   textOf,
@@ -87,6 +88,12 @@ import {
   listing,
   sourcesFrom,
 } from '../../helpers/sourceReaderFake';
+
+/** SearchSource at `detail: 'full'`, the JSON answer these cases read (terse answers, step 3). */
+const searchSourceFull = (
+  context: Parameters<typeof handleSearchSource>[0],
+  args: Parameters<typeof handleSearchSource>[1],
+) => handleSearchSource(context, { detail: 'full', ...args });
 
 /** The read tools a hit's fields must fill, by name: their argument schemas. */
 const READ_TOOLS: Record<
@@ -197,6 +204,18 @@ const sourceReads = (fake: Fake) =>
   sentUrls(fake)
     .filter((url) => !url.includes('/repository/nodestructure'))
     .sort();
+
+// Codex round 10: medium is the scan whole, as it is — the same answer as
+// full, nothing of it projected away.
+describe('SearchSource medium: the scan whole', () => {
+  it('answers what full answers, every hit in it', async () => {
+    const medium = await searchAll(standOn(ALL), false, { detail: 'medium' });
+    const full = await searchAll(standOn(ALL), false, { detail: 'full' });
+    assert.equal(isError(medium), false);
+    assert.ok(payloadOf(full).results.length > 0);
+    assert.deepStrictEqual(payloadOf(medium), payloadOf(full));
+  });
+});
 
 describe('SearchSource: every source-bearing type, at the asked version', () => {
   for (const [batch] of PATHS) {
@@ -394,6 +413,28 @@ describe('SearchSource: what cannot be read is skipped, the reads go on (DO17)',
       },
     );
   }
+
+  // Codex round 6, P1-2: raw is every response, failures too — the source
+  // read SAP refused is its 404 in the array, never a gap.
+  it('raw: a source read SAP refused is its response in the array', async () => {
+    const { result } = searchOne(
+      {
+        refuseWith: {
+          'PROGRAM ZGONE': { status: 404, body: NOT_FOUND_BODY },
+        },
+      },
+      true,
+      { object_types: ['PROG'], detail: 'raw' },
+    );
+    const answered = await result;
+    const responses: Array<{ status: number; body: string }> = JSON.parse(
+      textOf(answered),
+    );
+    assert.ok(
+      responses.some((r) => r.status === 404 && r.body === NOT_FOUND_BODY),
+      textOf(answered),
+    );
+  });
 
   for (const [batch] of PATHS) {
     it(
@@ -876,40 +917,26 @@ describe('SearchSource: the description is functional', () => {
     });
   }
 
-  it('names what it reads, its version, its masks, what it skips and its counters', () => {
+  it('names what it searches; its masks are told by the packages parameter', () => {
+    // Plan step 10: the description states the function and what comes
+    // back; how a parameter is read is the parameter's own text.
     for (const text of [
-      'programs, program includes',
-      'function groups (function modules and includes)',
-      'classes (main source and the four local includes)',
+      'programs',
+      'includes',
+      'function groups',
+      'classes',
       'interfaces',
-      'CDS data definitions',
-      'behavior definitions',
-      'metadata extensions',
-      'service definitions',
-      '`version`',
-      '`*` (zero or more characters) and `?` (one character) are the wildcards',
-      '`+`, `_`, `%` and `#` are characters of the name',
-      'every package it matches',
-      'every target is read in one run, unless `max_hits` is reached',
-      '`answer`',
-      '`objects`',
-      '`lines`',
-      '`snippets` (the default)',
-      '`max_hits`',
-      '`truncated.by_max_hits`',
-      'the sources of the last batch read, those read past the stop included',
-      'skipped',
-      '`scanned.objects`',
-      '`scanned.sources` the sources read (each once)',
-      '`scanned.objects_with_hits`',
-      'only when given',
-      '`PROG` a program, `PROG/I` a program include',
-      'a hit in a function module is `FUGR/FF`',
-      'a hit in an include addressed under its function group is `FUGR/I`',
-      'each with `function_group_name`',
-      'each module and each include of a function group is an object of its own',
+      'CDS sources',
     ]) {
-      assert.ok(description.includes(text));
+      assert.ok(description.includes(text), text);
+    }
+    const packages = TOOL_DEFINITION.inputSchema.shape.packages.description;
+    for (const text of [
+      '`*` stands for zero or more characters',
+      '`?` for one character',
+      '`+`, `_`, `%` and `#` are characters of the name',
+    ]) {
+      assert.ok(packages?.includes(text), text);
     }
   });
 
@@ -976,19 +1003,17 @@ describe('D23b: package masks (DO12)', () => {
     );
 
   /** The package roots a fake was asked for, in order. */
-  const walkedRoots = (fake: Fake, sequential = false): string[] =>
-    (sequential
-      ? fake.directs.map((r) => {
-          const u = new URL(r.url, 'https://system.invalid');
-          for (const [k, v] of Object.entries(r.params ?? {})) {
-            u.searchParams.set(k, String(v));
-          }
-          return u;
-        })
-      : fake.envelopes.flatMap((e) =>
-          e.parts.map((p) => new URL(p.url, 'https://system.invalid')),
-        )
-    )
+  // Both paths alike: a walk level of one root is a single request on the
+  // batched path too, so every request counts, in the order sent.
+  const walkedRoots = (fake: Fake, _sequential = false): string[] =>
+    sentInOrder(fake)
+      .map(({ url, params }) => {
+        const u = new URL(url, 'https://system.invalid');
+        for (const [k, v] of Object.entries(params ?? {})) {
+          u.searchParams.set(k, String(v));
+        }
+        return u;
+      })
       .filter(
         (u) =>
           u.pathname.endsWith('/repository/nodestructure') &&
@@ -1018,9 +1043,14 @@ describe('D23b: package masks (DO12)', () => {
           [all[1000]],
         );
         if (!sequential) {
-          // Each round is a phase of its own: one envelope per round.
-          assert.equal(fake.envelopes[0]?.parts.length, 1);
-          assert.equal(fake.envelopes[1]?.parts.length, 1);
+          // Each round is a phase of its own, of one search: a single
+          // request each.
+          assert.equal(
+            fake.envelopes.some((e) =>
+              e.parts.some((p) => p.url.includes('/informationsystem/search')),
+            ),
+            false,
+          );
           assert.equal(new Set(walkedRoots(fake)).size, 1001);
         } else {
           assert.equal(new Set(walkedRoots(fake, true)).size, 1001);
@@ -1073,10 +1103,19 @@ describe('D23b: package masks (DO12)', () => {
             ['ZE*', 4000],
           ]);
         } else {
-          // Round by round, every unresolved mask's search in one phase.
-          assert.deepStrictEqual(
-            fake.envelopes.slice(0, 3).map((e) => e.parts.length),
-            [2, 1, 1],
+          // Round by round, every unresolved mask's search in one phase:
+          // the first round's two in an envelope, then one search each,
+          // a single request.
+          assert.equal(fake.envelopes[0]?.parts.length, 2);
+          assert.equal(
+            fake.envelopes
+              .slice(1)
+              .some((e) =>
+                e.parts.some((p) =>
+                  p.url.includes('/informationsystem/search'),
+                ),
+              ),
+            false,
           );
           assert.deepStrictEqual(searches, [
             ['ZD*', 1000],
@@ -1249,8 +1288,10 @@ describe('D23b: the line match is a strategy (DO14)', () => {
         lineMatch: strategy,
         sapAnswers: skipSapAnswers,
       });
-      assert.ok(fake.envelopes.length > 0);
-      assert.equal(fake.directs.length, 0);
+      // The batched version, served — one package, one target: every phase
+      // of one read, so single requests.
+      assert.equal(fake.envelopes.length, 0);
+      assert.ok(fake.directs.length > 0);
       assert.deepStrictEqual(
         seen.map((s) => s.lines),
         [['first', 'second']],
@@ -3226,6 +3267,8 @@ describe('D23b: the fixed classification and the SAP-answer strategy (DO22)', ()
                 }),
                 false,
                 strategy,
+                // Two masks: a mask-search phase of one is no envelope.
+                { ...ARGS, packages: [...ARGS.packages, 'ZQ*'] },
               ),
             ),
             undefined,
@@ -3327,7 +3370,7 @@ describe("D23b: the handler takes the server's strategies (DO22, DO24)", () => {
           ['throw', true],
         ] as const) {
           const asked: string[] = [];
-          const result = await handleSearchSource(
+          const result = await searchSourceFull(
             withStrategies(
               standOn(ALL, { refuse: { 'PROGRAM ZPROG': 500 } }),
               absent,
@@ -3360,7 +3403,7 @@ describe("D23b: the handler takes the server's strategies (DO22, DO24)", () => {
       ),
       async () => {
         const seen: Array<{ lines: readonly string[]; input: ScanInput }> = [];
-        const result = await handleSearchSource(
+        const result = await searchSourceFull(
           withStrategies(standOn(ALL), batch === 'absent', {
             lineMatchStrategy: {
               match(lines, input) {
@@ -3414,7 +3457,7 @@ describe("D23b: the handler takes the server's strategies (DO22, DO24)", () => {
         batch,
       ),
       async () => {
-        const result = await handleSearchSource(
+        const result = await searchSourceFull(
           contextOn(
             standOn(ALL, { refuse: { 'PROGRAM ZPROG': 500 } }),
             batch === 'absent' ? 'absent' : 'served',
@@ -3563,7 +3606,7 @@ describe("D23b: the handler's boundary: a decided value leaves the handler as it
     it(
       format('%s thrown inside the scan is answered as itself', _name),
       async () => {
-        const result = await handleSearchSource(
+        const result = await searchSourceFull(
           {
             ...contextOn(standOn(ONE), 'absent'),
             lineMatchStrategy: {

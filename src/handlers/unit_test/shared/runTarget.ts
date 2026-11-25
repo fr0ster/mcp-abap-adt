@@ -44,7 +44,9 @@ const RUN_TARGET_OBJECT = z.object({
   type: z
     .enum(ABAP_UNIT_RUN_OBJECT_TYPES)
     .optional()
-    .describe('Run object type of the object (kind object; required there).'),
+    .describe(
+      "Run object type of the object (kind object; required there). FUNC runs the ABAP Unit tests of the module's whole function group.",
+    ),
   include_subpackages: z
     .boolean()
     .optional()

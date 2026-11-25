@@ -36,6 +36,30 @@ function parseTextPayload(result: any): any {
   return JSON.parse(textContent.text);
 }
 
+/**
+ * A feed's terse answer (RuntimeListFeeds' default) read back: its
+ * `# feed` and `# count` lines, the TSV header and one cell list per row.
+ */
+function terseFeed(result: any): {
+  feed: string;
+  count: number;
+  header: string;
+  rows: string[][];
+} {
+  const lines = String(result?.content?.[0]?.text ?? '').split('\n');
+  const feed = lines[0]?.startsWith('# feed ') ? lines[0].slice(7) : '';
+  const count = Number(
+    lines.find((line) => line.startsWith('# count '))?.slice(8) ?? NaN,
+  );
+  const body = lines.filter((line) => line !== '' && !line.startsWith('#'));
+  return {
+    feed,
+    count,
+    header: body[0] ?? '',
+    rows: body.slice(1).map((line) => line.split('\t')),
+  };
+}
+
 function extractErrorText(result: any): string {
   try {
     const textContent = result?.content?.find((c: any) => c.type === 'text');
@@ -104,14 +128,14 @@ describe('Runtime Feed Handlers Integration', () => {
       );
 
       expectSuccess(result, 'RuntimeListFeeds(descriptors)');
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(data.feed_type, 'descriptors');
-      assert.equal(Array.isArray(data.entries), true);
+      const data = terseFeed(result);
+      assert.equal(data.feed, 'descriptors');
+      assert.equal(data.header, 'id\ttitle\tcategory');
+      assert.equal(data.rows.length, data.count);
 
       // Store available feeds for subsequent tests
-      availableFeedTitles = (data.entries as any[]).map((e: any) =>
-        String(e.title ?? e.id ?? '').toLowerCase(),
+      availableFeedTitles = data.rows.map(([id, title]) =>
+        String(title || id || '').toLowerCase(),
       );
       logger?.info(
         `Feed descriptors: ${data.count} entries (${availableFeedTitles.join(', ')})`,
@@ -144,10 +168,9 @@ describe('Runtime Feed Handlers Integration', () => {
         );
       }
 
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(data.feed_type, 'variants');
-      assert.equal(Array.isArray(data.entries), true);
+      const data = terseFeed(result);
+      assert.equal(data.feed, 'variants');
+      assert.equal(data.header, 'feed\ttitle\tquery\tis_default');
       logger?.info(`Feed variants: ${data.count} entries`);
     });
   });
@@ -197,10 +220,9 @@ describe('Runtime Feed Handlers Integration', () => {
         );
       }
 
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(data.feed_type, 'dumps');
-      assert.equal(Array.isArray(data.entries), true);
+      const data = terseFeed(result);
+      assert.equal(data.feed, 'dumps');
+      assert.equal(data.header, 'dump_id\tupdated\ttitle');
       logger?.info(`Dumps feed: ${data.count} entries`);
     });
   });
@@ -229,10 +251,11 @@ describe('Runtime Feed Handlers Integration', () => {
       );
 
       expectSuccess(result, 'RuntimeListSystemMessages');
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(Array.isArray(data.messages), true);
-      logger?.info(`System messages: ${data.count} entries`);
+      // Terse, the default: `# count`, then a TSV row per message.
+      const lines = String(result.content?.[0]?.text ?? '').split('\n');
+      assert.equal(lines[0]?.startsWith('# count '), true, lines.join('\n'));
+      assert.equal(lines[1], 'id\tcreatedOn\tauthor\ttitle');
+      logger?.info(`System messages: ${lines[0]}`);
     });
   });
 
@@ -261,15 +284,14 @@ describe('Runtime Feed Handlers Integration', () => {
       );
 
       expectSuccess(result, 'RuntimeListFeeds(system_messages)');
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(data.feed_type, 'system_messages');
-      assert.equal(Array.isArray(data.entries), true);
+      const data = terseFeed(result);
+      assert.equal(data.feed, 'system_messages');
+      assert.equal(data.header, 'id\tcreatedOn\tauthor\ttitle');
       logger?.info(`System messages via feeds: ${data.count} entries`);
     });
   });
 
-  it('should list gateway errors via RuntimeGetGatewayErrorLog (on-prem)', async () => {
+  it('should list gateway errors via RuntimeGetGatewayErrorLog (on premise and cloud)', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
       if (skipUnlessServed('RuntimeGetGatewayErrorLog')) return;
 
@@ -288,7 +310,7 @@ describe('Runtime Feed Handlers Integration', () => {
 
       const result = await tester.invokeToolOrHandler(
         'RuntimeGetGatewayErrorLog',
-        { max_results: maxResults, user },
+        { max_results: maxResults, user, detail: 'full' },
         async () => {
           const handlerContext = createHandlerContext({
             connection: context.connection,
@@ -297,6 +319,7 @@ describe('Runtime Feed Handlers Integration', () => {
           return handleRuntimeGetGatewayErrorLog(handlerContext, {
             max_results: maxResults,
             user,
+            detail: 'full',
           });
         },
       );
@@ -310,14 +333,47 @@ describe('Runtime Feed Handlers Integration', () => {
     });
   });
 
-  it('should read gateway errors feed via RuntimeListFeeds (on-prem)', async () => {
+  it("reads a gateway error's detail by the opid and detail_kind its terse row names (on premise and cloud)", async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      if (context.isCloudSystem) {
-        throw new Error(
-          'SKIP: gateway error log is not available on cloud systems',
-        );
-      }
+      if (skipUnlessServed('RuntimeGetGatewayErrorLog')) return;
 
+      const handlerContext = createHandlerContext({
+        connection: context.connection,
+        logger,
+      });
+      const listed = await handleRuntimeGetGatewayErrorLog(handlerContext, {
+        max_results: 1,
+      });
+      expectSuccess(listed, 'RuntimeGetGatewayErrorLog');
+      const lines = String(listed.content[0]?.text ?? '').split('\n');
+      assert.equal(lines[0]?.startsWith('# count '), true);
+      assert.equal(
+        lines[1],
+        'opid\tdetail_kind\tdateTime\ttype\tshortText\tusername',
+      );
+      if (lines[2] === undefined || lines[2] === '') {
+        throw new Error('SKIP: the gateway error log holds no error to read');
+      }
+      // A row SAP answered names what its detail is read by: an opid and the
+      // kind, or the case fails.
+      const [opid, detailKind] = lines[2].split('\t');
+      assert.ok(opid, `a row without an opid: ${lines[2]}`);
+      assert.ok(detailKind, `a row without a detail_kind: ${lines[2]}`);
+
+      const detail = await handleRuntimeGetGatewayErrorLog(handlerContext, {
+        opid,
+        detail_kind: detailKind,
+        detail: 'full',
+      });
+      expectSuccess(detail, 'RuntimeGetGatewayErrorLog(detail)');
+      const data = parseTextPayload(detail);
+      assert.equal(data.mode, 'detail');
+      assert.equal(typeof data.error, 'object');
+    });
+  });
+
+  it('should read gateway errors feed via RuntimeListFeeds (on premise and cloud)', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
       const maxResults =
         readCaseParams(
           context.params,
@@ -341,10 +397,12 @@ describe('Runtime Feed Handlers Integration', () => {
       );
 
       expectSuccess(result, 'RuntimeListFeeds(gateway_errors)');
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(data.feed_type, 'gateway_errors');
-      assert.equal(Array.isArray(data.entries), true);
+      const data = terseFeed(result);
+      assert.equal(data.feed, 'gateway_errors');
+      assert.equal(
+        data.header,
+        'opid\tdetail_kind\tdateTime\ttype\tshortText\tusername',
+      );
       logger?.info(`Gateway errors via feeds: ${data.count} entries`);
     });
   });

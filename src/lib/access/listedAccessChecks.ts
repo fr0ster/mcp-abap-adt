@@ -1,7 +1,8 @@
 /**
  * The simple strategy (spec §3.3): the configured lists matched by name and
- * prefix; it reads nothing from SAP. A subtree entry needs the package tree
- * and is refused at construction.
+ * prefix. It reads one thing from SAP: a package create's given parent
+ * (`readableParent`). A subtree entry needs the package tree and is refused
+ * at construction.
  */
 
 import { accessRefusalWords, ServerRefusal } from '../auth/serverRefusal.js';
@@ -11,6 +12,7 @@ import {
   type AccessVerdict,
   ALLOWED,
   type IAccessChecks,
+  type IPackageReader,
   type NamedValue,
 } from './accessChecks.js';
 import {
@@ -80,6 +82,32 @@ export function requestsAndTables(
   return ALLOWED;
 }
 
+/**
+ * A package create's given `super_package` read through `sap`: SAP creates
+ * the package with no super package when the named one cannot be loaded
+ * (`CL_PACKAGE->create_new_package`), so a parent the lists admit by name
+ * alone could place the package outside the tree it was checked for. A
+ * parent that cannot be read refuses the call `package_tree_unreadable`;
+ * `undefined` when the call creates no package, names no parent, or the
+ * parent is read.
+ */
+export async function readableParent(
+  call: AccessCall,
+  sap: IPackageReader,
+): Promise<AccessVerdict | undefined> {
+  if (!call.packageCreate) return undefined;
+  const parent = call.packages.find(
+    (named) => named.argument === 'super_package',
+  );
+  if (parent === undefined) return undefined;
+  try {
+    await sap.superPackageOf(parent.value);
+  } catch {
+    return { allowed: false, code: 'package_tree_unreadable', ...parent };
+  }
+  return undefined;
+}
+
 /** The simple strategy over `lists`; refuses a subtree entry. */
 export function listedAccessChecks(lists: AccessLists): IAccessChecks {
   const own: AccessLists = { ...lists };
@@ -92,12 +120,14 @@ export function listedAccessChecks(lists: AccessLists): IAccessChecks {
     );
   }
   return {
-    async check(call) {
+    async check(call, sap) {
       if (own.allowedPackages !== undefined) {
         const outside = firstOutside(call.packages, own.allowedPackages);
         if (outside !== undefined) {
           return { allowed: false, code: 'package_not_allowed', ...outside };
         }
+        const unread = await readableParent(call, sap);
+        if (unread !== undefined) return unread;
       }
       return requestsAndTables(call, own);
     },

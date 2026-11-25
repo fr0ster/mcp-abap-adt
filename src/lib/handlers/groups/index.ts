@@ -7,6 +7,11 @@
  */
 
 export {
+  AbapGitHandlersGroup,
+  abapGitReadEntries,
+  abapGitWriteEntries,
+} from './AbapGitHandlersGroup.js';
+export {
   BackgroundRunHandlersGroup,
   backgroundRunEntries,
 } from './BackgroundRunHandlersGroup.js';

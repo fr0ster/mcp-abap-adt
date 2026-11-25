@@ -58,7 +58,7 @@ const NAME_FREE = corpusBody(
   'validation-name-free-class--01-validation-objectname',
 );
 const TRANSPORT_DOCUMENT =
-  '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="XXXK900001"/>';
+  '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="XXXK900001"><tm:request tm:number="XXXK900001"/></tm:root>';
 
 /** A message class document holding message `001`, the shape ADT answers. */
 const MESSAGE_CLASS_DOCUMENT =
@@ -531,12 +531,18 @@ const COMPACT: BatchEntryCase[] = [
     connection: 'http',
   },
   ...LOCKED_TYPES.map(([object_type, object_name]) => ({
-    tool: 'HandlerUnlock',
-    args: { object_type, object_name, lock_handle: LOCK_HANDLE },
+    tool: 'HandlerLock',
+    args: {
+      action: 'unlock',
+      object_type,
+      object_name,
+      lock_handle: LOCK_HANDLE,
+    },
   })),
   {
-    tool: 'HandlerUnlock',
+    tool: 'HandlerLock',
     args: {
+      action: 'unlock',
       object_type: 'PACKAGE',
       object_name: 'PKG_A',
       lock_handle: LOCK_HANDLE,

@@ -20,7 +20,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { format, isDeepStrictEqual } from 'node:util';
-import { compactDeleteSchema } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactDeleteSchema,
+  memberTokens,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
 import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
@@ -482,7 +485,7 @@ describe('the HandlerDelete schema and description', () => {
   });
 
   it('advertises every type it deletes, with only schema arguments; lock_handle for the includes alone', () => {
-    const description: string = TOOL_DEFINITION.description;
+    const description: string = memberTokens('HandlerDelete', 'onprem');
     const start = description.indexOf('object_type required:');
     assert.ok(start >= 0);
     const tail = description.slice(start);

@@ -4,9 +4,9 @@ Generated from the tool definitions the server builds (not from docs).
 
 ## Summary
 
-- Total tools: 293
-- Read-only tools: 68
-- High-level tools: 190
+- Total tools: 306
+- Read-only tools: 75
+- High-level tools: 196
 - Debug tools: 33
 - Session tools: 2
 
@@ -25,6 +25,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
+  - [Abapgit](#read-only-abapgit)
+    - [CheckAbapGitExternalRepo](#checkabapgitexternalrepo-read-only-abapgit)
+    - [CheckAbapGitRepo](#checkabapgitrepo-read-only-abapgit)
+    - [GetAbapGitErrorLog](#getabapgiterrorlog-read-only-abapgit)
+    - [GetAbapGitFile](#getabapgitfile-read-only-abapgit)
+    - [GetAbapGitModifiedObjects](#getabapgitmodifiedobjects-read-only-abapgit)
+    - [GetAbapGitStaging](#getabapgitstaging-read-only-abapgit)
+    - [ListAbapGitRepos](#listabapgitrepos-read-only-abapgit)
   - [Background Run](#read-only-background-run)
     - [DiscardBackgroundRun](#discardbackgroundrun-read-only-background-run)
     - [GetBackgroundRun](#getbackgroundrun-read-only-background-run)
@@ -122,6 +130,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
   - [Unit Test](#read-only-unit-test)
     - [GetUnitTestResult](#getunittestresult-read-only-unit-test)
 - [High-Level Group](#high-level-group)
+  - [Abapgit](#high-level-abapgit)
+    - [GetAbapGitBranchInfo](#getabapgitbranchinfo-high-level-abapgit)
+    - [LinkAbapGitRepo](#linkabapgitrepo-high-level-abapgit)
+    - [PullAbapGitRepo](#pullabapgitrepo-high-level-abapgit)
+    - [PushAbapGitRepo](#pushabapgitrepo-high-level-abapgit)
+    - [SwitchAbapGitBranch](#switchabapgitbranch-high-level-abapgit)
+    - [UnlinkAbapGitRepo](#unlinkabapgitrepo-high-level-abapgit)
   - [Atc](#high-level-atc)
     - [GetATCFindings](#getatcfindings-high-level-atc)
     - [GetATCResult](#getatcresult-high-level-atc)
@@ -388,12 +403,101 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 <a id="read-only-group"></a>
 ## Read-Only Group
 
+<a id="read-only-abapgit"></a>
+### Read-Only / Abapgit
+
+<a id="checkabapgitexternalrepo-read-only-abapgit"></a>
+#### CheckAbapGitExternalRepo (Read-Only / Abapgit)
+**Description:** [read-only] Checks an external git repository for abapGit before it is linked: its access and its branches.
+
+**Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitExternalRepo.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
+- `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+
+---
+
+<a id="checkabapgitrepo-read-only-abapgit"></a>
+#### CheckAbapGitRepo (Read-Only / Abapgit)
+**Description:** [read-only] Checks that the system reaches an abapGit repository's remote and is let in.
+
+**Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitRepo.ts`
+
+**Parameters:**
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="getabapgiterrorlog-read-only-abapgit"></a>
+#### GetAbapGitErrorLog (Read-Only / Abapgit)
+**Description:** [read-only] Reads the error log of the last abapGit pull or push of a repository, object by object.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitErrorLog.ts`
+
+**Parameters:**
+- `app_log_key` (string, required) - The run log key ListAbapGitRepos answers for the repository's last run.
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="getabapgitfile-read-only-abapgit"></a>
+#### GetAbapGitFile (Read-Only / Abapgit)
+**Description:** [read-only] Reads one file of an abapGit repository, as the system holds it or as the remote branch holds it.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitFile.ts`
+
+**Parameters:**
+- `filename` (string, required) - The file name, as GetAbapGitStaging lists it (for example zcl_demo.clas.abap).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+- `version` (string, required, one of: `local`, `remote`) - Which version of the file: local (the system's) or remote (the remote branch's).
+
+---
+
+<a id="getabapgitmodifiedobjects-read-only-abapgit"></a>
+#### GetAbapGitModifiedObjects (Read-Only / Abapgit)
+**Description:** [read-only] Reads the objects a pull of an abapGit repository would modify in the system, before it runs.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitModifiedObjects.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="getabapgitstaging-read-only-abapgit"></a>
+#### GetAbapGitStaging (Read-Only / Abapgit)
+**Description:** [read-only] Reads the abapGit staging of a linked repository: what changed, to choose what a push commits.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitStaging.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="listabapgitrepos-read-only-abapgit"></a>
+#### ListAbapGitRepos (Read-Only / Abapgit)
+**Description:** [read-only] Lists the abapGit repositories linked in the system, or the one with a key or of one package (DEVC).
+
+**Source:** `src/handlers/abapgit/readonly/handleListAbapGitRepos.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
+- `package_name` (string, optional) - Only the repository linked to this package.
+- `repository_key` (string, optional) - Only the repository with this key.
+
+---
+
 <a id="read-only-background-run"></a>
 ### Read-Only / Background Run
 
 <a id="discardbackgroundrun-read-only-background-run"></a>
 #### DiscardBackgroundRun (Read-Only / Background Run)
-**Description:** [read-only] [runtime] Ends the run named by run_handle: a running read is cancelled and its session logged off; a finished run's answer is deleted; a running code run is refused.
+**Description:** [read-only] Discards a background run by its run handle: a running read is cancelled and its session logged off, an ended run's answer deleted.
 
 **Source:** `src/handlers/background_run/readonly/handleDiscardBackgroundRun.ts`
 
@@ -404,7 +508,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbackgroundrun-read-only-background-run"></a>
 #### GetBackgroundRun (Read-Only / Background Run)
-**Description:** [read-only] [runtime] Reads one of your background runs by its run_handle: running; finished with what the run tool answered (the system answer as it is, an error included); or cancelled. A read run's finished or cancelled answer is answered once and then deleted, so a lost answer is read again by starting the read again; a code run's answer is kept until it is discarded.
+**Description:** [read-only] Reads one of the caller's background runs by its run handle, with the answer of a run that has ended.
 
 **Source:** `src/handlers/background_run/readonly/handleGetBackgroundRun.ts`
 
@@ -415,7 +519,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listbackgroundruns-read-only-background-run"></a>
 #### ListBackgroundRuns (Read-Only / Background Run)
-**Description:** [read-only] [runtime] Lists your background runs: run_handle, tool, object, when it started, and its state: running, finished or cancelled. A run's output is read by its run_handle; a read run leaves the list once its answer was read.
+**Description:** [read-only] Lists the caller's background runs, running, finished and cancelled.
 
 **Source:** `src/handlers/background_run/readonly/handleListBackgroundRuns.ts`
 
@@ -429,7 +533,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviordefinition-read-only-behavior-definition"></a>
 #### GetBehaviorDefinition (Read-Only / Behavior Definition)
-**Description:** [read-only] Reads the RAP behavior definition named by behavior_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of a RAP behavior definition (BDEF), or its metadata.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
@@ -449,7 +553,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviorimplementation-read-only-behavior-implementation"></a>
 #### GetBehaviorImplementation (Read-Only / Behavior Implementation)
-**Description:** [read-only] Reads the RAP behavior implementation (its class) named by behavior_implementation_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of a RAP behavior implementation class (CLAS), or its metadata.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
@@ -469,7 +573,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclass-read-only-class"></a>
 #### GetClass (Read-Only / Class)
-**Description:** [read-only] Reads the ABAP class named by class_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -489,7 +593,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectdraft-read-only-common"></a>
 #### GetObjectDraft (Read-Only / Common)
-**Description:** [read-only] Reads the active, inactive and working versions of each part of the object named by object_type and object_name, together, and tells whether it holds an unactivated change and whose. Answers { object_type, object_name, has_draft, parts }: per part (main, the source or metadata; for CLASS and BEHAVIOR_IMPLEMENTATION the includes implementations, definitions, testclasses, macros in place of the main source) draft states whose unactivated change it holds — own (the caller's), other (another user's), undetermined (its three ETags in another pattern), and the active state when its versions are equal — with changed_at (the change's last write, UTC) and age_seconds by the server's clock for own and other (null for METADATA_EXTENSION and SERVICE_DEFINITION, whose ETag carries a constant time), and the three ETags (active, inactive, workspace); has_draft is true when any part holds a change of a user's
+**Description:** [read-only] Reads whether an ABAP class (CLAS), interface (INTF), program (PROG), CDS view (DDLS), table (TABL) or other development object holds an unactivated change, and whose.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectDraft.ts`
 
@@ -498,11 +602,18 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `PROGRAM`, `INCLUDE`, `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
 
+**On ABAP Cloud (`cloud`):** [read-only] Reads whether an ABAP class (CLAS), interface (INTF), function module (FUGR), CDS view (DDLS), table (TABL) or other development object holds an unactivated change, and whose.
+
+**Parameters (`cloud`):**
+- `function_group_name` (string, optional) - The function group of a FUNCTION_MODULE (required for it).
+- `object_name` (string, required) - Object name.
+- `object_type` (string, required, one of: `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
+
 ---
 
 <a id="getobjectversiondiff-read-only-common"></a>
 #### GetObjectVersionDiff (Read-Only / Common)
-**Description:** [read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.
+**Description:** [read-only] Reads two versions of a class (CLAS), program (PROG), CDS view (DDLS) or other source object from its version history and compares them.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
 
@@ -515,11 +626,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
-**Description:** [read-only] Lists the version history of the class, program, interface, function module, table, structure, table type, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Reads the version history of an ABAP class (CLAS), program (PROG), interface (INTF), function module (FUGR), table (TABL), structure (TABL), CDS view (DDLS) or other versioned object.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`, `table_type`) - Object type.
@@ -528,7 +640,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectversionsource-read-only-common"></a>
 #### GetObjectVersionSource (Read-Only / Common)
-**Description:** [read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.
+**Description:** [read-only] Reads an older version of the source code of an ABAP class (CLAS), program (PROG), function module (FUGR), table (TABL), CDS view (DDLS) or other versioned object from its version history.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
 
@@ -543,7 +655,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getdataelement-read-only-data-element"></a>
 #### GetDataElement (Read-Only / Data Element)
-**Description:** [read-only] Reads the ABAP data element named by data_element_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP data element (DTEL) at the version asked, with its domain (DOMA) or built-in type, its labels, search help, package (DEVC) and description.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -560,7 +672,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getddl-read-only-ddl"></a>
 #### GetDdl (Read-Only / Ddl)
-**Description:** [read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of a CDS view (DDLS) or classic DDL view, or its metadata.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
@@ -580,7 +692,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getdomain-read-only-domain"></a>
 #### GetDomain (Read-Only / Domain)
-**Description:** [read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP domain (DOMA) at the version asked, with its data type, length, output format, value table, fixed values, package (DEVC) and description.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -597,7 +709,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getenhancementimpl-read-only-enhancement"></a>
 #### GetEnhancementImpl (Read-Only / Enhancement)
-**Description:** [read-only] Retrieve the active source code of a specific enhancement implementation by its name and enhancement spot.
+**Description:** [read-only] Reads the active source code of an ABAP enhancement implementation (ENHO), by its name and enhancement spot (ENHS).
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancementImpl.ts`
 
@@ -609,12 +721,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getenhancements-read-only-enhancement"></a>
 #### GetEnhancements (Read-Only / Enhancement)
-**Description:** [read-only] Lists the enhancements (enhancement implementations) of the program, include, function group or class named by object_name and object_type, read at its active version. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).
+**Description:** [read-only] Reads the enhancement implementations (ENHO) of ABAP programs (PROG), includes (PROG), function groups (FUGR) or classes (CLAS) at their active version, and of their includes when asked.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancements.ts`
 
 **Parameters:**
-- `detailed` (boolean, optional) - [read-only] true: every enhancement with its whole source; false (default): a short one
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `detailed` (boolean, optional) - [read-only] true: every field of each enhancement, as read; false (default): each enhancement by name, type and source. Either way every object read is answered, one without enhancements with total_enhancements 0
 - `include_nested` (boolean, optional) - [read-only] true: also the enhancements of every include of a program or function group
 - `max_includes` (integer, optional) - [read-only] With include_nested: how many includes are read (default 50)
 - `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects)
@@ -626,7 +739,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getenhancementspot-read-only-enhancement"></a>
 #### GetEnhancementSpot (Read-Only / Enhancement)
-**Description:** [read-only] Retrieve metadata and list of implementations for a specific enhancement spot, at its active version.
+**Description:** [read-only] Reads an enhancement spot (ENHS) at its active version.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancementSpot.ts`
 
@@ -640,7 +753,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctiongroup-read-only-function-group"></a>
 #### GetFunctionGroup (Read-Only / Function Group)
-**Description:** [read-only] Reads the ABAP function group named by function_group_name in one request: its ADT metadata document (package, description, contents), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP function group (FUGR) at the version asked, with its package (DEVC), description and contents.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
@@ -657,7 +770,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctioninclude-read-only-function-include"></a>
 #### GetFunctionInclude (Read-Only / Function Include)
-**Description:** [read-only] Reads the include named by include_name of the ABAP function group named by function_group_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata"), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of an include (FUGR) of an ABAP function group (FUGR), or its metadata.
 
 **Source:** `src/handlers/function_include/readonly/handleGetFunctionInclude.ts`
 
@@ -673,22 +786,24 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listfunctiongroupincludes-read-only-function-include"></a>
 #### ListFunctionGroupIncludes (Read-Only / Function Include)
-**Description:** [read-only] List the includes (TOP, custom) of an ABAP function group, read at its active version.
+**Description:** [read-only] Lists the includes (FUGR) of an ABAP function group (FUGR), its TOP include among them, at its active version.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name.
 
 ---
 
 <a id="listfunctionmodules-read-only-function-include"></a>
 #### ListFunctionModules (Read-Only / Function Include)
-**Description:** [read-only] List the function modules of an ABAP function group, read at its active version.
+**Description:** [read-only] Lists the function modules (FUGR) of an ABAP function group (FUGR), at its active version.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name.
 
 ---
@@ -698,7 +813,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctionmodule-read-only-function-module"></a>
 #### GetFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name: its source code, which declares the parameter signature (part "source", the default), or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. The module's metadata is read first, and the part is answered only when the function group named holds the module. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of an ABAP function module (FUGR), BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -719,7 +834,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinclude-read-only-include"></a>
 #### GetInclude (Read-Only / Include)
-**Description:** [read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of an ABAP include (PROG), or its metadata.
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
@@ -736,12 +851,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getincludeslist-read-only-include"></a>
 #### GetIncludesList (Read-Only / Include)
-**Description:** [read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads every include (PROG) of an ABAP program (PROG) or include, with the includes each one includes, down to the last. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
 - `object_name` (string, optional) - Name of the ABAP program or include (with object_type; or give objects)
 - `object_type` (string, optional, one of: `PROG/P`, `PROG/I`, `FUGR/F`, `CLAS/OC`, `FUGR`, `CLAS`) - [read-only] ADT object type of the parent. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC. A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
@@ -751,11 +867,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmainprograms-read-only-include"></a>
 #### GetMainPrograms (Read-Only / Include)
-**Description:** [read-only] Reads the main programs of the ABAP include named by include_name in one request: each program that includes it, or for an include of a function group the group. Returns main_programs, a list of { name, type, uri } — type PROG/P for a program, FUGR/F for a function group.
+**Description:** [read-only] Reads the main programs (PROG) of an ABAP include (PROG): each program that includes it, or the function group (FUGR) it belongs to.
 
 **Source:** `src/handlers/include/readonly/handleGetMainPrograms.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name.
 
 ---
@@ -765,7 +882,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterface-read-only-interface"></a>
 #### GetInterface (Read-Only / Interface)
-**Description:** [read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of an ABAP interface (INTF), or its metadata.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
@@ -785,7 +902,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmessageclass-read-only-message-class"></a>
 #### GetMessageClass (Read-Only / Message Class)
-**Description:** [read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request, at its active version: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP message class (MSAG): its messages with their numbers and texts, and its master language.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
@@ -796,12 +913,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmessageclassmessage-read-only-message-class"></a>
 #### GetMessageClassMessage (Read-Only / Message Class)
-**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request, from the active version of the class. Answers the one message under `message`: its number (msgno), text (msgtext), self-explanatory flag (selfexplainatory), long-text flag (documented), last changer (lastchangedby), change time (lastmodified), and every other field the system gives the message. A number absent from the class is refused as missing.
+**Description:** [read-only] Reads one message of an ABAP message class (MSAG) at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
@@ -812,7 +929,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextension-read-only-metadata-extension"></a>
 #### GetMetadataExtension (Read-Only / Metadata Extension)
-**Description:** [read-only] Reads the CDS metadata extension named by metadata_extension_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of a CDS metadata extension (DDLX), or its metadata.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
@@ -832,14 +949,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackage-read-only-package"></a>
 #### GetPackage (Read-Only / Package)
-**Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.
+**Description:** [read-only] Reads an ABAP package (DEVC) at the version asked.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -847,12 +964,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackagecontents-read-only-package"></a>
 #### GetPackageContents (Read-Only / Package)
-**Description:** [read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes; with include_descriptions, as single requests, several at a time. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads the objects of one or more ABAP packages (DEVC), with the objects of their subpackages when asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/package/readonly/handleGetPackageContents.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_descriptions` (boolean, optional) - Include each object's description in the response. The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes (default: false)
 - `include_subpackages` (boolean, optional) - Include contents of subpackages recursively (default: false)
 - `max_depth` (number, optional) - Maximum depth for recursive package traversal (default: 5)
@@ -866,7 +984,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogram-read-only-program"></a>
 #### GetProgram (Read-Only / Program)
-**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP's standard programs. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of an ABAP program (PROG) or report, on ABAP Cloud one of SAP's standard programs, or its metadata.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -886,45 +1004,46 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectsbytype-read-only-search"></a>
 #### GetObjectsByType (Read-Only / Search)
-**Description:** [read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type.
+**Description:** [read-only] Reads the objects of one type, such as classes (CLAS), tables (TABL), programs (PROG) or interfaces (INTF), in an ABAP package (DEVC) or other composite object.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 
 **Parameters:**
-- `format` (string, optional) - [read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on `nodeLevel` below.
+- `format` (string, optional) - [read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility and answers the same TSV.
 - `node_id` (string, required) - [read-only] Node ID
 - `parent_name` (string, required) - [read-only] Parent object name
 - `parent_tech_name` (string, required) - [read-only] Parent technical name
 - `parent_type` (string, required) - [read-only] Parent object type
-- `with_short_descriptions` (boolean, optional) - [read-only] Include short descriptions
+- `with_short_descriptions` (boolean, optional) - [read-only] Include short descriptions (default true): a description column on each row
 
 ---
 
 <a id="getobjectslist-read-only-search"></a>
 #### GetObjectsList (Read-Only / Search)
-**Description:** [read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads every object inside an ABAP program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object, down to its nested includes (PROG) and subcomponents. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsList.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objects` (array, optional) - [read-only] Several parents, read together (give this or parent_name)
 - `parent_name` (string, optional) - [read-only] Parent object name (with parent_tech_name and parent_type; or give objects)
 - `parent_tech_name` (string, optional) - [read-only] Parent technical name
 - `parent_type` (string, optional) - [read-only] Parent object type (e.g. PROG/P, FUGR)
-- `with_short_descriptions` (boolean, optional) - [read-only] Include short descriptions (default: true)
+- `with_short_descriptions` (boolean, optional) - [read-only] With detail medium or full: read each object's description from its metadata (default: true)
 
 ---
 
 <a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
-**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system's object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Finds ABAP repository objects by name or name pattern, of any type or of one: classes (CLAS), programs (PROG), tables (TABL), interfaces (INTF) and every other kind. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
 - `object_type` (string, optional) - [read-only] Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class).
@@ -936,7 +1055,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicebinding-read-only-service-binding"></a>
 #### GetServiceBinding (Read-Only / Service Binding)
-**Description:** [read-only] Reads the OData service binding named by service_binding_name in one request, at its active version: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.
+**Description:** [read-only] Reads an OData service binding (SRVB) at its active version, with its binding definition, or its package (DEVC), person responsible and description, in the format asked.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
@@ -954,7 +1073,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicedefinition-read-only-service-definition"></a>
 #### GetServiceDefinition (Read-Only / Service Definition)
-**Description:** [read-only] Reads the service definition named by service_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of a service definition (SRVD), or its metadata.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
@@ -974,7 +1093,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructure-read-only-structure"></a>
 #### GetStructure (Read-Only / Structure)
-**Description:** [read-only] Reads the ABAP structure named by structure_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads an ABAP structure (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
@@ -991,12 +1110,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
-**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. Takes structure_name (one structure: its tree) or structure_names (several structures: one entry per structure, in the order given, each its tree answer or { structure_name, error }). Works on BASIS 7.50 and later, where the DDIC structure/table endpoints it reads exist; legacy systems (BASIS < 7.50) refuse it (issue #207). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads the structures (TABL) embedded in one or more ABAP structures, through their includes and appends, down to the last, at the version asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_extensions` (boolean, optional (default: true)) - [read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.
 - `structure_name` (string, optional) - Structure name (or give structure_names).
 - `structure_names` (array, optional) - Several structure names, read together (give this or structure_name).
@@ -1009,49 +1129,50 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="describebylist-read-only-system"></a>
 #### DescribeByList (Read-Only / System)
-**Description:** [read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object's type is optional: a name of the system's object types list (e.g. CLAS, DTAB, STRU) or an ADT type code (e.g. PROG/P, PROG/I, FUGR/F, FUGR/FF, CLAS/OC, INTF/OI), either case, or a name standing for a code, in lower case (e.g. class, table, structure; view is a CDS view, while VIEW is the dictionary views); an object of any other type is searched by its name alone. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Describes several ABAP repository objects named in one call, each by its name and, when known, its type. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objects` (array, required)
 
 ---
 
 <a id="getadttypes-read-only-system"></a>
 #### GetAdtTypes (Read-Only / System)
-**Description:** [read-only] Retrieve all valid ADT object types (CLAS, TABL, PROG, DEVC, FUGR, INTF, DDLS, DTEL, DOMA, SRVD, SRVB, BDEF, DDLX, etc.) or validate a specific type name.
+**Description:** [read-only] Reads the repository object types the ABAP system knows, by their type codes.
 
 **Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `validate_type` (string, optional) - Type name to validate (optional)
 
 ---
 
 <a id="getinactiveobjects-read-only-system"></a>
 #### GetInactiveObjects (Read-Only / System)
-**Description:** [read-only] Get a list of inactive ABAP objects — modified and pending activation. Shows classes, tables, CDS views, and other objects awaiting activation.
+**Description:** [read-only] Reads the inactive ABAP objects of the system: classes (CLAS), tables (TABL), CDS views (DDLS) and other objects changed and awaiting activation.
 
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 
 <a id="getobjectinfo-read-only-system"></a>
 #### GetObjectInfo (Read-Only / System)
-**Description:** [read-only] Returns the object tree of the package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other object named by parent_type and parent_name. Shows root, group nodes, and terminal leaves up to maxDepth. With enrich=true each node also carries its description and package, from a repository search. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads the repository browser of a package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other repository object, with descriptions and packages when asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectInfo.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `enrich` (boolean, optional (default: true)) - [read-only] Whether to add description and package via SearchObject (default true)
-- `include_descriptions` (boolean, optional (default: false)) - [read-only] Include each leaf's description. Where the system serves ADT batch, each description is read from the leaf's metadata: one more read per leaf, which on a large tree takes most of the call (default false)
+- `include_descriptions` (boolean, optional (default: false)) - [read-only] Include each leaf's description, read from the leaf's metadata once the structure is read: one more read per leaf (in ADT batch envelopes where the system serves them), which on a large tree takes most of the call (default false)
 - `maxDepth` (integer, optional (default: 1)) - [read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.
 - `objects` (array, optional) - [read-only] Several objects, read together (give this or parent_type and parent_name)
 - `parent_name` (string, optional) - [read-only] Parent object name
@@ -1061,7 +1182,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectnodefromcache-read-only-system"></a>
 #### GetObjectNodeFromCache (Read-Only / System)
-**Description:** [read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present, reading the active version of the object it names.
+**Description:** [read-only] Reads one repository object the last objects listing named, by its type, name and technical name, with the content at its URI in the active version.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectNodeFromCache.ts`
 
@@ -1074,26 +1195,34 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectoutline-read-only-system"></a>
 #### GetObjectOutline (Read-Only / System)
-**Description:** [read-only] Lists the components of the ABAP object named by object_type and object_name — types, attributes, methods, events, local classes, forms, includes or modules — with their kind, visibility and level, and the source positions SAP's object structure states for each: the include each link points into and, for a class or an interface, its start and end line and column (lines from 1, columns from 0, the end exclusive), the lines a ranged source read (start_line, end_line) answers. Returns the components as a tree.
+**Description:** [read-only] Reads the components of an ABAP class (CLAS), interface (INTF), program (PROG) or function group (FUGR), with where each one is defined in its source.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectOutline.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `PROG/P`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, PROG/P, FUGR/F (class, interface, program, function group).
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+**On ABAP Cloud (`cloud`):** [read-only] Reads the components of an ABAP class (CLAS), interface (INTF), program (PROG) or function group (FUGR), with where each one is defined in its source.
+
+**Parameters (`cloud`):**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `object_name` (string, required) - Object name.
+- `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, FUGR/F (class, interface, function group).
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
 
 <a id="getobjectstructure-read-only-system"></a>
 #### GetObjectStructure (Read-Only / System)
-**Description:** [read-only] Returns the ADT structure of the repository object named by objecttype and objectname as a compact JSON tree.
+**Description:** [read-only] Reads the structure (TABL) of an ABAP repository object, such as a CDS view (DDLS): its parts and their parts, down to the last level.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objectname` (string, required) - ADT object name (e.g. /CBY/ACQ_DDL)
 - `objecttype` (string, required) - ADT object type (e.g. DDLS/DF)
 
@@ -1101,7 +1230,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicebindingpreviewurl-read-only-system"></a>
 #### GetServiceBindingPreviewUrl (Read-Only / System)
-**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. For a published binding it also reads the $metadata of the service once and answers live: true when the service answers 200, or live: false with the status (live_status) and the words (live_text) SAP answered — on ABAP Cloud a publication is a background job of SAP, and the service answers 403, blocked by UCON, until that job ends. A Web API binding answers the service URLs alone. Over RFC, the URLs are answered as their paths and query, to prefix with the HTTP origin of the system.
+**Description:** [read-only] Reads the Fiori preview URL of a published OData service binding (SRVB), with its service and $metadata URLs.
 
 **Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
 
@@ -1117,7 +1246,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getsqlquery-read-only-system"></a>
 #### GetSqlQuery (Read-Only / System)
-**Description:** [read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads the data an ABAP SQL SELECT selects from database tables (TABL) and CDS views (DDLS), up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
 
@@ -1125,7 +1254,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
 - `sql_query` (string, required) - SQL query to execute
 
@@ -1133,19 +1262,19 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettransaction-read-only-system"></a>
 #### GetTransaction (Read-Only / System)
-**Description:** [read-only] Reads the properties of the ABAP transaction (t-code) named by transaction_name in one request. Answers the transaction under `object` (name, text, type, package) and its facets under `properties`, in the order the system gives them — the application component chain, the package chain, type, owner, language, creation and the others the system names — each entry with its facet, name, displayName and text.
+**Description:** [read-only] Reads the properties of an ABAP transaction code.
 
 **Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transaction_name` (string, required) - Name of the ABAP transaction
 
 ---
 
 <a id="gettypeinfo-read-only-system"></a>
 #### GetTypeInfo (Read-Only / System)
-**Description:** [read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key. Each type is read from the working area: its inactive version where one exists.
+**Description:** [read-only] Reads the DDIC definition of a type name: each data element (DTEL), domain (DOMA), structure (TABL) or table type (TTYP) of that name, its inactive version where one exists.
 
 **Source:** `src/handlers/system/readonly/handleGetTypeInfo.ts`
 
@@ -1157,7 +1286,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads where an ABAP class (CLAS), function module (FUGR), table (TABL) or other repository object is used: every object that uses, calls or references it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
@@ -1166,6 +1295,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `container` (string, optional, one of: `program`, `function_group`) - With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `disable_types` (array, optional) - Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.
 - `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
 - `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
@@ -1177,7 +1307,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimeanalyzeprofilertrace-read-only-system"></a>
 #### RuntimeAnalyzeProfilerTrace (Read-Only / System)
-**Description:** [read-only] [runtime] Read profiler trace view and return compact analysis summary (totals + top entries). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Analyzes one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
 
@@ -1192,7 +1322,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetdumpbyid-read-only-system"></a>
 #### RuntimeGetDumpById (Read-Only / System)
-**Description:** [read-only] [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.
+**Description:** [read-only] Reads an ABAP runtime dump by its id, with a summary of where and why its program (PROG) terminated.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
 
@@ -1205,14 +1335,17 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetgatewayerrorlog-read-only-system"></a>
 #### RuntimeGetGatewayErrorLog (Read-Only / System)
-**Description:** [read-only] [runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.
+**Description:** [read-only] Reads the errors of the SAP Gateway error log, the one /IWFND/ERROR_LOG shows, or the detail of one error.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
 
 **Parameters:**
-- `error_url` (string, optional) - Feed URL of a specific error entry (from a previous list response link field). When provided, returns detailed error info instead of listing.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `detail_kind` (string, optional) - The error's detail_kind, from the list: the kind its detail is read under. Required with opid.
+- `error_url` (string, optional) - An error's detailUri, from the list at detail medium or full: answers that error's detail instead of the list.
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
 - `max_results` (number, optional) - Maximum number of errors to return.
+- `opid` (string, optional) - An error's opid, from the list: with detail_kind, answers that error's detail instead of the list.
 - `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
 - `user` (string, optional) - Filter errors by SAP username.
 
@@ -1220,7 +1353,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetprofilertracedata-read-only-system"></a>
 #### RuntimeGetProfilerTraceData (Read-Only / System)
-**Description:** [read-only] [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads one view of an ABAP profiler trace: its hit list, its statements or its database accesses. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts`
 
@@ -1237,13 +1370,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimelistfeeds-read-only-system"></a>
 #### RuntimeListFeeds (Read-Only / System)
-**Description:** [read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Lists the short dumps, system messages or SAP Gateway errors of an ABAP system by user and time, or the runtime feeds there are and their variants. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `component` (string, optional) - Dumps whose application component contains this text, in any case.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `exception` (string, optional) - Dumps whose exception class contains this text, in any case.
 - `feed_type` (string, optional, one of: `descriptors`, `variants`, `dumps`, `system_messages`, `gateway_errors`) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
 - `feed_types` (array, optional) - Several feeds, read together with the same filters (give this or feed_type).
@@ -1259,22 +1393,23 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimelistprofilertracefiles-read-only-system"></a>
 #### RuntimeListProfilerTraceFiles (Read-Only / System)
-**Description:** [read-only] [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.
+**Description:** [read-only] Lists the ABAP profiler traces recorded in the system.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
 
 **Parameters:**
-- None
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 
 <a id="runtimelistsystemmessages-read-only-system"></a>
 #### RuntimeListSystemMessages (Read-Only / System)
-**Description:** [read-only] [runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.
+**Description:** [read-only] Lists the system messages of the SAP system, the ones SM02 shows, optionally by one author.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
 - `max_results` (number, optional) - Maximum number of messages to return.
 - `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
@@ -1284,13 +1419,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="searchsource-read-only-system"></a>
 #### SearchSource (Read-Only / System)
-**Description:** [read-only] Search ABAP source text inside one or more packages: programs, program includes, function groups (function modules and includes), classes (main source and the four local includes), interfaces, CDS data definitions, behavior definitions, metadata extensions and service definitions. Each source is read at the call's `version` (default active). `packages` takes exact package names and masks (Z*, /NS/Z?); in a mask `*` (zero or more characters) and `?` (one character) are the wildcards, and `+`, `_`, `%` and `#` are characters of the name; a mask is resolved by the repository quick search to every package it matches. `object_types` and `object_filter` select the scan targets of the resolved packages (`PROG` selects programs and program includes, `FUGR` function groups with their modules and includes); every target is read in one run, unless `max_hits` is reached. A line matches when it contains `query` (and `query2`, when given), case-insensitively, and a line containing an `exclude` entry is dropped; `exclude_comments` skips col-1 `*` and full-line `"` comment lines. `max_hits_per_object` limits the hits of each object only when given; each module and each include of a function group is an object of its own, and a program include is one object however many function groups list it (its hits answered and counted once, from the first listing in the scan order). `max_hits` limits the hits of the whole answer, counted in the scan order after `max_hits_per_object`: reached, the scan stops reading, and `truncated.by_max_hits` is true when anything was left. `answer` sets what each hit is answered as: `snippets` (the default) with line and snippet, `lines` with the line only, `objects` one entry per object and include with its number of hits. The answer lists each hit (`results`: package, object type, object name, include, line, snippet). The `object_type` of a hit names its kind of source: `PROG` a program, `PROG/I` a program include (`object_name` the include name), `CLAS` a class with `include` the class name for its main source or `definitions`, `implementations`, `macros`, `testclasses` for its local includes, `INTF`, `DDLS`, `BDEF`, `DDLX` and `SRVD` the object source; a hit in a function module is `FUGR/FF` (`object_name` the module) and a hit in an include addressed under its function group is `FUGR/I` (`object_name` the include), each with `function_group_name`, the group, in place of `include`; an include a function group lists among the program includes is `PROG/I`; `scanned.objects` counts the objects read, `scanned.sources` the sources read (each once) and `scanned.objects_with_hits` the objects with a hit; `truncated.by_object_cap` is true when an object had more hits than `max_hits_per_object`. At a stop the counters report what was done until it; where the reads go in batches, `scanned.sources` counts the sources of the last batch read, those read past the stop included. A source, an object or a package SAP refuses is skipped, and a type node or subpackage SAP refuses is skipped with everything under it; a read that fails before SAP answers ends the call as an error. Sources are read in ADT batch envelopes where the system offers them, each source once per call. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Searches the ABAP source code of one or more packages (DEVC) for a text: programs (PROG), includes (PROG), function groups (FUGR), classes (CLAS), interfaces (INTF) and CDS sources. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleSearchSource.ts`
 
 **Parameters:**
-- `answer` (string, optional, one of: `objects`, `lines`, `snippets`) - What each hit is answered as: snippets (the default: line and snippet), lines (line, no snippet) or objects (one entry per object and include with its number of hits).
+- `answer` (string, optional, one of: `objects`, `lines`, `snippets`) - What each hit is answered as: lines (line, no snippet; the default at detail terse), snippets (line and snippet; the default at medium and full) or objects (one entry per object and include with its number of hits).
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `exclude` (array, optional) - Up to 3 substrings; a line containing any of them is dropped.
 - `exclude_comments` (boolean, optional) - Skip col-1 '*' and full-line '"' comment lines. Default false (comments are scanned).
 - `include_subpackages` (boolean, optional) - Recurse into subpackages (default true).
@@ -1310,7 +1446,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettable-read-only-table"></a>
 #### GetTable (Read-Only / Table)
-**Description:** [read-only] Reads the ABAP database table named by table_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads an ABAP database table (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
@@ -1327,7 +1463,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
-**Description:** [read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads the data of an ABAP database table (TABL) or CDS view (DDLS), as SE16 previews it, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
 
@@ -1335,7 +1471,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `max_rows` (number, optional) - Maximum number of rows to retrieve
 - `table_name` (string, required) - Name of the ABAP table
 
@@ -1343,7 +1479,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettablesettings-read-only-table"></a>
 #### GetTableSettings (Read-Only / Table)
-**Description:** [read-only] Reads the technical settings of the database table named by table_name, at the version asked: data class, size category, buffering (allowed, type, number of key fields), storage type, sharing type, load unit, translation, logging, and the table's description; on ABAP Cloud also whether AMDP may write to the table.
+**Description:** [read-only] Reads the technical settings of an ABAP database table (TABL) at the version asked.
 
 **Source:** `src/handlers/table/readonly/handleGetTableSettings.ts`
 
@@ -1358,7 +1494,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettabletype-read-only-table-type"></a>
 #### GetTableType (Read-Only / Table Type)
-**Description:** [read-only] Reads the ABAP table type named by table_type_name in one request: its ADT metadata document (row type, access, key, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP table type (TTYP) at the version asked, with its element type, access, key, package (DEVC) and description.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
@@ -1375,7 +1511,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettextelements-read-only-text-elements"></a>
 #### GetTextElements (Read-Only / Text Elements)
-**Description:** [read-only] Reads the text elements of the program, function group or class named by object_kind and object_name, in the object's original language, at the version asked: text symbols (key, text, maximum length), selection texts (name, text, and whether the text is the dictionary's label) and the list and column headings. A class has text symbols only. Reads the parts named by parts, every part of the object by default.
+**Description:** [read-only] Reads the text elements of an ABAP program (PROG), function group (FUGR) or class (CLAS) in its original language at the version asked: text symbols, selection texts and headings.
 
 **Source:** `src/handlers/text_elements/readonly/handleGetTextElements.ts`
 
@@ -1392,22 +1528,23 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettransport-read-only-transport"></a>
 #### GetTransport (Read-Only / Transport)
-**Description:** [read-only] Retrieve ABAP transport request information including metadata, included objects, and status from SAP system.
+**Description:** [read-only] Reads an ABAP transport or one of its tasks by its number, and says which of the two it is.
 
 **Source:** `src/handlers/transport/readonly/handleGetTransport.ts`
 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `include_objects` (boolean, optional (default: true)) - Include list of objects in transport (default: true)
-- `include_tasks` (boolean, optional (default: true)) - Include list of tasks in transport (default: true)
-- `transport_number` (string, required) - Transport request number, not a task
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `include_objects` (boolean, optional (default: true)) - With detail terse: list a task's objects (default: true); their count is answered either way.
+- `include_tasks` (boolean, optional (default: true)) - With detail terse: list a request's tasks (default: true); their count is answered either way.
+- `transport_number` (string, required) - Transport request or task number
 
 ---
 
 <a id="listtransports-read-only-transport"></a>
 #### ListTransports (Read-Only / Transport)
-**Description:** [read-only] List the transport requests of a user: the workbench, customizing and transport-of-copies requests the user owns or holds a task in, as SAP selects them. Returns each request's number, description, type, status, owner and target. Modifiable requests by default; with modifiable_only false, released requests too, from SAP's default window of the last 14 days. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Lists a user's transports, workbench, customizing and transport-of-copies alike, that the user owns or holds a task in. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/transport/readonly/handleListTransports.ts`
 
@@ -1415,7 +1552,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `modifiable_only` (boolean, optional) - Modifiable requests only (true, the default), or modifiable and released requests (false; released ones from SAP's default window of the last 14 days).
 - `user` (string, optional) - The SAP user whose requests to list, sent in upper case. Default: the session's login user.
 
@@ -1423,28 +1560,28 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="readtransportactionlog-read-only-transport"></a>
 #### ReadTransportActionLog (Read-Only / Transport)
-**Description:** [read-only] Reads the action log of the transport request named by transport_number: one entry per lifecycle event — created, object added, object deleted, owner changed. It confirms that an object entry was taken out of the request, since a removal answers by echoing what it was asked.
+**Description:** [read-only] Reads the action log of a transport or task: every event of its life, its objects added and taken out among them.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.
 
 ---
 
 <a id="readtransportobjects-read-only-transport"></a>
 #### ReadTransportObjects (Read-Only / Transport)
-**Description:** [read-only] Lists the objects the transport request or task named by transport_number holds, each with its `position`, which a removal of the entry names. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.
+**Description:** [read-only] Reads the objects a transport or one of its tasks holds, each with the position a removal names.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.
 
 ---
@@ -1454,14 +1591,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getunittestresult-read-only-unit-test"></a>
 #### GetUnitTestResult (Read-Only / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.
+**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `format` (string, optional, one of: `abapunit`, `junit`) - Result format: abapunit or junit.
 - `run_id` (string, required) - Run id a unit test run answered.
 - `with_navigation_uris` (boolean, optional) - Include navigation URIs in result if supported.
@@ -1471,38 +1608,148 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 <a id="high-level-group"></a>
 ## High-Level Group
 
+<a id="high-level-abapgit"></a>
+### High-Level / Abapgit
+
+<a id="getabapgitbranchinfo-high-level-abapgit"></a>
+#### GetAbapGitBranchInfo (High-Level / Abapgit)
+**Description:** Reads the abapGit branch information of a remote repository for the package (DEVC) it would be linked to.
+
+**Source:** `src/handlers/abapgit/high/handleGetAbapGitBranchInfo.ts`
+
+**Parameters:**
+- `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
+- `package_name` (string, required) - The ABAP package the repository is linked to.
+- `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+
+---
+
+<a id="linkabapgitrepo-high-level-abapgit"></a>
+#### LinkAbapGitRepo (High-Level / Abapgit)
+**Description:** Links an ABAP package (DEVC) to a remote abapGit repository on a branch and imports the branch's objects into it, recorded in a transport.
+
+**Source:** `src/handlers/abapgit/high/handleLinkAbapGitRepo.ts`
+
+**Parameters:**
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
+- `package_name` (string, required) - The ABAP package the repository is linked to.
+- `transport_request` (string, optional) - The transport request that records the objects written.
+- `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+
+**On ABAP Cloud (`cloud`):** Links an ABAP package (DEVC) to a remote abapGit repository on a branch, mapping its folders to subpackages as asked.
+
+**Parameters (`cloud`):**
+- `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
+- `folder_logic` (string, optional, one of: `FULL`, `PREFIX`) - How the repository's folders map to subpackages: FULL or PREFIX (SAP's default FULL).
+- `package_name` (string, required) - The ABAP package the repository is linked to.
+- `transport_request` (string, optional) - The transport request that records the objects written.
+- `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+
+---
+
+<a id="pullabapgitrepo-high-level-abapgit"></a>
+#### PullAbapGitRepo (High-Level / Abapgit)
+**Description:** Pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport.
+
+**Source:** `src/handlers/abapgit/high/handlePullAbapGitRepo.ts`
+
+**Parameters:**
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+- `transport_request` (string, optional) - The transport request that records the objects written.
+
+**On ABAP Cloud (`cloud`):** Pulls an abapGit repository from the branch it is linked on as an SAP job, recorded in a transport, its imported objects left inactive.
+
+**Parameters (`cloud`):**
+- `overwrite` (array, optional) - The objects listed by GetAbapGitModifiedObjects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused, within one list or across both: SAP matches by name within each list, so a collision inside one list could take an object not named. SAP selects by name when its job runs, against the list as it stands then: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state; SAP leaves a package warning with action 5 (delete and re-create) out of every pull. Without it the job takes every other listed object.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+- `transport_request` (string, optional) - The transport request that records the objects written.
+
+---
+
+<a id="pushabapgitrepo-high-level-abapgit"></a>
+#### PushAbapGitRepo (High-Level / Abapgit)
+**Description:** Pushes the objects and files chosen from an abapGit repository's staging to its remote branch, as a commit with its comment, author and committer.
+
+**Source:** `src/handlers/abapgit/high/handlePushAbapGitRepo.ts`
+
+**Parameters:**
+- `author` (object, required) - The commit author: name and email (GetAbapGitStaging answers the proposal of this system).
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `comment` (string, required) - The commit message.
+- `committer` (object, required) - The committer: name and email (GetAbapGitStaging answers the proposal of this system).
+- `objects` (array, required) - The objects and files to commit, each as GetAbapGitStaging with detail "medium" answers it.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+**On ABAP Cloud (`cloud`):** Pushes the objects and files chosen from an abapGit repository's staging to its remote branch as a commit, run as an SAP job.
+
+**Parameters (`cloud`):**
+- `author` (object, required) - The commit author: name and email (GetAbapGitStaging answers the proposal of this system).
+- `comment` (string, required) - The commit message.
+- `committer` (object, required) - The committer: name and email (GetAbapGitStaging answers the proposal of this system).
+- `objects` (array, required) - The objects and files to commit, each as GetAbapGitStaging with detail "medium" answers it.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="switchabapgitbranch-high-level-abapgit"></a>
+#### SwitchAbapGitBranch (High-Level / Abapgit)
+**Description:** Switches an abapGit repository to a branch, creating the branch in the remote first when asked.
+
+**Source:** `src/handlers/abapgit/high/handleSwitchAbapGitBranch.ts`
+
+**Parameters:**
+- `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
+- `create` (boolean, required) - true creates the branch in the remote when it does not exist; false switches to an existing branch only.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="unlinkabapgitrepo-high-level-abapgit"></a>
+#### UnlinkAbapGitRepo (High-Level / Abapgit)
+**Description:** Unlinks an abapGit repository by its key, keeping its objects in the system and its remote as it is.
+
+**Source:** `src/handlers/abapgit/high/handleUnlinkAbapGitRepo.ts`
+
+**Parameters:**
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
 <a id="high-level-atc"></a>
 ### High-Level / Atc
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** [read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position (location and line), the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the worklist gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `worklist_id` (string, required) - Worklist identifier an ATC run answered.
 
 ---
 
 <a id="getatcresult-high-level-atc"></a>
 #### GetATCResult (High-Level / Atc)
-**Description:** [read-only] Reads the stored ATC result named by display_id. Answers the result's title, check_variant and created_at, how many objects it covered, the counts per priority and each finding with the object, the source position (location and line), the priority, which check ran and what it said. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the result gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCResult.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `display_id` (string, required) - Display ID of a stored ATC result.
 
 ---
 
 <a id="getatcrunstatus-high-level-atc"></a>
 #### GetATCRunStatus (High-Level / Atc)
-**Description:** [read-only] Answers whether the ATC run named by run_id has ended (a run started with wait=false answers its run_id). Answers the status the server reports and whether it is finished — finished means ended, whatever the checks found. The run's findings are read by its worklist_id.
+**Description:** [read-only] Reads the status of an ATC run by its id, and whether it has ended.
 
 **Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
 
@@ -1513,7 +1760,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listatcresults-high-level-atc"></a>
 #### ListATCResults (High-Level / Atc)
-**Description:** [read-only] Lists the ATC results the system holds, newest first. Answers each result with its display_id, title, check_variant, run_series, created_at, the finding counts per priority and the failure count. created_by names whose results (a user name, or * for every user); central_only=true lists central results only; age_min and age_max bound the age in days, and when both are absent the system applies an age window of its own. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/atc/high/handleListATCResults.ts`
 
@@ -1528,7 +1775,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, program, program_include, function_include (with function_group, the include's function group), class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
+**Description:** [read-only] Runs the ABAP Test Cockpit checks of a check variant over ABAP objects and packages (DEVC), recording their findings in a new worklist.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
@@ -1545,21 +1792,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatebehaviordefinition-high-level-behavior-definition"></a>
 #### ActivateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Activates the RAP behavior definition named by name, so its inactive version is in force.
+**Description:** Activates a RAP behavior definition (BDEF), so its inactive version is in force.
 
 **Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Behavior definition name (root entity).
 
 ---
 
 <a id="checkbehaviordefinition-high-level-behavior-definition"></a>
 #### CheckBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Runs a syntax check on the RAP behavior definition (BDEF) named by name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of a RAP behavior definition (BDEF).
 
 **Source:** `src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts`
 
@@ -1573,7 +1820,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.
+**Description:** Creates a managed, unmanaged, abstract or projection RAP behavior definition (BDEF) for a root entity, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
 
@@ -1582,7 +1829,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate after creation. Default: true
 - `description` (string, optional) - Description
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `implementation_type` (string, required, one of: `Managed`, `Unmanaged`, `Abstract`, `Projection`) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', 'Projection'
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `name` (string, required) - Behavior Definition name (usually same as Root Entity name)
@@ -1594,7 +1841,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletebehaviordefinition-high-level-behavior-definition"></a>
 #### DeleteBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes a RAP behavior definition (BDEF), recorded in the transport given.
 
 **Source:** `src/handlers/behavior_definition/high/handleDeleteBehaviorDefinition.ts`
 
@@ -1602,14 +1849,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
 <a id="getbehaviordefinition-high-level-behavior-definition"></a>
 #### GetBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Reads the RAP behavior definition named by behavior_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of a RAP behavior definition (BDEF), or its metadata.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
@@ -1626,7 +1873,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatebehaviordefinition-high-level-behavior-definition"></a>
 #### UpdateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing RAP behavior definition (BDEF), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`
 
@@ -1634,7 +1881,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Behavior Definition name
 - `source_code` (string, required) - New source code
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -1646,7 +1893,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Creates the RAP behavior implementation class named by class_name for the behavior definition named by behavior_definition, in initial state: the FOR BEHAVIOR OF main source and the implementations include are written afterwards, the main source as a class source and the implementations include under the class lock.
+**Description:** Creates the RAP behavior implementation class (CLAS) of a behavior definition (BDEF), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
@@ -1656,7 +1903,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `behavior_definition` (string, required) - Behavior Definition name. The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.
 - `class_name` (string, required) - Behavior Implementation class name.
 - `description` (string, optional) - Class description. If not provided, class_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - Package name
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
@@ -1664,7 +1911,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletebehaviorimplementation-high-level-behavior-implementation"></a>
 #### DeleteBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Delete an ABAP behavior implementation from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes a RAP behavior implementation class (CLAS), recorded in the transport given.
 
 **Source:** `src/handlers/behavior_implementation/high/handleDeleteBehaviorImplementation.ts`
 
@@ -1672,14 +1919,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
 <a id="getbehaviorimplementation-high-level-behavior-implementation"></a>
 #### GetBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** [read-only] Reads the RAP behavior implementation (its class) named by behavior_implementation_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of a RAP behavior implementation class (CLAS), or its metadata.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
@@ -1696,7 +1943,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatebehaviorimplementation-high-level-behavior-implementation"></a>
 #### UpdateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Update source code of an existing ABAP behavior implementation class. Updates the implementations include. Manages lock, update, unlock, and optional activation.
+**Description:** Updates the implementations of an existing RAP behavior implementation class (CLAS), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/behavior_implementation/high/handleUpdateBehaviorImplementation.ts`
 
@@ -1706,7 +1953,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `activate` (boolean, optional) - Activate behavior implementation after update. Default: true.
 - `behavior_definition` (string, required) - Referenced Behavior Definition name. Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).
 - `class_name` (string, required) - Behavior Implementation class name. Must exist in the system.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `implementation_code` (string, required) - Implementation code for the implementations include. Contains the actual behavior implementation methods.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -1717,7 +1964,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateclass-high-level-class"></a>
 #### ActivateClass (High-Level / Class)
-**Description:** Activates the ABAP class named by class_name, so its inactive version is in force.
+**Description:** Activates an ABAP class (CLAS), so its inactive version is in force.
 
 **Source:** `src/handlers/class/low/handleActivateClass.ts`
 
@@ -1725,13 +1972,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 
 <a id="checkclass-high-level-class"></a>
 #### CheckClass (High-Level / Class)
-**Description:** [read-only] Runs a syntax check on the ABAP class named by class_name. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP class (CLAS) as stored or as the source given.
 
 **Source:** `src/handlers/class/high/handleCheckClass.ts`
 
@@ -1746,7 +1993,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Creates the ABAP class named by class_name in the package named by package_name, in initial state: the class object alone; its source code is written by an update of the class.
+**Description:** Creates an ABAP class (CLAS), with its description, its superclass and its FINAL and CREATE PROTECTED settings, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -1756,7 +2003,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `class_name` (string, required) - Class name.
 - `create_protected` (boolean, optional) - Protected constructor. Default: false
 - `description` (string, optional) - Class description (defaults to class_name).
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `final` (boolean, optional) - Mark class as final. Default: false
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name.
@@ -1767,7 +2014,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteclass-high-level-class"></a>
 #### DeleteClass (High-Level / Class)
-**Description:** Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP class (CLAS), recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleDeleteClass.ts`
 
@@ -1775,14 +2022,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
 <a id="deletelocaldefinitions-high-level-class"></a>
 #### DeleteLocalDefinitions (High-Level / Class)
-**Description:** Delete local definitions from an ABAP class by clearing the definitions include. Manages lock, update, unlock, and optional activation.
+**Description:** Deletes the local definitions of an ABAP class (CLAS), activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalDefinitions.ts`
 
@@ -1791,14 +2038,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
 
 <a id="deletelocalmacros-high-level-class"></a>
 #### DeleteLocalMacros (High-Level / Class)
-**Description:** Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros belong to older ABAP versions.
+**Description:** Deletes the local macros of an ABAP class (CLAS), activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalMacros.ts`
 
@@ -1807,14 +2054,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
 
 <a id="deletelocaltestclass-high-level-class"></a>
 #### DeleteLocalTestClass (High-Level / Class)
-**Description:** Clears the local test classes include of the ABAP class named by class_name. The include is cleared under the class lock; with activate_on_delete the class is activated.
+**Description:** Deletes the local test classes of an ABAP class (CLAS), activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
 
@@ -1823,14 +2070,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting test class. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
 <a id="deletelocaltypes-high-level-class"></a>
 #### DeleteLocalTypes (High-Level / Class)
-**Description:** Delete local types from an ABAP class by clearing the implementations include. Manages lock, update, unlock, and optional activation.
+**Description:** Deletes the local types of an ABAP class (CLAS), activating the class when asked.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTypes.ts`
 
@@ -1839,14 +2086,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
 
 <a id="getclass-high-level-class"></a>
 #### GetClass (High-Level / Class)
-**Description:** [read-only] Reads the ABAP class named by class_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -1863,7 +2110,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getlocaldefinitions-high-level-class"></a>
 #### GetLocalDefinitions (High-Level / Class)
-**Description:** [read-only] Reads the local definitions include (the definitions include) of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the local definitions of an ABAP class (CLAS).
 
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
 
@@ -1879,7 +2126,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getlocalmacros-high-level-class"></a>
 #### GetLocalMacros (High-Level / Class)
-**Description:** [read-only] Reads the local macros include of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the local macros of an ABAP class (CLAS).
 
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
 
@@ -1895,7 +2142,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
-**Description:** [read-only] Reads the local test classes include of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the local test classes of an ABAP class (CLAS).
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
@@ -1911,7 +2158,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getlocaltypes-high-level-class"></a>
 #### GetLocalTypes (High-Level / Class)
-**Description:** [read-only] Reads the local types include (the implementations include) of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the local types and implementations of an ABAP class (CLAS).
 
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
 
@@ -1927,7 +2174,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateclass-high-level-class"></a>
 #### UpdateClass (High-Level / Class)
-**Description:** Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing ABAP class (CLAS), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateClass.ts`
 
@@ -1936,7 +2183,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `class_name` (string, required) - Class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `source_code` (string, required) - Complete ABAP class source code.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
@@ -1944,7 +2191,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatelocaldefinitions-high-level-class"></a>
 #### UpdateLocalDefinitions (High-Level / Class)
-**Description:** Update local definitions (class-local types/constants) in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
+**Description:** Updates the local definitions of an existing ABAP class (CLAS), activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalDefinitions.ts`
 
@@ -1954,14 +2201,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local definitions. Default: false
 - `class_name` (string, required) - Parent class name.
 - `definitions_code` (string, required) - Updated source code for local definitions.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
 <a id="updatelocalmacros-high-level-class"></a>
 #### UpdateLocalMacros (High-Level / Class)
-**Description:** Update local macros in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
+**Description:** Updates the local macros of an existing ABAP class (CLAS), activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalMacros.ts`
 
@@ -1970,7 +2217,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local macros. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `macros_code` (string, required) - Updated source code for local macros.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
@@ -1978,7 +2225,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatelocaltestclass-high-level-class"></a>
 #### UpdateLocalTestClass (High-Level / Class)
-**Description:** Writes test_class_code as the local test classes include of the ABAP class named by class_name. The include is written under the class lock; with activate_on_update the class is activated.
+**Description:** Updates the local test classes of an existing ABAP class (CLAS), activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
@@ -1987,7 +2234,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating test class. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `test_class_code` (string, required) - Updated source code for the local test class.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
@@ -1995,7 +2242,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatelocaltypes-high-level-class"></a>
 #### UpdateLocalTypes (High-Level / Class)
-**Description:** Update local types definitions in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
+**Description:** Updates the local types of an existing ABAP class (CLAS), activating the class when asked, recorded in the transport given.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTypes.ts`
 
@@ -2004,7 +2251,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local types. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `local_types_code` (string, required) - Updated source code for local types.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
@@ -2015,19 +2262,27 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateobjects-high-level-common"></a>
 #### ActivateObjects (High-Level / Common)
-**Description:** Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.
+**Description:** Activates several ABAP repository objects of any type together in one activation, such as domains (DOMA), data elements (DTEL) and tables (TABL) at once.
 
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, PROG/P, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, program, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes; any other call is a group activation.
+
+**On ABAP Cloud (`cloud`):** Activates several ABAP repository objects of any type together in one activation, such as domains (DOMA), data elements (DTEL) and tables (TABL) at once.
+
+**Parameters (`cloud`):**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
+- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes; any other call is a group activation.
 
 ---
 
 <a id="getbehaviordefinitionversiondiff-high-level-common"></a>
 #### GetBehaviorDefinitionVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two RAP behavior definition versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
+**Description:** [read-only] Reads two versions of the same RAP behavior definition (BDEF) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2039,7 +2294,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviordefinitionversions-high-level-common"></a>
 #### GetBehaviorDefinitionVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the RAP behavior definition named by behavior_definition_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Reads the version history of a RAP behavior definition (BDEF).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2050,7 +2305,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviordefinitionversionsource-high-level-common"></a>
 #### GetBehaviorDefinitionVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the RAP behavior definition version named by content_uri, an entry of the RAP behavior definition's version history.
+**Description:** [read-only] Reads an older version of the source code of a RAP behavior definition (BDEF) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2061,7 +2316,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclassversiondiff-high-level-common"></a>
 #### GetClassVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two ABAP class versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
+**Description:** [read-only] Reads two versions of the same ABAP class (CLAS) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2073,7 +2328,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclassversions-high-level-common"></a>
 #### GetClassVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP class named by class_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Reads the version history of an ABAP class (CLAS).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2084,7 +2339,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclassversionsource-high-level-common"></a>
 #### GetClassVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP class version named by content_uri, an entry of the ABAP class's version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP class (CLAS) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2095,41 +2350,41 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getddlversiondiff-high-level-common"></a>
 #### GetDdlVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two CDS view (DDL source) versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
+**Description:** [read-only] Reads two versions of the same CDS view (DDLS) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the CDS view (DDL source)'s version history.
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the CDS view (DDL source)'s version history.
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the CDS view's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the CDS view's version history.
 
 ---
 
 <a id="getddlversions-high-level-common"></a>
 #### GetDdlVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the CDS view (DDL source) named by ddl_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Reads the version history of a CDS view (DDLS).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - CDS view (DDL source) name.
+- `ddl_name` (string, required) - CDS view name.
 
 ---
 
 <a id="getddlversionsource-high-level-common"></a>
 #### GetDdlVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the CDS view (DDL source) version named by content_uri, an entry of the CDS view (DDL source)'s version history.
+**Description:** [read-only] Reads an older version of the source code of a CDS view (DDLS) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
 **Parameters:**
-- `content_uri` (string, required) - Opaque content_uri of a version, from the CDS view (DDL source)'s version history.
+- `content_uri` (string, required) - Opaque content_uri of a version, from the CDS view's version history.
 
 ---
 
 <a id="getfunctionmoduleversiondiff-high-level-common"></a>
 #### GetFunctionModuleVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two ABAP function module versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
+**Description:** [read-only] Reads two versions of the same ABAP function module (FUGR) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2141,7 +2396,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctionmoduleversions-high-level-common"></a>
 #### GetFunctionModuleVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP function module named by function_module_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Reads the version history of an ABAP function module (FUGR).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2153,7 +2408,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctionmoduleversionsource-high-level-common"></a>
 #### GetFunctionModuleVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP function module version named by content_uri, an entry of the ABAP function module's version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP function module (FUGR) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2164,7 +2419,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterfaceversiondiff-high-level-common"></a>
 #### GetInterfaceVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two ABAP interface versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
+**Description:** [read-only] Reads two versions of the same ABAP interface (INTF) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2176,7 +2431,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterfaceversions-high-level-common"></a>
 #### GetInterfaceVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP interface named by interface_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Reads the version history of an ABAP interface (INTF).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2187,7 +2442,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterfaceversionsource-high-level-common"></a>
 #### GetInterfaceVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP interface version named by content_uri, an entry of the ABAP interface's version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP interface (INTF) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2198,7 +2453,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextensionversiondiff-high-level-common"></a>
 #### GetMetadataExtensionVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two CDS metadata extension versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
+**Description:** [read-only] Reads two versions of the same CDS metadata extension (DDLX) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2210,7 +2465,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextensionversions-high-level-common"></a>
 #### GetMetadataExtensionVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the CDS metadata extension named by metadata_extension_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Reads the version history of a CDS metadata extension (DDLX).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2221,7 +2476,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextensionversionsource-high-level-common"></a>
 #### GetMetadataExtensionVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the CDS metadata extension version named by content_uri, an entry of the CDS metadata extension's version history.
+**Description:** [read-only] Reads an older version of the source code of a CDS metadata extension (DDLX) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2232,7 +2487,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogramversiondiff-high-level-common"></a>
 #### GetProgramVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two ABAP program versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** [read-only] Reads two versions of the same ABAP program (PROG) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2244,7 +2499,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogramversions-high-level-common"></a>
 #### GetProgramVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP program named by program_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** [read-only] Reads the version history of an ABAP program (PROG), on ABAP Cloud one of SAP's standard programs.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2255,7 +2510,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogramversionsource-high-level-common"></a>
 #### GetProgramVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP program version named by content_uri, an entry of the ABAP program's version history. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** [read-only] Reads an older version of the source code of an ABAP program (PROG), on ABAP Cloud one of SAP's standard programs from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2266,7 +2521,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructureversiondiff-high-level-common"></a>
 #### GetStructureVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two ABAP structure versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
+**Description:** [read-only] Reads two versions of the same ABAP structure (TABL) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2278,7 +2533,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructureversions-high-level-common"></a>
 #### GetStructureVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP structure named by structure_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Reads the version history of an ABAP structure (TABL).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2289,7 +2544,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructureversionsource-high-level-common"></a>
 #### GetStructureVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP structure version named by content_uri, an entry of the ABAP structure's version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP structure (TABL) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2300,7 +2555,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettabletypeversions-high-level-common"></a>
 #### GetTableTypeVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP table type named by table_type_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Reads the version history of an ABAP table type (TTYP).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2311,7 +2566,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettableversiondiff-high-level-common"></a>
 #### GetTableVersionDiff (High-Level / Common)
-**Description:** [read-only] Compares the two ABAP table versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.
+**Description:** [read-only] Reads two versions of the same ABAP table (TABL) from its version history and compares them.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2323,7 +2578,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettableversions-high-level-common"></a>
 #### GetTableVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP table named by table_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Reads the version history of an ABAP table (TABL).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2334,7 +2589,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettableversionsource-high-level-common"></a>
 #### GetTableVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP table version named by content_uri, an entry of the ABAP table's version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP table (TABL) from its version history.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -2348,7 +2603,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatedataelement-high-level-data-element"></a>
 #### ActivateDataElement (High-Level / Data Element)
-**Description:** Activates the ABAP data element named by data_element_name, so its inactive version is in force.
+**Description:** Activates an ABAP data element (DTEL), so its inactive version is in force.
 
 **Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
 
@@ -2356,13 +2611,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 
 <a id="checkdataelement-high-level-data-element"></a>
 #### CheckDataElement (High-Level / Data Element)
-**Description:** [read-only] Runs a syntax check on the ABAP data element named by data_element_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP data element (DTEL).
 
 **Source:** `src/handlers/data_element/high/handleCheckDataElement.ts`
 
@@ -2376,7 +2631,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createdataelement-high-level-data-element"></a>
 #### CreateDataElement (High-Level / Data Element)
-**Description:** Create a new ABAP data element in SAP system. Creates the data element object in initial state.
+**Description:** Creates an ABAP data element (DTEL), typed by a domain (DOMA), a built-in type or a reference, with its labels and search help, recorded in the transport given.
 
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
 
@@ -2387,7 +2642,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `data_type` (string, optional (default: CHAR)) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'domain'.
 - `decimals` (number, optional (default: 0)) - Decimal places. Usually inherited from domain.
 - `description` (string, optional) - Data element description. If not provided, data_element_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `heading_label` (string, optional) - Heading field label (max 55 chars). Applied during update step after creation.
 - `length` (number, optional (default: 100)) - Data type length. Usually inherited from domain.
 - `long_label` (string, optional) - Long field label (max 40 chars). Applied during update step after creation.
@@ -2406,7 +2661,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletedataelement-high-level-data-element"></a>
 #### DeleteDataElement (High-Level / Data Element)
-**Description:** Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP data element (DTEL), recorded in the transport given.
 
 **Source:** `src/handlers/data_element/high/handleDeleteDataElement.ts`
 
@@ -2414,14 +2669,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
 <a id="getdataelement-high-level-data-element"></a>
 #### GetDataElement (High-Level / Data Element)
-**Description:** [read-only] Reads the ABAP data element named by data_element_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP data element (DTEL) at the version asked, with its domain (DOMA) or built-in type, its labels, search help, package (DEVC) and description.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -2435,7 +2690,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatedataelement-high-level-data-element"></a>
 #### UpdateDataElement (High-Level / Data Element)
-**Description:** Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
+**Description:** Updates the type, labels, search help and SET/GET parameter of an existing ABAP data element (DTEL), replacing them whole and activating it when asked.
 
 **Source:** `src/handlers/data_element/high/handleUpdateDataElement.ts`
 
@@ -2447,7 +2702,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `data_type` (string, optional) - Data type (CHAR, NUMC, etc.) - for predefinedAbapType or refToPredefinedAbapType
 - `decimals` (number, optional) - Decimals - for predefinedAbapType or refToPredefinedAbapType
 - `description` (string, optional) - New data element description
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `field_label_heading` (string, optional) - Heading field label (max 55 chars)
 - `field_label_long` (string, optional) - Long field label (max 40 chars)
 - `field_label_medium` (string, optional) - Medium field label (max 20 chars)
@@ -2468,7 +2723,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateddl-high-level-ddl"></a>
 #### ActivateDdl (High-Level / Ddl)
-**Description:** Activates the CDS view (DDL source) named by ddl_name, so its inactive version is in force.
+**Description:** Activates a CDS view (DDLS), so its inactive version is in force.
 
 **Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
 
@@ -2476,13 +2731,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 
 <a id="checkddl-high-level-ddl"></a>
 #### CheckDdl (High-Level / Ddl)
-**Description:** [read-only] Runs a syntax check on the CDS view named by ddl_name. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of a CDS view (DDLS) as stored or as the source given.
 
 **Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
 
@@ -2497,7 +2752,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Creates the CDS view or classic DDL view named by ddl_name in the package named by package_name, in initial state: the DDL source object, its DDL source code written afterwards.
+**Description:** Creates a CDS view (DDLS) or classic DDL view, with its description, recorded in the transport given.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
@@ -2506,7 +2761,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
 - `description` (string, optional) - Optional description (defaults to ddl_name).
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
 - `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
@@ -2515,7 +2770,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteddl-high-level-ddl"></a>
 #### DeleteDdl (High-Level / Ddl)
-**Description:** Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes a CDS view (DDLS) or classic DDL view, recorded in the transport given.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
@@ -2523,14 +2778,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
 <a id="getddl-high-level-ddl"></a>
 #### GetDdl (High-Level / Ddl)
-**Description:** [read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of a CDS view (DDLS) or classic DDL view, or its metadata.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
@@ -2547,7 +2802,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateddl-high-level-ddl"></a>
 #### UpdateDdl (High-Level / Ddl)
-**Description:** Updates the DDL source code of the existing CDS view or classic DDL view named by ddl_name to ddl_source. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the DDL source of an existing CDS view (DDLS) or classic DDL view, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
 
@@ -2557,7 +2812,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `ddl_name` (string, required) - DDL source name.
 - `ddl_source` (string, required) - Complete DDL source code.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
@@ -2567,21 +2822,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatemetadataextension-high-level-ddlx"></a>
 #### ActivateMetadataExtension (High-Level / Ddlx)
-**Description:** Activates the CDS metadata extension named by name, so its inactive version is in force.
+**Description:** Activates a CDS metadata extension (DDLX), so its inactive version is in force.
 
 **Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Metadata Extension name.
 
 ---
 
 <a id="checkmetadataextension-high-level-ddlx"></a>
 #### CheckMetadataExtension (High-Level / Ddlx)
-**Description:** [read-only] Runs a syntax check on the CDS metadata extension (DDLX) named by name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of a CDS metadata extension (DDLX).
 
 **Source:** `src/handlers/ddlx/high/handleCheckMetadataExtension.ts`
 
@@ -2595,7 +2850,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
-**Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.
+**Description:** Creates a CDS metadata extension (DDLX), with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
 
@@ -2604,7 +2859,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate after creation. Default: true
 - `description` (string, optional) - Description
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `name` (string, required) - Metadata Extension name
 - `package_name` (string, required) - Package name
@@ -2614,7 +2869,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatemetadataextension-high-level-ddlx"></a>
 #### UpdateMetadataExtension (High-Level / Ddlx)
-**Description:** Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing CDS metadata extension (DDLX), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`
 
@@ -2622,7 +2877,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Metadata Extension name
 - `source_code` (string, required) - New source code
 - `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
@@ -2634,21 +2889,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatedomain-high-level-domain"></a>
 #### ActivateDomain (High-Level / Domain)
-**Description:** Activates the ABAP domain named by domain_name, so its inactive version is in force.
+**Description:** Activates an ABAP domain (DOMA), so its inactive version is in force.
 
 **Source:** `src/handlers/domain/low/handleActivateDomain.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `domain_name` (string, required) - Domain name.
 
 ---
 
 <a id="checkdomain-high-level-domain"></a>
 #### CheckDomain (High-Level / Domain)
-**Description:** [read-only] Runs a syntax check on the ABAP domain named by domain_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP domain (DOMA).
 
 **Source:** `src/handlers/domain/high/handleCheckDomain.ts`
 
@@ -2662,7 +2917,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createdomain-high-level-domain"></a>
 #### CreateDomain (High-Level / Domain)
-**Description:** Create a new ABAP domain in SAP system. Creates the domain object in initial state.
+**Description:** Creates an ABAP domain (DOMA), with its data type, length, decimals, conversion exit, value table and fixed values, recorded in the transport given.
 
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
 
@@ -2674,7 +2929,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `datatype` (string, optional (default: CHAR)) - (optional) Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
 - `decimals` (number, optional (default: 0)) - (optional) Decimal places (for DEC, CURR, QUAN types)
 - `description` (string, optional) - (optional) Domain description. If not provided, domain_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `domain_name` (string, required) - Domain name.
 - `fixed_values` (array, optional) - (optional) Array of fixed values for domain value range
 - `length` (number, optional (default: 100)) - (optional) Field length (max depends on datatype)
@@ -2689,14 +2944,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletedomain-high-level-domain"></a>
 #### DeleteDomain (High-Level / Domain)
-**Description:** Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP domain (DOMA), recorded in the transport given.
 
 **Source:** `src/handlers/domain/high/handleDeleteDomain.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `domain_name` (string, required) - Domain name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -2704,7 +2959,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getdomain-high-level-domain"></a>
 #### GetDomain (High-Level / Domain)
-**Description:** [read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP domain (DOMA) at the version asked, with its data type, length, output format, value table, fixed values, package (DEVC) and description.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -2718,7 +2973,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatedomain-high-level-domain"></a>
 #### UpdateDomain (High-Level / Domain)
-**Description:** Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
+**Description:** Updates the data type, length, decimals, conversion exit, value table and fixed values of an existing ABAP domain (DOMA), replacing them whole.
 
 **Source:** `src/handlers/domain/high/handleUpdateDomain.ts`
 
@@ -2730,7 +2985,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `datatype` (string, optional) - Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
 - `decimals` (number, optional) - Decimal places (for DEC, CURR, QUAN types)
 - `description` (string, optional) - New domain description (optional)
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `domain_name` (string, required) - Domain name to update
 - `fixed_values` (array, optional) - Array of fixed values for domain value range
 - `length` (number, optional) - Field length (max depends on datatype)
@@ -2747,28 +3002,28 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatefunctiongroup-high-level-function"></a>
 #### ActivateFunctionGroup (High-Level / Function)
-**Description:** Activates the ABAP function group named by function_group_name, so its inactive version is in force.
+**Description:** Activates an ABAP function group (FUGR), so its inactive version is in force.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionGroup.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name.
 
 ---
 
 <a id="activatefunctionmodule-high-level-function"></a>
 #### ActivateFunctionModule (High-Level / Function)
-**Description:** Activates the ABAP function module named by function_module_name in the function group named by function_group_name, so its inactive version is in force.
+**Description:** Activates an ABAP function module (FUGR) of a function group (FUGR), so its inactive version is in force.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name.
 - `function_module_name` (string, required) - Function module name.
 
@@ -2776,7 +3031,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkfunctiongroup-high-level-function"></a>
 #### CheckFunctionGroup (High-Level / Function)
-**Description:** [read-only] Runs a syntax check on the ABAP function group named by function_group_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP function group (FUGR).
 
 **Source:** `src/handlers/function/high/handleCheckFunctionGroup.ts`
 
@@ -2790,7 +3045,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkfunctionmodule-high-level-function"></a>
 #### CheckFunctionModule (High-Level / Function)
-**Description:** [read-only] Runs a syntax check on the ABAP function module named by function_module_name in the function group named by function_group_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP function module (FUGR) of a function group (FUGR).
 
 **Source:** `src/handlers/function/high/handleCheckFunctionModule.ts`
 
@@ -2805,7 +3060,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
-**Description:** Create a new ABAP function group in SAP system. Function groups serve as containers for function modules.
+**Description:** Creates an ABAP function group (FUGR), with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionGroup.ts`
 
@@ -2814,7 +3069,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate function group after creation. Default: true. Set to false for batch operations.
 - `description` (string, optional) - Function group description. If not provided, function_group_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name. Up to 26 characters.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
@@ -2824,7 +3079,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createfunctionmodule-high-level-function"></a>
 #### CreateFunctionModule (High-Level / Function)
-**Description:** Create a new ABAP function module within an existing function group. Creates the function module in initial state.
+**Description:** Creates an ABAP function module (FUGR) in an existing function group (FUGR), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionModule.ts`
 
@@ -2832,7 +3087,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, optional) - Optional description for the function module
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Parent function group name
 - `function_module_name` (string, required) - Function module name. Up to 30 characters.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -2841,7 +3096,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
-**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules, which carry the source; this updates the group's metadata alone. Locks the group, writes, and unlocks it.
+**Description:** Updates the description of an existing ABAP function group (FUGR), recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 
@@ -2849,7 +3104,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, required) - New description for the function group.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name. Must exist in the system.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -2857,7 +3112,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatefunctionmodule-high-level-function"></a>
 #### UpdateFunctionModule (High-Level / Function)
-**Description:** Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing ABAP function module (FUGR) in its function group (FUGR), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionModule.ts`
 
@@ -2865,7 +3120,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate function module after source update. Default: false. Set to true to activate immediately.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name containing the function module.
 - `function_module_name` (string, required) - Function module name. Function module must already exist.
 - `source_code` (string, required) - Complete ABAP function module source code, from FUNCTION to ENDFUNCTION.
@@ -2878,14 +3133,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletefunctiongroup-high-level-function-group"></a>
 #### DeleteFunctionGroup (High-Level / Function Group)
-**Description:** Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP function group (FUGR), recorded in the transport given.
 
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - FunctionGroup name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -2893,7 +3148,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctiongroup-high-level-function-group"></a>
 #### GetFunctionGroup (High-Level / Function Group)
-**Description:** [read-only] Reads the ABAP function group named by function_group_name in one request: its ADT metadata document (package, description, contents), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP function group (FUGR) at the version asked, with its package (DEVC), description and contents.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
@@ -2910,13 +3165,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createfunctioninclude-high-level-function-include"></a>
 #### CreateFunctionInclude (High-Level / Function Include)
-**Description:** Create a new ABAP include within an existing function group. Creates the include in initial state.
+**Description:** Creates an include (FUGR) in an existing ABAP function group (FUGR), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
 
 **Parameters:**
 - `description` (string, optional) - Optional description for the include
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Parent function group name
 - `include_name` (string, required) - Include name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -2925,12 +3180,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletefunctioninclude-high-level-function-include"></a>
 #### DeleteFunctionInclude (High-Level / Function Include)
-**Description:** Delete an ABAP function group include from the SAP system via ADT deletion API. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for local objects.
+**Description:** Deletes an include (FUGR) of an ABAP function group (FUGR), recorded in the transport given.
 
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name containing the include.
 - `include_name` (string, required) - Include name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
@@ -2939,13 +3194,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatefunctioninclude-high-level-function-include"></a>
 #### UpdateFunctionInclude (High-Level / Function Include)
-**Description:** Update source code of an existing ABAP function group include.
+**Description:** Updates the source code of an existing include (FUGR) of an ABAP function group (FUGR), activating it when asked.
 
 **Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
 
 **Parameters:**
 - `activate` (boolean, optional (default: false)) - Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name containing the include.
 - `include_name` (string, required) - Include name. Include must already exist.
 - `source_code` (string, required) - Complete ABAP include source code.
@@ -2958,14 +3213,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletefunctionmodule-high-level-function-module"></a>
 #### DeleteFunctionModule (High-Level / Function Module)
-**Description:** Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP function module (FUGR), recorded in the transport given.
 
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - FunctionGroup name containing the function module.
 - `function_module_name` (string, required) - FunctionModule name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
@@ -2974,7 +3229,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** [read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name: its source code, which declares the parameter signature (part "source", the default), or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. The module's metadata is read first, and the part is answered only when the function group named holds the module. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of an ABAP function module (FUGR), BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -2995,21 +3250,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateinclude-high-level-include"></a>
 #### ActivateInclude (High-Level / Include)
-**Description:** Activates the ABAP include named by include_name, so its inactive version is in force.
+**Description:** Activates an ABAP include (PROG), so its inactive version is in force.
 
 **Source:** `src/handlers/include/low/handleActivateInclude.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name.
 
 ---
 
 <a id="createinclude-high-level-include"></a>
 #### CreateInclude (High-Level / Include)
-**Description:** Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive, holding the comment header SAP writes into a new include; its source is written afterwards.
+**Description:** Creates an ABAP include (PROG), with its description and the comment header SAP writes into it, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleCreateInclude.ts`
 
@@ -3017,7 +3272,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, optional) - Include description. If not provided, include_name is used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name.
@@ -3027,14 +3282,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteinclude-high-level-include"></a>
 #### DeleteInclude (High-Level / Include)
-**Description:** Deletes the ABAP include named by include_name through the ADT deletion service, after asking whether it can be deleted. Returns the deletion result.
+**Description:** Deletes an ABAP include (PROG), recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleDeleteInclude.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3042,7 +3297,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateinclude-high-level-include"></a>
 #### UpdateInclude (High-Level / Include)
-**Description:** Writes source_code as the whole source of the ABAP include named by include_name: locks it, writes, unlocks, and activates when activate is true. Returns SAP's answer to the write (and to the activation).
+**Description:** Updates the source code of an existing ABAP include (PROG), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleUpdateInclude.ts`
 
@@ -3050,7 +3305,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate the include after the write. Default: false.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name. The include must already exist.
 - `source_code` (string, required) - Complete ABAP source of the include.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -3059,12 +3314,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateincludemetadata-high-level-include"></a>
 #### UpdateIncludeMetadata (High-Level / Include)
-**Description:** Writes the given metadata document as the whole stored metadata of the ABAP include named by include_name: locks it, writes, unlocks. Returns SAP's answer to the write.
+**Description:** Updates the stored metadata of an existing ABAP include (PROG), replacing it whole, recorded in the transport given.
 
 **Source:** `src/handlers/include/high/handleUpdateIncludeMetadata.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name. The include must already exist.
 - `metadata` (string, required) - The whole ADT metadata document of the include, as GetInclude part "metadata" returns it, with the changes made; it is sent as given and replaces the stored one.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -3076,21 +3331,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateinterface-high-level-interface"></a>
 #### ActivateInterface (High-Level / Interface)
-**Description:** Activates the ABAP interface named by interface_name, so its inactive version is in force.
+**Description:** Activates an ABAP interface (INTF), so its inactive version is in force.
 
 **Source:** `src/handlers/interface/low/handleActivateInterface.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `interface_name` (string, required) - Interface name.
 
 ---
 
 <a id="checkinterface-high-level-interface"></a>
 #### CheckInterface (High-Level / Interface)
-**Description:** [read-only] Runs a syntax check on the ABAP interface named by interface_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP interface (INTF).
 
 **Source:** `src/handlers/interface/high/handleCheckInterface.ts`
 
@@ -3104,7 +3359,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
-**Description:** Create a new ABAP interface in SAP system. Creates the interface object in initial state.
+**Description:** Creates an ABAP interface (INTF), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
 
@@ -3112,7 +3367,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, optional) - Interface description. If not provided, interface_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `interface_name` (string, required) - Interface name.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
@@ -3122,14 +3377,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteinterface-high-level-interface"></a>
 #### DeleteInterface (High-Level / Interface)
-**Description:** Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP interface (INTF), recorded in the transport given.
 
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `interface_name` (string, required) - Interface name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3137,7 +3392,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterface-high-level-interface"></a>
 #### GetInterface (High-Level / Interface)
-**Description:** [read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of an ABAP interface (INTF), or its metadata.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
@@ -3154,7 +3409,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateinterface-high-level-interface"></a>
 #### UpdateInterface (High-Level / Interface)
-**Description:** Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing ABAP interface (INTF), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
 
@@ -3162,7 +3417,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate interface after update. Default: true.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `interface_name` (string, required) - Interface name. Must exist in the system.
 - `source_code` (string, required) - Complete ABAP interface source code with INTERFACE...ENDINTERFACE section.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
@@ -3174,13 +3429,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createmessageclass-high-level-message-class"></a>
 #### CreateMessageClass (High-Level / Message Class)
-**Description:** Creates the ABAP message class (T100) named by message_class_name, with its description, in the package named by package_name: a shell whose messages are added afterwards. A message class is in effect once saved.
+**Description:** Creates an ABAP message class (MSAG), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
 
 **Parameters:**
 - `description` (string, optional) - (optional) Short description. If not provided, message_class_name is used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `message_class_name` (string, required) - Message class name.
 - `package_name` (string, required) - Package name.
@@ -3190,7 +3445,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createmessageclassmessage-high-level-message-class"></a>
 #### CreateMessageClassMessage (High-Level / Message Class)
-**Description:** Adds the message numbered msgno, with the text msgtext, to the existing ABAP message class (T100) named by message_class_name.
+**Description:** Creates a message in an existing ABAP message class (MSAG), with its number, text and self-explanatory flag, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClassMessage.ts`
 
@@ -3206,12 +3461,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletemessageclass-high-level-message-class"></a>
 #### DeleteMessageClass (High-Level / Message Class)
-**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local objects.
+**Description:** Deletes an ABAP message class (MSAG) with all its messages, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `message_class_name` (string, required) - Message class name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects, optional for local ones.
 
@@ -3219,7 +3474,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletemessageclassmessage-high-level-message-class"></a>
 #### DeleteMessageClassMessage (High-Level / Message Class)
-**Description:** Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.
+**Description:** Deletes one message, by its number, from an ABAP message class (MSAG), keeping the class (CLAS) and its other messages.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClassMessage.ts`
 
@@ -3232,7 +3487,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmessageclass-high-level-message-class"></a>
 #### GetMessageClass (High-Level / Message Class)
-**Description:** [read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request, at its active version: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP message class (MSAG): its messages with their numbers and texts, and its master language.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
@@ -3243,12 +3498,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** [read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request, from the active version of the class. Answers the one message under `message`: its number (msgno), text (msgtext), self-explanatory flag (selfexplainatory), long-text flag (documented), last changer (lastchangedby), change time (lastmodified), and every other field the system gives the message. A number absent from the class is refused as missing.
+**Description:** [read-only] Reads one message of an ABAP message class (MSAG) at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
@@ -3256,13 +3511,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatemessageclass-high-level-message-class"></a>
 #### UpdateMessageClass (High-Level / Message Class)
-**Description:** Updates the header of the ABAP message class named by message_class_name: its description.
+**Description:** Updates the description of an existing ABAP message class (MSAG), recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClass.ts`
 
 **Parameters:**
 - `description` (string, required) - New short description for the message class.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `message_class_name` (string, required) - Message class name.
 - `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable objects.
 
@@ -3270,7 +3525,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatemessageclassmessage-high-level-message-class"></a>
 #### UpdateMessageClassMessage (High-Level / Message Class)
-**Description:** Change the text / flags of an existing message in an ABAP message class (T100). Creates the message when the class lacks it (upsert).
+**Description:** Updates the text and flags of a message in an ABAP message class (MSAG), creating the message when the class (CLAS) lacks it, recorded in the transport given.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClassMessage.ts`
 
@@ -3289,14 +3544,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletemetadataextension-high-level-metadata-extension"></a>
 #### DeleteMetadataExtension (High-Level / Metadata Extension)
-**Description:** Delete an ABAP metadata extension from the SAP system. Transport request optional for local objects.
+**Description:** Deletes a CDS metadata extension (DDLX), recorded in the transport given.
 
 **Source:** `src/handlers/metadata_extension/high/handleDeleteMetadataExtension.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `metadata_extension_name` (string, required) - MetadataExtension name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3304,7 +3559,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextension-high-level-metadata-extension"></a>
 #### GetMetadataExtension (High-Level / Metadata Extension)
-**Description:** [read-only] Reads the CDS metadata extension named by metadata_extension_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of a CDS metadata extension (DDLX), or its metadata.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
@@ -3324,7 +3579,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="checkpackage-high-level-package"></a>
 #### CheckPackage (High-Level / Package)
-**Description:** [read-only] Runs a syntax check on the ABAP package named by package_name. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP package (DEVC).
 
 **Source:** `src/handlers/package/high/handleCheckPackage.ts`
 
@@ -3338,7 +3593,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createpackage-high-level-package"></a>
 #### CreatePackage (High-Level / Package)
-**Description:** Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.
+**Description:** Creates a new ABAP package (DEVC) under a super package, with its type, software component, transport layer and description.
 
 **Source:** `src/handlers/package/high/handleCreatePackage.ts`
 
@@ -3347,13 +3602,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `application_component` (string, optional) - Application component (optional, e.g., BC-ABA)
 - `description` (string, optional) - Package description. If not provided, package_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name.
 - `package_type` (string, optional (default: development), one of: `development`, `structure`) - Package type: 'development' (default) or 'structure'
 - `record_changes` (boolean, optional) - Enable change recording for the package. Required for transportable packages. Default: false.
 - `software_component` (string, optional) - Software component. If not provided, SAP will set a default.
-- `super_package` (string, optional) - The package this package belongs to; a top-level package has none.
+- `super_package` (string, optional) - Optional: the package this package belongs to, which must exist (SAP creates the package with no super package when the named one is missing). Without one the package is top level, which SAP allows for a structure package or a package in software component LOCAL ($ or TEST names, no transport layer); in an ABAP Cloud software component the top level is a structure package (SAP answers TR 462 to any other).
 - `transport_layer` (string, optional) - Transport layer. Required for transportable packages.
 - `transport_request` (string, optional) - Transport request number, not a task. Required if the package is transportable.
 
@@ -3361,14 +3616,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletepackage-high-level-package"></a>
 #### DeletePackage (High-Level / Package)
-**Description:** Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server save a package on a session apart from this one, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.
+**Description:** Deletes an ABAP package (DEVC), recorded in the transport given.
 
 **Source:** `src/handlers/package/high/handleDeletePackage.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
 - `package_name` (string, required) - Package name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
@@ -3377,14 +3632,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.
+**Description:** [read-only] Reads an ABAP package (DEVC) at the version asked.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -3392,7 +3647,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatepackage-high-level-package"></a>
 #### UpdatePackage (High-Level / Package)
-**Description:** Update the description of an existing ABAP package. Locks the package, writes, and unlocks it again, whatever the write answered. Over RFC this runs in an ABAP session of its own, closed afterwards.
+**Description:** Updates the description of an existing ABAP package (DEVC), recorded in the transport given.
 
 **Source:** `src/handlers/package/high/handleUpdatePackage.ts`
 
@@ -3400,7 +3655,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, required) - New description for the package.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - Package name. Package must already exist.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
@@ -3411,21 +3666,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateprogram-high-level-program"></a>
 #### ActivateProgram (High-Level / Program)
-**Description:** Activates the ABAP program (report) named by program_name, so its inactive version is in force.
+**Description:** Activates an ABAP program (report (PROG)), so its inactive version is in force.
 
 **Source:** `src/handlers/program/low/handleActivateProgram.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Program name.
 
 ---
 
 <a id="checkprogram-high-level-program"></a>
 #### CheckProgram (High-Level / Program)
-**Description:** [read-only] Runs a syntax check on the ABAP program (report) named by program_name. Returns syntax errors, warnings, and messages. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** [read-only] Checks the syntax of an ABAP program (PROG) or report.
 
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
@@ -3439,7 +3694,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
-**Description:** Create a new ABAP program (report) in SAP system. Creates the program object in initial state.
+**Description:** Creates an executable ABAP program (PROG) or report, with its description and application area, recorded in the transport given.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
@@ -3448,7 +3703,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `application` (string, optional) - Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'
 - `description` (string, optional) - Program description. If not provided, program_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
 - `program_name` (string, required) - Program name.
@@ -3458,14 +3713,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteprogram-high-level-program"></a>
 #### DeleteProgram (High-Level / Program)
-**Description:** Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP program (PROG) or report, recorded in the transport given.
 
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Program name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3473,7 +3728,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP's standard programs. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of an ABAP program (PROG) or report, on ABAP Cloud one of SAP's standard programs, or its metadata.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -3490,7 +3745,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateprogram-high-level-program"></a>
 #### UpdateProgram (High-Level / Program)
-**Description:** Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing ABAP program (PROG) or report, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/program/high/handleUpdateProgram.ts`
 
@@ -3498,7 +3753,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Program name. Program must already exist.
 - `source_code` (string, required) - Complete ABAP program source code.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -3510,21 +3765,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateservicebinding-high-level-service-binding"></a>
 #### ActivateServiceBinding (High-Level / Service Binding)
-**Description:** Activates the OData service binding named by name, so its inactive version is in force.
+**Description:** Activates an OData service binding (SRVB), so its inactive version is in force.
 
 **Source:** `src/handlers/service_binding/low/handleActivateServiceBinding.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Service binding name.
 
 ---
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
-**Description:** Create an OData service binding (V2 or V4, UI or Web API) for a service definition, in initial state.
+**Description:** Creates an OData V2 or V4 service binding (SRVB), UI or Web API, for a service definition (SRVD), with its service name and version.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
@@ -3534,7 +3789,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `activate` (boolean, optional (default: true)) - Activate the service binding after create, then read its service group. Default: true.
 - `binding_variant` (string, optional (default: ODATA_V4_UI), one of: `ODATA_V2_UI`, `ODATA_V2_WEB_API`, `ODATA_V4_UI`, `ODATA_V4_WEB_API`) - Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.
 - `description` (string, optional) - Optional description. Defaults to service_binding_name when omitted.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - ABAP package name.
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
@@ -3548,14 +3803,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteservicebinding-high-level-service-binding"></a>
 #### DeleteServiceBinding (High-Level / Service Binding)
-**Description:** Delete ABAP service binding via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an OData service binding (SRVB), recorded in the transport given.
 
 **Source:** `src/handlers/service_binding/high/handleDeleteServiceBinding.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.
 - `service_binding_name` (string, required) - Service binding name to delete.
 - `transport_request` (string, optional) - Optional transport request for deletion transport flow.
@@ -3564,7 +3819,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicebinding-high-level-service-binding"></a>
 #### GetServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Reads the OData service binding named by service_binding_name in one request, at its active version: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.
+**Description:** [read-only] Reads an OData service binding (SRVB) at its active version, with its binding definition, or its package (DEVC), person responsible and description, in the format asked.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
@@ -3579,7 +3834,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listservicebindingtypes-high-level-service-binding"></a>
 #### ListServiceBindingTypes (High-Level / Service Binding)
-**Description:** [read-only] Lists the available service binding types (for example ODataV2/ODataV4) from the ADT Business Services endpoint, in the response_format given.
+**Description:** [read-only] Lists the service binding (SRVB) types the system offers, such as OData V2 and OData V4, in the format asked.
 
 **Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
 
@@ -3590,7 +3845,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateservicebinding-high-level-service-binding"></a>
 #### UpdateServiceBinding (High-Level / Service Binding)
-**Description:** Update publication state of an existing ABAP service binding. On premise the change is done when the call answers (result SUCCESS, completion 'done'). On ABAP Cloud SAP runs it as a background job: the call answers result STARTED, completion 'background', with SAP's severity and short text, and the service becomes usable (or stops being usable) once that job ends.
+**Description:** Updates the publication state of an existing OData service binding (SRVB), publishing or unpublishing its service.
 
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
 
@@ -3599,7 +3854,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `binding_variant` (string, required (default: ODATA_V4_UI), one of: `ODATA_V2_UI`, `ODATA_V2_WEB_API`, `ODATA_V4_UI`, `ODATA_V4_WEB_API`) - Service binding variant. Determines OData version for publish/unpublish routing.
 - `desired_publication_state` (string, required, one of: `published`, `unpublished`, `unchanged`) - Target publication state.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
 - `service_binding_name` (string, required) - Service binding name to update.
 - `service_name` (string, required) - Published service name, from the binding. Required: an OData V2 publication job resolves the service by name and version and refuses without them. Ignored for V4, where the request names its target on its own.
@@ -3609,13 +3864,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="validateservicebinding-high-level-service-binding"></a>
 #### ValidateServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint. The answer is the verdict of SAP's transport check for the binding's name and package: admissible true where SAP answers S, false where it answers E, each with SAP's messages, and any other value as result; creating the binding checks the name, the package and the service definition itself.
+**Description:** [read-only] Validates a new OData service binding (SRVB) for a service definition (SRVD), in the package (DEVC) and version given, by SAP's transport check of its name and package.
 
 **Source:** `src/handlers/service_binding/high/handleValidateServiceBinding.ts`
 
 **Parameters:**
 - `description` (string, optional) - Optional description used during validation.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - ABAP package of the binding, which the validation checks.
 - `service_binding_name` (string, required) - Service binding name to validate.
 - `service_binding_version` (string, optional) - Service binding version (for example: 1.0). Accepted for backward compatibility; the transport check this now runs does not read it.
@@ -3628,21 +3883,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateservicedefinition-high-level-service-definition"></a>
 #### ActivateServiceDefinition (High-Level / Service Definition)
-**Description:** Activates the service definition named by name, so its inactive version is in force.
+**Description:** Activates a service definition (SRVD), so its inactive version is in force.
 
 **Source:** `src/handlers/service_definition/low/handleActivateServiceDefinition.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Service definition name.
 
 ---
 
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
-**Description:** Create a service definition that exposes CDS views as an OData service, in initial state.
+**Description:** Creates a service definition (SRVD) exposing CDS views (DDLS) as an OData service, with its source code when given, activating it when asked.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
 
@@ -3651,7 +3906,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after creation. Default: true.
 - `description` (string, optional) - Service definition description. If not provided, service_definition_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
 - `service_definition_name` (string, required) - Service definition name.
@@ -3662,14 +3917,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deleteservicedefinition-high-level-service-definition"></a>
 #### DeleteServiceDefinition (High-Level / Service Definition)
-**Description:** Delete an ABAP service definition from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes a service definition (SRVD), recorded in the transport given.
 
 **Source:** `src/handlers/service_definition/high/handleDeleteServiceDefinition.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `service_definition_name` (string, required) - ServiceDefinition name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3677,7 +3932,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicedefinition-high-level-service-definition"></a>
 #### GetServiceDefinition (High-Level / Service Definition)
-**Description:** [read-only] Reads the service definition named by service_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the current source code of a service definition (SRVD), or its metadata.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
@@ -3694,7 +3949,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateservicedefinition-high-level-service-definition"></a>
 #### UpdateServiceDefinition (High-Level / Service Definition)
-**Description:** Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the source code of an existing service definition (SRVD), activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/service_definition/high/handleUpdateServiceDefinition.ts`
 
@@ -3702,7 +3957,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after update. Default: true.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `service_definition_name` (string, required) - Service definition name. Must exist in the system.
 - `source_code` (string, required) - Complete service definition source code.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
@@ -3714,21 +3969,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatestructure-high-level-structure"></a>
 #### ActivateStructure (High-Level / Structure)
-**Description:** Activates the ABAP structure named by structure_name, so its inactive version is in force.
+**Description:** Activates an ABAP structure (TABL), so its inactive version is in force.
 
 **Source:** `src/handlers/structure/low/handleActivateStructure.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `structure_name` (string, required) - Structure name.
 
 ---
 
 <a id="checkstructure-high-level-structure"></a>
 #### CheckStructure (High-Level / Structure)
-**Description:** [read-only] Runs a syntax check on the ABAP structure named by structure_name. Can check existing structure (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP structure (TABL) as stored or as the source given.
 
 **Source:** `src/handlers/structure/high/handleCheckStructure.ts`
 
@@ -3743,7 +3998,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createstructure-high-level-structure"></a>
 #### CreateStructure (High-Level / Structure)
-**Description:** Create a new ABAP structure in SAP system. Creates the structure object in initial state.
+**Description:** Creates an ABAP structure (TABL), with its description, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/structure/high/handleCreateStructure.ts`
 
@@ -3752,7 +4007,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after creation. Default: true. Set to false for batch operations (activate multiple objects later).
 - `description` (string, optional) - Structure description. If not provided, structure_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `fields` (array, required) - Does not reach creation — the shipped create endpoint posts a metadata document only. Use UpdateStructure (with ddl_code) after creating to set the fields.
 - `includes` (array, optional) - Does not reach creation — see `fields`. Use UpdateStructure (with ddl_code) after creating to set includes.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
@@ -3764,14 +4019,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletestructure-high-level-structure"></a>
 #### DeleteStructure (High-Level / Structure)
-**Description:** Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP structure (TABL), recorded in the transport given.
 
 **Source:** `src/handlers/structure/high/handleDeleteStructure.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `structure_name` (string, required) - Structure name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3779,7 +4034,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructure-high-level-structure"></a>
 #### GetStructure (High-Level / Structure)
-**Description:** [read-only] Reads the ABAP structure named by structure_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads an ABAP structure (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
@@ -3796,7 +4051,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatestructure-high-level-structure"></a>
 #### UpdateStructure (High-Level / Structure)
-**Description:** Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the DDL source of an existing ABAP structure (TABL), which defines its components, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/structure/high/handleUpdateStructure.ts`
 
@@ -3805,7 +4060,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after source update. Default: true.
 - `ddl_code` (string, required) - Complete DDL source code for structure. Example: '@EndUserText.label : \'My Structure\' @AbapCatalog.tableCategory : #TRANSPARENT define structure zz_s_test_001 { client : abap.clnt not null; id : abap.char(10); name : abap.char(255); }'
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `structure_name` (string, required) - Structure name. Structure must already exist.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -3816,13 +4071,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
-**Description:** [read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads the whole hierarchy of one or more ABAP packages (DEVC): each package with its subpackages and their objects, down to the last level. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `debug` (boolean, optional (default: false)) - Include diagnostic metadata in response (counts, types, hierarchy info). Default: false
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_descriptions` (boolean, optional (default: false)) - Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false
 - `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
 - `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
@@ -3833,7 +4089,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimecreateprofilertraceparameters-high-level-system"></a>
 #### RuntimeCreateProfilerTraceParameters (High-Level / System)
-**Description:** [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
+**Description:** Creates the parameters of an ABAP profiler trace, scheduling it for a later profiled run of a class (CLAS) or a report (PROG).
 
 **Source:** `src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters.ts`
 
@@ -3857,7 +4113,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimerunclass-high-level-system"></a>
 #### RuntimeRunClass (High-Level / System)
-**Description:** [runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.
+**Description:** Runs an ABAP class (CLAS) implementing if_oo_adt_classrun and gives its console output, under the ABAP profiler when asked.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunClass.ts`
 
@@ -3887,7 +4143,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimerunprogram-high-level-system"></a>
 #### RuntimeRunProgram (High-Level / System)
-**Description:** [runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).
+**Description:** Runs an ABAP report (PROG) and gives its output, under the ABAP profiler when asked.
 
 **Source:** `src/handlers/system/high/handleRuntimeRunProgram.ts`
 
@@ -3917,21 +4173,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatetable-high-level-table"></a>
 #### ActivateTable (High-Level / Table)
-**Description:** Activates the ABAP database table named by table_name, so its inactive version is in force.
+**Description:** Activates an ABAP database table (TABL), so its inactive version is in force.
 
 **Source:** `src/handlers/table/low/handleActivateTable.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `table_name` (string, required) - Table name.
 
 ---
 
 <a id="checktable-high-level-table"></a>
 #### CheckTable (High-Level / Table)
-**Description:** [read-only] Runs a syntax check on the ABAP database table named by table_name. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
+**Description:** [read-only] Checks the syntax of an ABAP database table (TABL) as stored or as the source given.
 
 **Source:** `src/handlers/table/high/handleCheckTable.ts`
 
@@ -3946,7 +4202,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
-**Description:** Create a new ABAP table in SAP system. Creates the table object in initial state.
+**Description:** Creates an ABAP database table (TABL) by its name, recorded in the transport given.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
@@ -3954,7 +4210,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, optional) - Does not reach creation — the shipped create endpoint has no description field of its own. Use UpdateTable (with ddl_code) after creating to set the DDL source, which carries the description.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
 - `table_name` (string, required) - Table name.
@@ -3964,14 +4220,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletetable-high-level-table"></a>
 #### DeleteTable (High-Level / Table)
-**Description:** Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for local objects.
+**Description:** Deletes an ABAP database table (TABL), recorded in the transport given.
 
 **Source:** `src/handlers/table/high/handleDeleteTable.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `table_name` (string, required) - Table name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3979,7 +4235,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettable-high-level-table"></a>
 #### GetTable (High-Level / Table)
-**Description:** [read-only] Reads the ABAP database table named by table_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads an ABAP database table (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
@@ -3996,7 +4252,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatetable-high-level-table"></a>
 #### UpdateTable (High-Level / Table)
-**Description:** Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.
+**Description:** Updates the DDL source of an existing ABAP database table (TABL), which defines its key, components and delivery class, activating it when asked.
 
 **Source:** `src/handlers/table/high/handleUpdateTable.ts`
 
@@ -4005,7 +4261,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate table after source update. Default: true.
 - `ddl_code` (string, required) - Complete DDL source code for table. Example: '@EndUserText.label : \'My Table\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `table_name` (string, required) - Table name. Table must already exist.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -4013,7 +4269,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatetablesettings-high-level-table"></a>
 #### UpdateTableSettings (High-Level / Table)
-**Description:** Writes technical settings of the existing database table named by table_name: each setting given is written over the stored one, every other setting keeps its stored value. Locks the settings, writes them, unlocks them, and activates the table when activate is true. Answers whether SAP saved the settings and, when activated, whether SAP activated the table, with its messages.
+**Description:** Updates the technical settings of an existing ABAP database table (TABL), its data class, size category, buffering and logging, each given over the stored one.
 
 **Source:** `src/handlers/table/high/handleUpdateTableSettings.ts`
 
@@ -4021,7 +4277,24 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `activate` (boolean, required) - true activates the table after the settings are written; false leaves them inactive.
 - `buffering` (object, optional) - Buffering; each field given replaces the stored one.
 - `data_class` (string, optional) - Data class. The value help lists APPL0 (master data), APPL1 (transaction data), APPL2 (organization and customizing) and DDIM, DFACT, DODS; SAP checks the value when the table is activated.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `load_unit` (string, optional) - Load unit.
+- `logging_enabled` (boolean, optional) - Whether changes to the table data are logged.
+- `sharing_type` (string, optional) - Sharing type.
+- `size_category` (string, optional) - Size category, a digit from 0 to 9.
+- `storage_type` (string, optional) - Storage type.
+- `table_name` (string, required) - Table name. The table must already exist.
+- `translation` (string, optional) - Translation value; the translation flags keep their stored values.
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if the table is local or already in a transport request.
+
+**On ABAP Cloud (`cloud`):** Updates the technical settings of an existing ABAP database table (TABL), its data class, size category, buffering and logging, each given over the stored one.
+
+**Parameters (`cloud`):**
+- `activate` (boolean, required) - true activates the table after the settings are written; false leaves them inactive.
+- `buffering` (object, optional) - Buffering; each field given replaces the stored one.
+- `data_class` (string, optional) - Data class. The value help lists APPL0 (master data), APPL1 (transaction data), APPL2 (organization and customizing) and DDIM, DFACT, DODS; SAP checks the value when the table is activated.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `is_writable_by_amdp` (boolean, optional) - true allows AMDP writes; activation then needs buffering N, logging off and no replacement object.
 - `load_unit` (string, optional) - Load unit.
 - `logging_enabled` (boolean, optional) - Whether changes to the table data are logged.
 - `sharing_type` (string, optional) - Sharing type.
@@ -4038,21 +4311,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activatetabletype-high-level-table-type"></a>
 #### ActivateTableType (High-Level / Table Type)
-**Description:** Activates the ABAP table type named by table_type_name, so its inactive version is in force.
+**Description:** Activates an ABAP table type (TTYP), so its inactive version is in force.
 
 **Source:** `src/handlers/table_type/low/handleActivateTableType.ts`
 
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `table_type_name` (string, required) - Table type name.
 
 ---
 
 <a id="checktabletype-high-level-table-type"></a>
 #### CheckTableType (High-Level / Table Type)
-**Description:** [read-only] Runs a check on the ABAP table type named by table_type_name. Returns errors, warnings, and messages.
+**Description:** [read-only] Checks an ABAP table type (TTYP) for errors and warnings.
 
 **Source:** `src/handlers/table_type/high/handleCheckTableType.ts`
 
@@ -4066,7 +4339,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createtabletype-high-level-table-type"></a>
 #### CreateTableType (High-Level / Table Type)
-**Description:** Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false, a refused check or a refused activation, the inactive version, read after the write. A definition whose read failed is answered with SAP's answer to that read.
+**Description:** Creates an ABAP table type (TTYP), with the type it holds, its access type and primary key, activating it when asked, recorded in the transport given.
 
 **Source:** `src/handlers/table_type/high/handleCreateTableType.ts`
 
@@ -4078,7 +4351,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `data_type` (string, optional) - Built-in data type of the row (ttyp:builtInType/ttyp:dataType).
 - `decimals` (number, optional) - Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).
 - `description` (string, optional) - Table type description. When left out, table_type_name is used.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `key_definition` (string, optional, one of: `standard`, `rowType`, `empty`, `notSpecified`) - Definition of the primary key (ttyp:primaryKey/ttyp:definition).
 - `key_kind` (string, optional, one of: `unique`, `nonUnique`, `notSpecified`) - Kind of the primary key (ttyp:primaryKey/ttyp:kind).
 - `length` (number, optional) - Length of the built-in row type (ttyp:builtInType/ttyp:length).
@@ -4092,14 +4365,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletetabletype-high-level-table-type"></a>
 #### DeleteTableType (High-Level / Table Type)
-**Description:** Deletes the ABAP table type named by table_type_name through the ADT deletion service, after asking whether it can be deleted. Returns the deletion result.
+**Description:** Deletes an ABAP table type (TTYP), recorded in the transport given.
 
 **Source:** `src/handlers/table_type/high/handleDeleteTableType.ts`
 
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `table_type_name` (string, required) - Table type name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -4107,7 +4380,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettabletype-high-level-table-type"></a>
 #### GetTableType (High-Level / Table Type)
-**Description:** [read-only] Reads the ABAP table type named by table_type_name in one request: its ADT metadata document (row type, access, key, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
+**Description:** [read-only] Reads an ABAP table type (TTYP) at the version asked, with its element type, access, key, package (DEVC) and description.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
@@ -4121,7 +4394,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatetabletype-high-level-table-type"></a>
 #### UpdateTableType (High-Level / Table Type)
-**Description:** Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false or a refused activation, the inactive version, read after the unlock. The write is checked under the lock, before that read: a refused check is answered alone. A definition whose read failed is answered with SAP's answer to that read.
+**Description:** Updates the definition of an existing ABAP table type (TTYP): its description, the type it holds, its access type and primary key, activating it when asked.
 
 **Source:** `src/handlers/table_type/high/handleUpdateTableType.ts`
 
@@ -4133,7 +4406,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `data_type` (string, optional) - Built-in data type of the row (ttyp:builtInType/ttyp:dataType).
 - `decimals` (number, optional) - Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).
 - `description` (string, optional) - New table type description.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `key_definition` (string, optional, one of: `standard`, `rowType`, `empty`, `notSpecified`) - Definition of the primary key (ttyp:primaryKey/ttyp:definition).
 - `key_kind` (string, optional, one of: `unique`, `nonUnique`, `notSpecified`) - Kind of the primary key (ttyp:primaryKey/ttyp:kind).
 - `length` (number, optional) - Length of the built-in row type (ttyp:builtInType/ttyp:length).
@@ -4149,15 +4422,27 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatetextelements-high-level-text-elements"></a>
 #### UpdateTextElements (High-Level / Text Elements)
-**Description:** Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers parts: each part SAP saved with SAP's answer, the list saved; when activated, whether SAP activated them, with its messages, beside the parts. A part SAP refuses ends the writes: the answer is SAP's failure, beside the parts saved before it (inactive).
+**Description:** Updates the text elements of an existing ABAP program (PROG), function group (FUGR) or class (CLAS), each part given replacing its stored one, activating the object when asked.
 
 **Source:** `src/handlers/text_elements/high/handleUpdateTextElements.ts`
 
 **Parameters:**
 - `activate` (boolean, required) - true activates the object together with its text elements after the write; false leaves them inactive.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `headings` (object, optional) - The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.
 - `object_kind` (string, required, one of: `program`, `function_group`, `class`) - Kind of object: program, function_group, class.
+- `object_name` (string, required) - Name of the program, function group or class.
+- `selections` (array, optional) - The selection texts (programs and function groups): the whole list; texts left out are deleted.
+- `symbols` (array, optional) - The text symbols: the whole list; symbols left out are deleted.
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if the object is local or already in a transport request.
+
+**On ABAP Cloud (`cloud`):** Updates the text elements of an existing ABAP program (PROG), function group (FUGR) or class (CLAS), each part given replacing its stored one, activating the object when asked.
+
+**Parameters (`cloud`):**
+- `activate` (boolean, required) - true activates the object together with its text elements after the write; false leaves them inactive.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `headings` (object, optional) - The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.
+- `object_kind` (string, required, one of: `function_group`, `class`) - Kind of object: function_group, class.
 - `object_name` (string, required) - Name of the program, function group or class.
 - `selections` (array, optional) - The selection texts (programs and function groups): the whole list; texts left out are deleted.
 - `symbols` (array, optional) - The text symbols: the whole list; symbols left out are deleted.
@@ -4170,14 +4455,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="addtransportobject-high-level-transport"></a>
 #### AddTransportObject (High-Level / Transport)
-**Description:** Adds the existing object named by object_name and object_type to the transport task named by transport_number, so it travels with the task's request.
+**Description:** Adds an existing ABAP object to a transport task, so it travels with the task's transport.
 
 **Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
@@ -4187,7 +4472,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createtransport-high-level-transport"></a>
 #### CreateTransport (High-Level / Transport)
-**Description:** Creates a transport request and gives the task SAP creates with it the type task_type (default S, Development/Correction). Response: JSON with transport_number, task_number and task_type.
+**Description:** Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked.
 
 **Source:** `src/handlers/transport/high/handleCreateTransport.ts`
 
@@ -4195,7 +4480,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, required) - Transport request description (mandatory)
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `owner` (string, optional) - Transport owner (optional, defaults to current user)
 - `target_system` (string, optional) - Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'
 - `task_type` (string, optional (default: S), one of: `S`, `R`, `X`) - The type given to the request's task: S — Development/Correction (default), R — Repair, X — Unclassified, as SAP creates it.
@@ -4205,14 +4490,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createtransporttask-high-level-transport"></a>
 #### CreateTransportTask (High-Level / Transport)
-**Description:** Creates a task under the existing transport request named by transport_number, owned by the user named by target_user, of the type task_type. The task is itself a request resource — it reads, writes and releases like one — and is what adding and removing an object entry address, since a request's objects live on its tasks. `target_user` is required: it names the task's owner, and an empty owner is refused with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses an added object on premise with SCTS_ADT_MSG 009 / TK127.
+**Description:** Creates a task of the type asked under an existing transport, owned by the SAP user named.
 
 **Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `target_user` (string, required) - The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
 - `task_type` (string, optional (default: S), one of: `S`, `R`, `X`) - S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).
 - `transport_number` (string, required) - The REQUEST to create the task under — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.
@@ -4221,14 +4506,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="movetransportobjects-high-level-transport"></a>
 #### MoveTransportObjects (High-Level / Transport)
-**Description:** Moves the object entries named by objects from the transport task named by transport_number to the task named by target_number. Each entry is named by its position in the source task's object list.
+**Description:** Moves objects from one transport task to another, each at its position in the task it leaves.
 
 **Source:** `src/handlers/transport/high/handleMoveTransportObjects.ts`
 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objects` (array, required) - The entries to move, at least one — each with object_name, object_type, position (in the source task) and an optional pgmid.
 - `target_number` (string, required) - Number of the transport task the entries move to.
 - `transport_number` (string, required) - Number of the transport task that holds the entries.
@@ -4237,14 +4522,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="removetransportobject-high-level-transport"></a>
 #### RemoveTransportObject (High-Level / Transport)
-**Description:** Removes the entry of the object named by object_name and object_type from the transport task named by transport_number, at position.
+**Description:** Removes a named object from a transport task, at its position among the task's objects.
 
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
@@ -4255,14 +4540,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="sortandcompresstransporttask-high-level-transport"></a>
 #### SortAndCompressTransportTask (High-Level / Transport)
-**Description:** Sorts the object list of the transport task named by transport_number and merges its duplicate entries. A task holding the same entry twice refuses removing an entry until this has run.
+**Description:** Sorts the objects of a transport task and merges its duplicates.
 
 **Source:** `src/handlers/transport/high/handleSortAndCompressTransportTask.ts`
 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_number` (string, required) - Number of the transport task to sort and compress.
 
 ---
@@ -4272,7 +4557,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test class named by class_name for the CDS view named by cds_view_name, from test_class_source. The view is checked to support CDS test doubles, the test class holding the local test classes is created in the package named by package_name, and it is activated.
+**Description:** Creates an ABAP Unit test class for a CDS view (DDLS), from the test class source given, once the view supports CDS test doubles.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
@@ -4281,7 +4566,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `cds_view_name` (string, required) - CDS view under test (DDL source). Must be active and testable with test doubles.
 - `class_name` (string, required) - Name of the new global class that holds the tests.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - Package of the new test class.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable package.
@@ -4290,12 +4575,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createfunctiongroupunittest-high-level-unit-test"></a>
 #### CreateFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of the function group named by function_group_name, from test_class_source. They are written to a test include, which is activated with the group.
+**Description:** Creates the ABAP Unit test classes of an ABAP function group (FUGR) from the test class source given, in a test include activated with the group.
 
 **Source:** `src/handlers/unit_test/high/handleCreateFunctionGroupUnitTest.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group that gets the tests. Must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -4304,12 +4589,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createprogramunittest-high-level-unit-test"></a>
 #### CreateProgramUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of the report named by program_name, from test_class_source. They are written to a test include, which is included into the report, and the report is activated.
+**Description:** Creates the ABAP Unit test classes of an ABAP report (PROG) from the test class source given, in a test include of the report, and activates the report.
 
 **Source:** `src/handlers/unit_test/high/handleCreateProgramUnitTest.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Report that gets the tests. Must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -4318,7 +4603,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
-**Description:** Creates the ABAP Unit test classes of the ABAP class named by class_name, from test_class_source. They are written as the class's local test classes, and the class is activated.
+**Description:** Creates the ABAP Unit test classes of an ABAP class (CLAS) from the test class source given, as its local test classes, and activates the class.
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
@@ -4326,7 +4611,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
@@ -4334,7 +4619,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletecdsunittest-high-level-unit-test"></a>
 #### DeleteCdsUnitTest (High-Level / Unit Test)
-**Description:** Deletes the CDS view test class named by class_name, with the ABAP Unit test classes it holds.
+**Description:** Deletes a CDS view (DDLS) test class, with the ABAP Unit test classes it holds.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
 
@@ -4342,14 +4627,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
 
 <a id="deleteunittest-high-level-unit-test"></a>
 #### DeleteUnitTest (High-Level / Unit Test)
-**Description:** Deletes the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are deleted, and the class stays.
+**Description:** Deletes the ABAP Unit test classes of an ABAP class (CLAS), keeping the class.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteUnitTest.ts`
 
@@ -4357,21 +4642,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.
+**Description:** [read-only] Reads the result of an ABAP Unit test run by its id, waiting while the run goes on.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `format` (string, optional, one of: `abapunit`, `junit`) - Result format: abapunit or junit.
 - `run_id` (string, required) - Run id a unit test run answered.
 - `with_navigation_uris` (boolean, optional) - Include navigation URIs in result if supported.
@@ -4380,14 +4665,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runabapunit-high-level-unit-test"></a>
 #### RunAbapUnit (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the run target named by target. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.
+**Description:** Runs the ABAP Unit tests of a class (CLAS), report (PROG), function group (FUGR), function module's group, CDS view (DDLS), package (DEVC), waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
 
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `duration` (object, optional) - Durations the run accepts.
 - `risk_level` (object, optional) - Risk levels the run accepts.
 - `scope` (object, optional) - Which tests the run covers. Assigned tests are test classes linked to the object by an ABAP Doc @testing relation (the tests of a CDS view are such).
@@ -4398,27 +4683,27 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runcdsunittest-high-level-unit-test"></a>
 #### RunCdsUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the CDS view test class named by class_name. The run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.
+**Description:** Runs the ABAP Unit tests of a CDS view (DDLS) test class, waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `wait` (boolean, optional) - true (default): the call reads the run's status at once, and a run SAP answers running again by long polling, SAP holding each read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Runs every ABAP Unit test of the function group named by function_group_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out.
+**Description:** Runs every ABAP Unit test of a function group (FUGR), waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group whose tests run.
 - `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
@@ -4428,16 +4713,16 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the function module named by function_module_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group, called with wait left out.
+**Description:** Runs the ABAP Unit tests of the function group (FUGR) holding a function module (FUGR), waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, optional) - Function group holding the function module; required by runner sync.
-- `function_module_name` (string, required) - Function module whose tests run.
+- `function_module_name` (string, required) - Function module whose function group the tests run for.
 - `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 - `wait` (boolean, optional) - true (default): the call reads the run's status at once, and a run SAP answers running again by long polling, SAP holding each read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
@@ -4446,14 +4731,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the report named by program_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** Runs the ABAP Unit tests of an ABAP report (PROG), waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Report whose tests run.
 - `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
@@ -4463,7 +4748,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Runs the ABAP Unit tests of the ABAP class named by class_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request that returns the finished result, called with wait left out.
+**Description:** Runs the ABAP Unit tests of an ABAP class (CLAS), waiting for the result or giving the run's id at once.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
@@ -4471,7 +4756,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 - `wait` (boolean, optional) - true (default): the call reads the run's status at once, and a run SAP answers running again by long polling, SAP holding each read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
@@ -4480,7 +4765,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** Writes test_class_source as the ABAP Unit test classes of the CDS view test class named by class_name. The local test classes in the test class are rewritten, and it is activated.
+**Description:** Updates the ABAP Unit test classes of a CDS view (DDLS) test class from the test class source given, activating it, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
@@ -4488,7 +4773,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view. Must already exist.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
@@ -4496,12 +4781,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatefunctiongroupunittest-high-level-unit-test"></a>
 #### UpdateFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Writes test_class_source as the ABAP Unit test classes of the function group named by function_group_name. The local test classes in its test include are rewritten, and it is activated.
+**Description:** Updates the ABAP Unit test classes of an ABAP function group (FUGR) from the test class source given, activating the group, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateFunctionGroupUnitTest.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group whose tests are replaced. Its test include must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -4510,12 +4795,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateprogramunittest-high-level-unit-test"></a>
 #### UpdateProgramUnitTest (High-Level / Unit Test)
-**Description:** Writes test_class_source as the ABAP Unit test classes of the report named by program_name. The local test classes in its test include are rewritten, and it is activated.
+**Description:** Updates the ABAP Unit test classes of an ABAP report (PROG) from the test class source given, activating the report, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateProgramUnitTest.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Report whose tests are replaced. Its test include must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -4524,7 +4809,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateunittest-high-level-unit-test"></a>
 #### UpdateUnitTest (High-Level / Unit Test)
-**Description:** Writes test_class_source as the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are rewritten, and the class is activated.
+**Description:** Updates the ABAP Unit test classes of an ABAP class (CLAS) from the test class source given, activating the class, recorded in the transport given.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateUnitTest.ts`
 
@@ -4532,7 +4817,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
@@ -4546,24 +4831,24 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugcancel-debug-debugger"></a>
 #### AmdpDebugCancel (Debug / Debugger)
-**Description:** [debug] Cancels the stopped AMDP debuggee's execution.
+**Description:** [debug] Cancels the execution of the stopped AMDP debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugCancel.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="amdpdebuggettable-debug-debugger"></a>
 #### AmdpDebugGetTable (Debug / Debugger)
-**Description:** [read-only] [debug] Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.
+**Description:** [read-only] Reads the records of a table (TABL) variable at the AMDP stop, up to 100, through a SELECT over it when one is set.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugGetTable.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `query` (string, optional) - A SELECT over the variable.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 - `variable` (string, required) - The table variable to read.
@@ -4572,26 +4857,26 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="amdpdebugsetbreakpoints-debug-debugger"></a>
 #### AmdpDebugSetBreakpoints (Debug / Debugger)
-**Description:** [debug] Sets the AMDP breakpoints of a debug session to the set given, as confirmed by the system. Catches every request of the connected SAP user, from this server and from anywhere else.
+**Description:** [debug] Sets the AMDP breakpoints of a debug session to the set asked, as the system confirms them.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugSetBreakpoints.ts`
 
 **Parameters:**
-- `breakpoints` (array, required) - Lines in SQLScript methods of a class.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `breakpoints` (array, required) - Lines in SQLScript methods of a class. Catches every request of the connected SAP user, from this server and from anywhere else.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="amdpdebugstart-debug-debugger"></a>
 #### AmdpDebugStart (Debug / Debugger)
-**Description:** [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. Catches every request of the connected SAP user, from this server and from anywhere else.
+**Description:** [debug] Starts an AMDP debug session of the connected SAP user with breakpoints in SQLScript methods, starting a background run once they are confirmed.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStart.ts`
 
 **Parameters:**
-- `breakpoints` (array, required) - Lines in SQLScript methods of a class.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `breakpoints` (array, required) - Lines in SQLScript methods of a class. Catches every request of the connected SAP user, from this server and from anywhere else.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
 - `stop_existing` (boolean, optional (default: false)) - Ends an AMDP debug session of this user left behind.
 
@@ -4605,31 +4890,31 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `action` (string, required, one of: `over`, `continue`) - over runs the current statement, continue runs to the next stop.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="amdpdebugstop-debug-debugger"></a>
 #### AmdpDebugStop (Debug / Debugger)
-**Description:** [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; when the whole debug session ends with it, the kept answers of its debugger batch go too. A part that failed to undo is reported and kept with the answers.
+**Description:** [debug] Stops the AMDP part of a debug session, releasing a suspended debuggee first.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStop.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="amdpdebugwait-debug-debugger"></a>
 #### AmdpDebugWait (Debug / Debugger)
-**Description:** [read-only] [debug] AMDP events of a debug session after waiting up to hold_seconds.
+**Description:** [read-only] Waits for the AMDP events of a debug session, up to the seconds asked.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugWait.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `hold_seconds` (number, optional (default: 10)) - Longest wait for a change, at most 30 seconds.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
@@ -4637,7 +4922,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchanswers-debug-debugger"></a>
 #### DebugBatchAnswers (Debug / Debugger)
-**Description:** [read-only] [debug] Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.
+**Description:** [read-only] Reads the outcome of each recorded debugger call of the last sending, by its number.
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchAnswers.ts`
 
@@ -4649,7 +4934,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchbegin-debug-debugger"></a>
 #### DebugBatchBegin (Debug / Debugger)
-**Description:** [read-only] [debug] Starts the debugger batch on the stopped ABAP debuggee, else at the AMDP break. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable at the ABAP debuggee, and of step over, continue or the data preview of a table variable at the AMDP break, is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).
+**Description:** [read-only] Starts recording the debugger calls at the stopped ABAP debuggee or at the AMDP break, each under the next number, to send them together. Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchBegin.ts`
 
@@ -4660,7 +4945,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugbatchend-debug-debugger"></a>
 #### DebugBatchEnd (Debug / Debugger)
-**Description:** [debug] Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.
+**Description:** [debug] Ends the recording of debugger calls, sending them together on the session they were recorded on, and splits SAP's answer by call.
 
 **Source:** `src/handlers/debugger/debug/handleDebugBatchEnd.ts`
 
@@ -4671,25 +4956,25 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugcreatememorysnapshot-debug-debugger"></a>
 #### DebugCreateMemorySnapshot (Debug / Debugger)
-**Description:** [debug] Writes a memory snapshot of the stopped debuggee and answers the file written.
+**Description:** [debug] Creates a memory snapshot of the stopped ABAP debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateMemorySnapshot.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="debugcreatewatchpoint-debug-debugger"></a>
 #### DebugCreateWatchpoint (Debug / Debugger)
-**Description:** [debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.
+**Description:** [debug] Creates a watchpoint on a variable of the stopped ABAP debuggee, stopping it when the variable changes, under a condition when one is set.
 
 **Source:** `src/handlers/debugger/debug/handleDebugCreateWatchpoint.ts`
 
 **Parameters:**
 - `condition` (string, optional) - Stops only when this ABAP condition holds.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Variable to watch; a path reaches a component.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
@@ -4697,25 +4982,25 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugdeletebreakpoint-debug-debugger"></a>
 #### DebugDeleteBreakpoint (Debug / Debugger)
-**Description:** [debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. An id outside the session's set is refused.
+**Description:** [debug] Deletes one breakpoint of an ABAP debug session by its id, the rest staying armed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteBreakpoint.ts`
 
 **Parameters:**
 - `breakpoint_id` (string, required) - Breakpoint id.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="debugdeletewatchpoint-debug-debugger"></a>
 #### DebugDeleteWatchpoint (Debug / Debugger)
-**Description:** [debug] Removes a watchpoint.
+**Description:** [debug] Deletes a watchpoint of the stopped ABAP debuggee by its id.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteWatchpoint.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 - `watchpoint_id` (string, required) - Watchpoint id.
 
@@ -4723,36 +5008,36 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuggetmemorysizes-debug-debugger"></a>
 #### DebugGetMemorySizes (Debug / Debugger)
-**Description:** [read-only] [debug] Memory the stopped debuggee uses. Needs a stopped debuggee.
+**Description:** [read-only] Reads how much memory the stopped ABAP debuggee uses.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetMemorySizes.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="debuggetstack-debug-debugger"></a>
 #### DebugGetStack (Debug / Debugger)
-**Description:** [read-only] [debug] Call stack of the stopped debuggee of the debug session named by state_handle, each frame with its ADT object address and its technical place. Needs a stopped debuggee.
+**Description:** [read-only] Reads the call stack of the stopped ABAP debuggee, each frame with its ADT object address and its place in the source.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetStack.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="debuggetvariables-debug-debugger"></a>
 #### DebugGetVariables (Debug / Debugger)
-**Description:** [read-only] [debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.
+**Description:** [read-only] Reads variables of the stopped ABAP debuggee by name, or the members of parent variables.
 
 **Source:** `src/handlers/debugger/debug/handleDebugGetVariables.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `names` (array, optional) - Variables by name; a path reads a component or a table row.
 - `parents` (array, optional) - Instead of names: members of these scopes, objects or tables.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
@@ -4761,51 +5046,51 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debuglistbreakpoints-debug-debugger"></a>
 #### DebugListBreakpoints (Debug / Debugger)
-**Description:** [read-only] [debug] Breakpoints a debug session armed.
+**Description:** [read-only] Lists the breakpoints an ABAP debug session armed.
 
 **Source:** `src/handlers/debugger/debug/handleDebugListBreakpoints.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="debuglistwatchpoints-debug-debugger"></a>
 #### DebugListWatchpoints (Debug / Debugger)
-**Description:** [read-only] [debug] Watchpoints of the stopped debuggee.
+**Description:** [read-only] Lists the watchpoints of the stopped ABAP debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugListWatchpoints.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="debugsetbreakpoints-debug-debugger"></a>
 #### DebugSetBreakpoints (Debug / Debugger)
-**Description:** [debug] Adds breakpoints to a debug session — a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition — and answers the whole set placed, this call's refusals each with its breakpoint and reason, earlier breakpoints that dropped out of the set, and any answer row left unpaired with a breakpoint. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Sets breakpoints in an ABAP debug session: at a source position, optionally conditional, on an exception class, an ABAP statement or a message.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetBreakpoints.ts`
 
 **Parameters:**
-- `breakpoints` (array, required) - Breakpoints: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `breakpoints` (array, required) - Breakpoints: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="debugsetsettings-debug-debugger"></a>
 #### DebugSetSettings (Debug / Debugger)
-**Description:** [debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.
+**Description:** [debug] Sets the debugger settings of an ABAP debug session at its current stop, applied again after each later attach.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetSettings.ts`
 
 **Parameters:**
 - `background_rfc` (boolean, optional) - Debugs background RFC calls.
 - `create_exception_object` (boolean, optional) - Creates the exception object even where a CATCH does not ask for it.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `shared_object_debugging` (boolean, optional) - Debugs shared objects.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 - `system_debugging` (boolean, optional) - Steps into system programs and stops at breakpoints there.
@@ -4815,12 +5100,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetstackposition-debug-debugger"></a>
 #### DebugSetStackPosition (Debug / Debugger)
-**Description:** [debug] Selects the stack frame variables are read in; execution goes on from the same point. Needs a stopped debuggee.
+**Description:** [debug] Sets the stack frame of a stopped debuggee whose variables are then shown, execution going on from the same point.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetStackPosition.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `position` (integer, required) - Frame position as the stack numbers it; the stopped frame has the highest position.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
@@ -4828,12 +5113,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugsetvariable-debug-debugger"></a>
 #### DebugSetVariable (Debug / Debugger)
-**Description:** [debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.
+**Description:** [debug] Sets the value of a variable of the stopped ABAP debuggee.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetVariable.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Variable to set; a path reaches a component.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 - `value` (string, required) - New value; converted to the type by the system.
@@ -4842,14 +5127,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstartlistener-debug-debugger"></a>
 #### DebugStartListener (Debug / Debugger)
-**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Starts an ABAP debug session: arms breakpoints, listens for a debuggee and attaches the first one caught.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStartListener.ts`
 
 **Parameters:**
-- `breakpoints` (array, required) - Breakpoints, at least one: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
+- `breakpoints` (array, required) - Breakpoints, at least one breakpoint: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 - `debugging_mode` (string, optional, one of: `user`, `terminal`) - user (when omitted) catches the requests of the request user; terminal catches the requests that carry this debug session's ids and needs no configuration: the run it starts carries them, so without run it catches only requests carrying the same ids.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `request_user` (string, optional) - User mode: the SAP user whose requests are caught; the connected user when omitted. Debugging another user's requests needs the debug authorization for that user. Not taken in terminal mode.
 - `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
 - `settings` (object, optional) - Debugger settings, applied after each attach; a field left out keeps its value.
@@ -4858,25 +5143,25 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstep-debug-debugger"></a>
 #### DebugStep (Debug / Debugger)
-**Description:** [debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.
+**Description:** [debug] Steps the stopped ABAP debuggee into a call, over it, out of it or on to the next stop, or leaves it running by detaching or freeing the debugger.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStep.ts`
 
 **Parameters:**
 - `action` (string, required, one of: `into`, `over`, `return`, `continue`, `detach`, `release_debugger`) - into enters the call, over runs it, return leaves the current one, continue runs to the next stop; detach lets the program run on, the listener and the breakpoints kept; release_debugger frees the debugger and the program runs on. detach and release_debugger apply to ABAP only.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="debugsteptoline-debug-debugger"></a>
 #### DebugStepToLine (Debug / Debugger)
-**Description:** [debug] Runs or jumps the stopped debuggee to a line.
+**Description:** [debug] Steps the stopped ABAP debuggee to a source position, running or jumping there.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStepToLine.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include` (string, optional) - For a class: definitions, implementations, macros or testclasses; the main source when omitted.
 - `line` (integer, required) - For a line: the line in the object source.
 - `mode` (string, required, one of: `run`, `jump`) - run executes up to the line; jump moves there without executing what lies between.
@@ -4889,26 +5174,26 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugstop-debug-debugger"></a>
 #### DebugStop (Debug / Debugger)
-**Description:** [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening, closes the connections and lets the kept answers of its debugger batch go; a part that failed to undo is reported and kept with the answers.
+**Description:** [debug] Stops a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes its connections.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStop.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="debugtakeoverlistener-debug-debugger"></a>
 #### DebugTakeOverListener (Debug / Debugger)
-**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. Displaces another debugger listening for the same user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user, or the one named), from this server and from anywhere else. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
+**Description:** [debug] Takes the ABAP debugging of a user over from another debugger: arms breakpoints, listens for a debuggee and attaches the first one caught.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTakeOverListener.ts`
 
 **Parameters:**
-- `breakpoints` (array, required) - Breakpoints, at least one: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
+- `breakpoints` (array, required) - Breakpoints, at least one breakpoint: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change rewrites that set as a whole.
 - `debugging_mode` (string, optional, one of: `user`, `terminal`) - user (when omitted) catches the requests of the request user; terminal catches the requests that carry this debug session's ids and needs no configuration: the run it starts carries them, so without run it catches only requests carrying the same ids.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `request_user` (string, optional) - User mode: the SAP user whose requests are caught; the connected user when omitted. Debugging another user's requests needs the debug authorization for that user. Not taken in terminal mode.
 - `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
 - `settings` (object, optional) - Debugger settings, applied after each attach; a field left out keeps its value.
@@ -4917,24 +5202,24 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="debugterminate-debug-debugger"></a>
 #### DebugTerminate (Debug / Debugger)
-**Description:** [debug] Ends the stopped debuggee and its program where it stands.
+**Description:** [debug] Terminates the stopped ABAP debuggee and its program (PROG) where it stands.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTerminate.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
 
 <a id="debugwait-debug-debugger"></a>
 #### DebugWait (Debug / Debugger)
-**Description:** [read-only] [debug] State of a debug session after waiting up to hold_seconds; a debugger that took the user over is an error carrying the system's message.
+**Description:** [read-only] Waits for the next stop or end of an ABAP debug session, up to the seconds asked, and tells its state.
 
 **Source:** `src/handlers/debugger/debug/handleDebugWait.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `hold_seconds` (number, optional (default: 10)) - Longest wait for a change, at most 30 seconds.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
@@ -4942,12 +5227,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotdelta-debug-debugger"></a>
 #### MemorySnapshotDelta (Debug / Debugger)
-**Description:** [read-only] [debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
+**Description:** [read-only] Compares two memory snapshots in a view: memory by kind, largest objects, an object's children or its referrers.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotDelta.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `from_id` (string, required) - Snapshot id to compare from.
 - `key` (string, optional) - Object key, for children and references.
 - `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
@@ -4958,12 +5243,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotget-debug-debugger"></a>
 #### MemorySnapshotGet (Debug / Debugger)
-**Description:** [read-only] [debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
+**Description:** [read-only] Reads one memory snapshot in a view: its header, memory by kind, largest objects, an object's children or its referrers.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotGet.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `key` (string, optional) - Object key, for children and references.
 - `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
 - `snapshot_id` (string, required) - Snapshot id.
@@ -4973,12 +5258,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="memorysnapshotlist-debug-debugger"></a>
 #### MemorySnapshotList (Debug / Debugger)
-**Description:** [read-only] [debug] Memory snapshots the system lists. Empty when the user lacks the memory snapshot authorization.
+**Description:** [read-only] Lists the memory snapshots the system holds, of one user when asked.
 
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotList.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `user` (string, optional) - Only the snapshots of this SAP user.
 
 ---
@@ -4991,7 +5276,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listleftoversessions-session-leftover-session"></a>
 #### ListLeftoverSessions (Session / Leftover Session)
-**Description:** [read-only] [session] Lists the SAP sessions of this server's destination that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user (absent for a token login) and when it was last recorded. Read from the session records alone, on this machine. Only sessions of ended processes are listed. Log one off by its handle. A server process that starts while exactly one instance session (built) of its destination is left is born on it, before any tool call; with several, all stay here, untaken.
+**Description:** [read-only] Lists the SAP sessions of this server's destination left open by an ended server process, which may still hold locks.
 
 **Source:** `src/handlers/leftover_session/session/handleListLeftoverSessions.ts`
 
@@ -5002,7 +5287,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="logoffleftoversession-session-leftover-session"></a>
 #### LogoffLeftoverSession (Session / Leftover Session)
-**Description:** [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, credential-free. The session record is deleted afterwards.
+**Description:** Logs off a leftover SAP session by its handle, releasing every lock it holds and deleting its record.
 
 **Source:** `src/handlers/leftover_session/session/handleLogoffLeftoverSession.ts`
 
@@ -5021,7 +5306,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="sessionopen-streamable-http"></a>
 ### SessionOpen (Streamable HTTP)
-**Description:** [read-only] Opens a long session on this server: the server instance and its SAP connection are kept for every call that carries the session's state_handle, until the session is closed or the server's idle bound passes between two calls. Answers the state_handle: send it as the state_handle argument of every call of the session (or in the x-mcp-state-handle header). Called with the state_handle of an instance that already holds state, or of an open session, answers that same state_handle and keeps what the instance holds. In batch mode it runs at once and the batch stays open.
+**Description:** [read-only] Opens a long session on this server, keeping its server instance and SAP connection for every call that carries its state handle.
 
 **Parameters:**
 - `state_handle` (string, optional) - The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance.
@@ -5030,11 +5315,11 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="sessionclose-streamable-http"></a>
 ### SessionClose (Streamable HTTP)
-**Description:** [read-only] Closes the long session the state_handle names: once this answer is written the server instance is closed — every SAP session it holds is logged off, which releases the locks taken in it; an open batch and its recorded calls are dropped unsent — and the state_handle ends: a later call carrying it gets the unavailable-state answer. Answers that the session is closed and what it held: its locks, a batch, a debug session. Called with an unknown state_handle, or on a new instance, it gets the unavailable-state answer. In batch mode it runs at once and drops the batch.
+**Description:** [read-only] Closes the long session a state handle names, logging off its SAP sessions and so releasing their locks.
 
 **Parameters:**
 - `state_handle` (string, optional) - The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance.
 
 ---
 
-*Last updated: 2026-11-21*
+*Last updated: 2026-11-25*

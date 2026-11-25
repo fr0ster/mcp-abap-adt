@@ -97,7 +97,7 @@ export const BACKGROUND_NOT_FOR_RUN_WORDS =
  * that read and cancel a run are named in the `background` parameter.
  */
 export const LONG_TOOL_ADVICE =
-  'Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.';
+  'Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.';
 
 /**
  * The words a listed tool's description carries where it is listed without

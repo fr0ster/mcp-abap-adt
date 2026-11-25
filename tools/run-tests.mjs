@@ -2,7 +2,8 @@
 // test selection, on every platform the repository supports.
 //
 //   node tools/run-tests.mjs --concurrency <N> [--root <dir>]... [--repo <dir>]
-//     [--env NAME=VALUE]... [--list] [node --test options]... [files]...
+//     [--env NAME=VALUE]... [--file-timeout <seconds>] [--list]
+//     [node --test options]... [files]...
 //
 // - With no file, it runs the compiled file, under `.test-build/tree/` (`npm
 //   run test:build` makes it), of every test the selection walks
@@ -62,6 +63,29 @@
 //   it ends the process tree of every file still running. Either way the
 //   run fails, and under a live script the teardown still runs.
 //
+// - `--file-timeout <seconds>` (1 to 2147483; the last one given wins)
+//   bounds each file's process (`tools/file-bound.mjs`): a file still
+//   running when it expires has its process tree ended as it is then
+//   (`endTree`: every descendant still under it, whatever group or session
+//   it is in; one reparented away before is not reached), and once its
+//   close is seen it is named on stderr with the last test it started (the
+//   preload `runningTestPreload.ts` writes each starting test's name to the
+//   file's own `MCP_ABAP_ADT_STARTED_FILE`; no file inherits one) and fails
+//   the run. A tree that cannot be ended is a failure at once, its file not
+//   waited for. The other files run on, and the run's end lists every file
+//   past the bound, `stopped` or `kill failed`. A file that exits first, or exits `0` while being stopped, has
+//   passed. Without the option there is no bound; it is refused under a live
+//   npm script and for any file under a live root by its place on disk
+//   (`__tests__/integration`, `__tests__/admin`), so a live run is never
+//   bounded. The
+//   unit run (`npm test`) passes it: a file that hangs (a macOS `fs.watch`
+//   race in CI jobs 137629013868 and 137761023526) fails with its name
+//   instead of running until the job's own timeout cancels the job. Its
+//   figure, 600 s, is over 3x the slowest file measured: 194.5 s
+//   (`unknownSweep.test.ts`, macOS + Node 24, CI, 2026-11-23; 120 s on
+//   Linux locally), and keeps a job with two hanging files inside CI's 45
+//   minutes.
+//
 // Every file's process may mock a module (`--experimental-test-module-mocks`,
 // node:test's `mock.module`; `src/__tests__/helpers/moduleMock.ts`).
 //
@@ -71,10 +95,11 @@
 // close (`src/__tests__/integration/helpers/closeConnectionsPreload.ts`): a
 // root `after` that closes the connections the file opened through the
 // helpers, after every hook of the file.
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import {
   existsSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -82,6 +107,14 @@ import {
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import {
+  endTree,
+  isLiveFile,
+  isLiveSource as isLiveSourceIn,
+  MAX_BOUND_SECONDS,
+  watchFile,
+  writeFlushed,
+} from './file-bound.mjs';
 import {
   buildDir,
   compiledFile,
@@ -105,6 +138,7 @@ const named = [];
 const roots = [];
 let repo = OWN_REPO;
 let concurrency;
+let fileTimeout;
 let listOnly = false;
 
 /**
@@ -137,6 +171,9 @@ for (let i = 0; i < args.length; i += 1) {
     env[pair.slice(0, eq)] = pair.slice(eq + 1);
   } else if (arg === '--concurrency') {
     concurrency = optionValue(args, i);
+    i += 1;
+  } else if (arg === '--file-timeout') {
+    fileTimeout = optionValue(args, i);
     i += 1;
   } else if (arg === '--root') {
     roots.push(optionValue(args, i));
@@ -199,7 +236,7 @@ function inRoots(dirs, file) {
 
 /** Whether `source` (a repository source path) is a live suite's file. */
 function isLiveSource(source) {
-  return LIVE_ROOTS.some((root) => source.startsWith(`${root}/`));
+  return isLiveSourceIn(source, LIVE_ROOTS);
 }
 
 /** The compiled module `parts` of this repository's build, required. */
@@ -259,178 +296,269 @@ function namedFile(arg) {
   return compiled;
 }
 
+/** Whether `value` is a positive integer written in digits only. */
+function positiveInteger(value) {
+  const digits = '0123456789';
+  return (
+    value !== '' &&
+    !value.startsWith('0') &&
+    [...value].every((character) => digits.includes(character))
+  );
+}
+
+if (fileTimeout !== undefined) {
+  if (
+    !positiveInteger(fileTimeout) ||
+    fileTimeout.length > String(MAX_BOUND_SECONDS).length ||
+    Number(fileTimeout) > MAX_BOUND_SECONDS
+  ) {
+    fail(
+      `--file-timeout "${fileTimeout}" is not a positive integer of seconds up to ${MAX_BOUND_SECONDS}`,
+    );
+  }
+  if (liveScriptRunning()) {
+    fail(
+      '--file-timeout is refused under a live npm script: a live run has no bound',
+    );
+  }
+}
+
 if (listOnly) {
   const listed = named.length > 0 ? selectedNamed() : selectedSources();
-  // Flushed before the exit: a pipe's write is asynchronous on macOS and
-  // Windows, and an exit right after it can cut the list.
-  await new Promise((done) =>
-    process.stdout.write(listed.map((source) => `${source}\n`).join(''), done),
-  );
-  process.exit(0);
-}
-
-if (concurrency === undefined) concurrency = env[CONCURRENCY_VARIABLE];
-if (concurrency === undefined) {
-  fail(
-    `no concurrency: give --concurrency <N> or set ${CONCURRENCY_VARIABLE} (the number of test files run at once)`,
-  );
-}
-const digits = '0123456789';
-if (
-  concurrency === '' ||
-  concurrency.startsWith('0') ||
-  [...concurrency].some((character) => !digits.includes(character))
-) {
-  fail(`concurrency "${concurrency}" is not a positive integer`);
-}
-
-/**
- * A repository source path of `file`, when it is one of `repo`'s: a compiled
- * file under the build (`.test-build/tree/…test.js`) is its source
- * (`…test.ts`), so the live refusal reads a compiled live suite as one.
- */
-function repoSource(file) {
-  const absolute = resolve(file);
-  if (isUnder(buildDir(repo), absolute) && absolute.endsWith('.test.js')) {
-    const compiled = relative(buildDir(repo), absolute).split(sep).join('/');
-    return `${compiled.slice(0, -'.js'.length)}.ts`;
-  }
-  return isUnder(repo, absolute)
-    ? relative(repo, absolute).split(sep).join('/')
-    : undefined;
-}
-
-let files;
-let sourcesRun;
-if (named.length > 0) {
-  const chosen = selectedNamed();
-  if (chosen.length === 0) {
-    fail(`no named file under ${roots.join(', ')}: no test file to run`);
-  }
-  files = chosen.map(namedFile);
-  sourcesRun = chosen.map((arg) => repoSource(arg) ?? arg);
+  // The process ends by itself once the list is flushed, never through
+  // process.exit(): a pipe's write is asynchronous on macOS and Windows, and
+  // an exit right after it can cut the list. Nothing else is open here.
+  process.stdout.write(listed.map((source) => `${source}\n`).join(''));
+  process.exitCode = 0;
 } else {
-  const sources = selectedSources();
-  if (sources.length === 0) {
+  await runSelection();
+}
+
+/** Runs the selection: everything after the arguments, but `--list`. */
+async function runSelection() {
+  if (concurrency === undefined) concurrency = env[CONCURRENCY_VARIABLE];
+  if (concurrency === undefined) {
     fail(
-      roots.length === 0
-        ? 'no test file found: no test file to run'
-        : `no test file under ${roots.join(', ')}: no test file to run`,
+      `no concurrency: give --concurrency <N> or set ${CONCURRENCY_VARIABLE} (the number of test files run at once)`,
     );
   }
-  if (!existsSync(buildDir(repo))) {
-    fail(`${buildDir(repo)} does not exist — run the test build first`);
+  if (!positiveInteger(concurrency)) {
+    fail(`concurrency "${concurrency}" is not a positive integer`);
   }
-  files = sources.map((source) => {
-    const compiled = compiledFile(repo, source);
-    if (!existsSync(compiled)) {
-      fail(`${source} has no compiled file — run the test build first`);
+
+  /**
+   * A repository source path of `file`, when it is one of `repo`'s: a compiled
+   * file under the build (`.test-build/tree/…test.js`) is its source
+   * (`…test.ts`), so the live refusal reads a compiled live suite as one.
+   */
+  function repoSource(file) {
+    const absolute = resolve(file);
+    if (isUnder(buildDir(repo), absolute) && absolute.endsWith('.test.js')) {
+      const compiled = relative(buildDir(repo), absolute).split(sep).join('/');
+      return `${compiled.slice(0, -'.js'.length)}.ts`;
     }
-    return compiled;
-  });
-  sourcesRun = sources;
-}
-
-const live = sourcesRun.some(isLiveSource);
-const liveScript = liveScriptRunning();
-if (live && !liveScript) {
-  fail(
-    `a live suite runs only under a live npm script (${LIVE_ROOTS.join(', ')}): ${sourcesRun
-      .filter(isLiveSource)
-      .join(', ')}`,
-  );
-}
-
-const preload = ownCompiled('src', '__tests__', 'helpers', 'resolvePreload.js');
-const closePreload = ownCompiled(
-  'src',
-  '__tests__',
-  'integration',
-  'helpers',
-  'closeConnectionsPreload.js',
-);
-// The running case, for a live helper's skip (`runningTestPreload.ts`).
-const runningPreload = ownCompiled(
-  'src',
-  '__tests__',
-  'integration',
-  'helpers',
-  'runningTestPreload.js',
-);
-
-/** The live run's setup or teardown module, compiled, its siblings resolved. */
-function liveRunModule(name) {
-  // The setup's sibling packages resolve as in every file's process.
-  ownRequire(preload);
-  return ownRequire(
-    ownCompiled('src', '__tests__', 'integration', `${name}.js`),
-  );
-}
-
-if (liveScript) {
-  // The setup and the teardown run in this process and read its
-  // environment: the run's own (`--env` included) is set here first, and
-  // what the setup sets (the run's directory above all) reaches the files.
-  Object.assign(process.env, env);
-  const { setUpLiveRun } = liveRunModule('globalSetup');
-  try {
-    await setUpLiveRun({ rootDir: OWN_REPO, named });
-  } catch (error) {
-    fail(
-      `the live setup failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return isUnder(repo, absolute)
+      ? relative(repo, absolute).split(sep).join('/')
+      : undefined;
   }
-  Object.assign(env, process.env);
-}
 
-// The stop file the runner owns: written on the first interrupt.
-const stopDir = mkdtempSync(join(tmpdir(), 'run-tests-stop-'));
-const STOP_FILE = join(stopDir, 'stop');
-env.MCP_ABAP_ADT_STOP_FILE = STOP_FILE;
-
-/** The files' processes still running, by pid. */
-const running = new Map();
-let interrupts = 0;
-
-/** Ends the process tree of `child`: its process group, or on Windows its tree. */
-function endTree(child) {
-  if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
-      stdio: 'ignore',
-    });
+  let files;
+  let sourcesRun;
+  if (named.length > 0) {
+    const chosen = selectedNamed();
+    if (chosen.length === 0) {
+      fail(`no named file under ${roots.join(', ')}: no test file to run`);
+    }
+    files = chosen.map(namedFile);
+    sourcesRun = chosen.map((arg) => repoSource(arg) ?? arg);
   } else {
-    try {
-      process.kill(-child.pid, 'SIGKILL');
-    } catch {
-      // The group has ended already.
+    const sources = selectedSources();
+    if (sources.length === 0) {
+      fail(
+        roots.length === 0
+          ? 'no test file found: no test file to run'
+          : `no test file under ${roots.join(', ')}: no test file to run`,
+      );
+    }
+    if (!existsSync(buildDir(repo))) {
+      fail(`${buildDir(repo)} does not exist — run the test build first`);
+    }
+    files = sources.map((source) => {
+      const compiled = compiledFile(repo, source);
+      if (!existsSync(compiled)) {
+        fail(`${source} has no compiled file — run the test build first`);
+      }
+      return compiled;
+    });
+    sourcesRun = sources;
+  }
+
+  if (fileTimeout !== undefined) {
+    // By where each file is on disk, whatever `--repo` says: a live or
+    // integration file is never bounded.
+    // Called with the file alone: `filter`'s index would be read as the
+    // platform, and Windows would compare case.
+    const liveFiles = files.filter((file) => isLiveFile(file));
+    if (liveFiles.length > 0) {
+      fail(
+        `--file-timeout is refused for a live or integration file: ${liveFiles.join(', ')}`,
+      );
     }
   }
-}
 
-process.on('SIGINT', () => {
-  interrupts += 1;
-  if (interrupts === 1) {
-    writeFileSync(STOP_FILE, 'interrupted');
-    console.error(
-      'run-tests: interrupted — no further file starts; the running files finish their current case and its cleanup. Interrupt again to stop them now.',
+  const live = sourcesRun.some(isLiveSource);
+  const liveScript = liveScriptRunning();
+  if (live && !liveScript) {
+    fail(
+      `a live suite runs only under a live npm script (${LIVE_ROOTS.join(', ')}): ${sourcesRun
+        .filter(isLiveSource)
+        .join(', ')}`,
     );
-    return;
   }
-  console.error(
-    'run-tests: interrupted again — the running files are stopped.',
-  );
-  for (const child of running.values()) endTree(child);
-});
 
-/** One file in a `node --test` of its own, in a process group of its own. */
-function runFile(file) {
-  return new Promise((resolve) => {
+  const preload = ownCompiled(
+    'src',
+    '__tests__',
+    'helpers',
+    'resolvePreload.js',
+  );
+  const closePreload = ownCompiled(
+    'src',
+    '__tests__',
+    'integration',
+    'helpers',
+    'closeConnectionsPreload.js',
+  );
+  // The running case, for a live helper's skip (`runningTestPreload.ts`).
+  const runningPreload = ownCompiled(
+    'src',
+    '__tests__',
+    'integration',
+    'helpers',
+    'runningTestPreload.js',
+  );
+
+  /** The live run's setup or teardown module, compiled, its siblings resolved. */
+  function liveRunModule(name) {
+    // The setup's sibling packages resolve as in every file's process.
+    ownRequire(preload);
+    return ownRequire(
+      ownCompiled('src', '__tests__', 'integration', `${name}.js`),
+    );
+  }
+
+  if (liveScript) {
+    // The setup and the teardown run in this process and read its
+    // environment: the run's own (`--env` included) is set here first, and
+    // what the setup sets (the run's directory above all) reaches the files.
+    Object.assign(process.env, env);
+    const { setUpLiveRun } = liveRunModule('globalSetup');
+    try {
+      await setUpLiveRun({ rootDir: OWN_REPO, named });
+    } catch (error) {
+      fail(
+        `the live setup failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    Object.assign(env, process.env);
+  }
+
+  // The stop file the runner owns: written on the first interrupt.
+  const stopDir = mkdtempSync(join(tmpdir(), 'run-tests-stop-'));
+  const STOP_FILE = join(stopDir, 'stop');
+  env.MCP_ABAP_ADT_STOP_FILE = STOP_FILE;
+
+  /** The files' processes still running, by pid. */
+  const running = new Map();
+  let interrupts = 0;
+
+  /** Ends the process tree of `child` (`endTree`, `file-bound.mjs`). */
+  function endChildTree(child) {
+    const ended = endTree(child.pid);
+    if (!ended.ok) {
+      console.error(
+        `run-tests: a file's process tree could not be ended: ${ended.reason}`,
+      );
+    }
+    return ended;
+  }
+
+  process.on('SIGINT', () => {
+    interrupts += 1;
+    if (interrupts === 1) {
+      writeFileSync(STOP_FILE, 'interrupted');
+      console.error(
+        'run-tests: interrupted — no further file starts; the running files finish their current case and its cleanup. Interrupt again to stop them now.',
+      );
+      return;
+    }
+    console.error(
+      'run-tests: interrupted again — the running files are stopped.',
+    );
+    for (const child of running.values()) endChildTree(child);
+  });
+
+  /**
+   * The test files that hold a whole TypeScript program of the repository
+   * (the source scans), with the peak resident memory each was measured at
+   * (Linux, Node 26, 2026-11-24): past the ~2 GB of heap a 7 GB macOS runner
+   * gives a process by default (run 45269937223: out of memory at 2,025 MB
+   * in `sources/unknownSweep`), so each gets 4 GB. Every other file keeps
+   * Node's default; one that comes to need more is measured and named here.
+   */
+  const HEAVY_FILES = new Map([
+    ['src/__tests__/unit/sources/unknownSweep.test.ts', '2.99 GB'],
+    ['src/__tests__/unit/runner/placedFiles.test.ts', '1.65 GB'],
+    ['src/__tests__/unit/sources/noRunnerTimeout.test.ts', '1.57 GB'],
+    [
+      'src/__tests__/unit/sources/noDerivationFromAuthorization.test.ts',
+      '1.51 GB',
+    ],
+    ['src/__tests__/unit/sources/noRegexOverInput.test.ts', '1.44 GB'],
+    ['src/__tests__/unit/sources/noProseMatching.test.ts', '1.42 GB'],
+    ['src/__tests__/unit/sources/noChainInstanceof.test.ts', '1.37 GB'],
+    ['src/__tests__/unit/sources/rfcConfigConstruction.test.ts', '1.07 GB'],
+  ]);
+
+  /** The heap a file's process gets: 4 GB for a heavy file, else Node's default. */
+  function heapOf(source) {
+    return HEAVY_FILES.has(source.split('\\').join('/'))
+      ? ['--max-old-space-size=4096']
+      : [];
+  }
+
+  /**
+   * The files that ran past the bound: their source path, and `stopped` or
+   * `kill failed` (their tree could not be ended whole).
+   */
+  const pastBound = [];
+  let startedFiles = 0;
+
+  /** The variable naming where a file's process writes each test it starts. */
+  const STARTED_VARIABLE = 'MCP_ABAP_ADT_STARTED_FILE';
+
+  /**
+   * One file in a `node --test` of its own, in a process group of its own;
+   * with a bound, its process tree is ended when the bound expires first
+   * (`watchFile`). `source` names the file in what the runner says.
+   */
+  async function runFile(file, source) {
+    // No file inherits a marker: only a bounded run names one, per file.
+    const fileEnv = { ...env };
+    delete fileEnv[STARTED_VARIABLE];
+    let startedFile;
+    if (fileTimeout !== undefined) {
+      startedFiles += 1;
+      startedFile = join(stopDir, `started-${startedFiles}`);
+      fileEnv[STARTED_VARIABLE] = startedFile;
+    }
     const child = spawn(
       process.execPath,
       [
         // node:test's `mock.module` (helpers/moduleMock.ts): a file may
         // replace a module whose exports map closes its internal files.
         '--experimental-test-module-mocks',
+        ...heapOf(source),
         '--require',
         preload,
         '--require',
@@ -444,49 +572,83 @@ function runFile(file) {
       ],
       {
         stdio: ['ignore', 'inherit', 'inherit'],
-        env,
+        env: fileEnv,
         detached: true,
         windowsHide: true,
       },
     );
-    running.set(child.pid, child);
-    child.on('error', (error) => {
-      console.error(`run-tests: node --test did not start: ${error}`);
-      running.delete(child.pid);
-      resolve(1);
-    });
-    child.on('close', (code) => {
-      running.delete(child.pid);
-      resolve(code ?? 1);
-    });
-  });
-}
-
-/** Every file, at most `concurrency` at once; none started after an interrupt. */
-async function runAll() {
-  const queue = [...files];
-  let status = 0;
-  const lane = async () => {
-    while (queue.length > 0 && interrupts === 0) {
-      const file = queue.shift();
-      if ((await runFile(file)) !== 0) status = 1;
-    }
-  };
-  await Promise.all(Array.from({ length: Number(concurrency) }, () => lane()));
-  return interrupts > 0 ? 1 : status;
-}
-
-let status = await runAll();
-rmSync(stopDir, { recursive: true, force: true });
-if (liveScript) {
-  const { tearDownLiveRun } = liveRunModule('globalTeardown');
-  try {
-    await tearDownLiveRun({ rootDir: OWN_REPO });
-  } catch (error) {
-    console.error(
-      `run-tests: the live teardown failed: ${error instanceof Error ? error.message : String(error)}`,
+    if (child.pid !== undefined) running.set(child.pid, child);
+    const result = await watchFile(
+      child,
+      fileTimeout === undefined ? undefined : Number(fileTimeout),
+      (target) => endTree(target.pid),
     );
-    status = 1;
+    running.delete(child.pid);
+    if (result.outcome === 'ended') return result.code;
+    if (result.outcome === 'error') {
+      console.error(`run-tests: node --test did not start: ${result.error}`);
+      return 1;
+    }
+    if (result.outcome === 'unkillable') {
+      pastBound.push({ source, how: 'kill failed' });
+      console.error(
+        `run-tests: ${source} ran past the bound of ${fileTimeout} s and could not be stopped: ${result.reason}`,
+      );
+      return 1;
+    }
+    let last = 'none';
+    try {
+      last = readFileSync(startedFile, 'utf8');
+    } catch {
+      // No test started.
+    }
+    pastBound.push({ source, how: 'stopped' });
+    console.error(
+      `run-tests: ${source} ran past the bound of ${fileTimeout} s and was stopped; the last test started: ${last}`,
+    );
+    return 1;
   }
+
+  /** Every file, at most `concurrency` at once; none started after an interrupt. */
+  async function runAll() {
+    const queue = files.map((file, index) => [file, sourcesRun[index]]);
+    let status = 0;
+    const lane = async () => {
+      while (queue.length > 0 && interrupts === 0) {
+        const [file, source] = queue.shift();
+        if ((await runFile(file, source)) !== 0) status = 1;
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Number(concurrency) }, () => lane()),
+    );
+    if (pastBound.length > 0) {
+      const count =
+        pastBound.length === 1 ? '1 file ran' : `${pastBound.length} files ran`;
+      // Flushed before the exit: a pipe's write is asynchronous on macOS and
+      // Windows, and an exit right after it can cut the summary.
+      await writeFlushed(
+        process.stderr,
+        `run-tests: ${count} past the bound of ${fileTimeout} s:\n${pastBound
+          .map(({ source, how }) => `  ${how}: ${source}`)
+          .join('\n')}\n`,
+      );
+    }
+    return interrupts > 0 ? 1 : status;
+  }
+
+  let status = await runAll();
+  rmSync(stopDir, { recursive: true, force: true });
+  if (liveScript) {
+    const { tearDownLiveRun } = liveRunModule('globalTeardown');
+    try {
+      await tearDownLiveRun({ rootDir: OWN_REPO });
+    } catch (error) {
+      console.error(
+        `run-tests: the live teardown failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      status = 1;
+    }
+  }
+  process.exit(status);
 }
-process.exit(status);

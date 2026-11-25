@@ -315,8 +315,9 @@ describe('with the host’s freshConnection', () => {
     const sentBeforeUnlock = fresh.requests.length;
 
     await client.callTool({
-      name: 'HandlerUnlock',
+      name: 'HandlerLock',
       arguments: {
+        action: 'unlock',
         object_type: 'PACKAGE',
         object_name: 'ZFRESH',
         lock_handle: lockHandle,

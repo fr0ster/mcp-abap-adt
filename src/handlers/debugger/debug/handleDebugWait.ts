@@ -6,14 +6,22 @@ import {
   HOLD_SECONDS_PROPERTY,
   STATE_HANDLE_PROPERTY,
 } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugWait',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] [debug] State of a debug session after waiting up to hold_seconds; a debugger that took the user over is an error carrying the system's message.",
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Waits for the next stop or end of an ABAP debug session, up to the seconds asked, and tells its state.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     ...HOLD_SECONDS_PROPERTY,

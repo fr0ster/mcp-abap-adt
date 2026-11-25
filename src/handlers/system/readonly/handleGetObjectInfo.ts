@@ -26,27 +26,33 @@ import {
 import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
+  longRunning,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
+import {
   onEveryVariant,
   type RuleVariant,
   stated,
   withInCallSchema,
 } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
   type MetadataTarget,
   metadataKeyOf,
 } from '../../../lib/strategies/metadataReads';
 import {
   batchReader,
+  childNodesOf,
+  concurrentReader,
   endsTheCall,
   kindOf,
   metadataDescriptions,
+  type NodeItem,
   type NodeLevel,
   type NodeRequest,
+  nodeItemsOf,
   nodeStructureOn,
   readNode,
 } from '../../../lib/strategies/packageWalk';
@@ -97,7 +103,7 @@ const FIELDS = {
     .default(false)
     .optional()
     .describe(
-      "[read-only] Include each leaf's description. Where the system serves ADT batch, each description is read from the leaf's metadata: one more read per leaf, which on a large tree takes most of the call (default false)",
+      "[read-only] Include each leaf's description, read from the leaf's metadata once the structure is read: one more read per leaf (in ADT batch envelopes where the system serves them), which on a large tree takes most of the call (default false)",
     ),
 };
 
@@ -163,9 +169,13 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectInfo',
   available_in: ['onprem', 'cloud'] as const,
   ...onEveryVariant(
-    withLongToolAdvice(
-      '[read-only] Returns the object tree of the package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other object named by parent_type and parent_name. Shows root, group nodes, and terminal leaves up to maxDepth. With enrich=true each node also carries its description and package, from a repository search. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last.',
-    ),
+    toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads the repository browser of a package, class, program, function group or other repository object, with descriptions and packages when asked.',
+      ),
+      notes: [longRunning],
+    }),
     schemaOn,
   ),
 } as const;
@@ -343,6 +353,69 @@ async function enrichNodeWithSearchObject(
 /** The utilities a tree is read on: our node reading (`ourUtils`). */
 type NodeSource = UtilsApi<typeof ourUtils, AdtModernVariant>;
 
+/** A leaf whose description its metadata answers, and that read. */
+interface LeafRead {
+  leaf: TreeNode;
+  target: MetadataTarget;
+}
+
+/**
+ * A leaf found under `parentType` `parentName`, without a description of
+ * its node structure; with `describe`, kept in `leaves` for the metadata
+ * phase, which gives it its description. A function module or include is
+ * read at its group: the node it was found under.
+ */
+function leafOf(
+  o: NodeItem,
+  parentType: AdtTypeCode,
+  parentName: string,
+  describe: boolean,
+  leaves: LeafRead[],
+): TreeNode {
+  const leaf: TreeNode = { OBJECT_TYPE: o.type, OBJECT_NAME: o.name };
+  if (!describe) return leaf;
+  const functionGroup =
+    parentType === 'FUGR/F' ||
+    parentType === 'FUGR/FF' ||
+    parentType === 'FUGR/I'
+      ? parentName
+      : undefined;
+  leaves.push({
+    leaf,
+    target: {
+      type: o.type,
+      name: o.name,
+      ...(functionGroup !== undefined ? { functionGroup } : {}),
+    },
+  });
+  return leaf;
+}
+
+/**
+ * The metadata phase: every leaf's description from its metadata — the one
+ * source of both paths. Batched, the reads go in envelopes (metadata reads
+ * do not cross-talk); `alone` (the sequential version), one after another.
+ * A leaf whose read SAP refused, a `401` included, has no description; the
+ * call answers.
+ */
+async function describeLeaves(
+  context: HandlerContext,
+  leaves: readonly LeafRead[],
+  alone: boolean,
+): Promise<void> {
+  if (leaves.length === 0) return;
+  const { descriptions } = await metadataDescriptions(
+    context,
+    leaves.map(({ target }) => target),
+    alone,
+  );
+  for (const { leaf, target } of leaves) {
+    const key = metadataKeyOf(target);
+    const description = key === undefined ? undefined : descriptions.get(key);
+    if (description) leaf.OBJECT_DESCRIPTION = description;
+  }
+}
+
 /**
  * One tree node: the object itself, enriched, plus its children — the
  * sequential version, where the destination has no communication batch.
@@ -354,12 +427,12 @@ type NodeSource = UtilsApi<typeof ourUtils, AdtModernVariant>;
  * fixtures under `tests/fixtures/adt/` — BDEF, FUGR, service definition,
  * structure, table, across every depth captured — no entry ever carries a
  * `NODE_ID`: real content lives in `DATA.OBJECT_TYPES.SEU_ADT_OBJECT_TYPE_INFO`
- * (the type folders `nodeLevel`'s `childNodes` reads), which the pre-migration
+ * (the type folders the node reading's `childNodes` lists), which the pre-migration
  * handler never read at all. For a package root, `TREE_CONTENT` is empty in
  * fixture 01 — so at the tool's own default `maxDepth` of 1, the pre-migration
  * handler answered an empty `CHILDREN` for the single most common call
  * (`parent_type: 'DEVC/K'`). This version reads both halves of the one
- * document `ourUtils.node` (`nodeLevel`) already parses: direct objects at
+ * document `ourUtils.node` (`utilNodeContents`) already reads: direct objects at
  * this level, plus one fetch per type folder for the objects inside it —
  * matching `walkPackage`'s own two-tier walk in `packageWalk.ts`, which is
  * exercised by `handleGetPackageContents`/`handleGetPackageTree` today. Also
@@ -401,6 +474,7 @@ async function buildTree(
   enrich: boolean,
   describe: boolean,
   ended: Ended,
+  leaves: LeafRead[],
 ): Promise<IAdtResponse<TreeNode, IAdtError>> {
   const enrichment = enrich
     ? await enrichNodeWithSearchObject(context, objectType, objectName, ended)
@@ -427,18 +501,13 @@ async function buildTree(
     }
     const root = rootResponse.getResult().value;
 
-    for (const o of root.objects) {
-      children.push({
-        OBJECT_TYPE: o.type,
-        OBJECT_NAME: o.name,
-        // A description only when asked for: SAP sends some without it.
-        ...(describe && o.description
-          ? { OBJECT_DESCRIPTION: o.description }
-          : {}),
-      });
+    // Each leaf's description is its metadata's (`describeLeaves`), as the
+    // batched version reads it.
+    for (const o of nodeItemsOf(root)) {
+      children.push(leafOf(o, objectType, objectName, describe, leaves));
     }
 
-    for (const child of root.childNodes) {
+    for (const child of childNodesOf(root)) {
       const childResponse = await withAdtHeaders(
         context,
         'utils.fetchNodeStructure',
@@ -454,7 +523,7 @@ async function buildTree(
         return childResponse;
       }
       const childLevel = childResponse.getResult().value;
-      for (const o of childLevel.objects) {
+      for (const o of nodeItemsOf(childLevel)) {
         // A subpackage is walked further by its code; a type ADT sent that
         // is no code of the tables stays a leaf.
         const subType = tableCodeOf(o.type);
@@ -473,6 +542,7 @@ async function buildTree(
             enrich,
             describe,
             ended,
+            leaves,
           );
           if (ended.answer !== undefined) return subtree;
           if (!subtree.ok) {
@@ -480,13 +550,7 @@ async function buildTree(
           }
           children.push(subtree.getResult().value);
         } else {
-          children.push({
-            OBJECT_TYPE: o.type,
-            OBJECT_NAME: o.name,
-            ...(describe && o.description
-              ? { OBJECT_DESCRIPTION: o.description }
-              : {}),
-          });
+          children.push(leafOf(o, objectType, objectName, describe, leaves));
         }
       }
     }
@@ -527,7 +591,10 @@ async function buildTrees(
   describe: boolean,
   ended: Ended,
 ): Promise<Trees> {
-  const read = batchReader(context, (request: NodeRequest, c) =>
+  // The structure first, each node structure sent alone (a node structure
+  // part in an envelope can carry another part's DESCRIPTION, measured
+  // 2026-10-18); the descriptions after, in the metadata phase.
+  const read = concurrentReader(context, (request: NodeRequest, c) =>
     readNode(
       nodeStructureOn(
         context,
@@ -545,38 +612,10 @@ async function buildTrees(
     children: [],
   }));
   const nodes: InfoNode[] = [...roots];
-  /** Every leaf of every tree, with its root and the object it reads. */
-  const leaves: Array<{
-    root: number;
-    leaf: TreeNode;
-    target: MetadataTarget;
-  }> = [];
-  /**
-   * A leaf without the description its part carried: a node structure part
-   * after the first of an envelope can carry another part's `DESCRIPTION`
-   * (measured, 2026-10-18); the leaf's description is its metadata's.
-   */
-  const bareLeaf = (node: InfoNode, o: NodeLevel['objects'][number]) => {
-    const leaf: TreeNode = { OBJECT_TYPE: o.type, OBJECT_NAME: o.name };
-    // A function module or include is read at its group: the node it was
-    // found under.
-    const functionGroup =
-      node.type === 'FUGR/F' ||
-      node.type === 'FUGR/FF' ||
-      node.type === 'FUGR/I'
-        ? node.name
-        : undefined;
-    leaves.push({
-      root: node.root,
-      leaf,
-      target: {
-        type: o.type,
-        name: o.name,
-        ...(functionGroup !== undefined ? { functionGroup } : {}),
-      },
-    });
-    return leaf;
-  };
+  /** Every leaf of every tree, by root, for the metadata phase. */
+  const leaves = objects.map((): LeafRead[] => []);
+  const bareLeaf = (node: InfoNode, o: NodeItem) =>
+    leafOf(o, node.type, node.name, describe, leaves[node.root] ?? []);
   const limit = (node: InfoNode) => objects[node.root].maxDepth;
   let ending: IAdtFailure | undefined;
   /** The level a read answered, or undefined once its root failed. */
@@ -616,8 +655,8 @@ async function buildTrees(
     tier.forEach((node, i) => {
       const level = settle(node, rootAnswers[i]);
       if (level === undefined) return;
-      node.children.push(...level.objects.map((o) => bareLeaf(node, o)));
-      for (const child of level.childNodes) {
+      node.children.push(...nodeItemsOf(level).map((o) => bareLeaf(node, o)));
+      for (const child of childNodesOf(level)) {
         typeNodes.push({ node, nodeId: child.nodeId });
       }
     });
@@ -639,7 +678,7 @@ async function buildTrees(
     typeNodes.forEach(({ node }, i) => {
       const level = settle(node, typeAnswers[i]);
       if (level === undefined) return;
-      for (const o of level.objects) {
+      for (const o of nodeItemsOf(level)) {
         const code = tableCodeOf(o.type);
         if (
           code !== undefined &&
@@ -665,21 +704,14 @@ async function buildTrees(
     tier = next.filter((node) => !failures.has(node.root));
   }
 
-  // Asked for: every leaf's description from its metadata, in one phase.
+  // Asked for: every leaf's description from its metadata, in the
+  // metadata phase.
   if (describe) {
-    const described = leaves.filter(({ root }) => !failures.has(root));
-    const { descriptions, refused } = await metadataDescriptions(
+    await describeLeaves(
       context,
-      described.map(({ target }) => target),
+      leaves.flatMap((own, root) => (failures.has(root) ? [] : own)),
+      false,
     );
-    // A metadata read SAP refused with a credential failure ends the call as
-    // a refused node read does: the method's error, with its step.
-    if (refused !== undefined) return { roots, failures, ended: refused };
-    for (const { leaf, target } of described) {
-      const key = metadataKeyOf(target);
-      const description = key === undefined ? undefined : descriptions.get(key);
-      if (description) leaf.OBJECT_DESCRIPTION = description;
-    }
   }
 
   if (enrich) {
@@ -734,6 +766,7 @@ async function buildTreesSequential(
   const trees: Array<IAdtResponse<TreeNode, IAdtError> | Thrown> = [];
   for (const o of objects) {
     let tree: IAdtResponse<TreeNode, IAdtError> | Thrown;
+    const leaves: LeafRead[] = [];
     try {
       tree = await buildTree(
         context,
@@ -745,7 +778,12 @@ async function buildTreesSequential(
         enrich,
         describe,
         ended,
+        leaves,
       );
+      // Its leaves' descriptions from their metadata, one after another.
+      if (tree.ok && ended.answer === undefined) {
+        await describeLeaves(context, leaves, true);
+      }
     } catch (thrown) {
       if (endsTheCall(thrown)) throw thrown;
       tree = { ok: false, thrown };
@@ -803,11 +841,9 @@ export async function handleGetObjectInfo(
   const asked = objects.map((o) => ({ ...o, maxDepth: depthOf(o.type) }));
 
   // Task 28: why this tool carries no `detail`. The node-level family's
-  // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
-  // `nodeLevel` parses `answer.data` and returns only the reduced
-  // `NodeLevel` it builds, never keeping the wire text beside it — there is
-  // no `.raw` for `detail: 'raw'` to answer without changing that shared
-  // strategy. This tool's own answer besides is a composite tree assembled
+  // shape (`ourUtils.node`, adt-strategies' `utilNodeContents`): the
+  // reading keeps no wire text beside the level — there is no `.raw` for
+  // `detail: 'raw'` to answer. This tool's own answer besides is a composite tree assembled
   // from several such calls (`buildTrees`), not one reading.
   let ended: Ended = {};
   const entryOf = (
@@ -854,6 +890,7 @@ export async function handleGetObjectInfo(
           ended = {};
           if (listed === undefined) {
             const only = asked[0];
+            const leaves: LeafRead[] = [];
             const tree = await buildTree(
               context,
               createAdtClient(context.connection, logger).getUtils(ourUtils),
@@ -864,8 +901,13 @@ export async function handleGetObjectInfo(
               enrich,
               describe,
               ended,
+              leaves,
             );
-            return tree.ok ? ok([tree.getResult().value]) : tree;
+            if (!tree.ok) return tree;
+            if (ended.answer === undefined) {
+              await describeLeaves(context, leaves, true);
+            }
+            return ok([tree.getResult().value]);
           }
           const read = await buildTreesSequential(
             context,

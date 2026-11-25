@@ -2,8 +2,11 @@
  * The definitions of the read tools the compact read routes serve, by tool
  * name: a compact route is the target tool's entry (`defineTool` of its
  * definition and its handler), so a routed call is parsed with the target's
- * own schema. Read tools only: this module is part of the read barrel.
+ * own schema; and a compact read tool states the function of the full tool
+ * it maps to in that tool's assembled parts. Read tools only: this module is
+ * part of the read barrel.
  */
+
 import { TOOL_DEFINITION as GetATCFindings } from '../../handlers/atc/high/handleGetATCFindings.js';
 import { TOOL_DEFINITION as GetATCResult } from '../../handlers/atc/high/handleGetATCResult.js';
 import { TOOL_DEFINITION as ListATCResults } from '../../handlers/atc/high/handleListATCResults.js';
@@ -29,6 +32,8 @@ import { TOOL_DEFINITION as GetPackageContents } from '../../handlers/package/re
 import { TOOL_DEFINITION as GetProgram } from '../../handlers/program/high/handleGetProgram.js';
 import { TOOL_DEFINITION as SearchObject } from '../../handlers/search/readonly/handleSearchObject.js';
 import { TOOL_DEFINITION as GetServiceBinding } from '../../handlers/service_binding/high/handleGetServiceBinding.js';
+import { TOOL_DEFINITION as ListServiceBindingTypes } from '../../handlers/service_binding/high/handleListServiceBindingTypes.js';
+import { TOOL_DEFINITION as ValidateServiceBinding } from '../../handlers/service_binding/high/handleValidateServiceBinding.js';
 import { TOOL_DEFINITION as GetServiceDefinition } from '../../handlers/service_definition/high/handleGetServiceDefinition.js';
 import { TOOL_DEFINITION as GetStructure } from '../../handlers/structure/high/handleGetStructure.js';
 import { TOOL_DEFINITION as GetPackageTree } from '../../handlers/system/high/handleGetPackageTree.js';
@@ -38,16 +43,24 @@ import { TOOL_DEFINITION as GetObjectStructure } from '../../handlers/system/rea
 import { TOOL_DEFINITION as GetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl.js';
 import { TOOL_DEFINITION as GetSqlQuery } from '../../handlers/system/readonly/handleGetSqlQuery.js';
 import { TOOL_DEFINITION as GetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed.js';
+import { TOOL_DEFINITION as RuntimeAnalyzeProfilerTrace } from '../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.js';
+import { TOOL_DEFINITION as RuntimeGetDumpById } from '../../handlers/system/readonly/handleRuntimeGetDumpById.js';
+import { TOOL_DEFINITION as RuntimeGetProfilerTraceData } from '../../handlers/system/readonly/handleRuntimeGetProfilerTraceData.js';
+import { TOOL_DEFINITION as RuntimeListFeeds } from '../../handlers/system/readonly/handleRuntimeListFeeds.js';
+import { TOOL_DEFINITION as RuntimeListProfilerTraceFiles } from '../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles.js';
 import { TOOL_DEFINITION as SearchSource } from '../../handlers/system/readonly/handleSearchSource.js';
 import { TOOL_DEFINITION as GetTable } from '../../handlers/table/high/handleGetTable.js';
 import { TOOL_DEFINITION as GetTableContents } from '../../handlers/table/readonly/handleGetTableContents.js';
 import { TOOL_DEFINITION as GetTableSettings } from '../../handlers/table/readonly/handleGetTableSettings.js';
 import { TOOL_DEFINITION as GetTableType } from '../../handlers/table_type/high/handleGetTableType.js';
 import { TOOL_DEFINITION as GetTextElements } from '../../handlers/text_elements/readonly/handleGetTextElements.js';
+import { TOOL_DEFINITION as GetTransport } from '../../handlers/transport/readonly/handleGetTransport.js';
 import { TOOL_DEFINITION as ListTransports } from '../../handlers/transport/readonly/handleListTransports.js';
 import { TOOL_DEFINITION as ReadTransportObjects } from '../../handlers/transport/readonly/handleReadTransportObjects.js';
 import { TOOL_DEFINITION as GetCdsUnitTestResult } from '../../handlers/unit_test/high/handleGetCdsUnitTestResult.js';
+import { TOOL_DEFINITION as GetCdsUnitTestStatus } from '../../handlers/unit_test/high/handleGetCdsUnitTestStatus.js';
 import { TOOL_DEFINITION as GetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult.js';
+import { TOOL_DEFINITION as GetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus.js';
 
 export const READ_DEFINITIONS = {
   GetBehaviorDefinition,
@@ -82,6 +95,7 @@ export const READ_DEFINITIONS = {
   GetTableType,
   GetTextElements,
   ReadTransportObjects,
+  GetTransport,
   GetCdsUnitTestResult,
   GetUnitTestResult,
   SearchObject,
@@ -94,4 +108,13 @@ export const READ_DEFINITIONS = {
   GetATCFindings,
   ListATCResults,
   GetATCResult,
+  GetUnitTestStatus,
+  GetCdsUnitTestStatus,
+  RuntimeListProfilerTraceFiles,
+  RuntimeGetProfilerTraceData,
+  RuntimeAnalyzeProfilerTrace,
+  RuntimeListFeeds,
+  RuntimeGetDumpById,
+  ListServiceBindingTypes,
+  ValidateServiceBinding,
 } as const;

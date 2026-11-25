@@ -89,13 +89,16 @@ describe('ATC Handlers Integration', () => {
     worklistId: string,
     params: any,
   ) {
+    // The fields read below: the JSON of detail medium, on both paths.
+    const findingsArgs = { worklist_id: worklistId, detail: 'medium' };
     const result = await tester.invokeToolOrHandler(
       'GetATCFindings',
-      { worklist_id: worklistId },
+      findingsArgs,
       async () =>
-        handleGetATCFindings(createHandlerContext({ connection, logger }), {
-          worklist_id: worklistId,
-        } as any),
+        handleGetATCFindings(
+          createHandlerContext({ connection, logger }),
+          findingsArgs as any,
+        ),
     );
     if (result.isError) {
       throw new Error(`GetATCFindings failed: ${extractErrorMessage(result)}`);
@@ -246,7 +249,11 @@ describe('ATC Handlers Integration', () => {
         String(b.created_at) > String(a.created_at) ? b : a,
       );
 
-      const readArgs = { display_id: newest.display_id };
+      // The fields read below: the JSON of detail medium, on both paths.
+      const readArgs = {
+        display_id: newest.display_id,
+        detail: 'medium' as const,
+      };
       const read = await tester.invokeToolOrHandler(
         'GetATCResult',
         readArgs,

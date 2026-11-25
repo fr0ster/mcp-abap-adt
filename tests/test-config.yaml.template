@@ -96,6 +96,7 @@ environment:
   # checks the session's SAP_URL.
   realm_check_url: ""                        # ← CHANGE (RFC): the system's HTTP URL
   connection_type: "http"                    # "http" | "rfc"
+  default_master_system: "SID"                # ← CHANGE: the system id (SID) this config connects to; abapgit.check_repo_fault_system is matched against it
   # RFC (rfc only): the destination states its address, client and language,
   # and no SAP_URL. Each key below sets its SAP_* variable (SAP_ASHOST, ...)
   # over the .env's; leave "" to take the .env's. One address: ashost + sysnr
@@ -1501,6 +1502,28 @@ create_transported_object:
   # the cloud package accepts (measured).
   target_system: "TARGET"                        # ← CHANGE: the package's transport target, no slashes
 
+# Read a Transport Request and Task (read only)
+# Read by coverage/transportTaskRead.live.test.ts (task_number): data, no
+# switch. GetTransport and HandlerGet TRANSPORT part metadata read this task
+# and its parent request (read from the task's answer). Nothing is created,
+# changed or released. onprem, cloud: needed (absent, the cases fail naming
+# this key) — any task of the system, with or without objects: read it from a
+# request of the session user (ListTransports, then GetTransport's tasks).
+read_transport:
+  task_number: "TASK"                            # ← CHANGE: a transport task of the system
+
+# abapGit (coverage/abapGit.live.test.ts, coverage/abapGitCompact.live.test.ts)
+# Data, no switch. check_repo_fault_system names the on-premise system whose
+# installed abapGit cannot answer the repository checks: its
+# ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory
+# IV_SERVICE at L53; measured). It is matched against
+# environment.default_master_system: on that system the checks case asserts
+# SAP's refusal whole (500, no T100 key); on any other system, onprem or
+# cloud, the checks must answer. onprem: needed only on that system; cloud:
+# not needed. Absent or empty: no system is that one.
+abapgit:
+  check_repo_fault_system: ""                    # ← CHANGE: the system id with the checks fault, or empty
+
 # Service Definition (Service Definition - High-Level)
 # Read by high/serviceDefinition/ServiceDefinitionHighHandlers.test.ts. Object
 # name and sources. onprem, cloud.
@@ -1767,6 +1790,9 @@ whereused_readonly:
         test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
         # cloud: needed — a table that exists on the cloud system.
         test_table: "SCARR"                    # Standard SAP table (Flight: Airlines)
+        # on premise: a class whose where-used list is above the stdio message
+        # limit (coverage/readToolBugs.live.test.ts); "" skips that case.
+        oversized_class: "CL_ABAP_UNIT_ASSERT"
 
 # Runtime Read-Only Handlers (Profiling + Dumps)
 # Read by readOnly/system/RuntimeProfilingAndDumpsHandlers.test.ts (all params)
@@ -1885,7 +1911,7 @@ access:
 
 # Batch mode (src/__tests__/integration/batch/communicationBatch.test.ts):
 # the compact server started over stdio; reads, then HandlerCreate, HandlerLock,
-# HandlerUpdate, HandlerUnlock and HandlerActivate of three objects, each phase
+# HandlerUpdate, HandlerLock unlock and HandlerActivate of three objects, each phase
 # one batch; the objects deleted at the end (HandlerDeletionCheck, HandlerDelete).
 # They go into environment.default_package / default_transport unless named here.
 # The names must be free: a name that reads is refused before anything is created.

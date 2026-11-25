@@ -15,12 +15,8 @@ import {
 import type { ServedTransport } from '../../lib/config/binaries';
 import { noConnectionContext } from '../../lib/handlers/registry/expositionRegistry';
 import { isLongTool } from '../../lib/longTools';
-import {
-  type ListedPromptTool,
-  listedPromptTool,
-  type PromptSource,
-  promptSourceOf,
-} from '../../lib/prompts';
+import { listedPromptTool, promptSourceOf } from '../../lib/prompts/source';
+import type { ListedPromptTool, PromptSource } from '../../lib/prompts/types';
 import type { AbapSystemKind } from '../../lib/systemKind';
 import type { ToolSet } from '../../lib/toolSet';
 

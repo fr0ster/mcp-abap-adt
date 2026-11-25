@@ -179,10 +179,12 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
   ): Promise<Array<{ id: string; objectName?: string }>> => {
     const listed = await tester.invokeToolOrHandler(
       'RuntimeListProfilerTraceFiles',
-      {},
+      // Each trace's id and object name are read: the full answer.
+      { detail: 'full' },
       async () =>
         handleRuntimeListProfilerTraceFiles(
           createHandlerContext({ connection: context.connection, logger }),
+          { detail: 'full' },
         ),
     );
     assert.equal(listed.isError, false);
@@ -498,6 +500,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           createHandlerContext({ connection: context.connection, logger }),
           {
             feed_type: 'dumps',
+            detail: 'full',
             user: dumpsUserBefore,
             max_results: toPositiveInt(
               readCaseParams(
@@ -614,6 +617,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             'RuntimeListFeeds',
             {
               feed_type: 'dumps',
+              detail: 'full',
               user: dumpsUser,
               max_results: dumpFeedTop,
             },
@@ -624,6 +628,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
               });
               return handleRuntimeListFeeds(handlerContext, {
                 feed_type: 'dumps',
+                detail: 'full',
                 user: dumpsUser,
                 max_results: dumpFeedTop,
               });
@@ -640,6 +645,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
               'RuntimeListFeeds',
               {
                 feed_type: 'dumps',
+                detail: 'full',
                 max_results: dumpFeedTop,
               },
               async () => {
@@ -649,6 +655,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
                 });
                 return handleRuntimeListFeeds(handlerContext, {
                   feed_type: 'dumps',
+                  detail: 'full',
                   max_results: dumpFeedTop,
                 });
               },
@@ -878,7 +885,8 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
       // Step 1: list dumps via feeds to get a dump_id — no user filter
       const listResult = await invoke(
         'RuntimeListFeeds',
-        { feed_type: 'dumps', max_results: 5 },
+        // The server call carries the detail the handler is given.
+        { feed_type: 'dumps', detail: 'full', max_results: 5 },
         async () => {
           const handlerContext = createHandlerContext({
             connection: context.connection,
@@ -886,6 +894,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           });
           return handleRuntimeListFeeds(handlerContext, {
             feed_type: 'dumps',
+            detail: 'full',
             max_results: 5,
           });
         },
@@ -938,11 +947,17 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         directCall: () => Promise<any>,
       ) => tester.invokeToolOrHandler(toolName, args, directCall);
       const listDumps = (args: Record<string, any>) =>
-        invoke('RuntimeListFeeds', { feed_type: 'dumps', ...args }, () =>
-          handleRuntimeListFeeds(handlerContext(), {
-            feed_type: 'dumps',
-            ...args,
-          }),
+        // The server call carries the detail the handler is given: full,
+        // the JSON read below.
+        invoke(
+          'RuntimeListFeeds',
+          { feed_type: 'dumps', detail: 'full', ...args },
+          () =>
+            handleRuntimeListFeeds(handlerContext(), {
+              feed_type: 'dumps',
+              detail: 'full',
+              ...args,
+            }),
         );
 
       // The newest dump — so a filter that matches it finds it on the
@@ -1007,7 +1022,12 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         ).dump_page_probe,
         150,
       );
-      const args = { feed_type: 'dumps' as const, max_results: wanted };
+      // The entries read below: the JSON of detail full, on both paths.
+      const args = {
+        feed_type: 'dumps' as const,
+        max_results: wanted,
+        detail: 'full' as const,
+      };
       const result = await tester.invokeToolOrHandler(
         'RuntimeListFeeds',
         args,
@@ -1036,7 +1056,11 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
       // `to` is inclusive, so an answer that ended inside a second would
       // hand that second's entries out twice; ours ends before it.
       const list = async (extra: Record<string, unknown>) => {
-        const listArgs = { feed_type: 'dumps' as const, ...extra };
+        const listArgs = {
+          feed_type: 'dumps' as const,
+          detail: 'full' as const,
+          ...extra,
+        };
         const answered = await tester.invokeToolOrHandler(
           'RuntimeListFeeds',
           listArgs,

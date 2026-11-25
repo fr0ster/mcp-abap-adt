@@ -1,13 +1,18 @@
-import { compactCdsUnitTestStatusSchema } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactCdsUnitTestStatusSchema,
+  compactOf,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleGetCdsUnitTestStatus } from '@mcp-abap-adt/lib/handlers/read';
+import {
+  handleGetCdsUnitTestStatus,
+  READ_DEFINITIONS,
+} from '@mcp-abap-adt/lib/handlers/read';
 import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerCdsUnitTestStatus',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the status of the CDS unit test run named by run_id. Required: run_id*. Optional: with_long_polling. Response: JSON.',
+  description: compactOf(READ_DEFINITIONS.GetCdsUnitTestStatus.description),
   inputSchema: compactCdsUnitTestStatusSchema,
 } as const;
 

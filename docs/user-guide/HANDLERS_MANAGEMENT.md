@@ -74,7 +74,6 @@ in the compact ones — and declares an optional `state_handle` argument on ever
    - `HandlerValidate`
    - `HandlerActivate`
    - `HandlerLock`
-   - `HandlerUnlock`
    - `HandlerCheckRun`
    - `HandlerDeletionCheck`
    - `HandlerUnitTestRun`, `HandlerUnitTestStatus`, `HandlerUnitTestResult`
@@ -337,10 +336,15 @@ the compact tool set of `@mcp-abap-adt/lib/tool-set` on every transport.
   call before the call's connection is taken, on the server's own path (`registerHandlers`),
   on a group registered on a plain `McpServer` (from `HandlerContext.accessChecks`), and on the
   exporter's entries. A registry that registers its own tools is its own.
-- Two strategies ship: `listedAccessChecks(lists)` (names and prefixes, reads nothing) and
-  `packageTreeAccessChecks(lists)` (also `ZFOO/**`, through the `IPackageReader` it is handed:
-  one package metadata read per step, on the call's connection); `accessChecksFor(lists)` picks
-  the one the launchers use. An embedder may give its own.
+- Two strategies ship: `listedAccessChecks(lists)` (names and prefixes, and one read: a package
+  create's given `super_package`) and `packageTreeAccessChecks(lists)` (also `ZFOO/**`). Both
+  read through the `IPackageReader` they are handed (one package metadata read per step, on the
+  call's connection); a reader that throws refuses the call `package_tree_unreadable`. The
+  server's own reader throws unless SAP's document names the package read. A reader an embedder
+  gives must throw for a missing, empty or mismatched document: a resolved `undefined` reads as
+  a top-level package — a create's parent counts as read, and a subtree walk ends there, refused
+  `package_not_allowed` when no allowed root was reached.
+  `accessChecksFor(lists)` picks the one the launchers use. An embedder may give its own.
 - Handlers an embedder takes into its own hands — parsing the exported entries' arguments
   itself, a registry of its own — are its own.
 

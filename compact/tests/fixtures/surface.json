@@ -14,13 +14,7 @@
   {
     "group": "compact",
     "name": "HandlerLock",
-    "inputs": "object_type*, object_name*, super_package",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "compact",
-    "name": "HandlerUnlock",
-    "inputs": "object_type*, object_name*, lock_handle*",
+    "inputs": "object_type*, object_name*, action, lock_handle, super_package",
     "available_in": "cloud, onprem"
   },
   {

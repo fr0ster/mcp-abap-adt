@@ -118,6 +118,7 @@ that serves it. See [YAML Configuration](../configuration/YAML_CONFIG.md).
 | `--deferred-logon` | `MCP_DEFERRED_LOGON` | `deferred-logon` | flag | Start without contacting the SAP system: the tools are listed at once, the first tool call logs on (default: off — the start logs on and exits `1` when it fails). See [--deferred-logon](#--deferred-logon) |
 | `--restore-session` | `MCP_RESTORE_SESSION` | `restore-session` | flag | With `--deferred-logon`: the first tool call takes up the destination's one leftover session instead of logging on. Refused without `--deferred-logon` |
 | `--login-timeout=<seconds>` | `MCP_LOGIN_TIMEOUT` | `login-timeout` | 1-86400 | Ends a browser login not finished after this many seconds (default: none) |
+| `--stdio-message-limit=<bytes>` | `MCP_STDIO_MESSAGE_LIMIT` | `stdio-message-limit` | a whole number of bytes from 2097152 | The server's assumption about the most bytes the MCP client buffers for one stdio message. It changes nothing in the client: a value above the client's real buffer brings the disconnect back. Default (not given, or blank — a blank value counts as not given and the next form decides): 10485760 (10 MiB), the MCP SDK client's default read buffer (`STDIO_DEFAULT_MAX_BUFFER_SIZE`). The server writes no message longer than this less 1048576 bytes (1 MiB, room for one read of the client: verified for Node, at most 65,536 bytes a chunk through libuv; Python MCP over AnyIO, `StreamReader.read(65536)`; the TS SDK on Bun, as Claude Code runs it, 262,144 bytes a chunk, measured on Bun 1.3.13). A client that reads larger chunks needs a correspondingly lower value, so a message and the start of the next never pass the client's buffer. A longer answer is answered the JSON-RPC error `InternalError` naming both sizes; a longer notification is dropped with a stderr line. The smallest value, 2097152, leaves 1 MiB per message: room for the largest tool list (about 397 KB). Any other value stops the start, in fixed words that do not repeat it |
 | `--auth-debug` | — | `auth-debug` | flag | Auth debugging: the token providers' debug lines go to stderr, and a refused token request's line names the first and last four characters of each secret it sent (default: off). **No environment variable** |
 | `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type, required for a destination: no default. With `--mcp=<name>` the destination's `.env` may state it; a service key does not |
 | `--ashost=<host>` | `SAP_ASHOST` | `ashost` | host | RFC: the application server host; with `--sysnr`, the application-server address |
@@ -177,6 +178,46 @@ A file you name that does not exist is refused at startup, naming the parameter 
 
 The chosen file is read **and written back** with a renewed token, whatever `--unsafe` says.
 It is read once per process: a change made from outside takes effect on restart.
+
+### abapGit endpoints file
+
+The git credentials of the abapGit tools come from the destination's **approved endpoints**, never
+from a tool argument: over stdio, the file `<name>.abapgit.yaml` beside the destination's
+`<name>.env` — beside the `--env-path` file (`sap-prod.abapgit.yaml` for `sap-prod.env`), or in
+the sessions directory for `--mcp=<name>` and `--env=<name>`
+(`~/.config/mcp-abap-adt/sessions/<name>.abapgit.yaml`, `Documents\mcp-abap-adt\sessions\…` on
+Windows). It is read once at the start; without it no endpoint is approved and every abapGit
+request goes without a credential. A file that cannot be read, or an entry that cannot be an
+endpoint, stops the start (`[MCP] <file>: endpoint <n> …; the server did not start`), naming the
+entry and never a value. Any git host over HTTPS:
+
+```yaml
+endpoints:
+  - url: https://github.com/acme/zabap.git           # GitHub
+    user: <user>
+    token: <personal access token>
+  - url: https://gitlab.com/acme/abap/zabap.git      # GitLab
+    user: <user>
+    token: <access token>
+    aliases:
+      - https://gitlab.com/acme/abap/zabap           # the same remote without .git
+  - url: https://dev.azure.com/acme/sap/_git/zabap   # Azure DevOps
+    user: <user>
+    token: <token>
+  - url: https://git.example.internal:8443/team/zabap.git   # self-hosted, its own port
+    user: <user>
+    token: <token>
+```
+
+- A `url` or alias is an exact `https` URL: host without letter case, a non-default port kept, the
+  path exact (`.git` and a trailing `/` make other endpoints); a user or password in the URL, a
+  query, a fragment or a dot segment stops the start.
+- **The alias rule:** a tool given an alias as its `url` sends SAP the configured `url`, with the
+  credential; a repository whose stored URL is an alias gets the credential, and no URL is sent.
+- SAP's abapGit, not this server, connects to the git host: the host's certificate is trusted in
+  the SAP system; `NODE_EXTRA_CA_CERTS` trusts the SAP system's own CA for this server.
+
+Details: [AUTHENTICATION: abapGit remotes](AUTHENTICATION.md#abapgit-remotes-approved-endpoints).
 
 ### --mcp=\<destination\>
 
@@ -456,6 +497,12 @@ Per request, the system context comes from the headers `x-sap-responsible`,
 `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_DEBUG_*` are not read (24.0.0). Held state is reached again with its `state_handle`, on
 the instance that holds it.
 
+**abapGit remotes:** a request's `x-abapgit-remote` (an exact `https` remote URL),
+`x-abapgit-user` and `x-abapgit-token` headers are its one approved endpoint, for that request
+only — no alias, nothing kept on the `state_handle`. There is no endpoints file over HTTP. Headers
+that state no endpoint are refused `abapgit_endpoint_refused`. See
+[AUTHENTICATION: abapGit remotes](AUTHENTICATION.md#abapgit-remotes-approved-endpoints).
+
 **What `mcp-abap-adt-http` refuses** (each stops the start, naming the form you used):
 
 | Parameter | Words |
@@ -523,6 +570,12 @@ The opening `GET`'s `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` /
 `x-sap-debug-breakpoint-conflict` (and the other system
 context headers) come first, then `SAP_DEBUG_*` of the environment. Held state lives in the
 connection's instance until the connection closes.
+
+**abapGit remotes:** the opening `GET`'s `x-abapgit-remote`, `x-abapgit-user` and
+`x-abapgit-token` headers are the stream's one approved endpoint, held by its instance and dropped
+with the stream; a `POST`'s own headers are not read. Closing the stream logs its connections off,
+which cuts an on-premise import under way. See
+[AUTHENTICATION: abapGit remotes](AUTHENTICATION.md#abapgit-remotes-approved-endpoints).
 
 **Held state**: `--state-idle-minutes` bounds each SSE connection's instance, which holds its state
 until the connection closes; see [Held State](#held-state).

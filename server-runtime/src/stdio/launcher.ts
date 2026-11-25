@@ -11,6 +11,8 @@ import {
   errorClassOf,
 } from '@mcp-abap-adt/lib/auth';
 import {
+  ApprovedEndpointError,
+  abapGitEndpointsFileOf,
   answerVersionOrHelp,
   DESTINATION_KEY_ENV,
   DESTINATION_KEYS,
@@ -19,6 +21,7 @@ import {
   type LauncherEdges,
   libInstances,
   processEdges,
+  readApprovedEndpointsFile,
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
 import {
@@ -823,6 +826,25 @@ async function launchStdio(
   // the system type to the server.
   config = { ...config, connectionType, systemType };
 
+  // The destination's approved git endpoints (spec §5.2): its endpoints
+  // file beside its .env, read once here; a file that cannot be served
+  // ends the start, naming the entry, never a value.
+  const envFile = destinationEnvFileOf(config);
+  let abapGitEndpoints: ReturnType<typeof readApprovedEndpointsFile> = [];
+  try {
+    abapGitEndpoints =
+      envFile === undefined
+        ? []
+        : readApprovedEndpointsFile(abapGitEndpointsFileOf(envFile));
+  } catch (error) {
+    const refused = thrownAs(error, ApprovedEndpointError);
+    deps.stderr(
+      `[MCP] ${refused !== undefined ? refused.words : 'the approved git endpoints could not be read'}; the server did not start`,
+    );
+    deps.exit(1);
+    return;
+  }
+
   // The command's tool set: fixed by the command, but for the data tools,
   // which --enable-data-tools adds.
   // The data tools only when the configuration turns them on.
@@ -995,8 +1017,14 @@ async function launchStdio(
       // --deferred-logon: the first tool call makes the connection
       // (--restore-session: on the destination's one leftover session).
       deferredLogon: config.deferredLogon === true,
+      // --stdio-message-limit: the client's buffer; absent, the SDK's default.
+      ...(config.stdioMessageLimit !== undefined && {
+        stdioMessageLimit: config.stdioMessageLimit,
+      }),
       restoreAtFirstBirth:
         config.deferredLogon === true && config.restoreSession === true,
+      abapGitEndpoints,
+      abapGitRestrictions: restricted.abapGitRestrictions,
       // --session-keep-alive-minutes: the held connection's keep-alive.
       sessionKeepAliveMs:
         config.sessionKeepAliveMinutes === undefined

@@ -106,7 +106,7 @@ with the single-step tools:
 3. write — `HandlerUpdate` with `lock_handle` (for PACKAGE, DOMAIN, DATA_ELEMENT and
    FUNCTION_GROUP the whole metadata document in `source_code`, read beforehand with `HandlerGet`
    part `metadata`);
-4. unlock — `HandlerUnlock`;
+4. unlock — `HandlerLock` `action: unlock`;
 5. read back, check — `HandlerGet` (one part per call: `source`, `metadata`), `HandlerCheckRun`.
 6. activate — `HandlerActivate`: one object of a type the per-object activation maps answers its
    verdict; a list (`objects[]`), an `object_adt_type`, PACKAGE, SERVICE_DEFINITION and
@@ -170,7 +170,7 @@ the metadata document, and for `SERVICE_BINDING` its publication request. For PA
 DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, and for INCLUDE with `part: 'metadata'`, `source_code`
 is the whole metadata document, sent byte for byte:
 nothing is read before the write or after it. Locking, unlocking and activating are their own
-calls (`HandlerLock`, `HandlerUnlock`, `HandlerActivate`); for `LOCAL_*`, `UNIT_TEST` and
+calls (`HandlerLock`, `HandlerLock` `action: unlock`, `HandlerActivate`); for `LOCAL_*`, `UNIT_TEST` and
 `CDS_UNIT_TEST` the lock is the class's — `HandlerLock` with `object_type: CLASS`. A `PACKAGE` update is recorded over HTTP
 only: over RFC the package lock is held in an ABAP session of its own, outside the batch.
 
@@ -253,7 +253,7 @@ request. Each phase was one `HandlerBatch` begin, the calls, end, then the answe
 4. lock — `HandlerLock` × 3, the lock handles read from the answers;
 5. write — `HandlerUpdate` × 3 under those handles: the class's and the interface's sources, the
    domain's whole document in `source_code`;
-6. unlock — `HandlerUnlock` × 3;
+6. unlock — `HandlerLock` `action: unlock` × 3;
 7. activate — `HandlerActivate` × 3, one object each, each answering `activated: true`;
 8. reads — `HandlerGet` × 3: the sources and the document as written;
 9. deletion check — `HandlerDeletionCheck` × 3, each answering `deletable: true`;
@@ -290,11 +290,102 @@ Time of each batch end, in milliseconds (the last run on each; recording a call 
 | delete | 3265 | 3062 |
 | reads (deleted) | 386 | 212 |
 
+## Reads of several objects inside one call
+
+Two rules decide what goes in an envelope:
+
+1. **Independence.** One envelope holds only calls that do not depend on each other; a call
+   that needs another's answer goes in a later envelope.
+2. **The node structure workaround.** Several node structure parts in one envelope cross-talk
+   their metadata (a part carries another part's `DESCRIPTION`, measured 2026-10-18), so the
+   metadata of the objects read is read separately, in a second phase of requests that do not
+   conflict.
+
+Within those rules, the tools below send a phase of one read — and, in some, the reads of one
+object — as single requests rather than as an envelope of one part. That is an implementation
+choice, not a rule: an envelope of one part would be as correct.
+
+- **Function module group checks.** A group activation (`ActivateObjects`, `HandlerActivate` with
+  `objects`) and `GetWhereUsed` with several `GROUP|FM` targets check, before anything else, that
+  each function module is in the group its reference names, from the module's metadata. Two or
+  more modules have their metadata reads in one envelope; the answer is the one read one after
+  another: the first failure in the references' order. A module that does not exist is its own
+  `404` part beside the other modules' `200`s, answered as SAP's `404` with its key, as before.
+  Every module of an envelope is read, also after a failure in it; no later envelope is sent after
+  one, and the refusal says so ("only function module metadata was read"). One module is its one
+  request.
+- **`GetEnhancements`.** An object of no known `object_type` is probed as a class, a program and an
+  include, by their metadata. With `objects` naming two or more objects (two spellings of one name
+  and type are one), every probe of every such object goes in one envelope, and each object's kind
+  is decided over those answers as the sequential version decides it: a `404` part means not that
+  kind; a probe the decision does not reach (the program probe of a class) decides nothing, a
+  `401` there included; a `401` on a probe the decision reaches ends the list there, as the
+  sequential version ends it. Then every object's enhancements; with `include_nested`, an object's
+  includes root only after its enhancements answered, in the next envelope. A phase left with one
+  object's reads sends them as single requests, and one object — `object_name`, or `objects`
+  naming one — is read as the sequential version reads it (an implementation choice).
+- **`GetObjectsList`.** Pass 1 reads the node structures in envelopes, level by level, without
+  descriptions — one parent included; at medium and full, pass 2 reads each object's own metadata
+  in a second batch (rule 2).
+- **`GetObjectInfo`: the structure first, the descriptions second.** The structure comes back
+  first, each node structure sent as its own request whatever `include_descriptions` says (rule 2:
+  node structures cross-talk inside an envelope). `include_descriptions: false` (the default) reads no
+  object metadata; the enrichment (`enrich`, on by default) still runs its searches, one per node,
+  in an envelope. With `include_descriptions: true` the server also runs the metadata phase itself:
+  every leaf's metadata, in envelopes (the second phase of rule 2: metadata reads do not
+  conflict), and each leaf's
+  description is its metadata's. The sequential version reads the same metadata, one request
+  each, so both paths answer from one source. A leaf whose metadata read SAP refused — a `401`
+  included — has no description, and the call answers, on both paths.
+- **`SearchSource`.** Several targets' rounds go in envelopes; a single target, and any phase of
+  one read (one mask's quickSearch, a walk level of one node structure, a round of one source
+  read), goes as single requests (an implementation choice).
+- **At most 300 reads per envelope** (`READS_PER_ENVELOPE`, `src/lib/batch/phases.ts`): more
+  independent reads go in consecutive envelopes of balanced size (`chunksOf`: 301 reads are 151 and
+  150, never 300 and 1), each judged as it answers. Where a credential refusal ends the call — the
+  group checks, `GetEnhancements`, the level walks — no envelope is sent after the one that met it;
+  `GetObjectInfo`'s metadata phase is the exception: a leaf's refused metadata read, a `401`
+  included, is that leaf's (no description) and the phase goes on with the next envelope. Every
+  phase splits so: the group checks, `GetEnhancements`, the metadata phase, the level walks
+  (`batchReader`: the package walks, `GetObjectsList`, `GetObjectInfo`'s enrichment searches) and
+  `SearchSource`'s source reads. SAP's own limit is not measured.
+- **Descriptions are never taken from a batched node structure.** Inside an envelope a node
+  structure part can carry another part's `DESCRIPTION` (measured, 2026-10-18). The package
+  listings with `include_descriptions: true` send each node structure as its own request and take
+  each object's description from it; `GetObjectInfo` and `GetObjectsList` take each object's
+  from its metadata, in the second phase (above).
+- **Single requests over RFC go one at a time.** Where a tool reads single requests several at a
+  time — the package listings with `include_descriptions: true` and `GetObjectInfo`'s structure,
+  whatever its options (8 at once),
+  `SearchSource` without a communication batch — an RFC connection gets one at a time
+  (`readsInFlight`, `src/lib/connectionKind.ts`), a batch connection or another view over it
+  included: an RFC connection is one ABAP session, and reads sent to it in parallel were lost
+  without an error (measured on premise, 2026-09-26, `SearchSource`). The others over RFC are
+  unit-tested only.
+- **An envelope that fails as a whole** is every read's failure in it: the answer is the one the
+  sequential reads give with those reads failed, each naming the envelope's request. An envelope
+  whose own request answered `404` once the endpoint is known served is such a failure, never each
+  part's "not found" (`GetEnhancements` reports its probes refused, not the object missing). A
+  credential refusal ends the call as it came. A destination with no communication batch reads one
+  after another, as before.
+- **A credential refusal in a list reports the first one in object order.** Where two objects of a
+  list meet a credential refusal on different reads, the call answers the refusal of the first
+  object in the list, which may not be the read the sequential version would have sent first. A
+  credential refusal stops everything anyway; the answer names one of them (accepted by the
+  owner).
+
+A part's `404` beside other parts' `200`s is that part's answer: measured (see "The phases,
+measured" above, and adt-clients' `docs/usage/BATCH.md`). The function module metadata reads and
+the `GetEnhancements` probes in one envelope are pinned by unit tests only
+(`src/__tests__/unit/batch/moduleGroupChecks.test.ts`, `includeTrees.test.ts`); they are not yet
+measured on a system.
+
 ## A system without the communication batch
 
 The tools that read several independent things inside one call (the package walks,
 `GetObjectInfo`, `SearchSource`, `GetIncludesList`, `GetStructuresList`, `GetEnhancements`,
-`DescribeByList`, `GetWhereUsed`, `RuntimeListFeeds`)
+`DescribeByList`, `GetWhereUsed`, `RuntimeListFeeds`, and the function module group checks of a
+group activation — `ActivateObjects`, `HandlerActivate` with `objects`)
 send them in envelopes to `/sap/bc/adt/communication/batch`.
 Whether a destination has that endpoint is learned only from the outer status of its first
 envelope: `2xx` means served, for good; `404` means not served, and from then on that
@@ -429,7 +520,7 @@ one envelope cannot hold a request built from another's answer. Each is refused
 | Tool | Recorded | Sends |
 |---|---|---|
 | `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is one of DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, METADATA_EXTENSION, BEHAVIOR_IMPLEMENTATION | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps) |
-| `HandlerActivate` | when objects is given and the type of every objects entry is any value but FUGR/FF, function, functionmodule, function_module, func | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
+| `HandlerActivate` | when objects is given and the type of every objects item is any value but FUGR/FF, function, functionmodule, function_module, func | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
 | `HandlerActivate` | when objects is absent and object_adt_type is given and object_adt_type is any value but FUGR/FF, function, functionmodule, function_module, func | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the one object, answering { run_id } (a code the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
 | `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is one of PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS | POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true for the one object, answering { run_id } |
 | `HandlerCdsUnitTestResult` | when run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false] |
@@ -452,8 +543,10 @@ one envelope cannot hold a request built from another's answer. Each is refused
 | `HandlerGet` | when part is source (absent reads as source) and object_type is one of UNIT_TEST, CDS_UNIT_TEST and run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}: the run's result, part source |
 | `HandlerGet` | when part is draft | as the full set's draft read: for each part of the object, GET its source or metadata ?version=active, ?version=inactive and ?version=workingArea, all sent together |
 | `HandlerGetData` | every call | POST /sap/bc/adt/datapreview/freestyle with sql_query, or with SELECT * FROM object_name, as the body |
-| `HandlerLock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |
-| `HandlerLock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
+| `HandlerLock` | when action is lock (absent reads as lock) and object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |
+| `HandlerLock` | when action is lock (absent reads as lock) and object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
+| `HandlerLock` | when action is unlock and object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS and lock_handle is given | POST {object uri}?_action=UNLOCK&lockHandle=…, stateful |
+| `HandlerLock` | when action is unlock and object_type is PACKAGE and lock_handle is given and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=UNLOCK&lockHandle=…, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerProfileList` | every call | GET /sap/bc/adt/runtime/traces/abaptraces |
 | `HandlerProfileRun` | every call | POST /sap/bc/adt/oo/classrun/{name} or /sap/bc/adt/programs/programrun/{name}; with profiler_id, ?profilerId={profiler_id} |
 | `HandlerProfileSchedule` | every call | POST /sap/bc/adt/runtime/traces/abaptraces/parameters: schedules a trace and answers its profiler_id |
@@ -471,8 +564,6 @@ one envelope cannot hold a request built from another's answer. Each is refused
 | `HandlerUnitTestRun` | when runner is sync | POST /sap/bc/adt/abapunit/testruns: runs every test class of each container named and answers the finished result |
 | `HandlerUnitTestRun` | when runner is async (absent reads as async) | POST /sap/bc/adt/abapunit/runs: starts the run and answers its id; the result is read with HandlerUnitTestStatus / HandlerUnitTestResult |
 | `HandlerUnitTestStatus` | every call | GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true |
-| `HandlerUnlock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS | POST {object uri}?_action=UNLOCK&lockHandle=…, stateful |
-| `HandlerUnlock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=UNLOCK&lockHandle=…, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerUpdate` | when lock_handle is given and object_type is one of DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST, PROGRAM, INTERFACE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, INCLUDE, TABLE_TYPE, CLASS_TEXT_ELEMENTS | one request under the lock_handle given: PUT of the source, the class include or the metadata document as given ({object uri}…?lockHandle=…[&corrNr=…]); for SERVICE_BINDING its publication request |
 | `HandlerUpdate` | when lock_handle is given and object_type is PACKAGE and the connection is HTTP | PUT /sap/bc/adt/packages/{name}?lockHandle=…[&corrNr=…], the metadata document as given; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerValidate` | every call | POST the type's validation endpoint (…/validation?objname=…, /cts/transportchecks for a service binding) |

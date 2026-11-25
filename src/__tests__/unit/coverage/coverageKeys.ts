@@ -137,7 +137,12 @@ function keyFrom(
  * and `ledgerScan` all use it.
  */
 export function keyOf(tool: string, args: ToolArgs): CoverageKey {
-  return keyFrom(tool, declaredDimensions(tool), (dimension) => {
+  // HandlerLock's lock and unlock share one key per type (its table below).
+  const dimensions =
+    tool === 'HandlerLock'
+      ? declaredDimensions(tool).filter((dimension) => dimension !== 'action')
+      : declaredDimensions(tool);
+  return keyFrom(tool, dimensions, (dimension) => {
     const value = args[dimension];
     return typeof value === 'string' ? value : undefined;
   });
@@ -212,6 +217,9 @@ const TABLES: Readonly<
 > = {
   HandlerGet: handlerGetKeys,
   HandlerUpdate: (_variant, enums) => handlerUpdateKeys(enums),
+  // HandlerLock's two actions, lock and unlock, share one key per type.
+  HandlerLock: (_variant, enums) =>
+    (enums.get('object_type') ?? []).map((type) => `HandlerLock#${type}`),
 };
 
 /** The keys one served tool requires on its variant. */

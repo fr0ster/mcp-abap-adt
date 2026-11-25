@@ -6,10 +6,15 @@ import {
   STATE_HANDLE_PROPERTY,
   terseOnceStep,
 } from '../../debugger/index';
+import {
+  type DescriptionParts,
+  pairsPurpose,
+  toolDescription,
+} from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
 import { DETAIL_SHAPE } from '../../strategies/detail';
-import { either, listed } from '../memberTexts';
+import { either } from '../memberTexts';
 import { KIND_PROPERTY, needed, onceAnswer, refuseOperation } from './shared';
 
 const ABAP_OPERATIONS = [
@@ -27,50 +32,25 @@ const AMDP_OPERATIONS = ['stepOver', 'stepContinue'] as const;
 export const STEP_OPERATIONS = [...ABAP_OPERATIONS] as const;
 type StepOperation = (typeof STEP_OPERATIONS)[number];
 
-/** The abap part of the description, for the operations left. */
-function abapWords(left: readonly StepOperation[]): string {
-  const steps = left.filter(
-    (op) =>
-      op === 'stepInto' ||
-      op === 'stepOver' ||
-      op === 'stepReturn' ||
-      op === 'stepContinue',
-  );
-  const toLine = left.includes('stepRunToLine');
-  const jump = left.includes('stepJumpToLine');
-  const clauses = [
-    ...(steps.length > 0
-      ? [
-          `${listed(steps)} ${steps.length === 1 ? 'steps' : 'step'} from where it stands`,
-        ]
-      : []),
-    ...(toLine && jump
-      ? [
-          'stepRunToLine runs to the line object_type, object_name and line name, stepJumpToLine moves there and skips what lies between',
-        ]
-      : toLine
-        ? [
-            'stepRunToLine runs to the line object_type, object_name and line name',
-          ]
-        : jump
-          ? [
-              'stepJumpToLine moves to the line object_type, object_name and line name and skips what lies between',
-            ]
-          : []),
-  ];
-  const sentences = [
-    ...(clauses.length > 0
-      ? [
-          `${clauses.join('; ')}; a step answers SAP's step result, or ended when SAP reports the program's end, and the stopped position is read from the stack.`,
-        ]
-      : []),
-    ...(left.includes('setStackPosition')
-      ? ['setStackPosition makes frame position the one variables are read in.']
-      : []),
-  ];
-  return sentences.length === 0
-    ? ''
-    : ` kind abap, on the attached debuggee: ${sentences.join(' ')}`;
+/** Each operation as an action and object pair (owner). */
+const PAIRS: { readonly [K in StepOperation]: string } = {
+  stepInto: 'steps into the call where the debuggee stands',
+  stepOver: 'steps over a statement',
+  stepReturn: 'steps out of the current call',
+  stepContinue: 'continues to the next stop',
+  stepRunToLine: 'runs to a source position',
+  stepJumpToLine: 'jumps to a source position',
+  setStackPosition: 'sets the stack frame whose variables are read',
+};
+
+/** `HandlerDebugStep`'s parts with `operations`: each by its function. */
+export function handlerDebugStepParts(
+  operations: readonly StepOperation[],
+): DescriptionParts {
+  return {
+    tag: 'debug',
+    purpose: pairsPurpose(operations.map((op) => PAIRS[op])),
+  };
 }
 
 /**
@@ -90,7 +70,7 @@ export function handlerDebugStepDefinition(
     ...(amdp.length > 0 ? [`amdp ${either(amdp)}`] : []),
   ];
   return {
-    description: `Moves the stopped debuggee: each call sends one SAP request, the operation's.${abapWords(operations)}${amdp.length > 0 ? ` kind amdp: ${listed(amdp)} ${amdp.length === 1 ? 'moves' : 'move'} debuggee_id and ${amdp.length === 1 ? 'answers' : 'answer'} the request id; the next stop arrives as a break event.` : ''}`,
+    description: toolDescription(handlerDebugStepParts(operations)),
     inputSchema: z.object({
       ...STATE_HANDLE_PROPERTY,
       ...KIND_PROPERTY,
@@ -125,7 +105,7 @@ export function handlerDebugStepDefinition(
 export const TOOL_DEFINITION = {
   name: 'HandlerDebugStep',
   available_in: ['onprem', 'cloud'] as const,
-  description: handlerDebugStepDefinition(STEP_OPERATIONS).description,
+  description: toolDescription(handlerDebugStepParts(STEP_OPERATIONS)),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     ...KIND_PROPERTY,

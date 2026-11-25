@@ -285,7 +285,6 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   HandlerUnitTestResult: 'runs ABAP Unit or reads a run',
   HandlerUnitTestRun: 'runs ABAP Unit or reads a run',
   HandlerUnitTestStatus: 'runs ABAP Unit or reads a run',
-  HandlerUnlock: 'unlocks',
   HandlerUpdate: "writes the document it is given under the caller's lock",
   HandlerValidate: 'validates a name',
   ListServiceBindingTypes: 'lists the binding types',

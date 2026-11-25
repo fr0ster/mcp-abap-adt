@@ -800,16 +800,15 @@ systemsDescribe(['onprem'], SUITE, () => {
       assert.equal(sortData.accepted, true);
       assert.equal('success' in sortData, false);
 
-      const sortedData = answerOf(
-        await handleReadTransportObjects(
-          createHandlerContext({ connection, logger }),
-          { transport_number: taskNumber },
-        ),
+      // ReadTransportObjects' terse answer (the default), read back.
+      const sortedResponse = await handleReadTransportObjects(
+        createHandlerContext({ connection, logger }),
+        { transport_number: taskNumber },
       );
-      const afterSort = sortedData.objects.filter(
-        (o: any) => o.name === programName && o.type === 'PROG',
+      const afterSort = readEntries(sortedResponse).objects.filter(
+        (o) => o.name === programName && o.type === 'PROG',
       );
-      assert.equal(afterSort.length, 1);
+      assert.equal(afterSort.length, 1, JSON.stringify(sortedResponse.content));
       logger?.success('Step 9: entry still on the task, once');
 
       // Step 10: a second request, and a task under it, the target of the
@@ -917,17 +916,16 @@ systemsDescribe(['onprem'], SUITE, () => {
 
       // The echo is not proof: re-read both tasks.
       const holds = async (task: string) =>
-        answerOf(
+        readEntries(
           await handleReadTransportObjects(
             createHandlerContext({ connection, logger }),
             { transport_number: task },
           ),
-        ).objects.filter(
-          (o: any) => o.name === programName && o.type === 'PROG',
-        );
-      assert.equal((await holds(taskNumber)).length, 0);
+        ).objects.filter((o) => o.name === programName && o.type === 'PROG');
+      const onFirst = await holds(taskNumber);
+      assert.equal(onFirst.length, 0, JSON.stringify(onFirst));
       const onSecond = await holds(secondTaskNumber);
-      assert.equal(onSecond.length, 1);
+      assert.equal(onSecond.length, 1, JSON.stringify(onSecond));
       logger?.success(
         'Step 11: entry moved — off the first task, on the second',
       );

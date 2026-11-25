@@ -3,23 +3,19 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  purpose,
+  sourceReader,
+  toolDescription,
+} from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  READ_PART_FIELD,
-  type ReadPart,
-  readPartOf,
-} from '../../../lib/handlers/readPart';
-import {
-  READ_VERSION_FIELD,
-  type ReadVersion,
-} from '../../../lib/handlers/readVersion';
+import { READ_PART_FIELD, readPartOf } from '../../../lib/handlers/readPart';
+import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
 import {
   answerSourceRead,
   rangeFields,
   SOURCE_RANGE_SHAPE,
-  SOURCE_RANGE_WORDS,
-  type SourceRangeArgs,
   sourceRangeOf,
 } from '../../../lib/handlers/sourceRange';
 import { readProgramMetadata } from '../../../lib/strategies/metadataReads';
@@ -30,7 +26,15 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetProgram',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP's standard programs. ${SOURCE_RANGE_WORDS}`,
+  description: toolDescription(
+    sourceReader({
+      object: 'an ABAP program or report',
+      purpose: purpose(
+        "Reads the current source code of an ABAP program or report, on ABAP Cloud one of SAP's standard programs, or its metadata.",
+      ),
+      metadata: true,
+    }),
+  ),
   inputSchema: z.object({
     program_name: requiredText('program_name is required').describe(
       'Program name.',

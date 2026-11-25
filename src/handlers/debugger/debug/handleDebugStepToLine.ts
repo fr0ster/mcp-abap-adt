@@ -15,13 +15,22 @@ import {
   LINE_WORDS,
   STATE_HANDLE_PROPERTY,
 } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugStepToLine',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[debug] Runs or jumps the stopped debuggee to a line.',
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Steps the stopped ABAP debuggee to a source position, running or jumping there.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     mode: z

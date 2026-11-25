@@ -18,13 +18,20 @@ import {
   credentialOption,
 } from '../../../lib/abapGit/client';
 import { statusAnswer } from '../../../lib/abapGit/formats';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'SwitchAbapGitBranch',
   available_in: ['onprem'] as const,
-  description:
-    "Switches the repository repository_key to branch; with create true, creates branch in the remote first when the remote lacks it; with create false and a branch the remote lacks, the repository stays on its branch and SAP answers success. Answers facts only: SAP's status.",
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        'Switches an abapGit repository to a branch, creating the branch in the remote first when asked.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     repository_key: REPOSITORY_KEY_FIELD,
     branch: BRANCH_FIELD,

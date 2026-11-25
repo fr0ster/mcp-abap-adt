@@ -288,7 +288,8 @@ liveSuite(
       }
       expectGroupRefused(
         'HandlerUnlock B',
-        await livePrepare('HandlerUnlock', {
+        await livePrepare('HandlerLock', {
+          action: 'unlock',
           object_type: 'FUNCTION_MODULE',
           object_name: `${GROUP_B}|${MODULE}`,
           lock_handle: handle,
@@ -296,7 +297,8 @@ liveSuite(
       );
       succeeded(
         'HandlerUnlock A',
-        await livePrepare('HandlerUnlock', {
+        await livePrepare('HandlerLock', {
+          action: 'unlock',
           object_type: 'FUNCTION_MODULE',
           object_name: `${GROUP_A}|${MODULE}`,
           lock_handle: handle,

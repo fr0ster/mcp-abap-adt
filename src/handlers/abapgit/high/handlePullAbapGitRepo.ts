@@ -36,6 +36,8 @@ import type { KindToolDefinition } from '../../../lib/abapGit/kindTool';
 import { pullSelection } from '../../../lib/abapGit/pullSelection';
 import type { McpResult } from '../../../lib/answer';
 import { BACKGROUND_FIELD } from '../../../lib/backgroundRuns/tools';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 const FIELDS = {
@@ -49,37 +51,41 @@ const CLOUD_SCHEMA = z.object({
   overwrite: OVERWRITE_FIELD.optional(),
 });
 
-const IMPORTS =
-  'every object changed in the remote is imported, objects changed in the system are overwritten, and objects held by other packages are written too';
-
-/**
- * On the cloud (Code, read 2026-11-23): SAP's pull handler hands its job
- * every R6 entry when the request selects none (`CL_ABAPGIT_RES_REPO_PULL->
- * post` L234–240), only the selected ones with `overwrite` (L230–233); the
- * job marks the others `N` (`CL_ABAPGIT_BG_ACTION_PULL->execute`
- * L123–152), a package warning with action 5 always `N` (L143–146). Of
- * the `N` entries, one with a local state, a remote deletion and any
- * package warning stay out; an `N` remote-only add or update is imported
- * (`pullSelection.ts`).
- */
-const CLOUD_IMPORTS =
-  'the job takes every object the modified-objects read lists and brings it to its remote version, a package warning with action 5 (delete and re-create) excepted: SAP leaves it out; given overwrite, SAP selects by name against the list as it stands when its job runs: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state';
-
-const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. When SAP's request or its response is lost mid-import (an SSE or stdio close logs the connection off), the outcome is unknown to this server and what SAP does then is unverified (unread in SAP's code, unmeasured): the repository's staging read shows the current differences, whichever writes made them. Answers facts only: SAP's status, done, and the objects SAP lists.`;
+const ONPREM_PARTS = runParts({
+  purpose: purpose(
+    'Pulls an abapGit repository from the branch it is linked on, importing every object changed in the remote, recorded in a transport.',
+  ),
+});
 
 export const TOOL_DEFINITION: KindToolDefinition<
   typeof ONPREM_SCHEMA,
   typeof CLOUD_SCHEMA
 > = {
   name: 'PullAbapGitRepo',
-  description: ONPREM_DESCRIPTION,
+  description: toolDescription(ONPREM_PARTS),
   inputSchema: ONPREM_SCHEMA,
   onprem: {
-    description: ONPREM_DESCRIPTION,
+    description: toolDescription(ONPREM_PARTS),
     inputSchema: ONPREM_SCHEMA,
   },
+  /**
+   * On the cloud (Code, read 2026-11-23): SAP's pull handler hands its job
+   * every R6 entry when the request selects none (`CL_ABAPGIT_RES_REPO_PULL->
+   * post` L234–240), only the selected ones with `overwrite` (L230–233); the
+   * job marks the others `N` (`CL_ABAPGIT_BG_ACTION_PULL->execute`
+   * L123–152), a package warning with action 5 always `N` (L143–146). Of
+   * the `N` entries, one with a local state, a remote deletion and any
+   * package warning stay out; an `N` remote-only add or update is imported
+   * (`pullSelection.ts`).
+   */
   cloud: {
-    description: `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${CLOUD_IMPORTS}. SAP accepts it as its own job, which runs to its end whatever happens to the client or its connection after the call; the objects it imports are inactive, and the repository list shows its run state. Answers facts only: SAP's status and accepted.`,
+    description: toolDescription(
+      runParts({
+        purpose: purpose(
+          'Pulls an abapGit repository from the branch it is linked on as an SAP job, recorded in a transport, its imported objects left inactive.',
+        ),
+      }),
+    ),
     inputSchema: CLOUD_SCHEMA,
   },
 };

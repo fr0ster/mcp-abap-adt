@@ -32,6 +32,8 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremExecutor } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { profilerTraceParameters } from '../../../lib/profilerTraceParameters';
 import { ourProgramExecutor } from '../../../lib/strategies/resultSets';
@@ -42,8 +44,13 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'RuntimeRunProgram',
   available_in: ['onprem'] as const,
-  description:
-    '[runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).',
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        'Runs an ABAP report and gives its output, under the ABAP profiler when asked.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     program_name: z.string().describe('ABAP program name to execute.'),
     background: BACKGROUND_FIELD,
@@ -95,11 +102,7 @@ export async function handleRuntimeRunProgram(
     return answer(
       { tool: 'RuntimeRunProgram', detail: 'terse' },
       () => programExecutor.run({ programName }, { analyse: analyseException }),
-      (output: string) => ({
-        success: true,
-        program_name: programName,
-        output: output ?? '',
-      }),
+      (output: string) => programRunAnswer(programName, output),
     );
   }
 
@@ -123,15 +126,8 @@ export async function handleRuntimeRunProgram(
           ),
         ),
       ),
-    ([profilerId, output]: [string, string]) => ({
-      success: true,
-      program_name: programName,
-      output: output ?? '',
-      profile: {
-        profiler_id: profilerId,
-        // traceId is not returned for programs — use RuntimeListProfilerTraceFiles to find it.
-      },
-    }),
+    ([profilerId, output]: [string, string]) =>
+      programRunAnswer(programName, output, profilerId),
   );
 }
 
@@ -176,11 +172,7 @@ export async function handleRuntimeRunProgramUnderProfiler(
       atStep('run program', () =>
         programExecutor.run({ programName }, { analyse: analyseException }),
       ),
-      (output: string) => ({
-        success: true,
-        program_name: programName,
-        output: output ?? '',
-      }),
+      (output: string) => programRunAnswer(programName, output),
     );
   }
   return answer(
@@ -191,11 +183,25 @@ export async function handleRuntimeRunProgramUnderProfiler(
         { analyse: analyseException, profilerId },
       ),
     ),
-    (output: string) => ({
-      success: true,
-      program_name: programName,
-      output: output ?? '',
-      profile: { profiler_id: profilerId },
-    }),
+    (output: string) => programRunAnswer(programName, output, profilerId),
   );
+}
+
+/**
+ * What a program run answers: the program, its output, and the profiler id
+ * it ran under (a program run answers no trace id: the trace list finds it).
+ */
+export function programRunAnswer(
+  programName: string,
+  output: string | undefined,
+  profilerId?: string,
+) {
+  return {
+    success: true,
+    program_name: programName,
+    output: output ?? '',
+    ...(profilerId === undefined
+      ? {}
+      : { profile: { profiler_id: profilerId } }),
+  };
 }

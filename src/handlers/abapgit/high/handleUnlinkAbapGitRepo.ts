@@ -13,12 +13,16 @@ import {
   admittedRepo,
 } from '../../../lib/abapGit/client';
 import { answer } from '../../../lib/answer';
+import { purpose, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'UnlinkAbapGitRepo',
-  description:
-    "Removes the link of the repository repository_key from its package; the package's objects stay in the system, and the remote stays as it is. Answers SAP's status.",
+  description: toolDescription({
+    purpose: purpose(
+      'Unlinks an abapGit repository by its key, keeping its objects in the system and its remote as it is.',
+    ),
+  }),
   inputSchema: z.object({ repository_key: REPOSITORY_KEY_FIELD }),
 } as const;
 

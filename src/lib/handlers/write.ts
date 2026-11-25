@@ -43,6 +43,7 @@ export { handleDeleteOnly } from '../../handlers/common/low/handleDeleteOnly.js'
 export {
   handleLockObject,
   lockObject,
+  lockObjectAnswering,
 } from '../../handlers/common/low/handleLockObject.js';
 export {
   handleUnlockObject,
@@ -129,5 +130,8 @@ export { handleUpdateProgramUnitTest } from '../../handlers/unit_test/high/handl
 export { handleUpdateUnitTest } from '../../handlers/unit_test/high/handleUpdateUnitTest.js';
 export {
   handleStartUnitTestRun,
+  START_RUN_PARTS,
   type UnitTestRunner,
 } from '../../handlers/unit_test/shared/startRun.js';
+// The write tools' definitions, for the compact write tools' descriptions.
+export { WRITE_DEFINITIONS } from './writeDefinitions.js';

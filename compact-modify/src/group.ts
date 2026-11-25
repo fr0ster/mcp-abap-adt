@@ -6,7 +6,7 @@
  * `CompactReadOnlyHandlersGroup`. Everything here either writes to the repository
  * (`HandlerCreate`, `HandlerUpdate`, `HandlerDelete`, `HandlerActivate`,
  * `HandlerTransportCreate`, `HandlerTransportSortAndCompress`,
- * `HandlerTransportMoveObjects`), takes an enqueue (`HandlerLock`, `HandlerUnlock` — a
+ * `HandlerTransportMoveObjects`), takes an enqueue (`HandlerLock`, lock and unlock — a
  * lock changes state and blocks other users), or schedules a trace or
  * executes ABAP and leaves traces (`HandlerProfileSchedule`,
  * `HandlerUnitTestRun`, `HandlerProfileRun`).
@@ -62,16 +62,12 @@ import {
   handleHandlerUnitTestRun,
 } from './handlers/handleHandlerUnitTestRun';
 import {
-  TOOL_DEFINITION as HandlerUnlock_Tool,
-  handleHandlerUnlock,
-} from './handlers/handleHandlerUnlock';
-import {
   TOOL_DEFINITION as HandlerUpdate_Tool,
   handleHandlerUpdate,
 } from './handlers/handleHandlerUpdate';
 import {
   deleteHeldLockOf,
-  unlockHeldLockOf,
+  lockHeldLockOf,
   updateHeldLockOf,
 } from './handlers/heldLockOf';
 
@@ -100,10 +96,9 @@ export function compactModifyEntries(): HandlerEntry[] {
       HandlerTransportMoveObjects_Tool,
       handleHandlerTransportMoveObjects,
     ),
-    defineTool(HandlerLock_Tool, handleHandlerLock),
     {
-      ...defineTool(HandlerUnlock_Tool, handleHandlerUnlock),
-      heldLockOf: unlockHeldLockOf,
+      ...defineTool(HandlerLock_Tool, handleHandlerLock),
+      heldLockOf: lockHeldLockOf,
     },
     defineTool(HandlerUnitTestRun_Tool, handleHandlerUnitTestRun),
     defineTool(HandlerProfileSchedule_Tool, handleHandlerProfileSchedule),

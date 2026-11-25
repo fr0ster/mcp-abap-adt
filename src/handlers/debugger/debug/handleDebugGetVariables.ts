@@ -5,16 +5,27 @@ import {
   requireDebugger,
 } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
-import { terseVariables } from '../../../lib/debugger/readings';
+import {
+  terseChildVariables,
+  terseVariables,
+} from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugGetVariables',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] [debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.',
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads variables of the stopped ABAP debuggee by name, or the members of parent variables.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     names: z
@@ -49,14 +60,7 @@ export async function handleDebugGetVariables(
           : a.recordChildVariables(recorder, parents);
       return names ? a.getVariables(names) : a.getChildVariables(parents);
     },
-    (v) => {
-      if (byName) return terseVariables(v);
-      // Every member keeps the id a further read takes as a parent; with several parents asked, the link to its parent too.
-      const variables = new Map(terseVariables(v).map((t) => [t.id, t]));
-      return v.children.map((c) => ({
-        ...(variables.get(c.child) ?? { id: c.child, label: c.label }),
-        ...(parents.length > 1 ? { parent: c.parent } : {}),
-      }));
-    },
+    (v) =>
+      byName ? terseVariables(v) : terseChildVariables(v, parents.length > 1),
   );
 }

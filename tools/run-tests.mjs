@@ -499,6 +499,35 @@ async function runSelection() {
   });
 
   /**
+   * The test files that hold a whole TypeScript program of the repository
+   * (the source scans), with the peak resident memory each was measured at
+   * (Linux, Node 26, 2026-11-24): past the ~2 GB of heap a 7 GB macOS runner
+   * gives a process by default (run 45269937223: out of memory at 2,025 MB
+   * in `sources/unknownSweep`), so each gets 4 GB. Every other file keeps
+   * Node's default; one that comes to need more is measured and named here.
+   */
+  const HEAVY_FILES = new Map([
+    ['src/__tests__/unit/sources/unknownSweep.test.ts', '2.99 GB'],
+    ['src/__tests__/unit/runner/placedFiles.test.ts', '1.65 GB'],
+    ['src/__tests__/unit/sources/noRunnerTimeout.test.ts', '1.57 GB'],
+    [
+      'src/__tests__/unit/sources/noDerivationFromAuthorization.test.ts',
+      '1.51 GB',
+    ],
+    ['src/__tests__/unit/sources/noRegexOverInput.test.ts', '1.44 GB'],
+    ['src/__tests__/unit/sources/noProseMatching.test.ts', '1.42 GB'],
+    ['src/__tests__/unit/sources/noChainInstanceof.test.ts', '1.37 GB'],
+    ['src/__tests__/unit/sources/rfcConfigConstruction.test.ts', '1.07 GB'],
+  ]);
+
+  /** The heap a file's process gets: 4 GB for a heavy file, else Node's default. */
+  function heapOf(source) {
+    return HEAVY_FILES.has(source.split('\\').join('/'))
+      ? ['--max-old-space-size=4096']
+      : [];
+  }
+
+  /**
    * The files that ran past the bound: their source path, and `stopped` or
    * `kill failed` (their tree could not be ended whole).
    */
@@ -529,6 +558,7 @@ async function runSelection() {
         // node:test's `mock.module` (helpers/moduleMock.ts): a file may
         // replace a module whose exports map closes its internal files.
         '--experimental-test-module-mocks',
+        ...heapOf(source),
         '--require',
         preload,
         '--require',

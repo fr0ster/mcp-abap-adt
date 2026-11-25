@@ -155,7 +155,7 @@
     "test:reinit": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
     "test": "npm run test:build && node tools/run-tests.mjs --concurrency 2 --file-timeout 600",
     "sweep:unknown": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/unit/sources/unknownSweep.test.ts",
-    "test:build": "node tools/build-node-tests.mjs",
+    "test:build": "node --max-old-space-size=4096 tools/build-node-tests.mjs",
     "test:install": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/unit/installMatrix.test.ts src/__tests__/unit/binSmoke.test.ts",
     "test:retrieval": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/unit/descriptions/toolRetrievalVectors.test.ts",
     "test:integration": "npm run test:build && node tools/run-tests.mjs --concurrency 1 --root src/__tests__/integration --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./.test-build/tree/src/__tests__/integration/coverageReport/ledgerReporter.js --test-reporter-destination=stdout",
@@ -164,6 +164,7 @@
     "test:live-deferred-logon": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/integration/live/deferredLogon.test.ts",
     "test:high": "npm run test:build && node tools/run-tests.mjs --concurrency 1 --root src/__tests__/integration/high",
     "test:check": "tsc --noEmit -p tsconfig.test.json",
+    "goldens:terse": "npm run test:build && node scripts/write-terse-goldens.mjs",
     "shared:setup": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/admin/shared-deps/setup.test.ts",
     "shared:teardown": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/admin/shared-deps/teardown.test.ts",
     "shared:check": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/admin/shared-deps/check.test.ts",
@@ -235,12 +236,12 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^46.2.0",
-    "@mcp-abap-adt/adt-strategies": "^0.27.0",
+    "@mcp-abap-adt/adt-clients": "^47.0.2",
+    "@mcp-abap-adt/adt-strategies": "^0.28.3",
     "@mcp-abap-adt/auth-errors": "^2.2.1",
     "@mcp-abap-adt/auth-providers": "^6.0.2",
-    "@mcp-abap-adt/connection": "^25.2.0",
-    "@mcp-abap-adt/interfaces-adt": "^30.2.0",
+    "@mcp-abap-adt/connection": "^25.2.1",
+    "@mcp-abap-adt/interfaces-adt": "^31.0.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^5.3.0",
     "@mcp-abap-adt/interfaces-auth": "^7.5.0",
     "@mcp-abap-adt/interfaces-auth-sap": "^4.0.0",
@@ -258,7 +259,7 @@
     "zod": "^4.6.5"
   },
   "optionalDependencies": {
-    "@mcp-abap-adt/sap-rfc-lite": "^0.4.0"
+    "@mcp-abap-adt/sap-rfc-lite": "^0.4.1"
   },
   "engines": {
     "node": ">=22.0.0",

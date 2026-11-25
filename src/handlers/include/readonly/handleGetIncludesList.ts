@@ -23,10 +23,13 @@ import {
 import { acceptedCodeOf, tableCodeOf } from '../../../lib/adtTypeCode';
 import {
   answerCaught,
+  answerPayload,
   failedPayloadOf,
   failureEntry,
   failurePayload,
   isCredentialPayload,
+  type ListedAnswer,
+  listedAnswer,
   type McpResult,
   messageOf,
 } from '../../../lib/answer';
@@ -36,27 +39,60 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import {
+  longRunning,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
+  asJsonResult,
+  asTextResult,
+  byListing,
+  type Column,
+  type DetailLevel,
+  entries,
+  type Head,
+  headShape,
+  type JsonSchemas,
+  jsonText,
+  type ListAnswerTable,
+  type Listing,
+  listAnswerAt,
+  marks,
+  member,
+  node,
+  partsOf,
+  type RowSchemas,
+  rows,
+  type TextResult,
+  values,
+  type Written,
+  wireAnswer,
+  writeJson,
+  writeJsonList,
+  writeListing,
+} from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AnswerObject,
-  type JsonValue,
-  jsonOrText,
-} from '../../../lib/json';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import type { AnswerObject, JsonValue } from '../../../lib/json';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { linesOf } from '../../../lib/plainText';
 import { includeNameOf } from '../../../lib/strategies/abapIncludeStatement';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import {
   type FunctionGroupNodeSource,
   fetchFunctionGroupChildren,
 } from '../../../lib/strategies/functionGroupChildren';
 import { classIncludeTypesOf } from '../../../lib/strategies/metadataFields';
 import {
+  childNodesOf,
   endsTheCall,
   type NodeLevel,
+  nodeItemsOf,
   nodeStructureOn,
 } from '../../../lib/strategies/packageWalk';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -64,13 +100,101 @@ import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
+
+/** A node's mark: `cyclic` or `duplicate` where it is so, else none. */
+const markOf = (node: IncludeNode) =>
+  node.cyclic === true ? 'cyclic' : node.duplicate === true ? 'duplicate' : '';
+
+/** The tree as indented rows: name, and `cyclic` or `duplicate` where it is so. */
+const includeColumns: Column<IncludeNode>[] = [
+  { name: 'name', means: 'its name', cell: (node) => node.name },
+  {
+    name: 'mark',
+    means: 'whether it includes itself again or was met before elsewhere',
+    cell: markOf,
+    when: (node) => markOf(node) !== '',
+  },
+];
+
+/** Every node below a node, one level deeper. */
+const includeSchemas: RowSchemas<IncludeNode> = {
+  children: about(
+    'for each include it includes',
+    rows('children', {
+      columns: includeColumns,
+      header: 'none',
+      get lists() {
+        return includeSchemas;
+      },
+    }),
+  ),
+};
+
+/** A node with every field read, nothing implied (medium). */
+const mediumEntry = (node: IncludeNode) => ({
+  name: node.name,
+  ...(node.type !== undefined ? { type: node.type } : {}),
+  ...(node.cyclic !== undefined ? { cyclic: node.cyclic } : {}),
+  ...(node.duplicate !== undefined ? { duplicate: node.duplicate } : {}),
+});
+
+/** The nodes below a node, medium: a leaf without its empty `children`. */
+const mediumSchemas: JsonSchemas<IncludeNode> = {
+  children: entries('children', mediumEntry, {
+    omitEmpty: true,
+    get lists() {
+      return mediumSchemas;
+    },
+  }),
+};
+
+/**
+ * What GetIncludesList answers of one object at each `detail`, selected
+ * before the reads (`src/lib/detail`): terse the tree as indented names
+ * under `# object`, a `# unreadable<TAB>NAME` line per include that could not be
+ * read; medium the tree without empty children; full the answer before
+ * `detail`. A tree reads many documents, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
+ */
+/** An include that could not be read, by its name. */
+const unreadableName = (entry: AnswerObject) => String(entry.name ?? '');
+
+/** The lists a IncludesRead listing writes: what its description states. */
+export const INCLUDES_LISTS: RowSchemas<IncludesRead> = {
+  unreadable: about(
+    'the includes left unread are named',
+    marks('unreadable', 'unreadable', (entry: AnswerObject) => [
+      unreadableName(entry),
+    ]),
+  ),
+  // The tree from its root: the root a row, every node below it.
+  tree: about(
+    'the object itself, its root',
+    node('tree', {
+      columns: includeColumns,
+      header: 'none',
+      tree: true,
+      lists: includeSchemas,
+    }),
+  ),
+};
+
+/** The head every object's listing opens with. */
+export const INCLUDES_HEADS = [
+  headShape('object', "the object's type and name"),
+];
+
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: withLongToolAdvice(
-      '[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }).',
-    ),
+    description: toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads every include of an ABAP program or include, with the includes each one includes, down to the last.',
+      ),
+      notes: [longRunning],
+    }),
     inputSchema: includesListSchema(variant),
   })),
 } as const;
@@ -168,6 +292,7 @@ function includesListFields(variant: ProjectionVariant) {
       .describe(
         '[read-only] If true, returns structured JSON with metadata and raw XML.',
       ),
+    ...ASSEMBLED_DETAIL_SHAPE,
   };
 }
 
@@ -294,9 +419,82 @@ function readSource(response: SourceAnswer): SourceRead {
   return absent ? { kind: 'absent' } : { kind: 'refused', error };
 }
 
+/** One object's tree as read: the object, its tree, and what could not be read. */
+interface IncludesRead {
+  object_name: string;
+  object_type: string;
+  tree: IncludeNode;
+  unreadable: AnswerObject[];
+}
+
+/** What a level answers of one object's tree. */
+type IncludesShown = (read: IncludesRead) => string;
+
+/**
+ * Each answered object's read, by the answer it became: a list call writes
+ * every object's terse text from these by the listing writer, never by
+ * splicing the single answers' texts.
+ */
+const readsOf = new WeakMap<McpResult, IncludesRead>();
+
+/** One object's answer at its level, its read kept for a list call. */
+function readAnswer(shown: IncludesShown, read: IncludesRead): McpResult {
+  const result: McpResult = {
+    isError: false,
+    content: [{ type: 'text', text: shown(read) }],
+  };
+  readsOf.set(result, read);
+  return result;
+}
+
+/**
+ * One object's terse text, written from its read: its `# object` line, a
+ * mark per include that could not be read, then the tree from its root.
+ */
+const includesListing = (read: IncludesRead): Listing<IncludesRead> => ({
+  heads: [{ head: 'object', value: `${read.object_type} ${read.object_name}` }],
+  reading: read,
+  lists: INCLUDES_LISTS,
+});
+
+// Every node (and, at terse, every unreadable include), written from the
+// read by the listing writers: one row, line or entry each.
+const INCLUDES_ANSWERS: ListAnswerTable<IncludesRead, string> = {
+  terse: (read) => writeListing(includesListing(read)),
+  medium: (read) =>
+    jsonText(
+      writeJson(
+        { object_name: read.object_name, object_type: read.object_type },
+        read,
+        {
+          // The tree from its root, every node below it.
+          tree: member('tree', mediumEntry, { lists: mediumSchemas }),
+          unreadable: entries('unreadable', (entry: AnswerObject) => entry, {
+            omitEmpty: true,
+          }),
+        },
+      ),
+    ),
+  full: fullIncludes,
+  raw: fullIncludes,
+};
+
+/** The answer before `detail`: the tree, and what could not be read only when there is something. */
+function fullIncludes(read: IncludesRead): string {
+  return JSON.stringify({
+    object_name: read.object_name,
+    object_type: read.object_type,
+    tree: read.tree,
+    // Only when there is something to say: a caller reading a tree needs to
+    // know it is short, and why.
+    ...(read.unreadable.length > 0 ? { unreadable: read.unreadable } : {}),
+  });
+}
+
 async function includesListOf(
   context: HandlerContext,
   args: IncludesListArgs,
+  shown: IncludesShown,
 ): Promise<McpResult> {
   const { connection, logger } = context;
   try {
@@ -471,26 +669,12 @@ async function includesListOf(
 
     const tree: IncludeNode = { name: parent.name, children };
 
-    return {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              object_name: parent.name,
-              object_type: parent.kind,
-              tree,
-              // Only when there is something to say: a caller reading a tree
-              // needs to know it is short, and why.
-              ...(unreadable.length > 0 ? { unreadable } : {}),
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-    };
+    return readAnswer(shown, {
+      object_name: parent.name,
+      object_type: parent.kind,
+      tree,
+      unreadable,
+    });
   } catch (error) {
     logger?.error(`Error getting includes list: ${messageOf(error)}`);
     // A carried method error as it is, a chain failure as it came, a throw
@@ -704,9 +888,9 @@ function includesNodeOf(result: PhaseResult<NodeAnswer>): string | undefined {
   if (!result.ok) return undefined;
   const response = result.value;
   if (!response.ok) return undefined;
-  return response
-    .getResult()
-    .value.childNodes.find((c) => tableCodeOf(c.type) === 'FUGR/I')?.nodeId;
+  return childNodesOf(response.getResult().value).find(
+    (c) => tableCodeOf(c.type) === 'FUGR/I',
+  )?.nodeId;
 }
 
 /**
@@ -719,6 +903,7 @@ async function treeFromAnswers(
   context: HandlerContext,
   parent: { kind: ParentKind; name: string },
   answers: IncludeAnswers,
+  shown: IncludesShown,
 ): Promise<McpResult> {
   const { logger } = context;
   try {
@@ -842,24 +1027,12 @@ async function treeFromAnswers(
     }
 
     const tree: IncludeNode = { name: parent.name, children };
-    return {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              object_name: parent.name,
-              object_type: parent.kind,
-              tree,
-              ...(unreadable.length > 0 ? { unreadable } : {}),
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-    };
+    return readAnswer(shown, {
+      object_name: parent.name,
+      object_type: parent.kind,
+      tree,
+      unreadable,
+    });
   } catch (error) {
     logger?.error(`Error getting includes list: ${messageOf(error)}`);
     return answerCaught(error, { tool: 'GetIncludesList', detail: 'terse' });
@@ -878,6 +1051,7 @@ async function treeFromAnswers(
 async function includeTrees(
   context: HandlerContext,
   parents: ReadonlyArray<{ kind: ParentKind; name: string }>,
+  shown: IncludesShown,
 ): Promise<McpResult[]> {
   const answers = includeAnswers(context);
   await answers.phase(parents.map(firstRead));
@@ -911,9 +1085,9 @@ async function includeTrees(
         if (response?.ok) {
           level = [
             ...new Set(
-              response
-                .getResult()
-                .value.objects.map((o) => o.name.toUpperCase()),
+              nodeItemsOf(response.getResult().value).map((o) =>
+                o.name.toUpperCase(),
+              ),
             ),
           ];
         }
@@ -947,14 +1121,9 @@ async function includeTrees(
   }
   const trees: McpResult[] = [];
   for (const parent of parents) {
-    trees.push(await treeFromAnswers(context, parent, answers));
+    trees.push(await treeFromAnswers(context, parent, answers, shown));
   }
   return trees;
-}
-
-/** A failed answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): JsonValue {
-  return jsonOrText(result.content[0]?.text ?? '');
 }
 
 /** Whether an answer is a credential failure: it ends a call for several objects. */
@@ -963,33 +1132,128 @@ function endsList(result: McpResult): boolean {
   return failed !== undefined && isCredentialPayload(failed);
 }
 
-/** A list call's answer: one entry per object, in the order asked. */
+/** What a list call answers from: the entries asked, and each one's answer. */
+interface ListOf {
+  readonly objects: ReadonlyArray<{ object_name: string; object_type: string }>;
+  readonly results: readonly McpResult[];
+}
+
+/**
+ * A list call's answer at each `detail`, selected through the table like
+ * every other answer: terse one text written by the listing writer, the other
+ * levels a JSON array of the entries.
+ */
+const LIST_ANSWERS: ListAnswerTable<ListOf, McpResult> = {
+  terse: terseList,
+  medium: jsonList,
+  full: (list) => jsonList(list).answer,
+  raw: (list) => jsonList(list).answer,
+};
+
+/** A list call's answer: one entry per asked, in the order asked, at the level asked. */
 function listAnswer(
   objects: ReadonlyArray<{ object_name: string; object_type: string }>,
   results: readonly McpResult[],
+  level: DetailLevel,
 ): McpResult {
-  const entries = results.map((result, i) => {
-    const asked = objects[i];
-    return result.isError
-      ? {
-          object_name: asked.object_name,
-          object_type: asked.object_type,
-          error: payloadOfAnswer(result),
-        }
-      : payloadOfAnswer(result);
-  });
-  return {
-    isError: false,
-    content: [{ type: 'text', text: JSON.stringify(entries, null, 2) }],
-  };
+  return listAnswerAt(LIST_ANSWERS, level)({ objects, results });
 }
 
+/** A list call's terse text. */
+function terseList({ objects, results }: ListOf): Written<TextResult> {
+  // Every object's text written by the listing writer: a failure under its
+  // escaped `# object` line and one `# error` line; an answered one as its
+  // own terse listing.
+  const text = writeListing({
+    heads: [],
+    reading: {
+      answered: results.map((result, i) => ({
+        asked: objects[i],
+        answer: answerPayload(result),
+        read: result.isError ? undefined : readsOf.get(result),
+      })),
+    },
+    lists: {
+      answered: partsOf(
+        'answered',
+        ({ asked, answer, read }: AnsweredObject): Head[] =>
+          read === undefined
+            ? [
+                {
+                  head: 'object',
+                  value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
+                },
+                {
+                  head: 'error',
+                  value: JSON.stringify(answer),
+                },
+              ]
+            : [],
+        'read',
+        byListing(INCLUDES_LISTS, includesListing),
+      ),
+    },
+  });
+  return asTextResult(text);
+}
+
+/** One object of a list call: what was asked, its answer, and its read when answered. */
+interface AnsweredObject {
+  readonly asked: ListOf['objects'][number] | undefined;
+  readonly answer: JsonValue;
+  readonly read: IncludesRead | undefined;
+}
+
+/** A list call's entries as a JSON array. */
+function jsonList({ objects, results }: ListOf): Written<TextResult> {
+  // Every answer one entry, written by the listing writer.
+  return asJsonResult(
+    writeJsonList(
+      { answered: results.map(listedAnswer) },
+      values('answered', ({ isError, answer, i }: ListedAnswer) =>
+        ((isError, answer, i) => {
+          const asked = objects[i];
+          return isError
+            ? {
+                object_name: asked.object_name,
+                object_type: asked.object_type,
+                error: answer,
+              }
+            : answer;
+        })(isError, answer, i),
+      ),
+    ),
+  );
+}
+
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetIncludesList(
+  context: HandlerContext,
+  args: IncludesListArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetIncludesList',
+        shape: 'assembled',
+      },
+      () => answeredGetIncludesList(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetIncludesList(context, args);
+}
+
+async function answeredGetIncludesList(
   context: HandlerContext,
   args: IncludesListArgs,
 ) {
   // The schema holds the rule: one object, or a non-empty `objects`.
   const { logger } = context;
+  const shown = listAnswerAt(INCLUDES_ANSWERS, levelOf(args));
   const listed = args?.objects;
   if (listed === undefined) {
     const parent =
@@ -1000,13 +1264,13 @@ export async function handleGetIncludesList(
         : undefined;
     // A class is one metadata read: there is nothing to read together.
     if (parent === undefined || parent.kind === 'CLAS/OC') {
-      return includesListOf(context, args);
+      return includesListOf(context, args, shown);
     }
     try {
       return await withSequentialFallback<McpResult>(
         context,
-        async () => (await includeTrees(context, [parent]))[0],
-        () => includesListOf(context, args),
+        async () => (await includeTrees(context, [parent], shown))[0],
+        () => includesListOf(context, args, shown),
       );
     } catch (error) {
       logger?.error(`Error getting includes list: ${messageOf(error)}`);
@@ -1035,28 +1299,30 @@ export async function handleGetIncludesList(
         const read = parents.filter(
           (p): p is { kind: ParentKind; name: string } => p !== undefined,
         );
-        const trees = await includeTrees(context, read);
+        const trees = await includeTrees(context, read, shown);
         const results: McpResult[] = [];
         let at = 0;
         for (const [i, parent] of parents.entries()) {
           if (parent === undefined) {
-            results.push(await includesListOf(context, single(objects[i])));
+            results.push(
+              await includesListOf(context, single(objects[i]), shown),
+            );
           } else {
             results.push(trees[at++]);
           }
         }
-        return listAnswer(objects, results);
+        return listAnswer(objects, results, levelOf(args));
       },
       async () => {
         // One object after another, each as the single call reads it; a
         // credential failure ends the call, and nothing after it is read.
         const results: McpResult[] = [];
         for (const o of objects) {
-          const result = await includesListOf(context, single(o));
+          const result = await includesListOf(context, single(o), shown);
           if (endsList(result)) return result;
           results.push(result);
         }
-        return listAnswer(objects, results);
+        return listAnswer(objects, results, levelOf(args));
       },
     );
   } catch (error) {

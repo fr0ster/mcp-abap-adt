@@ -27,12 +27,33 @@ import type { ServerOutlineCode } from '../../../lib/adtClientContract';
 import type { ProjectionVariant } from '../../../lib/adtProjections';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
-  READ_VERSION_FIELD,
-  type ReadVersion,
-} from '../../../lib/handlers/readVersion';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+  type AnswerTable,
+  about,
+  answerAt,
+  type Column,
+  entries,
+  headShape,
+  type JsonSchemas,
+  type ListAnswerTable,
+  listAnswerAt,
+  member,
+  omitted,
+  type RowSchemas,
+  rows,
+  values,
+  writeJson,
+  writeListing,
+  writeWhole,
+} from '../../../lib/detail';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
@@ -45,9 +66,6 @@ export const OUTLINE_TYPES = {
 
 /** A kind the tool takes on some variant. */
 export type OutlineType = (typeof OUTLINE_TYPES)['onprem'][number];
-
-const DESCRIPTION =
-  "[read-only] Lists the components of the ABAP object named by object_type and object_name — types, attributes, methods, events, local classes, forms, includes or modules — with their kind, visibility and level, and the source positions SAP's object structure states for each: the include each link points into and, for a class or an interface, its start and end line and column (lines from 1, columns from 0, the end exclusive), the lines a ranged source read (start_line, end_line) answers. Returns the components as a tree.";
 
 /** GetObjectOutline's input on `variant`. */
 function outlineSchema(variant: ProjectionVariant) {
@@ -63,11 +81,22 @@ function outlineSchema(variant: ProjectionVariant) {
   });
 }
 
+/** The heads an outline's listing opens with. */
+export const OUTLINE_HEADS = [
+  headShape('object', "the object's type and name"),
+  headShape('source', 'the include its components are defined in'),
+];
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectOutline',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: DESCRIPTION,
+    description: toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads the components of an ABAP class, interface, program or function group, with where each one is defined in its source.',
+      ),
+    }),
     inputSchema: outlineSchema(variant),
   })),
 } as const;
@@ -126,10 +155,10 @@ function linkOf(base: string | undefined, link: IOutlineLink): AnsweredLink {
   };
 }
 
-function componentOf(
-  base: string | undefined,
+/** A component's own members as answered, its lists left to the caller. */
+function componentEntry(
   element: IOutlineElement,
-): AnsweredComponent {
+): Omit<AnsweredComponent, 'links' | 'children'> {
   const optional = {
     visibility: element.visibility,
     level: element.level,
@@ -147,9 +176,38 @@ function componentOf(
     ...(element.constant ? { constant: true } : {}),
     ...(element.readOnly ? { read_only: true } : {}),
     ...(element.final ? { final: true } : {}),
+  };
+}
+
+function componentOf(
+  base: string | undefined,
+  element: IOutlineElement,
+): AnsweredComponent {
+  return {
+    ...componentEntry(element),
     links: element.links.map((link) => linkOf(base, link)),
     children: element.children.map((child) => componentOf(base, child)),
   };
+}
+
+/** A component's own members as answered, its lists left to its schemas. */
+
+/**
+ * A component's lists as the JSON writer writes them: every link, every
+ * child — each child with its own lists again.
+ */
+function componentSchemas(
+  base: string | undefined,
+): JsonSchemas<IOutlineElement> {
+  const schemas: JsonSchemas<IOutlineElement> = {
+    links: values('links', (link: IOutlineLink) => linkOf(base, link)),
+    children: entries('children', componentEntry, {
+      get lists() {
+        return schemas;
+      },
+    }),
+  };
+  return schemas;
 }
 
 /** The outline of a document, or the refusal when the document is none. */
@@ -161,6 +219,168 @@ function outlineOf(document: string): IObjectOutline {
     );
   }
   return outline;
+}
+
+/** The outline a call read: SAP's document, and its parse (none at raw). */
+interface OutlineRead {
+  document: string;
+  outline: IObjectOutline | undefined;
+}
+
+/** A document read with its parse: a document that is no outline throws. */
+const parsedRead = (document: string): OutlineRead => ({
+  document,
+  outline: outlineOf(document),
+});
+
+/**
+ * How the call reads SAP's document at each `detail`: parsed at terse,
+ * medium and full — inside the call, so a document that is no outline is
+ * the call's failure — and as it came at raw.
+ */
+const OUTLINE_READS: AnswerTable<string, OutlineRead> = {
+  terse: parsedRead,
+  medium: parsedRead,
+  full: parsedRead,
+  raw: (document) => ({ document, outline: undefined }),
+};
+
+/** A component's definition: its first link with a position, else its first. */
+function definitionOf(component: AnsweredComponent): AnsweredLink | undefined {
+  return (
+    component.links.find((link) => link.start !== undefined) ??
+    component.links[0]
+  );
+}
+
+/**
+ * The outline as indented rows: name, type, visibility, the definition's
+ * line, and its source where it is not the one the `# source` line names (a
+ * local include, a module's include) — every component, from the root.
+ */
+function outlineSchemas(source: string | undefined): {
+  readonly columns: Column<AnsweredComponent>[];
+  readonly below: RowSchemas<AnsweredComponent>;
+} {
+  const columns: Column<AnsweredComponent>[] = [
+    { name: 'name', means: 'its name', cell: (component) => component.name },
+    { name: 'type', means: 'its kind', cell: (component) => component.type },
+    {
+      name: 'visibility',
+      means: 'its visibility',
+      cell: (component) => component.visibility ?? '',
+    },
+    {
+      name: 'line',
+      means: 'where its definition starts',
+      cell: (component) => {
+        const start = definitionOf(component)?.start;
+        return start === undefined ? '' : String(start.line);
+      },
+    },
+    {
+      name: 'source',
+      means: 'the include it is defined in, where that differs',
+      cell: (component) => {
+        const definition = definitionOf(component);
+        return definition === undefined || definition.source === source
+          ? ''
+          : definition.source;
+      },
+    },
+  ];
+  const below: RowSchemas<AnsweredComponent> = {
+    // The approved terse shape: a component's links repeat the source the
+    // `# source` line names, and leave.
+    links: omitted<AnsweredLink, 'links'>(
+      'links',
+      'a link repeats the source the `# source` line names',
+    ),
+    children: rows('children', {
+      columns,
+      header: 'none',
+      get lists() {
+        return below;
+      },
+    }),
+  };
+  return { columns, below };
+}
+
+/** The lists an outline's listing writes: what its description states. */
+export function outlineLists(
+  source: string | undefined,
+): RowSchemas<{ tree: AnsweredComponent[] }> {
+  const { columns, below } = outlineSchemas(source);
+  return {
+    tree: about(
+      'for each component, such as a type, attribute, method, event, local class, form or module, at its depth',
+      rows('tree', { columns, header: 'always', tree: true, lists: below }),
+    ),
+  };
+}
+
+/**
+ * What GetObjectOutline answers at each `detail`, selected before the call
+ * (`src/lib/detail`): terse the components as indented
+ * `name\ttype\tvisibility\tline` rows under `# object` and `# source`
+ * (the source the lines are in, named once: the links each component
+ * carries repeat it); medium every component with its links (the former
+ * terse); full the parse; raw the document.
+ */
+function outlineAnswers(
+  objectType: string,
+  objectName: string,
+  version: string,
+): ListAnswerTable<OutlineRead, string | object> {
+  const components = (outline: IObjectOutline) =>
+    outline.root === undefined
+      ? undefined
+      : componentOf(outline.base, outline.root);
+  return {
+    // Every component of the outline, written by the listing writer. At
+    // terse and medium the document is always parsed (`OUTLINE_READS`), an
+    // outline without a root refused there; the reading without one is
+    // raw's alone, answered here as the document it holds.
+    terse: ({ document, outline }: OutlineRead) => {
+      const root = outline === undefined ? undefined : components(outline);
+      if (root === undefined) return writeWhole({ document });
+      const source = definitionOf(root)?.source;
+      return writeListing({
+        heads: [
+          { head: 'object', value: `${objectType} ${objectName}` },
+          ...(source === undefined ? [] : [{ head: 'source', value: source }]),
+        ],
+        reading: { tree: [root] },
+        lists: outlineLists(source),
+      });
+    },
+    // Every component with its links (the reading's own tree, every
+    // component in it); no outline read: the document as it came.
+    medium: ({ document, outline }: OutlineRead) => {
+      // No outline read (raw's reading alone): the document it holds.
+      if (outline === undefined) return writeWhole({ document });
+      // The reading's tree from its root, every link and child by the JSON
+      // writer.
+      return writeJson(
+        {
+          success: true,
+          object_type: objectType,
+          object_name: objectName,
+          version,
+        },
+        outline,
+        {
+          root: member('root', componentEntry, {
+            as: 'outline',
+            lists: componentSchemas(outline.base),
+          }),
+        },
+      );
+    },
+    full: ({ document, outline }) => outline ?? document,
+    raw: ({ document }) => document,
+  };
 }
 
 export async function handleGetObjectOutline(
@@ -181,8 +401,13 @@ export async function handleGetObjectOutline(
   }
   const objectName = object_name.toUpperCase();
   const detail = detailOf(args);
+  const shown = listAnswerAt(
+    outlineAnswers(object_type, objectName, version),
+    levelOf(args),
+  );
+  const readAt = answerAt(OUTLINE_READS, levelOf(args));
   /** The outline the call read, for the projection: parsed once. */
-  const read: { outline?: IObjectOutline } = {};
+  const read: { outline?: IObjectOutline | undefined } = {};
 
   return answer(
     { tool: 'GetObjectOutline', detail },
@@ -195,24 +420,11 @@ export async function handleGetObjectOutline(
         });
       // The document is read once, inside the call, as GetObjectStructure
       // checks its own: an answer that is no outline is the call's failure.
-      if (detail !== 'raw' && response.ok) {
-        read.outline = outlineOf(response.getResult().value);
+      if (response.ok) {
+        read.outline = readAt(response.getResult().value).outline;
       }
       return response;
     },
-    (document) => {
-      const outline = read.outline;
-      if (detail === 'raw' || outline === undefined) return document;
-      if (detail === 'full') return outline;
-      const root = outline.root;
-      return {
-        success: true,
-        object_type,
-        object_name: objectName,
-        version,
-        outline:
-          root === undefined ? undefined : componentOf(outline.base, root),
-      };
-    },
+    (document) => shown({ document, outline: read.outline }),
   );
 }

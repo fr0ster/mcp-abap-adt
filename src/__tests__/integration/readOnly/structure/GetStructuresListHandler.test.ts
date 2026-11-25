@@ -39,7 +39,6 @@ import {
 } from '../../helpers/testers/hardMode';
 import {
   createHandlerContext,
-  handlerAnswer,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
@@ -59,14 +58,6 @@ const paramsOf = (testCase: TestCase) =>
   );
 
 const testLogger = createTestLogger('structure-list-readonly');
-
-interface StructureNode {
-  structure: string;
-  kind: 'root' | 'include' | 'append';
-  children: StructureNode[];
-  cyclic?: boolean;
-  error?: string;
-}
 
 /**
  * This file's `describe`: the suite runs where the configured system serves
@@ -186,21 +177,23 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       throw new Error(`GetStructuresList failed: ${errorMsg}`);
     }
 
-    const data = handlerAnswer(
-      response,
-      z.looseObject({ success: z.unknown(), tree: z.unknown() }),
-    );
-    assert.equal(data.success, true);
+    // Terse, the default: the tree as indented `structure\tkind\tattribute`
+    // rows, the root first, its direct children two spaces in.
+    const rows = String(response.content[0]?.text ?? '')
+      .split('\n')
+      .filter((line: string) => line !== '' && !line.startsWith('#'));
+    const [rootStructure, rootKind] = (rows[0] ?? '').split('\t');
+    assert.equal(rootKind, 'root', rows.join('\n'));
+    assert.equal(rootStructure, structureName.toUpperCase());
+    const children = rows
+      .filter((row) => row.startsWith('  ') && !row.startsWith('    '))
+      .map((row) => {
+        const [structure, kind] = row.trim().split('\t');
+        return { structure, kind };
+      });
 
-    const tree = data.tree as StructureNode;
-    assert.ok(tree !== undefined);
-    assert.equal(tree.kind, 'root');
-    assert.equal(tree.structure, structureName.toUpperCase());
-
-    const child = (tree.children ?? []).find(
-      (node) => node.structure === expectedInclude,
-    );
-    assert.ok(child !== undefined);
+    const child = children.find((node) => node.structure === expectedInclude);
+    assert.ok(child !== undefined, rows.join('\n'));
     assert.equal(child?.kind, 'include');
 
     // Append (extension) child — config-driven; only asserted when the test
@@ -222,7 +215,7 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       ? String(paramsOf(testCase).expected_append).toUpperCase()
       : null;
     if (expectedAppend) {
-      const appendChild = (tree.children ?? []).find(
+      const appendChild = children.find(
         (node) => node.structure === expectedAppend,
       );
       if (!appendChild) {

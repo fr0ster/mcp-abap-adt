@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { readerParts, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -13,8 +14,12 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 export const TOOL_DEFINITION = {
   name: 'GetFunctionGroup',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the ABAP function group named by function_group_name in one request: its ADT metadata document (package, description, contents), at the version asked. Returns it under `metadata`, with `part: "metadata"`.',
+  description: toolDescription(
+    readerParts({
+      object: 'an ABAP function group',
+      holding: 'its package, description and contents',
+    }),
+  ),
   inputSchema: z.object({
     function_group_name: requiredText(
       'function_group_name is required',

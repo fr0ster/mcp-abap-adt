@@ -1,34 +1,38 @@
 import * as z from 'zod';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * GetInactiveObjects Handler - Retrieve list of inactive ABAP objects
  */
 
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type IInactiveObject,
+  type IInactiveObjectsResponse,
+  utilInactiveObjects,
+} from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
-import { ourUtils } from '../../../lib/strategies/resultSets';
 import {
-  attr,
-  child,
+  about,
+  answered,
   entries,
-  isList,
-  listOf,
-  type XmlList,
-  type XmlNode,
-  type XmlRead,
-} from '../../../lib/xml/tree';
-
-export const TOOL_DEFINITION = {
-  name: 'GetInactiveObjects',
-  available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Get a list of inactive ABAP objects — modified and pending activation. Shows classes, tables, CDS views, and other objects awaiting activation.',
-  inputSchema: z.object({ ...DETAIL_SHAPE }),
-} as const;
+  fullLevel,
+  headShape,
+  type ListDetailTable,
+  type RowSchemas,
+  rawLevel,
+  readingAt,
+  rows,
+  type Written,
+  writeJson,
+  writeListing,
+  written,
+} from '../../../lib/detail';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
+import { ourUtils } from '../../../lib/strategies/resultSets';
+import type { XmlNode } from '../../../lib/xml/node';
 
 interface InactiveObjectRef {
   type: string;
@@ -41,75 +45,103 @@ interface InactiveObjectRef {
   parentName?: string;
 }
 
-/** One entry's fields; `adtcore:parentUri`'s last segment is the owner's name. */
-function refOf(a: XmlRead): InactiveObjectRef {
-  const parentUri = attr(a, 'adtcore:parentUri');
-  const parent = parentUri
-    ? decodeURIComponent(parentUri.split('/').filter(Boolean).pop() ?? '')
-    : '';
+/**
+ * One object as the tool answers it: its code as SAP listed it, its name, and
+ * the owner `adtcore:parentUri`'s last segment names.
+ */
+function refOf(object: IInactiveObject): InactiveObjectRef {
+  const parentUri = object.parentUri;
+  const segment = parentUri?.split('/').filter(Boolean).pop() ?? '';
+  let parent = segment;
+  try {
+    parent = decodeURIComponent(segment);
+  } catch {
+    // A segment that does not decode is its own name.
+  }
   return {
-    type: attr(a, 'adtcore:type') ?? '',
-    name: attr(a, 'adtcore:name') ?? '',
+    type: object.type ?? object.unknownType,
+    name: object.name,
     ...(parent ? { parentName: parent.toUpperCase() } : {}),
   };
 }
 
-/**
- * `ioc:inactiveObjects/ioc:entry/ioc:object/ioc:ref`, attributes
- * `adtcore:type`/`adtcore:name` — the exact shape the SHIPPED `inactive`
- * reading parses (see `core/shared/getInactiveObjects.js`'s `inactiveObjects`
- * strategy), read here off the generic `structured` parse that overrides it
- * (`resultSets.ts`'s `READING_BY_SLOT`), field names unchanged. `entry` is one
- * of `structured`'s forced-array element names, so this holds regardless of
- * how many objects are inactive.
- */
-function extractInactiveObjects(value: XmlRead): InactiveObjectRef[] {
-  // BASIS 7.40 answers another document: `adtcore:objectReferences`, one
-  // `adtcore:objectReference` per object (measured 2026-10-01). Read as the
-  // newer shape it gave `count: 0` over eight inactive objects.
-  const legacy = child(value, 'adtcore:objectReferences');
-  if (legacy !== undefined) {
-    return listOf(child(legacy, 'adtcore:objectReference'))
-      .map((ref) => child(ref, '@'))
-      .filter((a) => attr(a, 'adtcore:name'))
-      .map(refOf);
-  }
-  const root = child(value, 'ioc:inactiveObjects');
-  if (root === undefined) {
-    // A document neither shape describes is not "nothing is inactive": an
-    // activation is confirmed off this answer, and a 0 read off the wrong
-    // document confirms one that did not happen.
-    throw new Error(
-      `GetInactiveObjects: unrecognised document (root: ${
-        entries(value)
-          .map(([name]) => name)
-          .join(', ') || 'none'
-      })`,
-    );
-  }
-  const entriesRaw = child(root, 'ioc:entry');
-  const listed = isList(entriesRaw)
-    ? entriesRaw
-    : entriesRaw
-      ? [entriesRaw]
-      : [];
-  const objects: InactiveObjectRef[] = [];
-  // `ioc:object` comes back as an array too — `structured` forces
-  // `object` to one. Read as a single element it gave no `ioc:ref`, and
-  // every entry was dropped: this tool answered "count: 0" over an
-  // inactive BDEF on premise (2026-09-26), and so did every caller relying on
-  // it to confirm an activation.
-  for (const entry of listed) {
-    for (const object of listOf(child(entry, 'ioc:object'))) {
-      for (const ref of listOf(child(object, 'ioc:ref'))) {
-        const a = child(ref, '@');
-        if (!attr(a, 'adtcore:name')) continue;
-        objects.push(refOf(a));
-      }
-    }
-  }
-  return objects;
+/** An inactive object as read: the reading's own entry. */
+type InactiveObject = IInactiveObjectsResponse['objects'][number];
+
+/** The list as the tool answers it at medium: every object, one entry each. */
+function inactiveAnswer(read: IInactiveObjectsResponse) {
+  return writeJson({ success: true, count: read.objects.length }, read, {
+    objects: entries('objects', refOf),
+  });
 }
+
+/** The lists the inactive objects listing writes: what its description states. */
+export const INACTIVE_LISTS: RowSchemas<IInactiveObjectsResponse> = {
+  objects: about(
+    'for each inactive object',
+    rows('objects', {
+      columns: [
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (o: InactiveObject) => refOf(o).type,
+        },
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (o: InactiveObject) => refOf(o).name,
+        },
+        {
+          name: 'parent',
+          means: 'the object it belongs to, such as a function group',
+          cell: (o: InactiveObject) => refOf(o).parentName ?? '',
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** The head the inactive objects listing opens with. */
+export const INACTIVE_HEADS = [headShape('count', 'how many there are')];
+
+export const TOOL_DEFINITION = {
+  name: 'GetInactiveObjects',
+  available_in: ['onprem', 'cloud'] as const,
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the inactive ABAP objects of the system: classes, tables, CDS views and other objects changed and awaiting activation.',
+    ),
+  }),
+  inputSchema: z.object({ ...DETAIL_SHAPE }),
+} as const;
+
+/** The list at terse: a TSV row per object — its type, name and owner. */
+function terseInactive(read: IInactiveObjectsResponse): Written<string> {
+  return writeListing({
+    heads: [{ head: 'count', value: String(read.objects.length) }],
+    reading: read,
+    lists: INACTIVE_LISTS,
+  });
+}
+
+/**
+ * What `GetInactiveObjects` answers at each `detail`: the reading passed to
+ * the call, selected before it (`src/lib/detail`) — terse (TSV) and medium over
+ * adt-strategies' `utilInactiveObjects` (0.28.0: both forms SAP answers,
+ * every object of an entry, and a document of another kind refused, since an
+ * activation is confirmed off this list), full the parse, raw the document.
+ */
+const INACTIVE_READINGS: ListDetailTable<
+  ReturnType<typeof inactiveAnswer>['answer'] | XmlNode | string
+> = {
+  // Every object the list held, written by the listing writers.
+  terse: written(utilInactiveObjects, terseInactive),
+  medium: written(utilInactiveObjects, inactiveAnswer),
+  full: fullLevel,
+  raw: rawLevel,
+};
 
 export async function handleGetInactiveObjects(
   context: HandlerContext,
@@ -125,11 +157,11 @@ export async function handleGetInactiveObjects(
     { tool: 'GetInactiveObjects', detail },
     () =>
       createAdtClient(connection, logger)
-        .getUtils(ourUtils)
+        .getUtils({
+          ...ourUtils,
+          inactive: readingAt(INACTIVE_READINGS, levelOf(args)),
+        })
         .getInactiveObjects({ analyse: analyseException }),
-    project(detail, (value) => {
-      const objects = extractInactiveObjects(value);
-      return { success: true, count: objects.length, objects };
-    }),
+    answered,
   );
 }

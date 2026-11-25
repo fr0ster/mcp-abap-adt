@@ -240,6 +240,59 @@ alone). A server without background runs (an embedder without a store) lists a l
 `background` and answers its read in the call.
 See [MIGRATION-24.0](docs/MIGRATION-24.0.md#callers-of-the-long-tools-background-by-default-no-timeout).
 
+### Answers
+
+A tool answers what the next call needs. What it answers is the reading the tool hands to its
+adt-clients call, chosen by `detail` before the request is sent; the answer is never cut — every
+row SAP answered is answered. `detail` has four levels:
+
+- `terse` (the default): compact, what the next call needs. A list answers TSV: one header line,
+  one row per item, and a `# <field> <value>` line where a value would repeat on every row (a
+  package, a task, an object). An item's details come from that item's own tool.
+- `medium`: every field the reading read, without the document's leftovers (URIs, namespaces).
+- `full`: the whole parse, the answer as it was before `detail` where a tool did not take it.
+- `raw`: what ADT sent. The shape is the tool's, not the call's, and each tool's `detail`
+  description names it. A tool that reads one document answers that document as is. A tool that
+  assembles reads — package contents and tree, the other repository walks, `SearchSource`,
+  `DescribeByList`, the include, structure and function group lists, `GetEnhancements`,
+  `GetWhereUsed`, `GetUnitTest`, `GetCdsUnitTest`, `GetUnitTestResult`, `GetCdsUnitTestResult`, the
+  unit-test runs, `RuntimeListFeeds`, `CreateTransport`, `CreateTransportTask`, `CreateTableType`,
+  `UpdateTableType`, `ActivateObjectLow` — always answers a JSON array of every response the call got, in read order, each as
+  `{ "status", "body" }` as ADT sent it, an array even when the call read one: no parse, no
+  projection, nothing of ours mixed in. A body the connection hands over as an object is its JSON
+  text, bytes their UTF-8 text. When `full` is an error, or reports a read that failed or could not
+  be read — an `error` member, a non-empty `failures`, `unreadable`, `append_candidates_unread` or
+  `includes_unread`, or `appends_unavailable: true` — `raw` answers `full`'s answer as an error. A
+  parse failure is the one exception: `full` an error while every exchange was answered `2xx` (every
+  part of a batch envelope included) and our reading refused what came — then `raw` still gives the
+  documents. `CreateTransport` answers a read-back that failed — with SAP's response or with none —
+  as `{ "responses", "read_back" }`, the responses beside the same note `full` gives. Otherwise `raw`
+  is the documents, and a failed exchange `full` neither refuses nor reports (the probe of a batch
+  endpoint a destination does not serve) is there as its failed response, never as a gap.
+
+An answer is the complete result or an error, never a partial one. A terse or medium list is
+written from the reading's own lists, by construction: each tool states a column schema for every
+list its reading holds — a list without one does not compile — and the writer takes the lists from
+the reading itself and writes one row (or line, or entry) per item, every cell from that item, so no
+formatter chooses its items. A kind of item the approved answer leaves out by definition (the
+package and container nodes of a where-used tree, a separator line of an action log, a branch
+repeating a transport request already listed, a component's links in an outline) is named with its
+reason in the tool's schemas, every item still visited. What a reading cannot show — a node SAP
+could not load, an include or a probe SAP refused, a read that failed — is a typed list of the
+reading and is written like any other. Every value is escaped: a tab or any line terminator in SAP's
+text adds no column and no line. Terse
+lists what SAP returned: no row says that something asked for is absent — a consumer reads that with
+its own call, or asks `medium` or `full` where a tool states it — while what SAP itself returned stays,
+incomplete objects and nodes SAP could not load included (a node SAP could not load is its
+`not loaded by SAP` row at terse, medium and full; at raw, SAP's XML carries it).
+
+JSON answers are minified. A compact tool answers as the full tool it reads through, at every
+level.
+
+**Migration (24.2.0):** a caller that parsed a tool's default JSON asks for `detail: 'full'`,
+which gives the former shape where the tool had no `detail` before; where it had one, the former
+terse JSON is `detail: 'medium'`. See the [CHANGELOG](CHANGELOG.md).
+
 ### Batch mode
 
 Calls none of whose requests depends on another's answer can be recorded and sent together, in
@@ -256,7 +309,7 @@ create or update, a fallback after a `404`, a poll. Run such work as phases, eac
 with the single-step tools: create (compact `HandlerCreate`, one request), lock (`HandlerLock`;
 the handles read with `HandlerBatch` `action: 'answers'`), write (`HandlerUpdate` with `lock_handle`, one request;
 the whole metadata document in `source_code` for PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, and for INCLUDE with `part: 'metadata'`), unlock
-(`HandlerUnlock`), read back (`HandlerGet`, one request per part: `source` or `metadata`), activate (`HandlerActivate`, one request; a list, an `object_adt_type` and the types the per-object activation leaves to a run answer `{ run_id }`), and the run's state (`HandlerGet` `part: activation_status`, then `activation_results`, by `run_id`; with `with_long_polling: true` the status read is one request SAP holds until the run ends, without it a read answered at once, as often as you choose); a unit-test run is one request with the synchronous runner (`HandlerUnitTestRun` with `runner: 'sync'`, answering the finished result) or, with the asynchronous runner (`runner: 'async'`, the default), its start (`HandlerUnitTestRun`, answering `run_id`; by `tests`, or by a run `target` — an object of any run type or a package — which takes this runner), its status (`HandlerUnitTestStatus`, as often as you choose, until `FINISHED`) and its result (`HandlerUnitTestResult`, one request); a profiled run is its schedule (`HandlerProfileSchedule`, answering `profiler_id`), the run under it (`HandlerProfileRun` with that `profiler_id`) and its trace (`HandlerProfileList`, as often as you choose, then `HandlerProfileView`); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
+(`HandlerLock` `action: unlock`), read back (`HandlerGet`, one request per part: `source` or `metadata`), activate (`HandlerActivate`, one request; a list, an `object_adt_type` and the types the per-object activation leaves to a run answer `{ run_id }`), and the run's state (`HandlerGet` `part: activation_status`, then `activation_results`, by `run_id`; with `with_long_polling: true` the status read is one request SAP holds until the run ends, without it a read answered at once, as often as you choose); a unit-test run is one request with the synchronous runner (`HandlerUnitTestRun` with `runner: 'sync'`, answering the finished result) or, with the asynchronous runner (`runner: 'async'`, the default), its start (`HandlerUnitTestRun`, answering `run_id`; by `tests`, or by a run `target` — an object of any run type or a package — which takes this runner), its status (`HandlerUnitTestStatus`, as often as you choose, until `FINISHED`) and its result (`HandlerUnitTestResult`, one request); a profiled run is its schedule (`HandlerProfileSchedule`, answering `profiler_id`), the run under it (`HandlerProfileRun` with that `profiler_id`) and its trace (`HandlerProfileList`, as often as you choose, then `HandlerProfileView`); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
 the delete (`HandlerDelete`, the deletion request alone). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
 recorded call decides — so each batch end sends one envelope; a call of another kind is refused
 `batch_other_kind`: record it in the next batch. A transport create (`HandlerTransportCreate`,
@@ -329,7 +382,7 @@ whitespace; a client that asks for the arguments in a form, or a `prompts/get`, 
 ```
 
 answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`, write with
-`HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerUnlock`. A value the user did
+`HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerLock` `action: unlock`. A value the user did
 not give is listed in the instruction as still to fill.
 
 A `prompts/get` with an `object_type` the binary does not serve is refused with the protocol's

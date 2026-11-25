@@ -26,27 +26,32 @@ import {
 import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
+  longRunning,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
+import {
   onEveryVariant,
   type RuleVariant,
   stated,
   withInCallSchema,
 } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
   type MetadataTarget,
   metadataKeyOf,
 } from '../../../lib/strategies/metadataReads';
 import {
   batchReader,
+  childNodesOf,
   endsTheCall,
   kindOf,
   metadataDescriptions,
+  type NodeItem,
   type NodeLevel,
   type NodeRequest,
+  nodeItemsOf,
   nodeStructureOn,
   readNode,
 } from '../../../lib/strategies/packageWalk';
@@ -163,9 +168,13 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectInfo',
   available_in: ['onprem', 'cloud'] as const,
   ...onEveryVariant(
-    withLongToolAdvice(
-      '[read-only] Returns the object tree of the package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other object named by parent_type and parent_name. Shows root, group nodes, and terminal leaves up to maxDepth. With enrich=true each node also carries its description and package, from a repository search. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last.',
-    ),
+    toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads the repository browser of a package, class, program, function group or other repository object, with descriptions and packages when asked.',
+      ),
+      notes: [longRunning],
+    }),
     schemaOn,
   ),
 } as const;
@@ -354,12 +363,12 @@ type NodeSource = UtilsApi<typeof ourUtils, AdtModernVariant>;
  * fixtures under `tests/fixtures/adt/` — BDEF, FUGR, service definition,
  * structure, table, across every depth captured — no entry ever carries a
  * `NODE_ID`: real content lives in `DATA.OBJECT_TYPES.SEU_ADT_OBJECT_TYPE_INFO`
- * (the type folders `nodeLevel`'s `childNodes` reads), which the pre-migration
+ * (the type folders the node reading's `childNodes` lists), which the pre-migration
  * handler never read at all. For a package root, `TREE_CONTENT` is empty in
  * fixture 01 — so at the tool's own default `maxDepth` of 1, the pre-migration
  * handler answered an empty `CHILDREN` for the single most common call
  * (`parent_type: 'DEVC/K'`). This version reads both halves of the one
- * document `ourUtils.node` (`nodeLevel`) already parses: direct objects at
+ * document `ourUtils.node` (`utilNodeContents`) already reads: direct objects at
  * this level, plus one fetch per type folder for the objects inside it —
  * matching `walkPackage`'s own two-tier walk in `packageWalk.ts`, which is
  * exercised by `handleGetPackageContents`/`handleGetPackageTree` today. Also
@@ -427,7 +436,7 @@ async function buildTree(
     }
     const root = rootResponse.getResult().value;
 
-    for (const o of root.objects) {
+    for (const o of nodeItemsOf(root)) {
       children.push({
         OBJECT_TYPE: o.type,
         OBJECT_NAME: o.name,
@@ -438,7 +447,7 @@ async function buildTree(
       });
     }
 
-    for (const child of root.childNodes) {
+    for (const child of childNodesOf(root)) {
       const childResponse = await withAdtHeaders(
         context,
         'utils.fetchNodeStructure',
@@ -454,7 +463,7 @@ async function buildTree(
         return childResponse;
       }
       const childLevel = childResponse.getResult().value;
-      for (const o of childLevel.objects) {
+      for (const o of nodeItemsOf(childLevel)) {
         // A subpackage is walked further by its code; a type ADT sent that
         // is no code of the tables stays a leaf.
         const subType = tableCodeOf(o.type);
@@ -556,7 +565,7 @@ async function buildTrees(
    * after the first of an envelope can carry another part's `DESCRIPTION`
    * (measured, 2026-10-18); the leaf's description is its metadata's.
    */
-  const bareLeaf = (node: InfoNode, o: NodeLevel['objects'][number]) => {
+  const bareLeaf = (node: InfoNode, o: NodeItem) => {
     const leaf: TreeNode = { OBJECT_TYPE: o.type, OBJECT_NAME: o.name };
     // A function module or include is read at its group: the node it was
     // found under.
@@ -616,8 +625,8 @@ async function buildTrees(
     tier.forEach((node, i) => {
       const level = settle(node, rootAnswers[i]);
       if (level === undefined) return;
-      node.children.push(...level.objects.map((o) => bareLeaf(node, o)));
-      for (const child of level.childNodes) {
+      node.children.push(...nodeItemsOf(level).map((o) => bareLeaf(node, o)));
+      for (const child of childNodesOf(level)) {
         typeNodes.push({ node, nodeId: child.nodeId });
       }
     });
@@ -639,7 +648,7 @@ async function buildTrees(
     typeNodes.forEach(({ node }, i) => {
       const level = settle(node, typeAnswers[i]);
       if (level === undefined) return;
-      for (const o of level.objects) {
+      for (const o of nodeItemsOf(level)) {
         const code = tableCodeOf(o.type);
         if (
           code !== undefined &&
@@ -803,11 +812,9 @@ export async function handleGetObjectInfo(
   const asked = objects.map((o) => ({ ...o, maxDepth: depthOf(o.type) }));
 
   // Task 28: why this tool carries no `detail`. The node-level family's
-  // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
-  // `nodeLevel` parses `answer.data` and returns only the reduced
-  // `NodeLevel` it builds, never keeping the wire text beside it — there is
-  // no `.raw` for `detail: 'raw'` to answer without changing that shared
-  // strategy. This tool's own answer besides is a composite tree assembled
+  // shape (`ourUtils.node`, adt-strategies' `utilNodeContents`): the
+  // reading keeps no wire text beside the level — there is no `.raw` for
+  // `detail: 'raw'` to answer. This tool's own answer besides is a composite tree assembled
   // from several such calls (`buildTrees`), not one reading.
   let ended: Ended = {};
   const entryOf = (

@@ -170,7 +170,10 @@ export function firstAttributeOn(
   return undefined;
 }
 
-/** `answer.data` as text, without pretending an object was ever a string. */
+/**
+ * `answer.data` as text, without pretending an object was ever a string:
+ * bytes (a `Buffer`) as the UTF-8 text they hold, never their numbers.
+ */
 export function rawOf(answer: IAdtWireResponse): string {
   const body = wireValueOf(answer.data);
   switch (body.kind) {
@@ -180,6 +183,7 @@ export function rawOf(answer: IAdtWireResponse): string {
     case 'null':
       return '';
     case 'bytes':
+      return new TextDecoder().decode(body.bytes);
     case 'list':
     case 'object':
       try {

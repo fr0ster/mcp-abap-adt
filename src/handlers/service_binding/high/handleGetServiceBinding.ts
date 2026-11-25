@@ -3,6 +3,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { readerParts, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -21,8 +22,14 @@ import {
 export const TOOL_DEFINITION = {
   name: 'GetServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the OData service binding named by service_binding_name in one request, at its active version: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.',
+  description: toolDescription(
+    readerParts({
+      object: 'an OData service binding',
+      at: 'at its active version',
+      holding:
+        'its binding definition, or its package, person responsible and description, in the format asked',
+    }),
+  ),
   inputSchema: z.object({
     service_binding_name: requiredText(
       'service_binding_name is required',

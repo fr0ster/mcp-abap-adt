@@ -89,6 +89,6 @@ export function projectSync(detail: 'terse' | 'full' | 'raw') {
     success: true,
     runner: 'sync',
     finished: true,
-    run_result: detail === 'raw' ? result.raw : result.value,
+    run_result: result.value,
   });
 }

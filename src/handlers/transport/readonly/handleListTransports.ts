@@ -4,20 +4,45 @@
  * `requestType`).
  */
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type ITransportTree,
+  transportTree,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+  longRunning,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
+  answered,
+  entries,
+  fullLevel,
+  headShape,
+  type ListDetailTable,
+  omitting,
+  type RowSchemas,
+  rawLevel,
+  readingAt,
+  rows,
+  writeJson,
+  writeListing,
+  written,
+} from '../../../lib/detail';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { getRequestContext } from '../../../lib/requestContext';
 import { statedUserOf } from '../../../lib/requestSystemResolution';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
-import { parseStructure } from '../../../lib/strategies/reading';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { succeeded } from '../../../lib/strategies/stepResponse';
@@ -25,22 +50,178 @@ import {
   isSystemInformationUnavailable,
   readSystemInformation,
 } from '../../../lib/systemInformation';
-import {
-  attr,
-  child,
-  type Element,
-  elements,
-  entries,
-  isList,
-  type XmlRead,
-} from '../../../lib/xml/tree';
+import type { XmlNode } from '../../../lib/xml/node';
+
+type ListTransportsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+interface TransportEntry {
+  number: string;
+  description?: string;
+  type?: string;
+  status?: string;
+  owner?: string;
+  target?: string;
+}
+
+/**
+ * Status implied by the container a request sits in (`tm:modifiable`,
+ * `tm:released`), used only when the request itself carries no `tm:status`;
+ * the innermost such container decides.
+ */
+const STATUS_BY_CONTAINER: Readonly<Record<string, string>> = {
+  modifiable: 'D',
+  released: 'R',
+};
+
+/** No listing: what a document with no `tm:root` reads as. */
+const NO_LISTING: ITransportTree = { attributes: {}, requests: [] };
+
+/**
+ * The listing as adt-strategies reads it (`transportTree`): every
+ * `tm:request` wherever it sits in the tree — the endpoint negotiates
+ * `application/vnd.sap.adt.transportorganizertree.v1+xml`, requests under
+ * status containers one level below the category
+ * (`tm:root > tm:workbench > tm:modifiable > tm:request`), `tm:workbench`
+ * repeated once per transport target and `tm:target` inserted with
+ * `?targets=true`. A document with no `tm:root` lists nothing, as the walk
+ * this replaced answered it.
+ */
+function listingOf(answer: IAdtWireResponse): ITransportTree {
+  try {
+    return transportTree(answer);
+  } catch {
+    return NO_LISTING;
+  }
+}
+
+/** A request as a row reads it. */
+function entryOf(request: ITransportTree['requests'][number]): TransportEntry {
+  const attributes = request.attributes;
+  const containerStatus = request.containers.reduce(
+    (status, container) => STATUS_BY_CONTAINER[container.element] ?? status,
+    '',
+  );
+  return {
+    number: attributes['tm:number'] || attributes['adtcore:name'] || '',
+    description: attributes['tm:desc'] || attributes['tm:description'] || '',
+    type: attributes['tm:type'] ?? '',
+    status: attributes['tm:status'] || containerStatus || '',
+    owner: attributes['tm:owner'] ?? '',
+    target: attributes['tm:target'] ?? '',
+  };
+}
+
+/** A request listed, and whether it repeats one listed before it. */
+interface ListedRequest {
+  readonly entry: TransportEntry;
+  /** The same request again through another branch: the same number, the same content and tasks. */
+  readonly repeat: boolean;
+}
+
+/**
+ * Every request of a listing, in order, each with its row's fields. A
+ * request SAP lists through several branches is a repeat only when it is
+ * the same request again — its number, every attribute, link and task
+ * alike;
+ * the same number with other content is written again. A request without
+ * a number is a request all the same: its row has an empty number.
+ */
+export function listedRequests(tree: ITransportTree): ListedRequest[] {
+  const seen = new Set<string>();
+  return tree.requests.map((request) => {
+    const entry = entryOf(request);
+    // The whole request as the reading holds it — every attribute, link,
+    // long description and task — and its row (the status a branch gives
+    // it). Only the branch itself, its containers, may differ in a repeat.
+    const content = JSON.stringify([
+      entry,
+      request.attributes,
+      request.links,
+      request.longDesc ?? null,
+      request.tasks,
+    ]);
+    const repeat = entry.number !== '' && seen.has(content);
+    seen.add(content);
+    return { entry, repeat };
+  });
+}
+
+/** Every request a listing holds, a repeat once (`listedRequests`). */
+export function listedTransports(tree: ITransportTree): TransportEntry[] {
+  return listedRequests(tree).flatMap(({ entry, repeat }) =>
+    repeat ? [] : [entry],
+  );
+}
+
+/** A repeat of a request listed before: the kind the answer's shape leaves out. */
+const REPEATS = omitting(
+  (listed: ListedRequest) => (listed.repeat ? 'repeat' : 'request'),
+  { repeat: 'a branch repeating a request already listed' },
+);
+
+/** The lists the transport listing writes: what its description states. */
+export const TRANSPORTS_LISTS: RowSchemas<{ requests: ListedRequest[] }> = {
+  requests: about(
+    'for each transport',
+    rows('requests', {
+      columns: [
+        {
+          name: 'number',
+          means: 'its number',
+          cell: (l: ListedRequest) => l.entry.number,
+        },
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (l: ListedRequest) => l.entry.type ?? '',
+        },
+        {
+          name: 'status',
+          means: 'its status',
+          cell: (l: ListedRequest) => l.entry.status ?? '',
+        },
+        {
+          name: 'owner',
+          means: 'its owner',
+          cell: (l: ListedRequest) => l.entry.owner ?? '',
+        },
+        {
+          name: 'target',
+          means: 'its target system',
+          cell: (l: ListedRequest) => l.entry.target ?? '',
+        },
+        {
+          name: 'description',
+          means: 'its description',
+          cell: (l: ListedRequest) => l.entry.description ?? '',
+        },
+      ],
+      header: 'always',
+      omit: REPEATS,
+    }),
+  ),
+};
+
+/** The head the transport listing opens with. */
+export const TRANSPORTS_HEADS = [headShape('count', 'how many there are')];
+
+/** A listing document's requests — for the #168 regression guard, which asserts against raw XML. */
+export function parseTransportListXml(xmlData: string): TransportEntry[] {
+  return listedTransports(
+    listingOf({ status: 200, statusText: 'OK', headers: {}, data: xmlData }),
+  );
+}
 
 export const TOOL_DEFINITION = {
   name: 'ListTransports',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    "[read-only] List the transport requests of a user: the workbench, customizing and transport-of-copies requests the user owns or holds a task in, as SAP selects them. Returns each request's number, description, type, status, owner and target. Modifiable requests by default; with modifiable_only false, released requests too, from SAP's default window of the last 14 days.",
-  ),
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      "Lists a user's transports, workbench, customizing and transport-of-copies alike, that the user owns or holds a task in.",
+    ),
+    notes: [longRunning],
+  }),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
     user: z
@@ -59,111 +240,46 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-type ListTransportsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
-
-interface TransportEntry {
-  number: string;
-  description?: string;
-  type?: string;
-  status?: string;
-  owner?: string;
-  target?: string;
-}
+/** What `ListTransports` answers: the terse rows, the medium listing, the parse, or the document. */
+type ListAnswer = object | XmlNode | string;
 
 /**
- * Status implied by the container a request sits in, used only when the request
- * node itself carries no `tm:status` attribute.
+ * What `ListTransports` answers at each `detail`: the reading the listing is
+ * read with, selected before the call (`src/lib/detail`): terse a TSV row per
+ * request (number, type, status, owner, target, description); medium the
+ * requests as JSON; full the parse; raw the document. Each is pure: it
+ * reads the answer and nothing else, the logger included.
  */
-const STATUS_BY_CONTAINER: Record<string, string> = {
-  'tm:modifiable': 'D',
-  'tm:released': 'R',
-};
-
-/** The attribute `name` of `node` (the reading groups them under `@`), `''` when absent. */
-function attrOf(node: XmlRead, name: string): string {
-  return attr(child(node, '@'), name) ?? '';
-}
-
-function collectRequestNodes(
-  node: XmlRead,
-  containerStatus: string,
-  found: { req: Element; containerStatus: string }[],
-): void {
-  if (isList(node)) {
-    for (const item of node) {
-      collectRequestNodes(item, containerStatus, found);
-    }
-    return;
-  }
-  for (const [key, value] of entries(node)) {
-    if (key === '@') continue; // attributes of THIS node, not a child to descend into
-    if (key === 'tm:request') {
-      for (const req of elements(value)) {
-        found.push({ req, containerStatus });
-      }
-      // Do not descend into a request: its children are tasks, not requests.
-      continue;
-    }
-    collectRequestNodes(
-      value,
-      STATUS_BY_CONTAINER[key] ?? containerStatus,
-      found,
-    );
-  }
-}
-
-/**
- * Parse the CTS transport list payload — same tree walk as before the
- * migration, adapted to the `structured` reading's `attributesGroupName: '@'`
- * (`resultSets.ts`'s `READING_BY_SLOT`; `list`'s slot name is `list`, mapped
- * to `structured` there), where the pre-migration parser had attributes
- * merged straight onto each node. `request` and `task` are both in
- * `structured`'s forced-array `REPEATABLE` set (added for this document — see
- * `reading.ts`), so a tree with exactly one request still parses as one.
- *
- * The endpoint negotiates `application/vnd.sap.adt.transportorganizertree.v1+xml`,
- * a *tree*: requests sit under status containers, one level below the category —
- * `tm:root > tm:workbench > tm:modifiable > tm:request` — and `tm:workbench` may
- * repeat, once per transport target. Requests are collected from anywhere in
- * the tree, and duplicates (same request number reached through more than one
- * branch) are collapsed, first occurrence winning.
- */
-export function parseTransportListValue(value: XmlRead): TransportEntry[] {
-  const found: { req: Element; containerStatus: string }[] = [];
-  collectRequestNodes(value, '', found);
-
-  const seen = new Set<string>();
-  const listed: TransportEntry[] = [];
-
-  for (const { req, containerStatus } of found) {
-    const number = attrOf(req, 'tm:number') || attrOf(req, 'adtcore:name');
-    if (!number || seen.has(number)) {
-      continue;
-    }
-    seen.add(number);
-    listed.push({
-      number,
-      description: attrOf(req, 'tm:desc') || attrOf(req, 'tm:description'),
-      type: attrOf(req, 'tm:type'),
-      status: attrOf(req, 'tm:status') || containerStatus || '',
-      owner: attrOf(req, 'tm:owner'),
-      target: attrOf(req, 'tm:target'),
-    });
-  }
-
-  return listed;
-}
-
-/**
- * `parseTransportListValue`, fed a raw XML string instead of an already-parsed
- * value — kept for `parseTransportListXml.test.ts` (the #168 regression
- * guard), which predates this migration and asserts against raw fixture XML.
- * Parses with the same `structured` reading's parser (`reading.ts`), so a
- * caller of either function sees identical results for identical documents.
- */
-export function parseTransportListXml(xmlData: string): TransportEntry[] {
-  return parseTransportListValue(parseStructure(xmlData));
-}
+const LIST_READINGS: ListDetailTable<ListAnswer> = (() => {
+  /** The requests a listing writes, a repeat counted once. */
+  const counted = (requests: readonly ListedRequest[]) =>
+    requests.filter((listed) => !REPEATS.omits(listed)).length;
+  return {
+    terse: written(listingOf, (tree) => {
+      const requests = listedRequests(tree);
+      return writeListing({
+        heads: [{ head: 'count', value: String(counted(requests)) }],
+        reading: { requests },
+        lists: TRANSPORTS_LISTS,
+      });
+    }),
+    medium: written(listingOf, (tree) => {
+      const requests = listedRequests(tree);
+      return writeJson(
+        { success: true, count: counted(requests) },
+        { requests },
+        {
+          requests: entries('requests', (l: ListedRequest) => l.entry, {
+            as: 'transports',
+            omit: REPEATS,
+          }),
+        },
+      );
+    }),
+    full: fullLevel,
+    raw: rawLevel,
+  };
+})();
 
 /** `D` modifiable, and `R` released beside it when asked for. */
 type RequestStatuses = readonly ['D'] | readonly ['D', 'R'];
@@ -230,7 +346,10 @@ export async function handleListTransports(
       );
       const listed = await atStep('list', () =>
         createAdtClient(connection, logger)
-          .getRequest(resultsFor(transportDocuments))
+          .getRequest({
+            ...resultsFor(transportDocuments),
+            list: readingAt(LIST_READINGS, levelOf(args)),
+          })
           .list({
             analyse: analyseException,
             user,
@@ -242,10 +361,6 @@ export async function handleListTransports(
       if (!listed.ok) return listed;
       return succeeded(listed.getResult().value, 'ListTransports');
     },
-    project(detail, (value) => {
-      const transports = parseTransportListValue(value);
-      logger?.info(`ListTransports: found ${transports.length} transport(s)`);
-      return { success: true, count: transports.length, transports };
-    }),
+    answered,
   );
 }

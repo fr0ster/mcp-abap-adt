@@ -362,7 +362,8 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       lock_handle: handle,
       transport_request: request(),
     });
-    const unlocked = await liveCall('HandlerUnlock', {
+    const unlocked = await liveCall('HandlerLock', {
+      action: 'unlock',
       object_type: 'PROGRAM_TEXT_ELEMENTS',
       object_name: N.program,
       lock_handle: handle,
@@ -415,7 +416,8 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       lock_handle: handle,
       transport_request: request(),
     });
-    const unlocked = await liveCall('HandlerUnlock', {
+    const unlocked = await liveCall('HandlerLock', {
+      action: 'unlock',
       object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
       object_name: N.group,
       lock_handle: handle,
@@ -468,7 +470,8 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       lock_handle: handle,
       transport_request: request(),
     });
-    const unlocked = await liveCall('HandlerUnlock', {
+    const unlocked = await liveCall('HandlerLock', {
+      action: 'unlock',
       object_type: 'CLASS_TEXT_ELEMENTS',
       object_name: N.class,
       lock_handle: handle,

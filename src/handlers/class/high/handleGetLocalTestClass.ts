@@ -2,18 +2,18 @@ import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  purpose,
+  sourceReader,
+  toolDescription,
+} from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  READ_VERSION_FIELD,
-  type ReadVersion,
-} from '../../../lib/handlers/readVersion';
+import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
 import {
   answerSourceRead,
   rangeFields,
   SOURCE_RANGE_SHAPE,
-  SOURCE_RANGE_WORDS,
-  type SourceRangeArgs,
   sourceRangeOf,
 } from '../../../lib/handlers/sourceRange';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -22,7 +22,12 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetLocalTestClass',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[read-only] Reads the local test classes include of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }. ${SOURCE_RANGE_WORDS}`,
+  description: toolDescription(
+    sourceReader({
+      object: 'the local test classes include of an ABAP class',
+      purpose: purpose('Reads the local test classes of an ABAP class.'),
+    }),
+  ),
   inputSchema: z.object({
     class_name: requiredText('class_name is required').describe(
       'Parent class name.',

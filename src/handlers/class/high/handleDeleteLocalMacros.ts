@@ -21,6 +21,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { deleteTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -35,8 +36,11 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'DeleteLocalMacros',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros belong to older ABAP versions.',
+  description: deleteTool({
+    purpose: purpose(
+      'Deletes the local macros of an ABAP class, activating the class when asked.',
+    ),
+  }),
   inputSchema: z.object({
     class_name: z.string().describe('Parent class name.'),
     transport_request: z

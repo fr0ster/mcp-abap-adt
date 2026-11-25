@@ -26,6 +26,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -41,8 +42,11 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateDdl',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Updates the DDL source code of the existing CDS view or classic DDL view named by ddl_name to ddl_source. Locks, updates, unlocks, and optionally activates.',
+  description: updateTool({
+    object: 'the DDL source of an existing CDS view or classic DDL view',
+    how: ', activating it when asked',
+    transported: true,
+  }),
   inputSchema: z.object({
     ddl_name: z.string().describe('DDL source name.'),
     ddl_source: z.string().describe('Complete DDL source code.'),

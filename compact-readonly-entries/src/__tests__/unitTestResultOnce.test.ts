@@ -12,7 +12,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, mock } from 'node:test';
+import { describe, it } from 'node:test';
 import { format } from 'node:util';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
@@ -26,10 +26,7 @@ import {
   TOOL_DEFINITION as CDS_RESULT_TOOL,
   handleHandlerCdsUnitTestResult,
 } from '../handlers/handleHandlerCdsUnitTestResult';
-import {
-  TOOL_DEFINITION as GET_TOOL,
-  handleHandlerGet,
-} from '../handlers/handleHandlerGet';
+import { handleHandlerGet } from '../handlers/handleHandlerGet';
 import {
   handleHandlerUnitTestResult,
   TOOL_DEFINITION as RESULT_TOOL,
@@ -130,9 +127,6 @@ const RESULT_CALLS: Array<
   ],
 ];
 
-const FINISHED_SENTENCE =
-  "Valid once the status is FINISHED; a finished run's result carries executionTime.";
-
 describe('compact unit-test results are read once', () => {
   for (const [_label, handler, args, step] of RESULT_CALLS) {
     describe(format('%s', _label), () => {
@@ -194,7 +188,8 @@ describe('compact unit-test results are read once', () => {
           UNFINISHED_RESULT,
         );
         assert.deepStrictEqual(raw.sent, [RESULT_GET]);
-        assert.equal(jsonOf(raw.answer).run_result, UNFINISHED_RESULT);
+        // raw is what ADT sent: the one result document, nothing around it.
+        assert.equal(raw.answer?.content?.[0]?.text, UNFINISHED_RESULT);
       });
     });
   }
@@ -208,9 +203,10 @@ describe('compact unit-test results are read once', () => {
     }
   });
 
-  it('the description carries the FINISHED sentence', () => {
-    for (const tool of [RESULT_TOOL, CDS_RESULT_TOOL, GET_TOOL]) {
-      assert.ok(tool.description.includes(FINISHED_SENTENCE));
+  it('the description states the read of the result by its id', () => {
+    for (const tool of [RESULT_TOOL, CDS_RESULT_TOOL]) {
+      assert.ok(tool.description.includes('Reads the result of'));
+      assert.ok(tool.description.includes('by its id'));
     }
   });
 });

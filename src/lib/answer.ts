@@ -26,6 +26,7 @@ import {
   type AnswerObject,
   type AnswerValue,
   type JsonValue,
+  jsonOrText,
   parseJson,
 } from './json';
 import type { SourcePosition } from './sourceHref';
@@ -42,7 +43,7 @@ import {
   isSystemContextRefusal,
   SystemContextMissingError,
 } from './systemContextGuard';
-import { child, isElement, isList } from './thrownValue';
+import { child, isElement } from './thrownValue';
 import { wireResponseOf } from './wireResponse';
 import { wireValueOf } from './wireValue';
 
@@ -84,6 +85,27 @@ export type JsonAnswer = {
   content: Array<{ type: 'json'; json: JsonValue }>;
 };
 
+/**
+ * An answer's payload, every content part of it: one part its JSON, else
+ * its text; several parts, each so, in order — no part left out.
+ */
+export function answerPayload(result: McpResult): JsonValue {
+  const parts = result.content.map((part) => jsonOrText(part.text));
+  return parts.length === 1 ? (parts[0] ?? null) : parts;
+}
+
+/** One answer of a list call, as its JSON entry is written: its payload whole. */
+export interface ListedAnswer {
+  readonly isError: boolean;
+  readonly answer: JsonValue;
+  readonly i: number;
+}
+
+/** A list call's answer as its JSON entry reads it. */
+export function listedAnswer(result: McpResult, i: number): ListedAnswer {
+  return { isError: result.isError, answer: answerPayload(result), i };
+}
+
 function text(value: string, isError = false): McpResult {
   return { isError, content: [{ type: 'text', text: value }] };
 }
@@ -91,7 +113,7 @@ function text(value: string, isError = false): McpResult {
 /** A value as an answer's JSON text. */
 const answers: IAnswerSerializer<McpResult> = {
   json<P>(payload: P, isError = false): McpResult {
-    return text(JSON.stringify(payload, null, 2), isError);
+    return text(JSON.stringify(payload), isError);
   },
 };
 
@@ -100,7 +122,7 @@ const failures: IAnswerSerializer<FailureAnswer> = {
   json<P>(payload: P): FailureAnswer {
     return {
       isError: true,
-      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify(payload) }],
     };
   },
 };

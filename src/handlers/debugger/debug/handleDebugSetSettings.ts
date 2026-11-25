@@ -8,14 +8,22 @@ import {
   STATE_HANDLE_PROPERTY,
   settingsFromArgs,
 } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugSetSettings',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.',
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Sets the debugger settings of an ABAP debug session at its current stop, applied again after each later attach.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     ...SETTINGS_FIELDS,

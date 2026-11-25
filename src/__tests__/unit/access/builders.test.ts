@@ -122,6 +122,13 @@ const PROSE: ReadonlyArray<readonly [string, string]> = [
   ['answers', 'answers the number of recorded calls'],
   ['answers', 'answers that error'],
   ['answers', 'then answers it'],
+  // A full abapGit tool's words, which a compact action states.
+  ['checks', 'checks an external git repository'],
+  ['checks', 'checks a remote repository'],
+  ['file', 'each ignored file'],
+  ['file', 'each staged file'],
+  ['file', 'each changed file'],
+  ['file', 'its file name'],
 ];
 
 /** Whether `text` names `value` as a token of its own, prose left aside. */

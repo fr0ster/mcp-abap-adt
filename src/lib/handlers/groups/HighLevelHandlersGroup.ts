@@ -618,6 +618,7 @@ import {
   isMutatingToolName,
   withCriticalSection,
 } from '../../criticalSection.js';
+import { activateTool } from '../../description';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import { defineTool, type HandlerEntry } from '../interfaces.js';
 
@@ -640,8 +641,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateDomain_Tool,
           name: 'ActivateDomain',
-          description:
-            'Activates the ABAP domain named by domain_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an ABAP domain',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateDomain,
       ),
@@ -649,8 +652,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateTableType_Tool,
           name: 'ActivateTableType',
-          description:
-            'Activates the ABAP table type named by table_type_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an ABAP table type',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateTableType,
       ),
@@ -658,8 +663,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateDataElement_Tool,
           name: 'ActivateDataElement',
-          description:
-            'Activates the ABAP data element named by data_element_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an ABAP data element',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateDataElement,
       ),
@@ -667,8 +674,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateTable_Tool,
           name: 'ActivateTable',
-          description:
-            'Activates the ABAP database table named by table_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an ABAP database table',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateTable,
       ),
@@ -676,8 +685,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateStructure_Tool,
           name: 'ActivateStructure',
-          description:
-            'Activates the ABAP structure named by structure_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an ABAP structure',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateStructure,
       ),
@@ -685,8 +696,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateDdl_Tool,
           name: 'ActivateDdl',
-          description:
-            'Activates the CDS view (DDL source) named by ddl_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'a CDS view',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateDdl,
       ),
@@ -694,8 +707,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateClass_Tool,
           name: 'ActivateClass',
-          description:
-            'Activates the ABAP class named by class_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an ABAP class',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateClass,
       ),
@@ -703,8 +718,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateInterface_Tool,
           name: 'ActivateInterface',
-          description:
-            'Activates the ABAP interface named by interface_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an ABAP interface',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateInterface,
       ),
@@ -712,8 +729,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateProgram_Tool,
           name: 'ActivateProgram',
-          description:
-            'Activates the ABAP program (report) named by program_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an ABAP program (report)',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateProgram,
       ),
@@ -721,8 +740,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateInclude_Tool,
           name: 'ActivateInclude',
-          description:
-            'Activates the ABAP include named by include_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an ABAP include',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateInclude,
       ),
@@ -730,8 +751,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateFunctionModule_Tool,
           name: 'ActivateFunctionModule',
-          description:
-            'Activates the ABAP function module named by function_module_name in the function group named by function_group_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an ABAP function module of a function group',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateFunctionModule,
       ),
@@ -739,8 +762,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateFunctionGroup_Tool,
           name: 'ActivateFunctionGroup',
-          description:
-            'Activates the ABAP function group named by function_group_name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an ABAP function group',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateFunctionGroup,
       ),
@@ -748,8 +773,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateBehaviorDefinition_Tool,
           name: 'ActivateBehaviorDefinition',
-          description:
-            'Activates the RAP behavior definition named by name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'a RAP behavior definition',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateBehaviorDefinition,
       ),
@@ -757,8 +784,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateMetadataExtension_Tool,
           name: 'ActivateMetadataExtension',
-          description:
-            'Activates the CDS metadata extension named by name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'a CDS metadata extension',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateMetadataExtension,
       ),
@@ -766,8 +795,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateServiceDefinition_Tool,
           name: 'ActivateServiceDefinition',
-          description:
-            'Activates the service definition named by name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'a service definition',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateServiceDefinition,
       ),
@@ -775,8 +806,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         {
           ...ActivateServiceBinding_Tool,
           name: 'ActivateServiceBinding',
-          description:
-            'Activates the OData service binding named by name, so its inactive version is in force.',
+          description: activateTool({
+            object: 'an OData service binding',
+            how: ', so its inactive version is in force',
+          }),
         },
         handleActivateServiceBinding,
       ),

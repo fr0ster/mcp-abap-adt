@@ -62,6 +62,7 @@ describe('GetTransaction', () => {
   it('answers the object and its facets in document order', async () => {
     const result = await handleGetTransaction(ctx, {
       transaction_name: 'ZTX_A',
+      detail: 'medium',
     });
     assert.equal(result.isError, false);
     assert.deepStrictEqual(payload(result), {
@@ -99,6 +100,25 @@ describe('GetTransaction', () => {
     });
   });
 
+  it('terse, by default: the facets as TSV under the transaction', async () => {
+    const result = await handleGetTransaction(ctx, {
+      transaction_name: 'ZTX_A',
+    });
+    assert.equal(
+      (result.content[0] as { text: string }).text,
+      [
+        '# transaction ZTX_A',
+        '# text Transaction text',
+        '# package ZPKG_A',
+        'facet\tname\ttext',
+        'APPL\tBC\tBasis',
+        'APPL\tBC-DWB\tWorkbench',
+        'PACKAGE\tZPKG_A\tPackage text',
+        'TYPE\tTRAN/T\t',
+      ].join('\n'),
+    );
+  });
+
   it('answers one facet as a list too', async () => {
     const one = DOCUMENT.replace(
       /<opr:property facet="APPL"[^>]*\/>|<opr:property facet="PACKAGE"[^>]*\/>|<opr:property facet="TYPE"[^>]*\/>/g,
@@ -111,7 +131,10 @@ describe('GetTransaction', () => {
       okResponse(structured({ data: one, status: 200 } as any)),
     );
     const answered = payload(
-      await handleGetTransaction(ctx, { transaction_name: 'ZTX_A' }),
+      await handleGetTransaction(ctx, {
+        transaction_name: 'ZTX_A',
+        detail: 'medium',
+      }),
     );
     assert.deepStrictEqual(answered.properties, [
       { facet: 'TYPE', name: 'TRAN/T', displayName: 'Type' },
@@ -195,6 +218,7 @@ describe('GetTransaction', () => {
     );
     const result = await handleGetTransaction(ctx, {
       transaction_name: 'ZTX_A',
+      detail: 'medium',
     });
     assert.equal(result.isError, false);
     assert.equal(payload(result).object.name, 'ZTX_A');
@@ -233,7 +257,10 @@ describe('GetTransaction', () => {
         throughStrategy({ status: 200, data }),
       );
       const answered = payload(
-        await handleGetTransaction(ctx, { transaction_name: 'ZTX_A' }),
+        await handleGetTransaction(ctx, {
+          transaction_name: 'ZTX_A',
+          detail: 'medium',
+        }),
       );
       assert.deepStrictEqual(answered.object, {
         text: 'T',

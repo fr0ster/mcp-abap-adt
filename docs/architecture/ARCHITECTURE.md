@@ -363,7 +363,7 @@ destination — a replacement after a lost session, a new logon after a gone lef
 keeps its parameters (`destinationSystems`), known per credential object and target system. The tool wrapper applies them (`withKnownSystemContext`) and sends nothing; a host's
 injected connection has them made by its first call (`systemBeforeTool`), inside the main flow.
 
-- **Compact's `HandlerLock`** keeps the lock across calls until `HandlerUnlock` —
+- **Compact's `HandlerLock`** keeps the lock across calls until `HandlerLock` `action: unlock` —
   the consumer's choice — where the connection lives across calls (stdio, SSE): the
   lock's ABAP context stays in the session (its `sap-contextid` cookie is kept), the
   calls between run stateless and outside it, and the `UNLOCK` reaches it. At the

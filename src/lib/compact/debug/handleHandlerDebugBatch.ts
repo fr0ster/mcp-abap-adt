@@ -7,40 +7,40 @@ import * as z from 'zod';
  * another action, the call is refused before anything runs.
  */
 
-import { TOOL_DEFINITION as DebugBatchAnswers_Tool } from '../../../handlers/debugger/debug/handleDebugBatchAnswers';
-import { TOOL_DEFINITION as DebugBatchBegin_Tool } from '../../../handlers/debugger/debug/handleDebugBatchBegin';
-import { TOOL_DEFINITION as DebugBatchEnd_Tool } from '../../../handlers/debugger/debug/handleDebugBatchEnd';
 import { asksNumbers } from '../../batch/batchTools';
 import { answersOf, beginDebugBatch, endDebugBatch } from '../../batch/tools';
+import {
+  type DescriptionParts,
+  pairsPurpose,
+  stateHandleAnswered,
+  toolDescription,
+} from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
 import { NUMBER_WITHOUT_ANSWERS_WORDS } from '../batch/handleHandlerBatch';
 import { textsOf } from '../memberTexts';
 
-const READ_ONLY_TAG = '[read-only] ';
-const DEBUG_TAG = '[debug] ';
-
-/** `text` without its leading `tag`, when it starts with it. */
-const withoutTag = (text: string, tag: string): string =>
-  text.startsWith(tag) ? text.slice(tag.length) : text;
-
-/** The full set's sentence, its `[read-only]` and `[debug]` tags left out. */
-const untagged = (description: string): string =>
-  withoutTag(withoutTag(description, READ_ONLY_TAG), DEBUG_TAG);
-
 /** `HandlerDebugBatch`'s actions. */
 export const DEBUG_BATCH_ACTIONS = ['begin', 'end', 'answers'] as const;
 type DebugBatchAction = (typeof DEBUG_BATCH_ACTIONS)[number];
 
-/** Each action's sentence: the full set's, one per action. */
-const ACTION_SENTENCES: ReadonlyArray<readonly [DebugBatchAction, string]> = [
-  ['begin', `action 'begin': ${untagged(DebugBatchBegin_Tool.description)}`],
-  ['end', `action 'end': ${untagged(DebugBatchEnd_Tool.description)}`],
-  [
-    'answers',
-    `action 'answers' (with number or numbers): ${untagged(DebugBatchAnswers_Tool.description)}`,
-  ],
-];
+/** Each action as an action and object pair (owner). */
+const PAIRS: { readonly [K in DebugBatchAction]: string } = {
+  begin: 'begins recording the debugger calls at a stopped debuggee',
+  end: 'ends the recording and sends the recorded debugger calls together',
+  answers: "reads each recorded debugger call's outcome by its number",
+};
+
+/** `HandlerDebugBatch`'s parts with `actions`: each action by its function. */
+export function handlerDebugBatchParts(
+  actions: readonly DebugBatchAction[],
+): DescriptionParts {
+  return {
+    tag: 'debug',
+    purpose: pairsPurpose(actions.map((action) => PAIRS[action])),
+    ...(actions.includes('begin') ? { notes: [stateHandleAnswered] } : {}),
+  };
+}
 
 /** Each action's words in `action`'s description. */
 const ACTION_WORDS: ReadonlyArray<readonly [DebugBatchAction, string]> = [
@@ -84,7 +84,7 @@ export function handlerDebugBatchDefinition(
   actions: readonly DebugBatchAction[],
 ) {
   return {
-    description: textsOf(actions, ACTION_SENTENCES).join(' '),
+    description: toolDescription(handlerDebugBatchParts(actions)),
     inputSchema: z.object({
       action: listedValues(actions).describe(actionWords(actions)),
       ...(actions.includes('answers') ? NUMBER_PROPERTIES : {}),
@@ -92,14 +92,10 @@ export function handlerDebugBatchDefinition(
   };
 }
 
-/** `HandlerDebugBatch`'s description with every action. */
-export const HANDLER_DEBUG_BATCH_DESCRIPTION =
-  handlerDebugBatchDefinition(DEBUG_BATCH_ACTIONS).description;
-
 export const TOOL_DEFINITION = {
   name: 'HandlerDebugBatch',
   available_in: ['onprem', 'cloud'] as const,
-  description: HANDLER_DEBUG_BATCH_DESCRIPTION,
+  description: toolDescription(handlerDebugBatchParts(DEBUG_BATCH_ACTIONS)),
   inputSchema: z.object({
     action: listedValues(DEBUG_BATCH_ACTIONS).describe(
       actionWords(DEBUG_BATCH_ACTIONS),

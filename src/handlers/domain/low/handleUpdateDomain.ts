@@ -31,11 +31,13 @@ import * as z from 'zod';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
+  answer,
   answerFailure,
   answerThrown,
   messageCarriedBy,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type {
   HandlerContext,
   ToolArgValue,
@@ -52,6 +54,8 @@ import {
   domainChanges,
 } from '../../../lib/strategies/documentChanges';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
@@ -59,8 +63,12 @@ import { return_error, return_response } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateDomainLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Update properties of an existing ABAP domain. Requires lock handle from LockObject. - use UpdateDomain (high-level) for full workflow with lock/unlock/activate.',
+  description: updateTool({
+    tag: 'low-level',
+    object:
+      'the data type, length, decimals, conversion exit, value table and fixed values of an existing ABAP domain',
+    how: ', under a lock the caller holds',
+  }),
   inputSchema: z.object({
     domain_name: z.string().describe('Domain name. Domain must already exist.'),
     properties: z
@@ -161,7 +169,7 @@ export async function handleUpdateDomain(
           ),
         atStep('update metadata', (document) =>
           withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
-            client.getDomain(domainDocuments).updateMetadata(
+            client.getDomain(resultsFor(domainDocuments)).updateMetadata(
               {
                 domainName,
                 transportRequest,
@@ -189,17 +197,13 @@ export async function handleUpdateDomain(
 
       logger?.info(`✅ UpdateDomain completed: ${domainName}`);
 
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            domain_name: domainName,
-            message: `Domain ${domainName} updated successfully. Remember to unlock using UnlockObject.`,
-          },
-          null,
-          2,
-        ),
-      });
+      // A write with nothing to report answers as every other low update
+      // does: `terseWrite` over the write's reading (SAP's status).
+      return answer(
+        { tool: 'UpdateDomainLow', detail: 'terse' },
+        async () => written,
+        project('terse', terseWrite),
+      );
     } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is

@@ -153,8 +153,9 @@ liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
       'HandlerValidate.DOMAIN',
       'HandlerCheckRun.DOMAIN',
       'HandlerLock.INTERFACE',
+      // Both actions of HandlerLock: the lock and the unlock of INTERFACE
+      // (24.0.0: a HandlerUnlock.<TYPE> entry stops the start).
       'HandlerUpdate.INTERFACE',
-      'HandlerUnlock.INTERFACE',
     ),
     () => {
       it('each denied value refused at the parse', async () => {
@@ -189,7 +190,8 @@ liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
           source_code: 'x',
           lock_handle: 'NONE',
         });
-        await refusedAtParse('HandlerUnlock', {
+        await refusedAtParse('HandlerLock', {
+          action: 'unlock',
           object_type: 'INTERFACE',
           object_name: 'ZIF_MCP_SHARED',
           lock_handle: 'NONE',
@@ -243,7 +245,8 @@ liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
           } finally {
             succeeded(
               'HandlerUnlock CLASS',
-              await livePrepare('HandlerUnlock', {
+              await livePrepare('HandlerLock', {
+                action: 'unlock',
                 object_type: 'CLASS',
                 object_name: written,
                 lock_handle: handle,

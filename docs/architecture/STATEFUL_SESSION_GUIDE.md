@@ -46,14 +46,14 @@ reach into the connection's session.
   enforces it, so no call is sent inside another call's window. Every send on the
   instance's connection is in the order; a background run, a listed long read and the
   debugger tools that work on the debugger's own connections are outside it.
-- **Compact `HandlerLock` → `HandlerUpdate { lock_handle }` → `HandlerUnlock`**: on
+- **Compact `HandlerLock` → `HandlerUpdate { lock_handle }` → `HandlerLock` `action: unlock`**: on
   stdio and SSE, where the connection lives across calls, the lock stays in the
   session between the calls — the consumer's choice. Every call between them is
   stateless; the `UNLOCK` reaches the lock's context. At the latest the instance's
   logoff ends it (a logoff releases the session's locks). Over Streamable HTTP every
   request is an MCP session of its own, so the `state_handle` carries the chain:
   compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
-  `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it as
+  `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerLock` `action: unlock` under that lock send it as
   the `state_handle` argument (every tool of the Streamable HTTP binaries declares it; or in the
   `x-mcp-state-handle` header, which wins when both are sent)
   and reach the SAP session that holds the lock — without it they reach another instance and are

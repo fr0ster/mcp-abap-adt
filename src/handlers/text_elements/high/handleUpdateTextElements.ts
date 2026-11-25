@@ -54,6 +54,7 @@ import {
   createOnPremAdtClient,
   textElementsClientOf,
 } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -73,9 +74,6 @@ import {
   SELECTIONS,
   SYMBOLS,
 } from '../textElementsShared';
-
-const DESCRIPTION =
-  "Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers parts: each part SAP saved with SAP's answer, the list saved; when activated, whether SAP activated them, with its messages, beside the parts. A part SAP refuses ends the writes: the answer is SAP's failure, beside the parts saved before it (inactive).";
 
 /** The object kinds UpdateTextElements writes on `variant`. */
 function kindsOn(variant: ProjectionVariant) {
@@ -137,11 +135,18 @@ function updateSchema(variant: ProjectionVariant) {
     });
 }
 
+/** A part SAP saved, and the list saved for it. */
+type SavedPart = { part: string; saved: string };
+
 export const TOOL_DEFINITION = {
   name: 'UpdateTextElements',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: DESCRIPTION,
+    description: updateTool({
+      object:
+        'the text elements of an existing ABAP program, function group or class',
+      how: ', each part given replacing its stored one, activating the object when asked',
+    }),
     inputSchema: updateSchema(variant),
   })),
 } as const;
@@ -269,7 +274,6 @@ type PartsArgs = Pick<
 >;
 
 /** A part SAP saved: the part and SAP's answer to its PUT, which echoes the list saved. */
-type SavedPart = { part: string; saved: string };
 
 /**
  * One PUT per part given, in order, under `lockHandle`; the first refused

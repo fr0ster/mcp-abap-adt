@@ -76,12 +76,13 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
       },
     ];
     mockClassGetVersions.mock.mockImplementation(async () =>
-      okResponse(versions),
+      okResponse({ versions, document: '<feed/>' }),
     );
 
     const result = await handleGetObjectVersions(ctx, {
       object_type: 'class',
       object_name: 'zcl_my_class',
+      detail: 'full',
     });
 
     assert.equal(result.isError, false);
@@ -116,12 +117,13 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
       },
     ];
     mockClassGetVersions.mock.mockImplementation(async () =>
-      okResponse(versions),
+      okResponse({ versions, document: '<feed/>' }),
     );
 
     const result = await handleGetObjectVersions(ctx, {
       object_type: 'class',
       object_name: 'zcl_my_class',
+      detail: 'full',
     });
 
     assert.equal(result.isError, false);
@@ -130,12 +132,57 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
     assert.equal(v.transportDescription, 'My change');
   });
 
+  it('raw answers the version feed as ADT sent it', async () => {
+    mockClassGetVersions.mock.mockImplementation(async () =>
+      okResponse({ versions: [], document: '<atom:feed>RAW</atom:feed>' }),
+    );
+    const result = await handleGetObjectVersions(ctx, {
+      object_type: 'class',
+      object_name: 'ZCL_X',
+      detail: 'raw',
+    });
+    assert.equal(result.content[0]?.text, '<atom:feed>RAW</atom:feed>');
+  });
+
+  it('terse, by default: a TSV row per version, its content_uri the next read', async () => {
+    mockClassGetVersions.mock.mockImplementation(async () =>
+      okResponse({
+        document: '<feed/>',
+        versions: [
+          {
+            versionId: '00002',
+            author: 'DEV',
+            updatedAt: '2026-06-30T00:00:00Z',
+            title: 'Version List',
+            transportRequest: 'DS4K901917',
+            contentUri: '/sap/bc/adt/x;version=00002',
+          },
+        ],
+      }),
+    );
+    const result = await handleGetObjectVersions(ctx, {
+      object_type: 'class',
+      object_name: 'zcl_my_class',
+    });
+    assert.equal(
+      (result.content[0] as { text: string }).text,
+      [
+        '# object class ZCL_MY_CLASS',
+        'versionId\tauthor\tupdatedAt\ttransport\tcontent_uri',
+        '00002\tDEV\t2026-06-30T00:00:00Z\tDS4K901917\t/sap/bc/adt/x;version=00002',
+      ].join('\n'),
+    );
+  });
+
   it('dispatches a table to getTable().getVersions with tableName', async () => {
-    mockTableGetVersions.mock.mockImplementation(async () => okResponse([]));
+    mockTableGetVersions.mock.mockImplementation(async () =>
+      okResponse({ versions: [], document: '<feed/>' }),
+    );
 
     const result = await handleGetObjectVersions(ctx, {
       object_type: 'table',
       object_name: 'zmy_table',
+      detail: 'full',
     });
 
     assert.equal(result.isError, false);

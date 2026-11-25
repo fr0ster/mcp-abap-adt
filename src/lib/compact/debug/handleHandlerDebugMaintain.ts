@@ -9,6 +9,11 @@ import {
   terseMemorySizes,
   terseVariables,
 } from '../../debugger/index';
+import {
+  type DescriptionParts,
+  pairsPurpose,
+  toolDescription,
+} from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
 import { DETAIL_SHAPE } from '../../strategies/detail';
@@ -32,27 +37,26 @@ export const MAINTAIN_OPERATIONS = [
 ] as const;
 type MaintainOperation = (typeof MAINTAIN_OPERATIONS)[number];
 
-/** Each abap operation's clause of the description. */
-const ABAP_CLAUSES: ReadonlyArray<readonly [MaintainOperation, string]> = [
-  [
-    'getStack',
-    'getStack answers the frames, each with its program, include, line and ADT address, the stopped position on top',
-  ],
-  [
-    'getVariables',
-    'getVariables answers the variables in names (a path reads a component or a table row)',
-  ],
-  [
-    'getChildVariables',
-    'getChildVariables answers the members of the ids in parents, the scopes (@ROOT) when parents is omitted',
-  ],
-  ['getMemorySizes', 'getMemorySizes answers the memory sizes'],
-  ['createMemorySnapshot', 'createMemorySnapshot creates a memory snapshot'],
-  [
-    'setVariableValue',
-    'setVariableValue sets variable_name to value and answers the variable',
-  ],
-];
+/** Each operation as an action and object pair (owner). */
+const PAIRS: { readonly [K in MaintainOperation]: string } = {
+  getStack: "gets the debuggee's call stack",
+  getVariables: 'gets variables by name',
+  getChildVariables: "gets a variable's members",
+  getMemorySizes: "gets the debuggee's memory sizes",
+  createMemorySnapshot: 'creates a memory snapshot',
+  setVariableValue: "sets a variable's value",
+  getDataPreview: "gets an AMDP table variable's records",
+};
+
+/** `HandlerDebugMaintain`'s parts with `operations`: each by its function. */
+export function handlerDebugMaintainParts(
+  operations: readonly MaintainOperation[],
+): DescriptionParts {
+  return {
+    tag: 'debug',
+    purpose: pairsPurpose(operations.map((op) => PAIRS[op])),
+  };
+}
 
 /** Each operation's words in `operation`'s description. */
 const OPERATION_WORDS: ReadonlyArray<readonly [MaintainOperation, string]> = [
@@ -71,7 +75,6 @@ const OPERATION_WORDS: ReadonlyArray<readonly [MaintainOperation, string]> = [
 export function handlerDebugMaintainDefinition(
   operations: readonly MaintainOperation[],
 ) {
-  const abap = textsOf(operations, ABAP_CLAUSES);
   const preview = operations.includes('getDataPreview');
   const setValue = operations.includes('setVariableValue');
   const request = [
@@ -87,7 +90,7 @@ export function handlerDebugMaintainDefinition(
     ...(preview ? ['amdp getDataPreview: the table variable read.'] : []),
   ];
   return {
-    description: `Reads and changes the stopped debuggee: each call sends one SAP request, chosen by operation.${abap.length > 0 ? ` kind abap, on the attached debuggee: ${abap.join('; ')}.` : ''}${preview ? ' kind amdp: getDataPreview answers the rows of the table variable variable_name of debuggee_id.' : ''}`,
+    description: toolDescription(handlerDebugMaintainParts(operations)),
     inputSchema: z.object({
       ...STATE_HANDLE_PROPERTY,
       ...KIND_PROPERTY,
@@ -158,7 +161,7 @@ const PREVIEW_PROPERTIES = {
 export const TOOL_DEFINITION = {
   name: 'HandlerDebugMaintain',
   available_in: ['onprem', 'cloud'] as const,
-  description: handlerDebugMaintainDefinition(MAINTAIN_OPERATIONS).description,
+  description: toolDescription(handlerDebugMaintainParts(MAINTAIN_OPERATIONS)),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     ...KIND_PROPERTY,

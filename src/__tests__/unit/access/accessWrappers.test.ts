@@ -381,8 +381,13 @@ describe('a package is checked by its own name', () => {
     ],
     [
       'an unlock',
-      'HandlerUnlock',
-      { object_type: 'PACKAGE', object_name: 'YFOO', lock_handle: HELD },
+      'HandlerLock',
+      {
+        action: 'unlock',
+        object_type: 'PACKAGE',
+        object_name: 'YFOO',
+        lock_handle: HELD,
+      },
       OBJECT_WORDS,
     ],
     [

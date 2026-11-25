@@ -1,25 +1,118 @@
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import {
+  about,
+  entries,
+  type Head,
+  headShape,
+  type JsonSchemas,
+  type ListAnswerTable,
+  listAnswerAt,
+  member,
+  type RowSchemas,
+  rows,
+  writeJson,
+  writeListing,
+} from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
 import {
-  READ_VERSION_FIELD,
-  type ReadVersion,
-} from '../../../lib/handlers/readVersion';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
+  type PackageDetails,
   packageDetails,
-  packageSummary,
 } from '../../../lib/strategies/packageSummary';
 import type { AdtReading } from '../../../lib/strategies/reading';
+
+/** A sub-package as the document lists it. */
+type SubPackage = ReturnType<typeof packageDetails>['sub_packages'][number];
+
+/** The package's facts a terse answer writes as heads, each by its noun. */
+export const PACKAGE_HEADS = [
+  headShape('package', 'name'),
+  headShape('description', 'description'),
+  headShape('package_type', 'type'),
+  headShape('super_package', 'super package'),
+  headShape('software_component', 'software component'),
+  headShape('application_component', 'application component'),
+  headShape('transport_layer', 'transport layer'),
+  headShape('language_version', 'language version'),
+  headShape('responsible', 'person responsible'),
+];
+
+/** The package's subpackages at terse. */
+export const PACKAGE_TERSE: RowSchemas<PackageDetails> = {
+  sub_packages: about(
+    'for each subpackage',
+    rows('sub_packages', {
+      columns: [
+        {
+          name: 'sub_package',
+          means: 'its name',
+          cell: (sub: SubPackage) => sub.name ?? '',
+        },
+        {
+          name: 'description',
+          means: 'its description',
+          cell: (sub: SubPackage) => sub.description ?? '',
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** The package at medium: its settings, each subpackage an entry. */
+export const PACKAGE_MEDIUM: JsonSchemas<{ metadata: PackageDetails }> = {
+  metadata: about(
+    "the package's settings",
+    member(
+      'metadata',
+      ({ sub_packages: _subPackages, ...facts }: PackageDetails) => facts,
+      {
+        lists: {
+          sub_packages: about(
+            'for each subpackage',
+            entries('sub_packages', (sub: SubPackage) => sub),
+          ),
+        },
+      },
+    ),
+  ),
+};
+
+/** The heads of a package's terse answer: its name, then each fact it holds. */
+export function packageHeads(
+  packageName: string,
+  read: PackageDetails,
+): Head[] {
+  const {
+    sub_packages: _subPackages,
+    sub_package_count: _count,
+    ...facts
+  } = read;
+  return [
+    { head: 'package', value: facts.name ?? packageName },
+    ...Object.entries(facts).flatMap(([field, value]) =>
+      field === 'name' || value === undefined ? [] : [{ head: field, value }],
+    ),
+  ];
+}
 
 export const TOOL_DEFINITION = {
   name: 'GetPackage',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose('Reads an ABAP package at the version asked.'),
+  }),
   inputSchema: z.object({
     package_name: requiredText('package_name is required').describe(
       'Package name.',
@@ -30,6 +123,42 @@ export const TOOL_DEFINITION = {
 } as const;
 
 type GetPackageArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/**
+ * What the package answers at each `detail`, selected through a table
+ * (`src/lib/detail`): terse the package's facts as `#` lines and its
+ * sub-packages as TSV rows, name and description; medium and full the
+ * details, each sub-package an entry; raw the metadata document as SAP
+ * sent it, nothing of ours around it. Every sub-package written by the
+ * listing writers.
+ */
+function packageAnswers(
+  packageName: string,
+  version: string,
+): ListAnswerTable<string, string | object> {
+  const details = (document: string) => {
+    // The sub-packages written from the document's own list, inside the
+    // metadata as before.
+    return writeJson(
+      { success: true, package_name: packageName, version, part: 'metadata' },
+      { metadata: packageDetails(document) },
+      PACKAGE_MEDIUM,
+    );
+  };
+  return {
+    terse: (document: string) => {
+      const read = packageDetails(document);
+      return writeListing({
+        heads: packageHeads(packageName, read),
+        reading: read,
+        lists: PACKAGE_TERSE,
+      });
+    },
+    medium: details,
+    full: (document) => details(document).answer,
+    raw: (document) => document,
+  };
+}
 
 export async function handleGetPackage(
   context: HandlerContext,
@@ -48,17 +177,10 @@ export async function handleGetPackage(
   return answer(
     { tool: 'GetPackage', detail },
     () => readPackageMetadata(client, { packageName }, version),
-    (metadata: AdtReading<string>) => ({
-      success: true,
-      package_name: packageName,
-      version,
-      part: 'metadata',
-      metadata:
-        detail === 'raw'
-          ? metadata.raw
-          : detail === 'full'
-            ? packageDetails(metadata.raw)
-            : packageSummary(metadata.raw),
-    }),
+    (metadata: AdtReading<string>) =>
+      listAnswerAt(
+        packageAnswers(packageName, version),
+        levelOf(args),
+      )(metadata.raw),
   );
 }

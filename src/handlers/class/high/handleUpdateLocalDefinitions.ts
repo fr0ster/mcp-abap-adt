@@ -25,6 +25,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -39,8 +40,11 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalDefinitions',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Update local definitions (class-local types/constants) in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.',
+  description: updateTool({
+    object: 'the local definitions of an existing ABAP class',
+    how: ', activating the class when asked',
+    transported: true,
+  }),
   inputSchema: z.object({
     class_name: z.string().describe('Parent class name.'),
     definitions_code: z

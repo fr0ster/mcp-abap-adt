@@ -21,15 +21,15 @@ import type * as z from 'zod';
  * exposed here for the first time.
  */
 
-import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
   acceptedOf,
   byVariant,
   COMPACT_VALIDATE,
   COMPACT_VALIDATE_KINDS,
-  compactValidateDescription,
+  compactValidateParts,
   compactValidateSchemaFor,
   supported,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -45,7 +45,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerValidate',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactValidateDescription(variant),
+    description: toolDescription(compactValidateParts(variant)),
     inputSchema: compactValidateSchemaFor(COMPACT_VALIDATE[variant]),
     members: COMPACT_VALIDATE[variant],
   })),

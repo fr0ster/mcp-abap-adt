@@ -44,7 +44,7 @@ import {
   CompactDebugBatchHandlersGroup,
   CompactDebugHandlersGroup,
 } from '../../../lib/compact/debug/group';
-import { HANDLER_DEBUG_BATCH_DESCRIPTION } from '../../../lib/compact/debug/handleHandlerDebugBatch';
+import { TOOL_DEFINITION as HandlerDebugBatch_Tool } from '../../../lib/compact/debug/handleHandlerDebugBatch';
 import {
   AmdpSession,
   DebuggerInstance,
@@ -915,15 +915,12 @@ describe("DebugBatchAnswers, the full set's reader of the debugger batch", () =>
     assert.equal(schema.safeParse({ numbers: [] }).success, false);
   });
 
-  it("means what HandlerDebugBatch's answers action means, in the same words", () => {
-    const words = DebugBatchAnswers_Tool.description.replace(
-      '[read-only] [debug] ',
-      '',
-    );
+  it('HandlerDebugBatch names its answers action by the same function', () => {
     assert.ok(
-      HANDLER_DEBUG_BATCH_DESCRIPTION.includes(
-        `action 'answers' (with number or numbers): ${words}`,
+      HandlerDebugBatch_Tool.description.includes(
+        "reads each recorded debugger call's outcome by its number",
       ),
+      HandlerDebugBatch_Tool.description,
     );
   });
 });

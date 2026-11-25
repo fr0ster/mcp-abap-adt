@@ -293,8 +293,9 @@ describe('over RFC: HandlerLock → HandlerUpdate → HandlerUnlock PACKAGE', ()
 
   const unlock = (client: Client, handle: string) =>
     client.callTool({
-      name: 'HandlerUnlock',
+      name: 'HandlerLock',
       arguments: {
+        action: 'unlock',
         object_type: 'PACKAGE',
         object_name: 'ZFRESH',
         lock_handle: handle,

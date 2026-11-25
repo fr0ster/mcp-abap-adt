@@ -9,28 +9,27 @@ import type { ProjectionVariant } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer, answerCaught } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
 import { draftOf } from '../../../lib/draft/draftOf';
-import {
-  DRAFT_TYPES,
-  draftPartWords,
-  draftRuleOf,
-} from '../../../lib/draft/draftTypes';
+import { DRAFT_TYPES, draftRuleOf } from '../../../lib/draft/draftTypes';
 import { readDraftEtags } from '../../../lib/draft/readDraftEtags';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
 
-/** What the tool answers, beside the object's type and name. */
-/** What the tool answers on `variant`, beside the object's type and name. */
-function answerWords(variant: ProjectionVariant): string {
-  return `Answers { object_type, object_name, has_draft, parts }: per part (${draftPartWords(variant, DRAFT_TYPES[variant])}) draft states whose unactivated change it holds — own (the caller's), other (another user's), undetermined (its three ETags in another pattern), and the active state when its versions are equal — with changed_at (the change's last write, UTC) and age_seconds by the server's clock for own and other (null for METADATA_EXTENSION and SERVICE_DEFINITION, whose ETag carries a constant time), and the three ETags (active, inactive, workspace); has_draft is true when any part holds a change of a user's`;
-}
-
 export const TOOL_DEFINITION = {
   name: 'GetObjectDraft',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: `[read-only] Reads the active, inactive and working versions of each part of the object named by object_type and object_name, together, and tells whether it holds an unactivated change and whose. ${answerWords(variant)}`,
+    description: toolDescription({
+      tag: 'read-only',
+      // A program is read on premise only (`DRAFT_TYPES`).
+      purpose: purpose(
+        variant === 'onprem'
+          ? 'Reads whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose.'
+          : 'Reads whether an ABAP class, interface, function module, CDS view, table or other development object holds an unactivated change, and whose.',
+      ),
+    }),
     inputSchema: objectDraftSchema(variant),
   })),
 } as const;
@@ -99,17 +98,13 @@ export async function handleGetObjectDraft(
     ...draftOf(etags, now, rule),
   }));
   return return_response({
-    data: JSON.stringify(
-      {
-        object_type: type,
-        object_name: name,
-        has_draft: parts.some(
-          (part) => part.draft === 'own' || part.draft === 'other',
-        ),
-        parts,
-      },
-      null,
-      2,
-    ),
+    data: JSON.stringify({
+      object_type: type,
+      object_name: name,
+      has_draft: parts.some(
+        (part) => part.draft === 'own' || part.draft === 'other',
+      ),
+      parts,
+    }),
   });
 }

@@ -16,6 +16,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -26,8 +27,11 @@ import { validateTransportRequest } from '../../../utils/transportValidation';
 export const TOOL_DEFINITION = {
   name: 'CreateMessageClass',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Creates the ABAP message class (T100) named by message_class_name, with its description, in the package named by package_name: a shell whose messages are added afterwards. A message class is in effect once saved.',
+  description: createTool({
+    object: 'an ABAP message class',
+    how: ', with its description',
+    transported: true,
+  }),
   inputSchema: createArguments('CreateMessageClass', {
     message_class_name: z.string().describe('Message class name.'),
     description: z

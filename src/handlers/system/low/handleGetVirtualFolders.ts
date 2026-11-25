@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * GetVirtualFolders Handler - Low-level handler for virtual folders
@@ -8,8 +9,8 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * takes `analyseException` since adt-clients 23.
  *
  * `folders` is one of the 300-odd slots `resultSets.ts` maps to `structured`
- * (unlike `node`, which `ourUtils` overrides with the tree-flattening
- * `nodeLevel` reading), so this answers an `AdtReading` the same shape every
+ * (unlike `node`, which `ourUtils` reads with adt-strategies'
+ * `utilNodeContents`), so this answers an `AdtReading` the same shape every
  * write handler in this cluster does — `detail: 'raw'` and `'full'` both
  * work. No corpus fixture for this endpoint exists yet (the README's
  * endpoint table has no `/virtualfolders/contents` row at all), so `terse`
@@ -30,8 +31,12 @@ import { ourUtils } from '../../../lib/strategies/resultSets';
 export const TOOL_DEFINITION = {
   name: 'GetVirtualFoldersLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Retrieve hierarchical virtual folder contents from ADT information system. Used for browsing ABAP objects by package, group, type, etc.',
+  description: toolDescription({
+    tag: 'low-level',
+    purpose: purpose(
+      'Reads the virtual folders that group ABAP repository objects by package, group, type and other facets, for a name pattern.',
+    ),
+  }),
   inputSchema: z.object({
     object_search_pattern: z
       .string()

@@ -1,11 +1,12 @@
 import * as z from 'zod';
+import { TOOL_DEFINITION as DiscardBackgroundRun } from '../../../handlers/background_run/readonly/handleDiscardBackgroundRun';
 import { answerBackgroundDiscard } from '../../backgroundRuns/answers';
+import { compactOf } from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerBackgroundRunDiscard',
-  description:
-    "[read-only] Ends the run named by run_handle: a running read is cancelled and its session logged off; a finished run's answer is deleted; a running code run is refused.",
+  description: compactOf(DiscardBackgroundRun.description),
   inputSchema: z.object({
     run_handle: z
       .string()

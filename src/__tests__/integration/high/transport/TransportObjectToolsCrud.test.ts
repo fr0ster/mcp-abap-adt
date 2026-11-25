@@ -197,6 +197,45 @@ const MoveAnswer = z.looseObject({
 const answerOf = (response: Parameters<typeof parseHandlerResponse>[0]) =>
   handlerAnswer(response, TransportAnswer);
 
+/** One entry of ReadTransportObjects' terse answer, with its task and pgmid. */
+interface ReadEntry {
+  task: string;
+  pgmid: string;
+  type: string;
+  name: string;
+  position: string;
+}
+
+/**
+ * ReadTransportObjects' terse answer (the default) read back: the
+ * `type\tname\tposition` rows under their `# task` and `# pgmid` lines, and
+ * the `# count`.
+ */
+function readEntries(response: { content?: unknown }): {
+  count: number;
+  objects: ReadEntry[];
+} {
+  const content = Array.isArray(response.content) ? response.content : [];
+  const text = String(
+    (content[0] as { text?: unknown } | undefined)?.text ?? '',
+  );
+  let count = 0;
+  let task = '';
+  let pgmid = '';
+  const objects: ReadEntry[] = [];
+  for (const line of text.split('\n')) {
+    if (line.startsWith('# count ')) count = Number(line.slice(8));
+    else if (line.startsWith('# task ')) task = line.slice(7);
+    else if (line.startsWith('# pgmid ')) pgmid = line.slice(8);
+    else if (line.startsWith('#') || line === 'type\tname\tposition') continue;
+    else if (line !== '') {
+      const [type = '', name = '', position = ''] = line.split('\t');
+      objects.push({ task, pgmid, type, name, position });
+    }
+  }
+  return { count, objects };
+}
+
 /** Asserts a handler response is not an error, logging its content first if it is. */
 function expectOk(
   response: any,
@@ -257,14 +296,12 @@ systemsDescribe(['onprem'], SUITE, () => {
 
   /** The test program's entries on one task. */
   const programEntriesOn = async (task: string): Promise<any[]> =>
-    (
-      answerOf(
-        await handleReadTransportObjects(
-          createHandlerContext({ connection, logger }),
-          { transport_number: task },
-        ),
-      )?.objects ?? []
-    ).filter((o: any) => o.name === programName && o.type === 'PROG');
+    readEntries(
+      await handleReadTransportObjects(
+        createHandlerContext({ connection, logger }),
+        { transport_number: task },
+      ),
+    ).objects.filter((o) => o.name === programName && o.type === 'PROG');
 
   /**
    * Detach the test program's entries from one task — only the program's:
@@ -479,12 +516,12 @@ systemsDescribe(['onprem'], SUITE, () => {
         // ask for the task. `accepted` from a removal is not evidence — the
         // re-read is, exactly as the scenario above asserts it.
         const readCtx = createHandlerContext({ connection, logger });
-        const held = answerOf(
+        const held = readEntries(
           await handleReadTransportObjects(readCtx, {
             transport_number: task,
           }),
         );
-        for (const entry of held?.objects ?? []) {
+        for (const entry of held.objects) {
           if (!entry?.position) {
             logger?.warn(
               `Cleanup: ${entry?.name} is listed without a position — cannot detach it`,
@@ -504,13 +541,13 @@ systemsDescribe(['onprem'], SUITE, () => {
           logger?.info(`Cleanup: detached ${entry.type} ${entry.name}`);
         }
 
-        const left = answerOf(
+        const left = readEntries(
           await handleReadTransportObjects(
             createHandlerContext({ connection, logger }),
             { transport_number: task },
           ),
         );
-        if ((left?.count ?? 0) > 0) {
+        if (left.count > 0) {
           logger?.warn(
             `Cleanup: task ${task} still holds ${left.count} entr(y|ies) — not deleting it, left for manual review`,
           );
@@ -589,8 +626,8 @@ systemsDescribe(['onprem'], SUITE, () => {
       });
 
       expectOk(taskResponse, 'Step 1 CreateTransportTask', logger);
+      // Terse, the default: `{ task_number, task_type }`.
       const taskData = answerOf(taskResponse);
-      assert.equal(taskData.success, true);
       assert.ok(taskData.task_number);
       taskNumber = taskData.task_number;
       logger?.success(`Step 1: task ${taskNumber} created`);
@@ -661,10 +698,9 @@ systemsDescribe(['onprem'], SUITE, () => {
       });
 
       expectOk(readResponse1, 'Step 3 ReadTransportObjects', logger);
-      const readData1 = answerOf(readResponse1);
-      assert.equal(readData1.success, true);
+      const readData1 = readEntries(readResponse1);
       const entry1 = readData1.objects.find(
-        (o: any) => o.name === programName && o.type === 'PROG',
+        (o) => o.name === programName && o.type === 'PROG',
       );
       assert.ok(entry1 !== undefined);
       assert.ok(entry1.position);
@@ -694,9 +730,9 @@ systemsDescribe(['onprem'], SUITE, () => {
       });
 
       expectOk(readResponse2, 'Step 5 ReadTransportObjects', logger);
-      const readData2 = answerOf(readResponse2);
+      const readData2 = readEntries(readResponse2);
       const entry2 = readData2.objects.find(
-        (o: any) => o.name === programName && o.type === 'PROG',
+        (o) => o.name === programName && o.type === 'PROG',
       );
       assert.equal(entry2, undefined);
       logger?.success('Step 5: entry confirmed removed');
@@ -723,9 +759,9 @@ systemsDescribe(['onprem'], SUITE, () => {
       });
 
       expectOk(readResponse3, 'Step 7 ReadTransportObjects', logger);
-      const readData3 = answerOf(readResponse3);
+      const readData3 = readEntries(readResponse3);
       const entry3 = readData3.objects.find(
-        (o: any) => o.name === programName && o.type === 'PROG',
+        (o) => o.name === programName && o.type === 'PROG',
       );
       assert.ok(entry3 !== undefined);
       logger?.success('Step 7: entry confirmed back on the task');
@@ -738,12 +774,17 @@ systemsDescribe(['onprem'], SUITE, () => {
       });
 
       expectOk(logResponse, 'Step 8 ReadTransportActionLog', logger);
-      const logData = answerOf(logResponse);
-      assert.equal(logData.success, true);
-      assert.ok((logData.count ?? 0) > 0);
-      assert.equal(Array.isArray(logData.entries), true);
+      // Terse, the default: `# transport`, `# count`, the `entry` header, then
+      // a line per entry.
+      const logLines = String(
+        (logResponse.content[0] as { text?: unknown } | undefined)?.text ?? '',
+      ).split('\n');
+      const logCount = Number(
+        logLines.find((line) => line.startsWith('# count '))?.slice(8) ?? 0,
+      );
+      assert.ok(logCount > 0, logLines.join('\n'));
       logger?.success(
-        `Step 8: action log has ${logData.count} entr${logData.count === 1 ? 'y' : 'ies'}`,
+        `Step 8: action log has ${logCount} entr${logCount === 1 ? 'y' : 'ies'}`,
       );
 
       // Step 9: SortAndCompressTransportTask — accepted, and the entry is
@@ -759,16 +800,15 @@ systemsDescribe(['onprem'], SUITE, () => {
       assert.equal(sortData.accepted, true);
       assert.equal('success' in sortData, false);
 
-      const sortedData = answerOf(
-        await handleReadTransportObjects(
-          createHandlerContext({ connection, logger }),
-          { transport_number: taskNumber },
-        ),
+      // ReadTransportObjects' terse answer (the default), read back.
+      const sortedResponse = await handleReadTransportObjects(
+        createHandlerContext({ connection, logger }),
+        { transport_number: taskNumber },
       );
-      const afterSort = sortedData.objects.filter(
-        (o: any) => o.name === programName && o.type === 'PROG',
+      const afterSort = readEntries(sortedResponse).objects.filter(
+        (o) => o.name === programName && o.type === 'PROG',
       );
-      assert.equal(afterSort.length, 1);
+      assert.equal(afterSort.length, 1, JSON.stringify(sortedResponse.content));
       logger?.success('Step 9: entry still on the task, once');
 
       // Step 10: a second request, and a task under it, the target of the
@@ -875,18 +915,27 @@ systemsDescribe(['onprem'], SUITE, () => {
       assert.equal('success' in moveData, false);
 
       // The echo is not proof: re-read both tasks.
-      const holds = async (task: string) =>
-        answerOf(
-          await handleReadTransportObjects(
-            createHandlerContext({ connection, logger }),
-            { transport_number: task },
-          ),
-        ).objects.filter(
-          (o: any) => o.name === programName && o.type === 'PROG',
+      // Each re-read first proven a read of that task: an error parses to
+      // no entries, which would pass for the object having left.
+      const holds = async (task: string) => {
+        const read = await handleReadTransportObjects(
+          createHandlerContext({ connection, logger }),
+          { transport_number: task },
         );
-      assert.equal((await holds(taskNumber)).length, 0);
+        expectOk(read, `re-read ${task}`, logger);
+        const text = String(read.content[0]?.text ?? '');
+        assert.ok(
+          text.split('\n').includes(`# transport ${task}`),
+          `the re-read of ${task} is no read of it: ${text.slice(0, 2000)}`,
+        );
+        return readEntries(read).objects.filter(
+          (o) => o.name === programName && o.type === 'PROG',
+        );
+      };
+      const onFirst = await holds(taskNumber);
+      assert.equal(onFirst.length, 0, JSON.stringify(onFirst));
       const onSecond = await holds(secondTaskNumber);
-      assert.equal(onSecond.length, 1);
+      assert.equal(onSecond.length, 1, JSON.stringify(onSecond));
       logger?.success(
         'Step 11: entry moved — off the first task, on the second',
       );

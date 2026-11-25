@@ -22,11 +22,8 @@ import {
 import {
   TOOL_DEFINITION as HandlerLock,
   handleHandlerLock,
+  handleHandlerLock as lockOrUnlock,
 } from '../../../compact-modify/src/handlers/handleHandlerLock';
-import {
-  TOOL_DEFINITION as HandlerUnlock,
-  handleHandlerUnlock,
-} from '../../../compact-modify/src/handlers/handleHandlerUnlock';
 import {
   handleLockObject,
   TOOL_DEFINITION as LockObjectLow,
@@ -73,8 +70,12 @@ const TOOLS: Readonly<Record<string, Send>> = {
     defineTool(HandlerLock, handleHandlerLock).call(context, args),
   UnlockObjectLow: (context, args) =>
     defineTool(UnlockObjectLow, handleUnlockObject).call(context, args),
+  // The unlock of the merged HandlerLock, under its own key here.
   HandlerUnlock: (context, args) =>
-    defineTool(HandlerUnlock, handleHandlerUnlock).call(context, args),
+    defineTool(HandlerLock, lockOrUnlock).call(context, {
+      ...args,
+      action: 'unlock',
+    }),
 };
 
 /** The requests one call sends on `variant`, and what it answered. */
@@ -188,8 +189,13 @@ describe('a top-level package: no super package', () => {
       { object_type: 'package', object_name: PACKAGE, lock_handle: HANDLE },
     ],
     [
-      'HandlerUnlock',
-      { object_type: 'PACKAGE', object_name: PACKAGE, lock_handle: HANDLE },
+      'HandlerLock',
+      {
+        action: 'unlock',
+        object_type: 'PACKAGE',
+        object_name: PACKAGE,
+        lock_handle: HANDLE,
+      },
     ],
   ];
 

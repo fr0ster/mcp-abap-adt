@@ -26,6 +26,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { inOwnSessionOverRfc } from '../../../lib/packageSessions';
 import { detailOf } from '../../../lib/strategies/detail';
@@ -43,8 +44,10 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdatePackage',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Update the description of an existing ABAP package. Locks the package, writes, and unlocks it again, whatever the write answered. Over RFC this runs in an ABAP session of its own, closed afterwards.',
+  description: updateTool({
+    object: 'the description of an existing ABAP package',
+    transported: true,
+  }),
   inputSchema: z.object({
     package_name: z
       .string()

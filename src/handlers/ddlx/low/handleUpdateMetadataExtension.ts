@@ -23,6 +23,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -32,8 +33,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateMetadataExtensionLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Update source code of an existing ABAP metadata extension. Requires lock handle from LockObject. - use UpdateMetadataExtension (high-level) for full workflow with lock/unlock/activate.',
+  description: updateTool({
+    tag: 'low-level',
+    object: 'the source code of an existing CDS metadata extension',
+    how: ', under a lock the caller holds',
+  }),
   inputSchema: z.object({
     name: z
       .string()

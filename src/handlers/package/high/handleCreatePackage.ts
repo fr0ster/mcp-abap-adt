@@ -30,13 +30,14 @@ import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_LEVELS } from '../../../lib/detail/levels';
 import { givenName } from '../../../lib/givenName';
 import { createArguments } from '../../../lib/handlers/createArguments';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { inOwnSessionOverRfc } from '../../../lib/packageSessions';
-import { detailOf } from '../../../lib/strategies/detail';
+import { DETAIL_WORDS, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -44,8 +45,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'CreatePackage',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.',
+  description: toolDescription({
+    purpose: purpose(
+      'Creates a new ABAP package under a super package, with its type, software component, transport layer and description.',
+    ),
+  }),
   inputSchema: createArguments('CreatePackage', {
     package_name: z.string().describe('Package name.'),
     description: z
@@ -97,9 +101,7 @@ export const TOOL_DEFINITION = {
       .enum(DETAIL_LEVELS)
       .optional()
       .default('terse')
-      .describe(
-        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).',
-      ),
+      .describe(DETAIL_WORDS),
   }),
 } as const;
 

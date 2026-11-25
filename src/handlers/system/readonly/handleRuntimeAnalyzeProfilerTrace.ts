@@ -13,19 +13,28 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import {
+  longRunning,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeAnalyzeProfilerTrace',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] [runtime] Read profiler trace view and return compact analysis summary (totals + top entries).',
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Analyzes one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time.',
+      ),
+      notes: [longRunning],
+    }),
   ),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
@@ -182,13 +191,8 @@ export async function handleRuntimeAnalyzeProfilerTrace(
   // Each view ranks its own collection on its own numeric field.
   const project =
     <P>(summaryOf: (payload: P) => RankedSummary) =>
-    (payload: P) => ({
-      success: true,
-      trace_id_or_uri: traceIdOrUri,
-      view,
-      summary: summaryOf(payload),
-      payload,
-    });
+    (payload: P) =>
+      traceSummaryAnswer(traceIdOrUri, view, summaryOf(payload), payload);
   const ctx = { tool: 'RuntimeAnalyzeProfilerTrace', detail: 'terse' as const };
 
   if (view === 'hitlist') {
@@ -229,3 +233,22 @@ export async function handleRuntimeAnalyzeProfilerTrace(
     ),
   );
 }
+
+/** What an analysis answers: the trace, the view, its totals and top records, and the view's data. */
+export function traceSummaryAnswer<P>(
+  traceIdOrUri: string,
+  view: TraceView,
+  summary: RankedSummary,
+  payload: P,
+) {
+  return {
+    success: true,
+    trace_id_or_uri: traceIdOrUri,
+    view,
+    summary,
+    payload,
+  };
+}
+
+/** The views a trace is read in. */
+type TraceView = 'hitlist' | 'statements' | 'db_accesses';

@@ -34,6 +34,10 @@ import {
 } from '../../../lib/adtProjections';
 import type { ServerVariant } from '../../../lib/clients';
 import {
+  isObjectTypeTool,
+  memberTokens,
+} from '../../../lib/compact/compactDescriptions';
+import {
   COMPACT_ACTIVATE_TAKES,
   COMPACT_CHECK_TAKES,
   COMPACT_CREATE_TAKES,
@@ -42,7 +46,6 @@ import {
   COMPACT_LOCK_TAKES,
   COMPACT_PROFILE_TAKES,
   COMPACT_READ_TAKES,
-  COMPACT_UNLOCK_TAKES,
   COMPACT_UPDATE_TAKES,
   COMPACT_VALIDATE_TAKES,
 } from '../../../lib/compact/compactSchemas';
@@ -65,7 +68,6 @@ const TOOLS: Readonly<
   HandlerUpdate: { takes: COMPACT_UPDATE_TAKES, members: COMPACT_UPDATE },
   HandlerDelete: { takes: COMPACT_DELETE_TAKES, members: COMPACT_DELETE },
   HandlerLock: { takes: COMPACT_LOCK_TAKES, members: COMPACT_LOCK },
-  HandlerUnlock: { takes: COMPACT_UNLOCK_TAKES, members: COMPACT_UNLOCK },
   HandlerValidate: { takes: COMPACT_VALIDATE_TAKES, members: COMPACT_VALIDATE },
   HandlerCheckRun: { takes: COMPACT_CHECK_TAKES, members: COMPACT_CHECK },
   HandlerDeletionCheck: {
@@ -215,26 +217,56 @@ describe('a compact tool offers on each variant the properties its offered membe
           );
           if (absent.length > 0) missing[tool.name] = absent;
         }
-        assert.ok(checked >= (kind === 'compact' ? 11 : 4));
+        assert.ok(checked >= (kind === 'compact' ? 10 : 4));
         assert.deepStrictEqual(
           { untaken, missing },
           { untaken: {}, missing: {} },
         );
       });
 
-      it(`${kind} on ${variant}: every argument a description names for a member is one that member takes`, async () => {
+      it(`${kind} on ${variant}: every argument a served description names for a member is one that member takes`, async () => {
+        const tools = await listed(set, variant);
+        let read = 0;
+        for (const tool of tools) {
+          const declared = TOOLS[tool.name];
+          if (declared === undefined) continue;
+          read += 1;
+          // Every property the tool takes on any variant, so a description
+          // naming one its variant does not offer is caught too.
+          const properties = takenOn(declared.takes, declared.members.onprem);
+          // The description as served: a purpose of pairs names no
+          // argument today, and any it comes to name is checked here.
+          for (const [member, argument] of namedArguments(
+            tool.description ?? '',
+            declared.members[variant],
+            properties,
+          )) {
+            assert.deepStrictEqual(
+              {
+                tool: tool.name,
+                member,
+                argument,
+                taken: takenOn(declared.takes, [member]).has(argument),
+              },
+              { tool: tool.name, member, argument, taken: true },
+            );
+          }
+        }
+        assert.ok(read >= (kind === 'compact' ? 10 : 4));
+      });
+
+      it(`${kind} on ${variant}: every argument the member table names for a member is one that member takes`, async () => {
         const tools = await listed(set, variant);
         let named = 0;
         for (const tool of tools) {
           const declared = TOOLS[tool.name];
-          if (declared === undefined) continue;
-          const offered = declared.members[variant];
-          // Every property the tool takes on any variant, so a description
-          // naming one its variant does not offer is caught too.
+          if (declared === undefined || !isObjectTypeTool(tool.name)) continue;
           const properties = takenOn(declared.takes, declared.members.onprem);
+          // The members' table (`memberTokens`): each member with the
+          // arguments it takes, as the prompts and tool search read it.
           for (const [member, argument] of namedArguments(
-            tool.description ?? '',
-            offered,
+            memberTokens(tool.name, variant),
+            declared.members[variant],
             properties,
           )) {
             named += 1;

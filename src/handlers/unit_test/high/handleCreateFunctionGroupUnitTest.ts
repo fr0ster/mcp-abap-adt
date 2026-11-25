@@ -8,6 +8,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  */
 
 import { answer } from '../../../lib/answer';
+import { createTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -17,8 +18,11 @@ import { writeFunctionGroupTests } from '../shared/writeTests';
 export const TOOL_DEFINITION = {
   name: 'CreateFunctionGroupUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Creates the ABAP Unit test classes of the function group named by function_group_name, from test_class_source. They are written to a test include, which is activated with the group.',
+  description: createTool({
+    purpose: purpose(
+      'Creates the ABAP Unit test classes of an ABAP function group from the test class source given, in a test include activated with the group.',
+    ),
+  }),
   inputSchema: createArguments('CreateFunctionGroupUnitTest', {
     function_group_name: z
       .string()

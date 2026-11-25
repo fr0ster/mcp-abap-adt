@@ -171,7 +171,7 @@ function compactEntryRead(source: PromptSource): EntryRead | undefined {
 }
 
 const NULL_POSITION =
-  'An entry whose position is null is named to the user and left out of the call.';
+  'An entry the read answers without a position is named to the user and left out of the call.';
 
 /** The words that pick the entry of `object` named `name` from the read. */
 function pickWords(object: TransportObjectType, name: string): string {

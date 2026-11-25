@@ -1,29 +1,166 @@
 import * as z from 'zod';
+import type { McpResult } from '../../../lib/answer';
 import { isRfcConnection } from '../../../lib/connectionKind';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
-import { ANSWER_LEVELS } from '../../../lib/search-source/answerLevel';
+  longRunning,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  type AnswerTable,
+  about,
+  answerAt,
+  type Column,
+  type DetailLevel,
+  headShape,
+  jsonText,
+  type ListAnswerTable,
+  listAnswerAt,
+  marks,
+  type RowSchemas,
+  rows,
+  type Written,
+  wireAnswer,
+  writeListing,
+  writeWhole,
+} from '../../../lib/detail';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
+import {
+  ANSWER_LEVELS,
+  type AnswerLevel,
+} from '../../../lib/search-source/answerLevel';
 import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 import {
-  type OrchestratorInput,
+  type OrchestratorResult,
   runSearchSourceWithContext,
 } from '../../../lib/search-source/orchestrator';
-import { SCAN_OBJECT_TYPES } from '../../../lib/search-source/packageEnumerator';
+import {
+  type IncompleteTarget,
+  type NotLoadedNode,
+  SCAN_OBJECT_TYPES,
+} from '../../../lib/search-source/packageEnumerator';
 import {
   skipSapAnswers,
   undecided,
 } from '../../../lib/search-source/readFailure';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
+
+/** One hit of a scan. */
+type Hit = OrchestratorResult['results'][number];
+
+/** The answer level a scan was read at, by its first hit's shape (`lines` when none). */
+function answerLevelOf(first: Hit | undefined): AnswerLevel {
+  if (first === undefined) return 'lines';
+  if ('snippet' in first) return 'snippets';
+  return 'line' in first ? 'lines' : 'objects';
+}
+
+const includeCell: Column<Hit> = {
+  name: 'include',
+  means: 'its include',
+  cell: includeColumn,
+};
+const lineCell: Column<Hit> = {
+  name: 'line',
+  means: 'its position in the source',
+  cell: (hit) => ('line' in hit ? String(hit.line) : ''),
+};
+
+/** The lists of one scan, by its answer level: what its description states. */
+function searchSourceLists(
+  noun: string,
+  columns: Column<Hit>[],
+): RowSchemas<OrchestratorResult> {
+  return {
+    not_loaded: about(
+      'the package parts SAP left unloaded are named, each by its package and type',
+      marks('not_loaded', 'not loaded by SAP', (node: NotLoadedNode) => [
+        node.package,
+        node.type,
+      ]),
+    ),
+    // A target SAP listed without a name: never scanned, named by what
+    // tells it apart.
+    incomplete: about(
+      'the nameless objects SAP lists, left unsearched, are named by what tells them apart',
+      marks('incomplete', 'incomplete', incompleteWords),
+    ),
+    results: about(
+      noun,
+      rows('results', {
+        columns,
+        header: 'always',
+        groups: [
+          {
+            label: 'object',
+            of: (hit: Hit) =>
+              `${hit.devclass} ${hit.object_type} ${hit.object_name}`,
+            mode: 'gathered',
+          },
+        ],
+      }),
+    ),
+  };
+}
+
+/** Each match's object, as the group above its matches names it. */
+const MATCH_NOUN =
+  'for each match, under its object named by package, type and name';
+
+/**
+ * The lists of a scan at each answer level: `include\tline`,
+ * `include\tline\tsnippet`, or `include\thits`.
+ */
+export const SEARCH_SOURCE_LISTS: Readonly<
+  Record<AnswerLevel, RowSchemas<OrchestratorResult>>
+> = {
+  lines: searchSourceLists(MATCH_NOUN, [includeCell, lineCell]),
+  snippets: searchSourceLists(MATCH_NOUN, [
+    includeCell,
+    lineCell,
+    {
+      name: 'snippet',
+      means: 'the source code that matched, when snippets are asked',
+      cell: (hit) => ('snippet' in hit ? hit.snippet : ''),
+    },
+  ]),
+  objects: searchSourceLists(
+    'with objects asked, for each object it matched in, named by package, type and name',
+    [
+      includeCell,
+      {
+        name: 'hits',
+        means: 'how many matches it has',
+        cell: (hit) => ('hits' in hit ? String(hit.hits) : ''),
+      },
+    ],
+  ),
+};
+
+/** The heads every scan's listing opens with. */
+export const SEARCH_SOURCE_HEADS = [
+  headShape(
+    'scanned',
+    'how many objects and sources were searched, and how many objects matched',
+  ),
+  headShape('truncated', 'which limit stopped the search, when one did'),
+];
 
 export const TOOL_DEFINITION = {
   name: 'SearchSource',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Search ABAP source text inside one or more packages: programs, program includes, function groups (function modules and includes), classes (main source and the four local includes), interfaces, CDS data definitions, behavior definitions, metadata extensions and service definitions. Each source is read at the call\'s `version` (default active). `packages` takes exact package names and masks (Z*, /NS/Z?); in a mask `*` (zero or more characters) and `?` (one character) are the wildcards, and `+`, `_`, `%` and `#` are characters of the name; a mask is resolved by the repository quick search to every package it matches. `object_types` and `object_filter` select the scan targets of the resolved packages (`PROG` selects programs and program includes, `FUGR` function groups with their modules and includes); every target is read in one run, unless `max_hits` is reached. A line matches when it contains `query` (and `query2`, when given), case-insensitively, and a line containing an `exclude` entry is dropped; `exclude_comments` skips col-1 `*` and full-line `"` comment lines. `max_hits_per_object` limits the hits of each object only when given; each module and each include of a function group is an object of its own, and a program include is one object however many function groups list it (its hits answered and counted once, from the first listing in the scan order). `max_hits` limits the hits of the whole answer, counted in the scan order after `max_hits_per_object`: reached, the scan stops reading, and `truncated.by_max_hits` is true when anything was left. `answer` sets what each hit is answered as: `snippets` (the default) with line and snippet, `lines` with the line only, `objects` one entry per object and include with its number of hits. The answer lists each hit (`results`: package, object type, object name, include, line, snippet). The `object_type` of a hit names its kind of source: `PROG` a program, `PROG/I` a program include (`object_name` the include name), `CLAS` a class with `include` the class name for its main source or `definitions`, `implementations`, `macros`, `testclasses` for its local includes, `INTF`, `DDLS`, `BDEF`, `DDLX` and `SRVD` the object source; a hit in a function module is `FUGR/FF` (`object_name` the module) and a hit in an include addressed under its function group is `FUGR/I` (`object_name` the include), each with `function_group_name`, the group, in place of `include`; an include a function group lists among the program includes is `PROG/I`; `scanned.objects` counts the objects read, `scanned.sources` the sources read (each once) and `scanned.objects_with_hits` the objects with a hit; `truncated.by_object_cap` is true when an object had more hits than `max_hits_per_object`. At a stop the counters report what was done until it; where the reads go in batches, `scanned.sources` counts the sources of the last batch read, those read past the stop included. A source, an object or a package SAP refuses is skipped, and a type node or subpackage SAP refuses is skipped with everything under it; a read that fails before SAP answers ends the call as an error. Sources are read in ADT batch envelopes where the system offers them, each source once per call.',
-  ),
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Searches the ABAP source code of one or more packages for a text: programs, includes, function groups, classes, interfaces and CDS sources.',
+    ),
+    notes: [longRunning],
+  }),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
     query: z
@@ -91,12 +228,13 @@ export const TOOL_DEFINITION = {
       .enum(ANSWER_LEVELS)
       .optional()
       .describe(
-        'What each hit is answered as: snippets (the default: line and snippet), lines (line, no snippet) or objects (one entry per object and include with its number of hits).',
+        'What each hit is answered as: lines (line, no snippet; the default at detail terse), snippets (line and snippet; the default at medium and full) or objects (one entry per object and include with its number of hits).',
       ),
     version: z
       .enum(['active', 'inactive', 'workingArea'])
       .optional()
       .describe('The version every source is read at. Default active.'),
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -110,15 +248,122 @@ type SearchSourceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 // and found nothing, where one at a time read all 13 and found both hits, as
 // HTTP does.
 
+/**
+ * What each hit is read as, selected before the scan: the `answer` given, or
+ * — none given — `lines` at terse (the snippets at `answer: snippets` or at
+ * medium and full) and `snippets` at the other levels, as before `detail`.
+ */
+export function searchSourceAnswerLevel(
+  level: DetailLevel,
+  answer: AnswerLevel | undefined,
+): AnswerLevel {
+  return answerAt(HIT_READINGS, level)(answer);
+}
+
+/** Each level's default for what a hit is read as, the `answer` given kept. */
+const HIT_READINGS: AnswerTable<AnswerLevel | undefined, AnswerLevel> = {
+  terse: (answer) => answer ?? 'lines',
+  medium: (answer) => answer ?? 'snippets',
+  full: (answer) => answer ?? 'snippets',
+  raw: (answer) => answer ?? 'snippets',
+};
+
+/** The include column of a hit: the class include, or a module's or include's group. */
+function includeColumn(hit: OrchestratorResult['results'][number]): string {
+  return 'include' in hit ? hit.include : hit.function_group_name;
+}
+
+/**
+ * The scan as TSV (terse): `# scanned` and `# truncated` counter lines, a
+ * `# not loaded by SAP<TAB>PACKAGE<TAB>TYPE` line per node the walk could not read,
+ * then the hits under `# object PACKAGE TYPE NAME` group lines — at lines
+ * `include\tline`, at snippets `include\tline\tsnippet`, at objects
+ * `include\thits`. Every hit is answered.
+ */
+export function searchSourceRows(result: OrchestratorResult): Written<string> {
+  return writeListing({
+    heads: [
+      {
+        head: 'scanned',
+        value: `objects ${result.scanned.objects} sources ${result.scanned.sources} objects_with_hits ${result.scanned.objects_with_hits}`,
+      },
+      ...(result.truncated.by_object_cap
+        ? [{ head: 'truncated', value: 'by_object_cap' }]
+        : []),
+      ...(result.truncated.by_max_hits === true
+        ? [{ head: 'truncated', value: 'by_max_hits' }]
+        : []),
+    ],
+    reading: result,
+    lists: SEARCH_SOURCE_LISTS[answerLevelOf(result.results[0])],
+  });
+}
+
+/** A target SAP listed without a name: the words of its line. */
+function incompleteWords(target: IncompleteTarget): string[] {
+  return [
+    target.package,
+    target.type,
+    ...(target.tech_name !== undefined
+      ? [`tech_name=${target.tech_name}`]
+      : []),
+    ...(target.uri !== undefined ? [`uri=${target.uri}`] : []),
+  ];
+}
+
+/**
+ * What SearchSource answers at each `detail`, selected before the scan
+ * (`src/lib/detail`): terse {@link searchSourceRows}; medium and full the
+ * answer before `detail`. A scan reads many documents, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
+ */
+const SEARCH_SOURCE_ANSWERS: ListAnswerTable<OrchestratorResult, string> = {
+  terse: searchSourceRows,
+  // The scan whole, as it is — typed as the reading itself, so no
+  // projection of it passes for it.
+  medium: (result) => jsonText(writeWhole<OrchestratorResult>(result)),
+  full: (result) => JSON.stringify(result),
+  raw: (result) => JSON.stringify(result),
+};
+
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleSearchSource(
   context: HandlerContext,
   args: SearchSourceArgs,
 ) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'SearchSource',
+        shape: 'assembled',
+      },
+      () => answeredSearchSource(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredSearchSource(context, args);
+}
+
+async function answeredSearchSource(
+  context: HandlerContext,
+  args: SearchSourceArgs,
+): Promise<McpResult> {
   const { logger } = context;
+  const level = levelOf(args);
+  const shown = listAnswerAt(SEARCH_SOURCE_ANSWERS, levelOf(args));
+  const asked = {
+    ...args,
+    answer: searchSourceAnswerLevel(level, args.answer),
+  };
   try {
     const result = await runSearchSourceWithContext(
       context,
-      isRfcConnection(context.connection) ? { ...args, concurrency: 1 } : args,
+      isRfcConnection(context.connection)
+        ? { ...asked, concurrency: 1 }
+        : asked,
       // The server's strategies, set from its options; absent, the shipped
       // ones — the one place their default lives (DO24).
       {
@@ -131,7 +376,7 @@ export async function handleSearchSource(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
+          text: shown(result),
         },
       ],
     };

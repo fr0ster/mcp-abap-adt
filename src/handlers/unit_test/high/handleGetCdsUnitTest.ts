@@ -1,26 +1,55 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { toolDescription } from '../../../lib/description';
+import { unitTestRead } from '../../../lib/description/runs';
+import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
-import { readGivenRun, unfinishedRun } from '../shared/pollRun';
+import { readGivenRun, runOutcomeWithStatus } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Retrieve CDS unit test run status and result for a previously started run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
+  description: toolDescription(
+    unitTestRead('the status and result', 'a CDS unit test run', 'waits'),
+  ),
   inputSchema: z.object({
     run_id: z.string().describe('Run identifier returned by unit test run.'),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
 type GetCdsUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetCdsUnitTest(
+  context: HandlerContext,
+  args: GetCdsUnitTestArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetCdsUnitTest',
+        shape: 'assembled',
+      },
+      () => answeredGetCdsUnitTest(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetCdsUnitTest(context, args);
+}
+
+async function answeredGetCdsUnitTest(
   context: HandlerContext,
   args: GetCdsUnitTestArgs,
 ) {
@@ -48,19 +77,7 @@ export async function handleGetCdsUnitTest(
         run_id,
         () => cdsUnitTest.getResult(run_id, { analyse: analyseException }),
       ),
-    // Task 28 fix round 1 — same finding, same fix as `GetUnitTest`: both
-    // readings behind this answer are `structured`, and `detail` was owed.
-    (outcome) =>
-      !outcome.finished
-        ? unfinishedRun(run_id, outcome.runStatus)
-        : {
-            success: true,
-            run_id,
-            finished: true,
-            run_status:
-              detail === 'raw' ? outcome.status.raw : outcome.status.value,
-            run_result:
-              detail === 'raw' ? outcome.result.raw : outcome.result.value,
-          },
+    // As `GetUnitTest`: the parse of both readings; `raw` is answered above.
+    (outcome) => runOutcomeWithStatus(run_id, outcome),
   );
 }

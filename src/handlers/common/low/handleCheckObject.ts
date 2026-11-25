@@ -42,6 +42,7 @@ import { CHECK_KINDS, type CheckKind } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import { checkTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
@@ -52,8 +53,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'CheckObjectLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages.',
+  description: checkTool({
+    tag: 'low-level',
+    object: 'an ABAP repository object of any type',
+    how: 'by its name and type, leaving it as it is',
+  }),
   inputSchema: z.object({
     object_name: z.string().describe('Object name'),
     object_type: z

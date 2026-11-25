@@ -41,6 +41,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -55,8 +56,11 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalTestClass',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Writes test_class_code as the local test classes include of the ABAP class named by class_name. The include is written under the class lock; with activate_on_update the class is activated.',
+  description: updateTool({
+    object: 'the local test classes of an existing ABAP class',
+    how: ', activating the class when asked',
+    transported: true,
+  }),
   inputSchema: z.object({
     class_name: z.string().describe('Parent class name.'),
     test_class_code: z

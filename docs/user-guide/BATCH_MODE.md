@@ -106,7 +106,7 @@ with the single-step tools:
 3. write — `HandlerUpdate` with `lock_handle` (for PACKAGE, DOMAIN, DATA_ELEMENT and
    FUNCTION_GROUP the whole metadata document in `source_code`, read beforehand with `HandlerGet`
    part `metadata`);
-4. unlock — `HandlerUnlock`;
+4. unlock — `HandlerLock` `action: unlock`;
 5. read back, check — `HandlerGet` (one part per call: `source`, `metadata`), `HandlerCheckRun`.
 6. activate — `HandlerActivate`: one object of a type the per-object activation maps answers its
    verdict; a list (`objects[]`), an `object_adt_type`, PACKAGE, SERVICE_DEFINITION and
@@ -170,7 +170,7 @@ the metadata document, and for `SERVICE_BINDING` its publication request. For PA
 DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, and for INCLUDE with `part: 'metadata'`, `source_code`
 is the whole metadata document, sent byte for byte:
 nothing is read before the write or after it. Locking, unlocking and activating are their own
-calls (`HandlerLock`, `HandlerUnlock`, `HandlerActivate`); for `LOCAL_*`, `UNIT_TEST` and
+calls (`HandlerLock`, `HandlerLock` `action: unlock`, `HandlerActivate`); for `LOCAL_*`, `UNIT_TEST` and
 `CDS_UNIT_TEST` the lock is the class's — `HandlerLock` with `object_type: CLASS`. A `PACKAGE` update is recorded over HTTP
 only: over RFC the package lock is held in an ABAP session of its own, outside the batch.
 
@@ -253,7 +253,7 @@ request. Each phase was one `HandlerBatch` begin, the calls, end, then the answe
 4. lock — `HandlerLock` × 3, the lock handles read from the answers;
 5. write — `HandlerUpdate` × 3 under those handles: the class's and the interface's sources, the
    domain's whole document in `source_code`;
-6. unlock — `HandlerUnlock` × 3;
+6. unlock — `HandlerLock` `action: unlock` × 3;
 7. activate — `HandlerActivate` × 3, one object each, each answering `activated: true`;
 8. reads — `HandlerGet` × 3: the sources and the document as written;
 9. deletion check — `HandlerDeletionCheck` × 3, each answering `deletable: true`;
@@ -429,7 +429,7 @@ one envelope cannot hold a request built from another's answer. Each is refused
 | Tool | Recorded | Sends |
 |---|---|---|
 | `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is one of DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, METADATA_EXTENSION, BEHAVIOR_IMPLEMENTATION | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps) |
-| `HandlerActivate` | when objects is given and the type of every objects entry is any value but FUGR/FF, function, functionmodule, function_module, func | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
+| `HandlerActivate` | when objects is given and the type of every objects item is any value but FUGR/FF, function, functionmodule, function_module, func | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
 | `HandlerActivate` | when objects is absent and object_adt_type is given and object_adt_type is any value but FUGR/FF, function, functionmodule, function_module, func | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the one object, answering { run_id } (a code the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
 | `HandlerActivate` | when objects is absent and object_adt_type is absent and object_type is one of PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS | POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true for the one object, answering { run_id } |
 | `HandlerCdsUnitTestResult` | when run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false] |
@@ -452,8 +452,10 @@ one envelope cannot hold a request built from another's answer. Each is refused
 | `HandlerGet` | when part is source (absent reads as source) and object_type is one of UNIT_TEST, CDS_UNIT_TEST and run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}: the run's result, part source |
 | `HandlerGet` | when part is draft | as the full set's draft read: for each part of the object, GET its source or metadata ?version=active, ?version=inactive and ?version=workingArea, all sent together |
 | `HandlerGetData` | every call | POST /sap/bc/adt/datapreview/freestyle with sql_query, or with SELECT * FROM object_name, as the body |
-| `HandlerLock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |
-| `HandlerLock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
+| `HandlerLock` | when action is lock (absent reads as lock) and object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |
+| `HandlerLock` | when action is lock (absent reads as lock) and object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
+| `HandlerLock` | when action is unlock and object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS and lock_handle is given | POST {object uri}?_action=UNLOCK&lockHandle=…, stateful |
+| `HandlerLock` | when action is unlock and object_type is PACKAGE and lock_handle is given and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=UNLOCK&lockHandle=…, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerProfileList` | every call | GET /sap/bc/adt/runtime/traces/abaptraces |
 | `HandlerProfileRun` | every call | POST /sap/bc/adt/oo/classrun/{name} or /sap/bc/adt/programs/programrun/{name}; with profiler_id, ?profilerId={profiler_id} |
 | `HandlerProfileSchedule` | every call | POST /sap/bc/adt/runtime/traces/abaptraces/parameters: schedules a trace and answers its profiler_id |
@@ -471,8 +473,6 @@ one envelope cannot hold a request built from another's answer. Each is refused
 | `HandlerUnitTestRun` | when runner is sync | POST /sap/bc/adt/abapunit/testruns: runs every test class of each container named and answers the finished result |
 | `HandlerUnitTestRun` | when runner is async (absent reads as async) | POST /sap/bc/adt/abapunit/runs: starts the run and answers its id; the result is read with HandlerUnitTestStatus / HandlerUnitTestResult |
 | `HandlerUnitTestStatus` | every call | GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true |
-| `HandlerUnlock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS | POST {object uri}?_action=UNLOCK&lockHandle=…, stateful |
-| `HandlerUnlock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=UNLOCK&lockHandle=…, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerUpdate` | when lock_handle is given and object_type is one of DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST, PROGRAM, INTERFACE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, INCLUDE, TABLE_TYPE, CLASS_TEXT_ELEMENTS | one request under the lock_handle given: PUT of the source, the class include or the metadata document as given ({object uri}…?lockHandle=…[&corrNr=…]); for SERVICE_BINDING its publication request |
 | `HandlerUpdate` | when lock_handle is given and object_type is PACKAGE and the connection is HTTP | PUT /sap/bc/adt/packages/{name}?lockHandle=…[&corrNr=…], the metadata document as given; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerValidate` | every call | POST the type's validation endpoint (…/validation?objname=…, /cts/transportchecks for a service binding) |

@@ -17,12 +17,17 @@ import {
   admittedRepo,
   credentialOption,
 } from '../../../lib/abapGit/client';
+import { purpose, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'GetAbapGitFile',
-  description:
-    "[read-only] Reads one file of the repository: the system's version (local) or the remote branch's (remote). Answers the file's text as it is.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads one file of an abapGit repository, as the system holds it or as the remote branch holds it.',
+    ),
+  }),
   inputSchema: z.object({
     repository_key: REPOSITORY_KEY_FIELD,
     filename: FILENAME_FIELD,

@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
-  handleGetEnhancements,
+  filterMinimalNested,
+  handleGetEnhancements as handleGetEnhancementsOf,
   parseEnhancementsFromXml,
 } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { assertMatchObject } from '../helpers/assertions';
+
+/** handleGetEnhancements at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleGetEnhancements = (
+  context: Parameters<typeof handleGetEnhancementsOf>[0],
+  args: Parameters<typeof handleGetEnhancementsOf>[1],
+) => handleGetEnhancementsOf(context, { detail: 'full', ...args });
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -368,5 +375,149 @@ describe('parseEnhancementsFromXml', () => {
   it('reads no source of a document without one', () => {
     assert.deepStrictEqual(parse(root('')), []);
     assert.deepStrictEqual(parse(''), []);
+  });
+});
+
+describe('GetEnhancements terse, by default', () => {
+  const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64');
+  const document =
+    '<enh:enhancements xmlns:enh="http://www.sap.com/adt/abapsource/enhancements" xmlns:adtcore="http://www.sap.com/adt/core">' +
+    '<enh:enhancementImplementations adtcore:name="Z_FIRST" adtcore:type="ENHO/XHH" adtcore:version="active">' +
+    `<enh:elements><enh:sourceCodePlugin enh:uri="/x"><enh:source>${b64('ENHANCEMENT 1 z_first.\nSECRET_SOURCE_LINE.\nENDENHANCEMENT.')}</enh:source></enh:sourceCodePlugin></enh:elements>` +
+    '</enh:enhancementImplementations></enh:enhancements>';
+
+  it('answers the object, its count and a name/type row per enhancement, no source', async () => {
+    const connection = {
+      async makeAdtRequest(req: { url: string }) {
+        if (
+          req.url.startsWith(
+            '/sap/bc/adt/functions/groups/zfg/source/main/enhancements/elements',
+          )
+        ) {
+          return { status: 200, data: document };
+        }
+        const error: any = new Error('Request failed with status code 404');
+        error.response = { status: 404 };
+        throw error;
+      },
+    };
+    const result: any = await handleGetEnhancementsOf(
+      { connection, logger: undefined, batchAvailability: notServed } as any,
+      { object_name: 'SAPLZFG', object_type: 'program' },
+    );
+
+    const text: string = result.content[0].text;
+    assert.equal(result.isError, false, text);
+    assert.deepStrictEqual(text.split('\n').slice(-2), [
+      'name\ttype\tdescription',
+      'Z_FIRST\tENHO/XHH\t',
+    ]);
+    assert.equal(text.split('\n')[0]?.startsWith('# object '), true);
+    assert.equal(text.includes('# count 1'), true);
+    assert.equal(text.includes('SECRET_SOURCE_LINE'), false);
+  });
+});
+
+describe('GetEnhancements answers every source whole at medium, full and raw', () => {
+  const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64');
+  const LONG = `ENHANCEMENT 1 z_long.\n${'* a line of the source\n'.repeat(60)}ENDENHANCEMENT.`;
+  const document =
+    '<enh:enhancements xmlns:enh="http://www.sap.com/adt/abapsource/enhancements" xmlns:adtcore="http://www.sap.com/adt/core">' +
+    '<enh:enhancementImplementations adtcore:name="Z_LONG" adtcore:type="ENHO/XHH" adtcore:version="active">' +
+    `<enh:elements><enh:sourceCodePlugin enh:uri="/x"><enh:source>${b64(LONG)}</enh:source></enh:sourceCodePlugin></enh:elements>` +
+    '</enh:enhancementImplementations></enh:enhancements>';
+  const connection = {
+    async makeAdtRequest(req: { url: string }) {
+      if (
+        req.url.startsWith(
+          '/sap/bc/adt/functions/groups/zfg/source/main/enhancements/elements',
+        )
+      ) {
+        return { status: 200, data: document };
+      }
+      const error: any = new Error('Request failed with status code 404');
+      error.response = { status: 404 };
+      throw error;
+    },
+  };
+  for (const detail of ['medium', 'full', 'raw'] as const) {
+    for (const detailed of [false, true]) {
+      it(`detail ${detail}, detailed ${detailed}`, async () => {
+        const result: any = await handleGetEnhancementsOf(
+          {
+            connection,
+            logger: undefined,
+            batchAvailability: notServed,
+          } as any,
+          { object_name: 'SAPLZFG', object_type: 'program', detail, detailed },
+        );
+        const body = JSON.parse(result.content[0].text);
+        // raw is what ADT sent: the documents read, the source whole inside.
+        if (detail === 'raw') {
+          // Every response, the include probes SAP refused (404) too.
+          assert.ok(
+            body.some(
+              (r: { status: number; body: string }) =>
+                r.status === 200 && r.body === document,
+            ),
+          );
+          return;
+        }
+        assert.equal(body.enhancements[0].sourceCode, LONG);
+      });
+    }
+  }
+});
+
+// Codex round 10, P1-4: medium with include_nested writes every object read
+// — one without enhancements too, with its zero count, as one with refused
+// probes, its probes beside it; the count of objects with enhancements
+// counts only those.
+describe('GetEnhancements medium, nested', () => {
+  it('writes every object read, its probes and its count', () => {
+    const refusedProbe = {
+      message: 'no authorization',
+      step: 'read enhancements',
+      status: 403,
+    };
+    const minimal = filterMinimalNested({
+      main_object: { name: 'ZPROG', type: 'program' },
+      include_nested: true,
+      total_objects_analyzed: 3,
+      total_enhancements_found: 1,
+      objects: [
+        {
+          object_name: 'ZPROG',
+          object_type: 'program',
+          enhancements: [{ name: 'Z_E', type: 'ENHO/XHH' }],
+        },
+        { object_name: 'ZINC_EMPTY', object_type: 'include', enhancements: [] },
+        {
+          object_name: 'ZINC_REFUSED',
+          object_type: 'include',
+          enhancements: [],
+          unreadable: [refusedProbe],
+        },
+      ],
+    }).answer;
+    const objects = minimal.objects as Array<{ object_name: string }>;
+    assert.deepStrictEqual(
+      objects.map((o) => o.object_name),
+      ['ZPROG', 'ZINC_EMPTY', 'ZINC_REFUSED'],
+    );
+    assert.deepStrictEqual(objects[1], {
+      object_name: 'ZINC_EMPTY',
+      object_type: 'include',
+      total_enhancements: 0,
+      enhancements: [],
+    });
+    assert.deepStrictEqual(objects[2], {
+      object_name: 'ZINC_REFUSED',
+      object_type: 'include',
+      total_enhancements: 0,
+      enhancements: [],
+      unreadable: [refusedProbe],
+    });
+    assert.equal(minimal.total_objects_with_enhancements, 1);
   });
 });

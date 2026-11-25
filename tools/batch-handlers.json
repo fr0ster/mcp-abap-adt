@@ -295,6 +295,10 @@
     "sends": "POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful",
     "when": [
       {
+        "argument": "action",
+        "equals": ["lock"]
+      },
+      {
         "argument": "object_type",
         "equals": [
           "CLASS",
@@ -328,6 +332,10 @@
     "sends": "POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch",
     "when": [
       {
+        "argument": "action",
+        "equals": ["lock"]
+      },
+      {
         "argument": "object_type",
         "equals": ["PACKAGE"]
       }
@@ -335,11 +343,15 @@
     "connection": "http"
   },
   {
-    "tool": "HandlerUnlock",
+    "tool": "HandlerLock",
     "set": "compact",
-    "handler": "compact-modify/src/handlers/handleHandlerUnlock.ts#handleHandlerUnlock",
+    "handler": "compact-modify/src/handlers/handleHandlerLock.ts#handleHandlerLock",
     "sends": "POST {object uri}?_action=UNLOCK&lockHandle=…, stateful",
     "when": [
+      {
+        "argument": "action",
+        "equals": ["unlock"]
+      },
       {
         "argument": "object_type",
         "equals": [
@@ -364,18 +376,30 @@
           "FUNCTION_GROUP_TEXT_ELEMENTS",
           "CLASS_TEXT_ELEMENTS"
         ]
+      },
+      {
+        "argument": "lock_handle",
+        "present": true
       }
     ]
   },
   {
-    "tool": "HandlerUnlock",
+    "tool": "HandlerLock",
     "set": "compact",
-    "handler": "compact-modify/src/handlers/handleHandlerUnlock.ts#handleHandlerUnlock",
+    "handler": "compact-modify/src/handlers/handleHandlerLock.ts#handleHandlerLock",
     "sends": "POST /sap/bc/adt/packages/{name}?_action=UNLOCK&lockHandle=…, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch",
     "when": [
       {
+        "argument": "action",
+        "equals": ["unlock"]
+      },
+      {
         "argument": "object_type",
         "equals": ["PACKAGE"]
+      },
+      {
+        "argument": "lock_handle",
+        "present": true
       }
     ],
     "connection": "http"

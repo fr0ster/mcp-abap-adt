@@ -74,7 +74,6 @@ in the compact ones — and declares an optional `state_handle` argument on ever
    - `HandlerValidate`
    - `HandlerActivate`
    - `HandlerLock`
-   - `HandlerUnlock`
    - `HandlerCheckRun`
    - `HandlerDeletionCheck`
    - `HandlerUnitTestRun`, `HandlerUnitTestStatus`, `HandlerUnitTestResult`

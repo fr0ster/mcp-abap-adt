@@ -3,14 +3,22 @@ import * as z from 'zod';
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugStateAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugTerminate',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[debug] Ends the stopped debuggee and its program where it stands.',
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Terminates the stopped ABAP debuggee and its program where it stands.',
+      ),
+    }),
+  ),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),
 } as const;
 

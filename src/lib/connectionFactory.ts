@@ -32,6 +32,7 @@ import {
   stateSystemKind,
 } from './systemKind';
 import { child, childAt, entries } from './thrownValue';
+import { decodeResponseBytes } from './wireResponse';
 import { wireValueOf } from './wireValue';
 
 export type { AbapSystemKind } from './systemKind';
@@ -239,6 +240,39 @@ function safeHeaders(headers: Readonly<Record<string, string>>): string {
  * untouched when the switch is off — no wrapper, no cost, no behaviour to
  * explain in production.
  */
+/**
+ * Every body the connection answers as text: bytes (a `Buffer`) decoded as
+ * UTF-8 before anything reads them — an analyser, a reading, the raw
+ * recorder — so an `exc:exception` on a `200` is refused whether it came as
+ * bytes or as a string (Codex round 8). A refusal the connection throws
+ * carries its response's body decoded too.
+ */
+export function withDecodedBodies<T extends IAbapConnection>(connection: T): T {
+  const original = connection.makeAdtRequest.bind(connection);
+  connection.makeAdtRequest = async (
+    options: IAbapRequestOptions,
+  ): Promise<IAdtWireResponse> => {
+    try {
+      const answer = await original(options);
+      return answer.data instanceof Uint8Array
+        ? { ...answer, data: new TextDecoder().decode(answer.data) }
+        : answer;
+    } catch (thrown) {
+      // A thrown value is outside the type system: its response read as a
+      // wire answer, and its bytes decoded in place on the thrown object.
+      decodeThrownBody(thrown);
+      throw thrown;
+    }
+  };
+  return connection;
+}
+
+/** A thrown request failure's response body decoded to UTF-8 in place, when it is bytes. */
+function decodeThrownBody(thrown: unknown): void {
+  if (typeof thrown !== 'object' || thrown === null) return;
+  decodeResponseBytes(Reflect.get(thrown, 'response'));
+}
+
 export function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
   const { logWire, bodyChars } = httpWireOptions();
   if (!logWire) return connection;
@@ -550,6 +584,7 @@ export function createAbapConnection(
     );
   })();
 
+  withDecodedBodies(built);
   records.set(built, {
     settings,
     credential,

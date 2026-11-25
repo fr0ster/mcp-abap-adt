@@ -176,8 +176,28 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
     assert.deepStrictEqual(parseTransportListXml(CAPTURED_NO_TRANSPORTS), []);
   });
 
-  it('collapses a request reachable through more than one branch', () => {
-    const duplicated = `<?xml version="1.0" encoding="utf-8"?>
+  // Plan step 9 (owner): a repeat is the same request again — number,
+  // content and tasks alike — and is listed once; the same number with
+  // other content is written again, nothing it carries vanishing.
+  it('lists an exact repeat once', () => {
+    const repeated = `<?xml version="1.0" encoding="utf-8"?>
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm">
+  <tm:workbench><tm:modifiable>
+    <tm:request tm:number="SIDK900002" tm:desc="Once" tm:status="D"/>
+  </tm:modifiable></tm:workbench>
+  <tm:workbench><tm:modifiable>
+    <tm:request tm:number="SIDK900002" tm:desc="Once" tm:status="D"/>
+  </tm:modifiable></tm:workbench>
+</tm:root>`;
+
+    const parsed = parseTransportListXml(repeated);
+
+    assert.equal(parsed.length, 1);
+    assert.equal(parsed[0]?.description, 'Once');
+  });
+
+  it('writes the same number with other content again', () => {
+    const differing = `<?xml version="1.0" encoding="utf-8"?>
 <tm:root xmlns:tm="http://www.sap.com/cts/adt/tm">
   <tm:workbench><tm:modifiable>
     <tm:request tm:number="SIDK900002" tm:desc="Once" tm:status="D"/>
@@ -187,9 +207,57 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
   </tm:modifiable></tm:workbench>
 </tm:root>`;
 
-    const parsed = parseTransportListXml(duplicated);
+    assert.deepStrictEqual(
+      parseTransportListXml(differing).map((t) => t.description),
+      ['Once', 'Twice'],
+    );
+  });
 
-    assert.equal(parsed.length, 1);
-    assert.equal(parsed[0].description, 'Once');
+  // Codex round 10: the repeat key is the whole request as the reading
+  // holds it — the same row with other links is another request.
+  it('writes the same row with other release links again', () => {
+    const linked = (href: string) =>
+      `<tm:workbench><tm:modifiable>
+    <tm:request tm:number="SIDK900002" tm:desc="Once" tm:status="D">
+      <atom:link href="${href}" rel="http://www.sap.com/cts/relations/release"/>
+    </tm:request>
+  </tm:modifiable></tm:workbench>`;
+    const differing = `<?xml version="1.0" encoding="utf-8"?>
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:atom="http://www.w3.org/2005/Atom">
+  ${linked('/sap/bc/adt/cts/transportrequests/SIDK900002/release/a')}
+  ${linked('/sap/bc/adt/cts/transportrequests/SIDK900002/release/b')}
+</tm:root>`;
+
+    assert.deepStrictEqual(
+      parseTransportListXml(differing).map((t) => t.description),
+      ['Once', 'Once'],
+    );
+  });
+
+  it('writes the same row with another attribute it does not show again', () => {
+    const differing = `<?xml version="1.0" encoding="utf-8"?>
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm">
+  <tm:workbench><tm:modifiable>
+    <tm:request tm:number="SIDK900002" tm:desc="Once" tm:status="D" tm:lastchanged_timestamp="1"/>
+  </tm:modifiable></tm:workbench>
+  <tm:workbench><tm:modifiable>
+    <tm:request tm:number="SIDK900002" tm:desc="Once" tm:status="D" tm:lastchanged_timestamp="2"/>
+  </tm:modifiable></tm:workbench>
+</tm:root>`;
+
+    assert.equal(parseTransportListXml(differing).length, 2);
+  });
+
+  it('lists a request without a number, its number empty', () => {
+    const numberless = `<?xml version="1.0" encoding="utf-8"?>
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm">
+  <tm:workbench><tm:modifiable>
+    <tm:request tm:desc="No number" tm:status="D"/>
+  </tm:modifiable></tm:workbench>
+</tm:root>`;
+
+    assertMatchObject(parseTransportListXml(numberless), [
+      { number: '', description: 'No number' },
+    ]);
   });
 });

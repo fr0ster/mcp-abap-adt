@@ -25,6 +25,7 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { type AdtReading, parseStructure, rawOf } from '../strategies/reading';
 import type { XmlNode } from '../xml/node';
+import type { Written } from './listing';
 
 /**
  * The levels of `detail`: `terse` (the default: what the next call needs),
@@ -102,5 +103,75 @@ export function answerAt<V, A>(
   table: AnswerTable<V, A>,
   detail: DetailLevel,
 ): (value: V) => A {
+  return table[detail];
+}
+
+/** Only this module brands a level written by the listing writers. */
+const writtenLevel: unique symbol = Symbol('written level');
+
+/** A level reading whose value the listing writers wrote: only `written` and `whole` make one. */
+export type WrittenLevel<P> = LevelReading<P> & {
+  readonly [writtenLevel]: true;
+};
+
+/**
+ * A level a listing writer writes: the typed reading, then the writer's
+ * answer — never a plain value of the formatter's own.
+ */
+export function written<T, P>(
+  typed: (answer: IAdtWireResponse) => T,
+  write: (value: T, status: number) => Written<P>,
+): WrittenLevel<P> {
+  return Object.assign(
+    (answer: IAdtWireResponse) => ({
+      value: write(typed(answer), answer.status).answer,
+      raw: rawOf(answer),
+      status: answer.status,
+    }),
+    { [writtenLevel]: true as const },
+  );
+}
+
+/**
+ * A level that answers its reading whole, unchanged (the parse, the
+ * document): complete by construction, nothing reshaped.
+ */
+export function whole<P>(level: LevelReading<P>): WrittenLevel<P> {
+  return Object.assign((answer: IAdtWireResponse) => level(answer), {
+    [writtenLevel]: true as const,
+  });
+}
+
+/**
+ * A list tool's readings: terse and medium only as the listing writers
+ * write them (`written`) or the reading whole (`whole`) — a plain value of
+ * a formatter's own does not compile.
+ */
+export type ListDetailTable<P> = {
+  readonly terse: WrittenLevel<P>;
+  readonly medium: WrittenLevel<P>;
+  readonly full: LevelReading<P>;
+  readonly raw: LevelReading<P>;
+};
+
+/**
+ * A list tool's answers: terse and medium only as the listing writers
+ * write them (`Written`) — a plain string or object of a formatter's own
+ * does not compile.
+ */
+export type ListAnswerTable<V, A> = {
+  readonly terse: (value: V) => Written<A>;
+  readonly medium: (value: V) => Written<A>;
+  readonly full: (value: V) => A;
+  readonly raw: (value: V) => A;
+};
+
+/** The answer of the level asked for, a written one unwrapped. */
+export function listAnswerAt<V, A>(
+  table: ListAnswerTable<V, A>,
+  detail: DetailLevel,
+): (value: V) => A {
+  if (detail === 'terse') return (value) => table.terse(value).answer;
+  if (detail === 'medium') return (value) => table.medium(value).answer;
   return table[detail];
 }

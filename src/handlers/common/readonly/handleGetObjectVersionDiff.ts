@@ -9,11 +9,7 @@ import * as z from 'zod';
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type {
-  IAdtError,
-  IAdtResponse,
-  IAdtVersionable,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { createTwoFilesPatch } from 'diff';
 import {
   type ProjectionVariant,
@@ -22,6 +18,11 @@ import {
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import {
+  type DescriptionParts,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { both } from '../../../lib/strategies/sequence';
 import { atStep, carryingFailure } from '../../../lib/strategies/step';
@@ -128,12 +129,27 @@ export async function buildVersionDiff(
   return diffSources(contentUriFrom, contentUriTo, rawFrom, rawTo);
 }
 
+/**
+ * A version diff tool's description parts: two versions of `object` compared,
+ * then the facts of {@link VersionDiffResult} — shared by this tool and
+ * every per-type `Get<Type>VersionDiff`.
+ */
+export function versionDiffParts(object: string): DescriptionParts {
+  return {
+    tag: 'read-only',
+    purpose: purpose(
+      `Reads two versions of ${object} from its version history and compares them.`,
+    ),
+  };
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectVersionDiff',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description:
-      "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
+    description: toolDescription(
+      versionDiffParts('a class, program, CDS view or other source object'),
+    ),
     inputSchema: objectVersionDiffSchema(variant),
   })),
 } as const;

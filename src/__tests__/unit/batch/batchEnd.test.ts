@@ -92,7 +92,7 @@ function sap(inner: InnerRequest): PartAnswer {
   };
 }
 
-const TOOLS = ['HandlerGet', 'HandlerLock', 'HandlerUnlock'];
+const TOOLS = ['HandlerGet', 'HandlerLock'];
 
 /** The program's source, whose three versions a draft read sends. */
 const DRAFT_SOURCE = '/sap/bc/adt/programs/programs/prog_a/source/main';
@@ -622,7 +622,8 @@ describe('BatchEnd', () => {
     await on.end();
     const [read] = await on.answers([1]);
     on.begin();
-    await on.call('HandlerUnlock', {
+    await on.call('HandlerLock', {
+      action: 'unlock',
       object_type: 'CLASS',
       object_name: 'CLAS_A',
       lock_handle: LOCK_HANDLE_OF_XML,
@@ -655,7 +656,8 @@ describe('BatchEnd', () => {
         object_type: 'PROGRAM',
         program_name: 'PROG_A',
       }),
-      await s.call('HandlerUnlock', {
+      await s.call('HandlerLock', {
+        action: 'unlock',
         object_type: 'CLASS',
         object_name: 'CLAS_A',
         lock_handle: LOCK_HANDLE_OF_XML,
@@ -670,8 +672,9 @@ describe('BatchEnd', () => {
       ['HandlerLock', { object_type: 'CLASS', object_name: 'CLAS_A' }],
       ['HandlerGet', { object_type: 'PROGRAM', program_name: 'PROG_A' }],
       [
-        'HandlerUnlock',
+        'HandlerLock',
         {
+          action: 'unlock',
           object_type: 'CLASS',
           object_name: 'CLAS_A',
           lock_handle: LOCK_HANDLE_OF_XML,

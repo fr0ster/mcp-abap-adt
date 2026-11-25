@@ -144,10 +144,7 @@ const parametersOf = (definition: ToolDefinition): string[] => {
  * silence. This one answers a feed with no argument; `HandlerProfileList` was the
  * other until the compact facade moved into `@mcp-abap-adt/compact-readonly-entries`.
  */
-const TAKES_NO_PARAMETERS = [
-  'ListBackgroundRuns',
-  'RuntimeListProfilerTraceFiles',
-];
+const TAKES_NO_PARAMETERS = ['ListBackgroundRuns'];
 
 describe('descriptions carry no incidental literals', () => {
   const tools = [

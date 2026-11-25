@@ -132,8 +132,8 @@ it('lock, update, unlock over three requests with the header: one SAP session, t
   assert.equal(updated.isError, false);
 
   const unlocked = await s.call(
-    'HandlerUnlock',
-    { ...LOCK, lock_handle: lockHandle },
+    'HandlerLock',
+    { action: 'unlock', ...LOCK, lock_handle: lockHandle },
     withHeader(stateHandle),
   );
   assert.equal(unlocked.isError, false);
@@ -164,7 +164,8 @@ it('lock, update, unlock over three requests with the state_handle argument alon
   });
   assert.equal(updated.isError, false);
 
-  const unlocked = await s.call('HandlerUnlock', {
+  const unlocked = await s.call('HandlerLock', {
+    action: 'unlock',
     ...LOCK,
     lock_handle: lockHandle,
     state_handle: stateHandle,
@@ -204,7 +205,8 @@ it('without the header or the argument the write and the unlock are refused, sen
   assert.equal(updated.isError, true);
   assert.ok(updated.text.includes(NOT_HELD_WORDS));
 
-  const unlocked = await s.call('HandlerUnlock', {
+  const unlocked = await s.call('HandlerLock', {
+    action: 'unlock',
     ...LOCK,
     lock_handle: lockHandle,
   });
@@ -248,8 +250,8 @@ it('a request with another credential (a renewed token) works on the held connec
   assert.deepStrictEqual(s.standIn.loggedOff(), []);
 
   const unlocked = await s.call(
-    'HandlerUnlock',
-    { ...LOCK, lock_handle: lockHandle },
+    'HandlerLock',
+    { action: 'unlock', ...LOCK, lock_handle: lockHandle },
     withHeader(stateHandle, renewed),
   );
   assert.equal(unlocked.isError, false);

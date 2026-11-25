@@ -4,10 +4,15 @@ import {
   settingsFromArgs,
   terseAmdpEvent,
 } from '../../debugger/index';
+import {
+  type DescriptionParts,
+  pairsPurpose,
+  toolDescription,
+} from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
 import { DETAIL_SHAPE } from '../../strategies/detail';
-import { either, listed, textsOf } from '../memberTexts';
+import { either, listed } from '../memberTexts';
 import {
   endAnswer,
   IDENTITY_PROPERTIES,
@@ -46,59 +51,32 @@ export const SESSION_OPERATIONS = [
 ] as const;
 type SessionOperation = (typeof SESSION_OPERATIONS)[number];
 
-/** Each abap operation's clause of the description. */
-const ABAP_CLAUSES: ReadonlyArray<readonly [SessionOperation, string]> = [
-  [
-    'checkListener',
-    "checkListener answers whether another debugger holds this identity's debugging (SAP's 409 names the holder)",
-  ],
-  [
-    'listen',
-    "listen waits for a debuggee for exactly hold_seconds, SAP's hold, and answers the debuggee caught (debuggee_id, its server) or caught: false; a breakpoint stops a program while a listen is open",
-  ],
-  [
-    'stopListener',
-    "stopListener ends the listener and deletes the identity's breakpoints",
-  ],
-  [
-    'attach',
-    'attach attaches debuggee_id on the attaching session, which the first attach opens and every later attach, step and reading uses',
-  ],
-  [
-    'detachDebugger',
-    'detachDebugger sends detachDebugger on the attaching session, which releases the debuggee, and the program runs on',
-  ],
-];
+/** Each operation as an action and object pair (owner). */
+const PAIRS: { readonly [K in SessionOperation]: string } = {
+  checkListener:
+    "checks whether another debugger holds this identity's debugging",
+  listen: 'listens for an ABAP debuggee',
+  stopListener: 'stops the ABAP listener',
+  attach: 'attaches an ABAP debuggee',
+  detachDebugger: 'detaches the debugger from the debuggee',
+  terminateDebuggee: 'terminates the ABAP debuggee',
+  terminateDebugger: 'terminates the debugger',
+  setDebuggerSettings: 'sets the debugger settings',
+  start: 'starts an AMDP debug session',
+  getEvents: "gets the AMDP session's events",
+  stop: 'stops the AMDP debug session',
+  deleteDebuggee: 'deletes an AMDP debuggee',
+  end: 'ends the debug state',
+};
 
-/** Each amdp operation's clause of the description. */
-const AMDP_CLAUSES: ReadonlyArray<readonly [SessionOperation, string]> = [
-  [
-    'start',
-    'start opens an AMDP session for the connected SAP user and answers its main_id',
-  ],
-  [
-    'getEvents',
-    'getEvents answers the events SAP sends (breaks with their debuggee ids, breakpoint confirmations, ends)',
-  ],
-  ['stop', 'stop ends the AMDP session'],
-  ['deleteDebuggee', 'deleteDebuggee cancels the execution of debuggee_id'],
-];
-
-/** The clause of the two terminations, for those left. */
-function terminations(has: (op: SessionOperation) => boolean): string[] {
-  const parts = [
-    ...(has('terminateDebuggee')
-      ? ['terminateDebuggee ends the debuggee where it stands']
-      : []),
-    ...(has('terminateDebugger')
-      ? ['terminateDebugger frees the debugger']
-      : []),
-  ];
-  return parts.length === 0
-    ? []
-    : [
-        `${parts.join(' and ')}; ${parts.length === 1 ? 'it answers' : 'each answers'} SAP's answer as it came, which is a 500 when it succeeded, and the next answer shows the success (noSessionAttached, or the program's end)`,
-      ];
+/** `HandlerDebugSession`'s parts with `operations`: each by its function. */
+export function handlerDebugSessionParts(
+  operations: readonly SessionOperation[],
+): DescriptionParts {
+  return {
+    tag: 'debug',
+    purpose: pairsPurpose(operations.map((op) => PAIRS[op])),
+  };
 }
 
 /** The operations of the opening state handle's description, for those left. */
@@ -121,16 +99,6 @@ export function handlerDebugSessionDefinition(
   operations: readonly SessionOperation[],
 ) {
   const has = (op: SessionOperation) => operations.includes(op);
-  const abapClauses = [
-    ...textsOf(operations, ABAP_CLAUSES),
-    ...terminations(has),
-    ...(has('setDebuggerSettings')
-      ? [
-          'setDebuggerSettings sends the settings given at the attached debuggee',
-        ]
-      : []),
-  ];
-  const amdpClauses = textsOf(operations, AMDP_CLAUSES);
   const abapOps = ABAP_OPERATIONS.filter(has);
   const amdpOps = AMDP_OPERATIONS.filter(has);
   const request = [
@@ -159,7 +127,7 @@ export function handlerDebugSessionDefinition(
       : []),
   ];
   return {
-    description: `Debugger listener and session. Each operation${has(END) ? ' up to end' : ''} sends one SAP request, the operation's, and answers what SAP answered.${abapClauses.length > 0 ? ` kind abap: ${abapClauses.join('; ')}.` : ''}${amdpClauses.length > 0 ? ` kind amdp: ${amdpClauses.join('; ')}.` : ''}${has(END) ? ` end, for either kind, takes state_handle and logs off each connection the debug state opened, one logoff each: an attached debuggee runs on, an AMDP debug session ends, and the user's breakpoints stay set${has('stopListener') ? ' until stopListener removes them' : ''}; the debug state and its handle end with it, and a new debug state of either kind and any identity opens after it.` : ''} The answer carries state_handle while the debug state holds something, and for abap the identity in force.`,
+    description: toolDescription(handlerDebugSessionParts(operations)),
     inputSchema: z.object({
       ...(opening.length > 0
         ? openingStateHandleProperty(opening)
@@ -226,7 +194,7 @@ const OWN_STATE_HANDLE = {
 export const TOOL_DEFINITION = {
   name: 'HandlerDebugSession',
   available_in: ['onprem', 'cloud'] as const,
-  description: handlerDebugSessionDefinition(SESSION_OPERATIONS).description,
+  description: toolDescription(handlerDebugSessionParts(SESSION_OPERATIONS)),
   inputSchema: z.object({
     ...openingStateHandleProperty(
       'abap checkListener, listen, stopListener and attach, and amdp start,',

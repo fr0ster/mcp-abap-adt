@@ -508,8 +508,9 @@ async function runOn(kind: Kind, testCase: any): Promise<void> {
 
     // 6. Unlock.
     const unlockCalls = objects.map((object) => ({
-      tool: 'HandlerUnlock',
+      tool: 'HandlerLock',
       args: {
+        action: 'unlock',
         object_type: object.type,
         object_name: object.name,
         lock_handle: handleOf(object),
@@ -610,7 +611,8 @@ async function cleanUp(
   for (const object of created) {
     const handle = held.get(object.name);
     if (handle === undefined) continue;
-    const answer = await served.call('HandlerUnlock', {
+    const answer = await served.call('HandlerLock', {
+      action: 'unlock',
       object_type: object.type,
       object_name: object.name,
       lock_handle: handle,

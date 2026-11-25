@@ -57,7 +57,8 @@ function member(value: unknown, key: string): unknown {
 
 /** The unlock of the package under `handle`. */
 function unlock(handle: string): Promise<LiveAnswer> {
-  return livePrepare('HandlerUnlock', {
+  return livePrepare('HandlerLock', {
+    action: 'unlock',
     object_type: 'PACKAGE',
     object_name: PACKAGE,
     lock_handle: handle,

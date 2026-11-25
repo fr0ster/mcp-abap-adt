@@ -28,6 +28,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -43,8 +44,11 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'CreateMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.',
+  description: createTool({
+    object: 'a CDS metadata extension',
+    how: ', with its description, activating it when asked',
+    transported: true,
+  }),
   inputSchema: createArguments('CreateMetadataExtension', {
     name: z.string().describe('Metadata Extension name'),
     description: z.string().optional().describe('Description'),

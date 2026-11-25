@@ -20,13 +20,13 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { handleGetEnhancements } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
+import { handleGetEnhancements as handleGetEnhancementsOf } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
 import {
   TOOL_DEFINITION as GetIncludesList,
-  handleGetIncludesList,
+  handleGetIncludesList as handleGetIncludesListOf,
 } from '../../../handlers/include/readonly/handleGetIncludesList';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
+import { handleGetStructuresList as handleGetStructuresListOf } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { assertMatchObject } from '../../helpers/assertions';
 import {
@@ -39,6 +39,24 @@ import {
 } from '../../helpers/batchEnvelope';
 import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
+
+/** handleGetEnhancements at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleGetEnhancements = (
+  context: Parameters<typeof handleGetEnhancementsOf>[0],
+  args: Parameters<typeof handleGetEnhancementsOf>[1],
+) => handleGetEnhancementsOf(context, { detail: 'full', ...args });
+
+/** handleGetStructuresList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetStructuresList = (
+  context: Parameters<typeof handleGetStructuresListOf>[0],
+  args: Parameters<typeof handleGetStructuresListOf>[1],
+) => handleGetStructuresListOf(context, { detail: 'full', ...args });
+
+/** handleGetIncludesList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetIncludesList = (
+  context: Parameters<typeof handleGetIncludesListOf>[0],
+  args: Parameters<typeof handleGetIncludesListOf>[1],
+) => handleGetIncludesListOf(context, { detail: 'full', ...args });
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -638,6 +656,31 @@ describe('GetIncludesList', () => {
     assertMatchObject(payloadOf(a).unreadable, [
       { name: 'ZINC_B', status: 403 },
     ]);
+  });
+
+  // Codex round 9: a read full reports unreadable makes raw an error, on
+  // both paths — full's report, never the documents as a success.
+  it('raw with an include full reports unreadable: an error, on both paths', async () => {
+    const model = {
+      answers: {
+        'src:incl:ZINC_B': {
+          status: 403,
+          statusText: 'Forbidden',
+          body: '',
+        },
+      },
+    };
+    const { a, b } = await bothWays(
+      handleGetIncludesList,
+      { object_name: 'ZPROG', object_type: 'PROG/P', detail: 'raw' },
+      model,
+    );
+    for (const raw of [a, b]) {
+      assert.equal((raw as { isError?: boolean }).isError, true, textOf(raw));
+      assertMatchObject(payloadOf(raw).unreadable, [
+        { name: 'ZINC_B', status: 403 },
+      ]);
+    }
   });
 
   it('a 401 SAP answered to an include ends the call as it came; no later level is read', async () => {

@@ -25,6 +25,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -35,8 +36,11 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'CreateTable',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Create a new ABAP table in SAP system. Creates the table object in initial state.',
+  description: createTool({
+    object: 'an ABAP database table',
+    how: 'by its name',
+    transported: true,
+  }),
   inputSchema: createArguments('CreateTable', {
     table_name: z.string().describe('Table name.'),
     description: z

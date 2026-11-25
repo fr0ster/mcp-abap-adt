@@ -18,6 +18,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -28,8 +29,11 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'CreateInclude',
   available_in: ['onprem'] as const,
-  description:
-    'Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive, holding the comment header SAP writes into a new include; its source is written afterwards.',
+  description: createTool({
+    object: 'an ABAP include',
+    how: ', with its description and the comment header SAP writes into it',
+    transported: true,
+  }),
   inputSchema: createArguments('CreateInclude', {
     include_name: z.string().describe('Include name.'),
     package_name: z.string().describe('Package name.'),

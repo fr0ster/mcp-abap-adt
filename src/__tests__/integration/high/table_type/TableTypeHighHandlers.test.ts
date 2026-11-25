@@ -43,8 +43,10 @@ import * as z from 'zod';
 import { handleHandlerActivate } from '../../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleHandlerCreate } from '../../../../../compact-modify/src/handlers/handleHandlerCreate';
 import { handleHandlerDelete } from '../../../../../compact-modify/src/handlers/handleHandlerDelete';
-import { handleHandlerLock } from '../../../../../compact-modify/src/handlers/handleHandlerLock';
-import { handleHandlerUnlock } from '../../../../../compact-modify/src/handlers/handleHandlerUnlock';
+import {
+  handleHandlerLock,
+  handleHandlerLock as lockOrUnlock,
+} from '../../../../../compact-modify/src/handlers/handleHandlerLock';
 import { handleHandlerUpdate } from '../../../../../compact-modify/src/handlers/handleHandlerUpdate';
 import { handleHandlerCheckRun } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerCheckRun';
 import { handleHandlerDeletionCheck } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerDeletionCheck';
@@ -97,6 +99,12 @@ import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
+
+/** An unlock, as the merged HandlerLock takes it: `action: 'unlock'`. */
+const handleHandlerUnlock = (
+  context: Parameters<typeof lockOrUnlock>[0],
+  args: Omit<Parameters<typeof lockOrUnlock>[1], 'action'>,
+) => lockOrUnlock(context, { ...args, action: 'unlock' });
 
 /** What this file's cases state, as its tests read them. */
 const TableTypeParams = z.looseObject({
@@ -230,7 +238,6 @@ const describe = servedSuite([
   'HandlerGet',
   'HandlerLock',
   'HandlerSystem',
-  'HandlerUnlock',
   'HandlerUpdate',
   'HandlerValidate',
   'SearchObject',
@@ -424,6 +431,7 @@ describe('TableType High-Level Handlers Integration', () => {
       };
       const createdAnswer = await must(`CreateTableType ${TABLE_TYPE}`, () =>
         handleCreateTableType(context, {
+          detail: 'full',
           table_type_name: TABLE_TYPE,
           package_name: packageName,
           description,
@@ -446,6 +454,7 @@ describe('TableType High-Level Handlers Integration', () => {
         `UpdateTableType ${TABLE_TYPE} access_type=${updateAccess}`,
         () =>
           handleUpdateTableType(context, {
+            detail: 'full',
             table_type_name: TABLE_TYPE,
             ...transport(),
             access_type: updateAccess,
@@ -470,6 +479,7 @@ describe('TableType High-Level Handlers Integration', () => {
         `UpdateTableType ${TABLE_TYPE} access_type=sorted activate=false`,
         () =>
           handleUpdateTableType(context, {
+            detail: 'full',
             table_type_name: TABLE_TYPE,
             ...transport(),
             access_type: 'sorted',
@@ -527,10 +537,14 @@ describe('TableType High-Level Handlers Integration', () => {
           object_name: TABLE_TYPE,
         }),
       );
-      const list = field(parsed(versions.text), 'versions');
-      const firstVersion: unknown = Array.isArray(list) ? list[0] : undefined;
-      const contentUri =
-        field(firstVersion, 'contentUri') ?? field(firstVersion, 'content_uri');
+      // Terse, the default: a TSV row per version, its content_uri last.
+      const [, header, firstRow] = versions.text.split('\n');
+      assert.equal(
+        header,
+        'versionId\tauthor\tupdatedAt\ttransport\tcontent_uri',
+        versions.text,
+      );
+      const contentUri: unknown = firstRow?.split('\t')[4];
       if (typeof contentUri === 'string') {
         // The model's call, through the tool's entry: its schema refuses
         // table_type before the handler, and that refusal is the answer.
@@ -561,6 +575,7 @@ describe('TableType High-Level Handlers Integration', () => {
       // carries what SAP stored.
       const refused = answerOf(
         await handleCreateTableType(context, {
+          detail: 'full',
           table_type_name: REFUSED_TABLE_TYPE,
           package_name: packageName,
           description,

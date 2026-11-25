@@ -20,6 +20,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -29,8 +30,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'CreateFunctionInclude',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Create a new ABAP include within an existing function group. Creates the include in initial state.',
+  description: createTool({
+    object: 'an include',
+    how: 'in an existing ABAP function group, with its description',
+    transported: true,
+  }),
   inputSchema: createArguments('CreateFunctionInclude', {
     function_group_name: z.string().describe('Parent function group name'),
     include_name: z.string().describe('Include name.'),

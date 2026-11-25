@@ -146,7 +146,8 @@ liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
       lock_handle: handle,
       transport_request: request(),
     });
-    const unlocked = await liveCall('HandlerUnlock', {
+    const unlocked = await liveCall('HandlerLock', {
+      action: 'unlock',
       object_type: 'TABLE_SETTINGS',
       object_name: TABLE,
       lock_handle: handle,

@@ -2,13 +2,17 @@ import * as z from 'zod';
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugCancel',
   available_in: ['onprem', 'cloud'] as const,
-  description: "[debug] Cancels the stopped AMDP debuggee's execution.",
+  description: toolDescription({
+    tag: 'debug',
+    purpose: purpose('Cancels the execution of the stopped AMDP debuggee.'),
+  }),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),
 } as const;
 

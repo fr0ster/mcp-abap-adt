@@ -2,12 +2,15 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import {
+  longRunning,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { parseAtcResultList } from '../../../lib/strategies/atcResults';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 
@@ -26,8 +29,14 @@ const AGE_MAX_WORDS = 'age_max is a whole number of days from 0 up.';
 export const TOOL_DEFINITION = {
   name: 'ListATCResults',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Lists the ATC results the system holds, newest first. Answers each result with its display_id, title, check_variant, run_series, created_at, the finding counts per priority and the failure count. created_by names whose results (a user name, or * for every user); central_only=true lists central results only; age_min and age_max bound the age in days, and when both are absent the system applies an age window of its own.',
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days.',
+      ),
+      notes: [longRunning],
+    }),
   ),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
@@ -75,9 +84,12 @@ export async function handleListATCResults(
         ...(args.age_max !== undefined && { ageMax: args.age_max }),
         analyse: analyseException,
       }),
-    (document) => {
-      const { results } = parseAtcResultList(String(document ?? ''));
-      return { success: true, result_count: results.length, results };
-    },
+    (document) => atcResultListAnswer(String(document ?? '')),
   );
+}
+
+/** What the list answers: how many results, and each result. */
+export function atcResultListAnswer(document: string) {
+  const { results } = parseAtcResultList(document);
+  return { success: true, result_count: results.length, results };
 }

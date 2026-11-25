@@ -2,8 +2,16 @@ import type { McpResult } from '../answer';
 import type { IAnswerSerializer } from '../answerSerializer';
 import { type DetailArgs, detailOf } from '../strategies/detail';
 import { return_error } from '../utils';
+import type { AmdpState } from './AmdpSession';
 import type { DebugExtra } from './access';
-import type { DebugState, DebugView, OnceStep } from './DebugSession';
+import { terseAmdpEvent } from './amdpReadings';
+import type {
+  BreakpointsAnswer,
+  DebugState,
+  DebugView,
+  OnceStep,
+} from './DebugSession';
+import type { DebugFailure } from './failures';
 import { terseSettings, terseStop } from './readings';
 
 /** A debugger answer's text block: a string as it is, any other value as JSON. */
@@ -11,7 +19,7 @@ const textBlocks: IAnswerSerializer<{ type: 'text'; text: string }> = {
   json<P>(value: P) {
     return {
       type: 'text',
-      text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
+      text: typeof value === 'string' ? value : JSON.stringify(value),
     };
   },
 };
@@ -73,7 +81,7 @@ export const terseOnceStep = (v: OnceStep) =>
 /** A debug state: under terse a stop is its place and the top frames; raw is SAP's documents of the stop. */
 export async function debugStateAnswer(
   args: DetailArgs,
-  work: () => Promise<DebugState>,
+  work: () => Promise<StartedState>,
   extraOf: () => DebugExtra = () => ({}),
   failureExtraOf: () => DebugExtra = () => ({}),
 ): Promise<McpResult> {
@@ -91,20 +99,45 @@ export async function debugStateAnswer(
           : JSON.stringify(state);
       return { value: state, raw };
     },
-    (s) => {
-      if (s.state !== 'stopped') return s;
-      // Everything a start added beside the stop (breakpoints placed and refused, reconciliation) stays.
-      const { stop, ...rest } = s;
-      return {
-        ...rest,
-        ...terseStop(stop.debuggee, stop.stack, stop.attach),
-        ...(stop.stackError ? { stack_error: stop.stackError } : {}),
-        ...(stop.settings ? { settings: terseSettings(stop.settings) } : {}),
-        ...(stop.settingsError ? { settings_error: stop.settingsError } : {}),
-      };
-    },
+    terseDebugState,
     (s) => s,
     extraOf,
     failureExtraOf,
   );
+}
+
+/** A debug state, with the breakpoints a start placed beside it. */
+export type StartedState = DebugState & {
+  breakpoints?: BreakpointsAnswer | undefined;
+};
+
+/** A debug state under terse: a stop is its place and the top frames. */
+export function terseDebugState(s: StartedState) {
+  if (s.state !== 'stopped') return s;
+  // Everything a start added beside the stop (breakpoints placed and refused, reconciliation) stays.
+  const { stop, ...rest } = s;
+  return {
+    ...rest,
+    ...terseStop(stop.debuggee, stop.stack, stop.attach),
+    ...(stop.stackError ? { stack_error: stop.stackError } : {}),
+    ...(stop.settings ? { settings: terseSettings(stop.settings) } : {}),
+    ...(stop.settingsError ? { settings_error: stop.settingsError } : {}),
+  };
+}
+
+/** An AMDP state under terse: each event read. */
+export function terseAmdpState(s: AmdpState) {
+  return s.state === 'event'
+    ? { state: 'event' as const, events: s.events.map(terseAmdpEvent) }
+    : s;
+}
+
+/** What an AMDP step answers: the state after it. */
+export function amdpStepped(state: string) {
+  return { state };
+}
+
+/** What a debug session's end answers: stopped, and each part that failed to undo. */
+export function stoppedSession(notes: readonly DebugFailure[]) {
+  return { state: 'stopped' as const, ...(notes.length ? { notes } : {}) };
 }

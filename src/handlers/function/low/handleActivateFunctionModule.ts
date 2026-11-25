@@ -11,6 +11,7 @@ import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { activateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { inCheckedGroup } from '../../../lib/strategies/functionModuleGroup';
@@ -21,8 +22,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'ActivateFunctionModuleLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Activate an ABAP function module. Returns activation status and any warnings/errors.',
+  description: activateTool({
+    tag: 'low-level',
+    object: 'an ABAP function module of a function group',
+    how: ', so its inactive version is in force',
+  }),
   inputSchema: z.object({
     function_module_name: z.string().describe('Function module name.'),
     function_group_name: z.string().describe('Function group name.'),

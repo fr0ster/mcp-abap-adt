@@ -17,14 +17,19 @@ import {
   ABAPGIT_DETAIL_SHAPE,
   STAGING_ANSWERS,
 } from '../../../lib/abapGit/formats';
-import { answerAt } from '../../../lib/detail';
+import { purpose, toolDescription } from '../../../lib/description';
+import { listAnswerAt } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
 export const TOOL_DEFINITION = {
   name: 'GetAbapGitStaging',
-  description:
-    '[read-only] Reads what changed between the system and the remote branch of the repository, to choose what a push commits. Answers facts only: the unstaged, staged and ignored objects, each with its files and their local and remote state, and the author and committer this system proposes. With detail "medium" every field of the objects a push takes is listed.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the abapGit staging of a linked repository: what changed, to choose what a push commits.',
+    ),
+  }),
   inputSchema: z.object({
     repository_key: REPOSITORY_KEY_FIELD,
     ...ABAPGIT_DETAIL_SHAPE,
@@ -35,7 +40,7 @@ export async function handleGetAbapGitStaging(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const format = answerAt(STAGING_ANSWERS, levelOf(args));
+  const format = listAnswerAt(STAGING_ANSWERS, levelOf(args));
   return answer(
     { tool: 'GetAbapGitStaging', detail: detailOf(args) },
     async () => {

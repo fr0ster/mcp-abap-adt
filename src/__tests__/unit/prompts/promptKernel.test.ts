@@ -116,9 +116,10 @@ describe('renderInstruction', () => {
           stillToFill: [],
         },
         {
-          tool: 'HandlerUnlock',
+          tool: 'HandlerLock',
           lead: 'Unlock it',
           arguments: [
+            ['action', { from: 'user', value: 'unlock' }],
             ['lock_handle', { from: 'step', step: 2, field: 'lock_handle' }],
           ],
           finally: 3,
@@ -140,7 +141,7 @@ describe('renderInstruction', () => {
     );
     assert.ok(
       text.includes(
-        '4. Unlock it: call HandlerUnlock with lock_handle: the lock_handle from step 2 — after step 3, whatever it answered.',
+        '4. Unlock it: call HandlerLock with action: "unlock", lock_handle: the lock_handle from step 2 — after step 3, whatever it answered.',
       ),
     );
     assert.ok(text.endsWith('\nThe change: "add a method"'));

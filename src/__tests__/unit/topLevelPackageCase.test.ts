@@ -24,19 +24,8 @@ const NAME = 'ZMCP_SHR_PKG';
 const PARENT_ELEMENT =
   '<pak:superPackage adtcore:uri="/sap/bc/adt/packages/zadt_bld_pkg03" adtcore:type="DEVC/K" adtcore:name="ZADT_BLD_PKG03" adtcore:description="baseline package probe"/>';
 
-/** The text `GetPackage` answers with `detail: raw` for `document`. */
-const rawAnswer = (document: string): string =>
-  JSON.stringify(
-    {
-      success: true,
-      package_name: NAME,
-      version: 'active',
-      part: 'metadata',
-      metadata: document,
-    },
-    null,
-    2,
-  );
+/** The text `GetPackage` answers with `detail: raw` for `document`: SAP's document itself. */
+const rawAnswer = (document: string): string => document;
 
 /** The recorded document with its parent element emptied. */
 function topLevel(): string {
@@ -66,6 +55,11 @@ describe('the read check of the top-level package case', () => {
 
   it('refuses an answer that is not a raw package read', () => {
     assert.ok(topLevelReadProblem('SUCCESS', NAME) !== undefined);
+    // The JSON wrapper of the answers before 24.0.0's raw level.
+    assert.ok(
+      topLevelReadProblem(JSON.stringify({ metadata: topLevel() }), NAME) !==
+        undefined,
+    );
   });
 });
 

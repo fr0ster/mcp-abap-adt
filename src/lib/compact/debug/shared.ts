@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { McpResult } from '../../answer';
+import type { DebugExtra } from '../../debugger/access';
 import {
-  type DebugExtra,
   type DebuggerInstance,
   type DebugView,
   debugAnswer,

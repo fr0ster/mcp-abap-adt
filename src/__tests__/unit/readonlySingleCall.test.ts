@@ -37,7 +37,7 @@ import { resolveVersionedObject } from '../../handlers/common/readonly/resolveVe
 import { handleGetDataElement } from '../../handlers/data_element/high/handleGetDataElement';
 import { handleGetDdl } from '../../handlers/ddl/high/handleGetDdl';
 import { handleGetDomain } from '../../handlers/domain/high/handleGetDomain';
-import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
+import { handleGetEnhancements as handleGetEnhancementsOf } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleGetFunctionGroup } from '../../handlers/function_group/high/handleGetFunctionGroup';
 import { handleGetFunctionModule } from '../../handlers/function_module/high/handleGetFunctionModule';
 import { handleGetInterface } from '../../handlers/interface/high/handleGetInterface';
@@ -76,12 +76,7 @@ import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import * as clients from '../../lib/clients';
 import { objectsListCache } from '../../lib/getObjectsListCache';
-import { nodeLevel } from '../../lib/strategies/packageWalk';
-import {
-  parseStructure,
-  structured,
-  verbatim,
-} from '../../lib/strategies/reading';
+import { structured, verbatim } from '../../lib/strategies/reading';
 import { child, listOf } from '../../lib/thrownValue';
 import { corpusBody } from '../helpers/adtCorpus';
 import { assertThrows } from '../helpers/assertions';
@@ -95,7 +90,14 @@ import {
   refusingClient,
 } from '../helpers/fakeClient';
 import { readsModuleIn } from '../helpers/functionModuleMetadata';
+import { nodeLevelOfXml } from '../helpers/nodeLevels';
 import { stateSystemKind } from '../helpers/systemKind';
+
+/** handleGetEnhancements at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleGetEnhancements = (
+  context: Parameters<typeof handleGetEnhancementsOf>[0],
+  args: Parameters<typeof handleGetEnhancementsOf>[1],
+) => handleGetEnhancementsOf(context, { detail: 'full', ...args });
 
 // The declared variant the boundary checks a type argument against.
 stateSystemKind('onprem');
@@ -246,7 +248,8 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
       {
         headers: DEFAULT_ADT_HEADERS['utils.fetchNodeStructure'],
         nodeId: '000000',
-        withShortDescriptions: true,
+        // Pass 1 asks no description (the owner's decision).
+        withShortDescriptions: false,
       },
     ]);
   });
@@ -311,6 +314,44 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
       .filter((c) => c.member === 'getObjectStructure')
       .at(-1);
     assert.deepStrictEqual(call?.args, ['CLAS/OC', 'ZCL_X']);
+  });
+
+  it('GetObjectStructure terse leaves the include of each component out; medium keeps it', async () => {
+    const document = {
+      'projectexplorer:objectstructure': {
+        'projectexplorer:node': [
+          {
+            '@': {
+              nodeid: '000002',
+              parentid: '000001',
+              objecttype: 'CLAS/OM',
+              objectname: 'ZCL_X=========CM001',
+              description: 'RUN',
+            },
+          },
+        ],
+      },
+    };
+    fakeClient = fakeClientOf({
+      getObjectStructure: async () => okResponse(reading(document, '<x/>')),
+    });
+    const terse: any = await handleGetObjectStructure(context as any, {
+      objectname: 'ZCL_X',
+      objecttype: 'class',
+    });
+    const medium: any = await handleGetObjectStructure(context as any, {
+      objectname: 'ZCL_X',
+      objecttype: 'class',
+      detail: 'medium',
+    });
+    assert.equal(
+      terse.content[0].text,
+      'tree:\n- class: ZCL_X\n  - CLAS/OM: RUN\n',
+    );
+    assert.equal(
+      medium.content[0].text,
+      'tree:\n- class: ZCL_X\n  - CLAS/OM: RUN (ZCL_X=========CM001)\n',
+    );
   });
 
   it('GetSqlQuery calls getSqlQuery({sql_query, row_number})', async () => {
@@ -479,7 +520,10 @@ describe('resolveVersionedObject', () => {
   const versionable = (factory: string) => () => ({
     getVersions: async (config: unknown) => {
       calls.push([factory, config]);
-      return { ok: true, getResult: () => ({ value: [] }) };
+      return {
+        ok: true,
+        getResult: () => ({ value: { versions: [], document: '' } }),
+      };
     },
     getVersionSource: async () => ({
       ok: true,
@@ -646,7 +690,7 @@ describe('GetObjectsByType, mapped from a real captured node-structure document'
   // produces rather than a hand-built `NodeLevel` that might not match it.
   it('answers a real object under the requested node', async () => {
     const body = corpusBody('read-object-tree-structure--02-nodestructure');
-    const level = nodeLevel({ data: body });
+    const level = nodeLevelOfXml(body);
     fakeClient = fakeClientOf({
       fetchNodeStructure: async () => okResponse(level),
     });
@@ -676,9 +720,9 @@ describe('GetObjectsByType and GetObjectsList agree on the objectsListCache row 
   // fixture where the technical name genuinely differs from the object name
   // — `ZMCP_SHR_FGRP` / `SAPLZMCP_SHR_FGRP` — the exact case a fabricated or
   // absent `TECH_NAME` cannot round-trip.
-  const level = nodeLevel({
-    data: corpusBody('read-object-tree-structure--05-nodestructure'),
-  });
+  const level = nodeLevelOfXml(
+    corpusBody('read-object-tree-structure--05-nodestructure'),
+  );
   // Read straight from the fixture body, NOT off `level.objects` — deriving
   // the expected URI from the same `nodeLevel()` call under test would make
   // a regression that drops `uri` invisible (both sides go `undefined`
@@ -715,9 +759,13 @@ describe('GetObjectsByType and GetObjectsList agree on the objectsListCache row 
       OBJECT_NAME: 'ZMCP_SHR_FGRP',
       TECH_NAME: 'SAPLZMCP_SHR_FGRP',
       OBJECT_URI: FUGR_URI,
+      DESCRIPTION: 'Shared FUGR for include/FM tests',
     };
     assert.deepStrictEqual(byTypeRow, expected);
-    assert.deepStrictEqual(listRow, expected);
+    // GetObjectsList's pass 1 takes no description (the owner's decision);
+    // its identity fields are the same row.
+    const { DESCRIPTION: _description, ...identity } = expected;
+    assert.deepStrictEqual(listRow, identity);
   });
 
   it('GetObjectNodeFromCache finds a row either handler wrote, by its real technical name', async () => {
@@ -764,13 +812,13 @@ describe('GetObjectInfo, mapped from a real matched pair of captured node-struct
     fakeClient = fakeClientOf({
       fetchNodeStructure: async (...args: any[]) => {
         const options = args[2] as { nodeId?: string } | undefined;
-        if (!options?.nodeId) return okResponse(nodeLevel({ data: rootBody }));
+        if (!options?.nodeId) return okResponse(nodeLevelOfXml(rootBody));
         if (options.nodeId === '31') {
-          return okResponse(nodeLevel({ data: bdefBody }));
+          return okResponse(nodeLevelOfXml(bdefBody));
         }
         // The other six type folders fixture 01 lists have no captured
         // response — answered empty rather than invented.
-        return okResponse(nodeLevel({ data: '' }));
+        return okResponse(nodeLevelOfXml(''));
       },
     });
 
@@ -819,10 +867,16 @@ describe('ListTransports, mapped from a real captured transport list', () => {
   const body = corpusBody(
     'read-transport-list-structure--01-cts-transportrequests',
   );
-  const listing = () =>
-    fakeClientOf({
-      list: async () => okResponse(reading(parseStructure(body), body)),
-    });
+  // The listing read through the result set the handler passes, as
+  // adt-clients reads it: the reading is the handler's choice.
+  const listing = () => ({
+    getRequest: (set: { list: (answer: unknown) => unknown }) => ({
+      list: async () =>
+        okResponse(
+          set.list({ status: 200, statusText: 'OK', headers: {}, data: body }),
+        ),
+    }),
+  });
 
   it('answers every request the captured document holds, whoever asked', async () => {
     for (const args of [
@@ -832,7 +886,10 @@ describe('ListTransports, mapped from a real captured transport list', () => {
     ]) {
       fakeClient = listing();
 
-      const result: any = await handleListTransports(context as any, args);
+      const result: any = await handleListTransports(context as any, {
+        ...args,
+        detail: 'medium',
+      });
 
       assert.equal(result.isError, false);
       const payload = JSON.parse(result.content[0].text);

@@ -17,6 +17,8 @@
  *   which learns the destination's verdict from its first envelope), their
  *   order alternating per repetition;
  * - every answer equals the reference (compared after the timing is written),
+ *   each read at `detail: 'full'`, where every object's error is a field the
+ *   comparison reads,
  *   the sequential reads send no envelope, and the batched reads send at
  *   least one;
  * - recorded per read: wall time, the requests sent (round trips: envelopes
@@ -183,12 +185,13 @@ const CASES: Case[] = [
       handleGetPackageContents(context, {
         package_name: name,
         include_subpackages: true,
+        detail: 'full',
       }),
   },
   {
     tool: 'GetPackageTree',
     read: (name) => (context) =>
-      handleGetPackageTree(context, { package_name: name }),
+      handleGetPackageTree(context, { package_name: name, detail: 'full' }),
   },
   {
     tool: 'GetObjectsList',
@@ -197,6 +200,7 @@ const CASES: Case[] = [
         parent_type: 'DEVC/K',
         parent_name: name,
         parent_tech_name: name,
+        detail: 'full',
       }),
   },
   {
@@ -223,6 +227,7 @@ const CASES: Case[] = [
       handleSearchSource(context, {
         query: 'DATA',
         packages: [name],
+        detail: 'full',
       }),
   },
 ];
@@ -285,6 +290,7 @@ const SHARED_CASES: SharedCase[] = [
       if (typeof groups === 'string') return groups;
       return (context) =>
         handleGetIncludesList(context, {
+          detail: 'full',
           objects: groups.map((name) => ({
             object_name: name,
             object_type: 'FUGR/F',
@@ -298,7 +304,10 @@ const SHARED_CASES: SharedCase[] = [
       const structures = two('structures');
       if (typeof structures === 'string') return structures;
       return (context) =>
-        handleGetStructuresList(context, { structure_names: structures });
+        handleGetStructuresList(context, {
+          structure_names: structures,
+          detail: 'full',
+        });
     },
   },
   {
@@ -308,6 +317,7 @@ const SHARED_CASES: SharedCase[] = [
       if (typeof classes === 'string') return classes;
       return (context) =>
         handleGetEnhancements(context, {
+          detail: 'full',
           objects: classes.map((name) => ({
             object_name: name,
             object_type: 'CLAS/OC',
@@ -326,6 +336,7 @@ const SHARED_CASES: SharedCase[] = [
       }
       return (context) =>
         handleDescribeByList(context, {
+          detail: 'full',
           objects: [
             { name: cls, type: 'CLAS/OC' },
             { name: table, type: 'TABL/DT' },
@@ -341,6 +352,7 @@ const SHARED_CASES: SharedCase[] = [
       if (typeof tables === 'string') return tables;
       return (context) =>
         handleGetWhereUsed(context, {
+          detail: 'full',
           objects: tables.map((name) => ({
             object_name: name,
             object_type: 'TABL/DT',
@@ -353,6 +365,7 @@ const SHARED_CASES: SharedCase[] = [
     prepare: () => (context) =>
       handleRuntimeListFeeds(context, {
         feed_types: ['dumps', 'system_messages'],
+        detail: 'full',
         from: '20261001000000',
         to: '20261002000000',
         max_results: 20,

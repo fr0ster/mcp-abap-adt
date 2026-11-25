@@ -1,4 +1,5 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { whereUsedListReading } from '../../lib/strategies/whereUsedList';
 
 /** A success carrying whatever a result strategy would have produced. */
 export function okResponse<T>(value: T): IAdtResponse<T, IAdtError> {
@@ -245,4 +246,58 @@ export function recordAnalyse(answers: Record<string, () => unknown> = {}) {
     countOf: (member: string) =>
       calls.filter((c) => c.member === member).length,
   };
+}
+
+/** A result set as a factory receives it: a reading per slot. */
+export type ResultSet = Record<string, (answer: unknown) => unknown>;
+
+/**
+ * {@link fakeClientOf}, with the member table built from the result set the
+ * handler passed to the factory: a member answers what that set reads out of
+ * a wire answer ({@link answerThrough}), so the handler's choice of reading
+ * is exercised, not bypassed.
+ */
+export function fakeClientThroughSet(members: (set: ResultSet) => Members) {
+  return new Proxy({} as Record<string, unknown>, {
+    get:
+      () =>
+      (set: ResultSet = {}) => {
+        const table = members(set);
+        return new Proxy(table, {
+          get: (target, name: string) =>
+            target[name] ?? (async () => defaultAnswer(name)),
+        });
+      },
+  });
+}
+
+/** A success: the wire answer `data` read by the set's reading of `slot`. */
+export function answerThrough(set: ResultSet, slot: string, data: string) {
+  const read = set[slot];
+  if (read === undefined) {
+    throw new Error(`the result set has no slot ${slot}`);
+  }
+  return okResponse(read({ status: 200, statusText: 'OK', headers: {}, data }));
+}
+
+/**
+ * A where-used answer as the handler's set reads it: `references` read by
+ * the shipped slot reading (`ourUtils.whereUsed`) out of a `/usageReferences`
+ * document naming each `[name, type]`.
+ */
+export function whereUsedAnswer(...references: [string, string][]) {
+  const objects = references
+    .map(
+      ([name, type]) =>
+        `<usagereferences:referencedObject uri="/sap/bc/adt/x/${name.toLowerCase()}" usageInformation="gradeDirect"><usagereferences:adtObject adtcore:name="${name}" adtcore:type="${type}"/></usagereferences:referencedObject>`,
+    )
+    .join('');
+  return okResponse(
+    whereUsedListReading({
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: `<?xml version="1.0" encoding="utf-8"?><usagereferences:usageReferenceResult xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences" xmlns:adtcore="http://www.sap.com/adt/core" numberOfResults="${references.length}"><usagereferences:referencedObjects>${objects}</usagereferences:referencedObjects></usagereferences:usageReferenceResult>`,
+    }),
+  );
 }

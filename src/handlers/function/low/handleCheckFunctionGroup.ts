@@ -16,6 +16,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { checkTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
@@ -25,8 +26,10 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'CheckFunctionGroupLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Perform syntax check on an ABAP function group. Returns syntax errors, warnings, and messages.',
+  description: checkTool({
+    tag: 'low-level',
+    object: 'an ABAP function group',
+  }),
   inputSchema: z.object({
     function_group_name: z.string().describe('FunctionGroup name.'),
     version: z

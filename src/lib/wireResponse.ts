@@ -57,3 +57,13 @@ export function wireResponseOf(value: unknown): IAdtWireResponse | undefined {
     ...('request' in value ? { request: value.request } : {}),
   };
 }
+
+/**
+ * A thrown failure's response (outside the type system): its body decoded
+ * to UTF-8 in place when it is bytes, so whatever reads the failure next
+ * reads text.
+ */
+export function decodeResponseBytes(value: unknown): void {
+  if (!isElement(value) || !(value.data instanceof Uint8Array)) return;
+  Reflect.set(value, 'data', new TextDecoder().decode(value.data));
+}

@@ -23,15 +23,19 @@ import {
   ABAPGIT_DETAIL_SHAPE,
   BRANCH_INFO_ANSWERS,
 } from '../../../lib/abapGit/formats';
-import { answerAt } from '../../../lib/detail';
+import { purpose, toolDescription } from '../../../lib/description';
+import { listAnswerAt } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
 export const TOOL_DEFINITION = {
   name: 'GetAbapGitBranchInfo',
   available_in: ['cloud'] as const,
-  description:
-    "Reads one branch of the remote repository at url for the package it would be linked to: to answer it, SAP links the repository to package_name, reads the repository's settings and removes the link again. Answers facts only: the access mode and the branch with its name, type, whether it is the head, its commit hash and its folder logic.",
+  description: toolDescription({
+    purpose: purpose(
+      'Reads the abapGit branch information of a remote repository for the package it would be linked to.',
+    ),
+  }),
   inputSchema: z.object({
     url: URL_FIELD,
     branch: BRANCH_FIELD,
@@ -44,7 +48,7 @@ export async function handleGetAbapGitBranchInfo(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const format = answerAt(BRANCH_INFO_ANSWERS, levelOf(args));
+  const format = listAnswerAt(BRANCH_INFO_ANSWERS, levelOf(args));
   return answer(
     { tool: 'GetAbapGitBranchInfo', detail: detailOf(args) },
     async () => {

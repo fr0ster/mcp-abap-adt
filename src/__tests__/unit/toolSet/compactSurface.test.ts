@@ -90,8 +90,9 @@ describe('the compact tool surface', () => {
   }));
 
   it('enumerates the whole facade, so the assertions below are not vacuous', () => {
-    assert.equal(frozen.length, 34);
-    assert.equal(current.length, 34);
+    // 24.2.0: HandlerUnlock is HandlerLock's `action: 'unlock'` (33).
+    assert.equal(frozen.length, 33);
+    assert.equal(current.length, 33);
   });
 
   it('has the same tools', () => {

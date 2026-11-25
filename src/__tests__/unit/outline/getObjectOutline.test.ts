@@ -69,12 +69,37 @@ function linkOf(component: unknown, rel: string): unknown {
 }
 
 describe('GetObjectOutline', () => {
-  it('a class: one GET of its objectstructure, its components with visibility, level and source positions', async () => {
+  it('terse, by default: the components as indented rows, the source named once', async () => {
     const result = await run({
       tool: 'GetObjectOutline',
       variant: 'onprem',
       stand: 'recording',
       args: { object_type: 'CLAS/OC', object_name: 'ZMCP_D1_9E25_CL' },
+      answers: answered('read-outline-class--01-objectstructure'),
+      expected: 'none',
+    });
+    assert.equal(result.isError, false);
+    const lines = result.text.split('\n');
+    assert.equal(lines[0], '# object CLAS/OC ZMCP_D1_9E25_CL');
+    assert.equal(
+      lines[1],
+      '# source /sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main',
+    );
+    assert.equal(lines[2], 'name\ttype\tvisibility\tline\tsource');
+    assert.ok(lines.includes('  PUB\tCLAS/OM\tpublic\t12\t'));
+    assert.equal(result.text.includes('implementationBlock'), false);
+  });
+
+  it('a class: one GET of its objectstructure, its components with visibility, level and source positions', async () => {
+    const result = await run({
+      tool: 'GetObjectOutline',
+      variant: 'onprem',
+      stand: 'recording',
+      args: {
+        object_type: 'CLAS/OC',
+        object_name: 'ZMCP_D1_9E25_CL',
+        detail: 'medium',
+      },
       answers: answered('read-outline-class--01-objectstructure'),
       expected: 'none',
     });
@@ -131,12 +156,49 @@ describe('GetObjectOutline', () => {
     );
   });
 
+  // Codex round 10: medium writes the parse's tree by the JSON writer —
+  // every component and every link of the document, none left out.
+  it('medium: every component and every link the document holds', async () => {
+    const document = corpusBody('read-outline-class--01-objectstructure');
+    const result = await run({
+      tool: 'GetObjectOutline',
+      variant: 'onprem',
+      stand: 'recording',
+      args: {
+        object_type: 'CLAS/OC',
+        object_name: 'ZMCP_D1_9E25_CL',
+        detail: 'medium',
+      },
+      answers: answered('read-outline-class--01-objectstructure'),
+      expected: 'none',
+    });
+    type Node = { links?: unknown[]; children?: Node[] };
+    const count = (node: Node): { nodes: number; links: number } =>
+      (node.children ?? []).map(count).reduce(
+        (sum, child) => ({
+          nodes: sum.nodes + child.nodes,
+          links: sum.links + child.links,
+        }),
+        { nodes: 1, links: node.links?.length ?? 0 },
+      );
+    const occurrences = (text: string, word: string) =>
+      text.split(word).length - 1;
+    assert.deepStrictEqual(count(member(result.payload, 'outline') as Node), {
+      nodes: occurrences(document, '<abapsource:objectStructureElement '),
+      links: occurrences(document, '<atom:link '),
+    });
+  });
+
   it("a class's local components point into its local includes", async () => {
     const result = await run({
       tool: 'GetObjectOutline',
       variant: 'cloud',
       stand: 'recording',
-      args: { object_type: 'CLAS/OC', object_name: 'ZMCP_D1_276D_CL' },
+      args: {
+        object_type: 'CLAS/OC',
+        object_name: 'ZMCP_D1_276D_CL',
+        detail: 'medium',
+      },
       answers: answered('read-outline-local-class--01-objectstructure'),
       expected: 'none',
     });
@@ -169,6 +231,7 @@ describe('GetObjectOutline', () => {
         object_type: 'INTF/OI',
         object_name: 'ZMCP_D1_9E25_IF',
         version: 'inactive',
+        detail: 'medium',
       },
       answers: answered('read-outline-interface--01-objectstructure'),
       expected: 'none',
@@ -192,7 +255,11 @@ describe('GetObjectOutline', () => {
       tool: 'GetObjectOutline',
       variant: 'onprem',
       stand: 'recording',
-      args: { object_type: 'PROG/P', object_name: 'ZMCP_D1_9E25_PR' },
+      args: {
+        object_type: 'PROG/P',
+        object_name: 'ZMCP_D1_9E25_PR',
+        detail: 'medium',
+      },
       answers: answered('read-outline-program--01-objectstructure'),
       expected: 'none',
     });
@@ -223,7 +290,11 @@ describe('GetObjectOutline', () => {
       tool: 'GetObjectOutline',
       variant: 'cloud',
       stand: 'recording',
-      args: { object_type: 'FUGR/F', object_name: 'ZMCP_D19E25' },
+      args: {
+        object_type: 'FUGR/F',
+        object_name: 'ZMCP_D19E25',
+        detail: 'medium',
+      },
       answers: answered('read-outline-function-group--01-objectstructure'),
       expected: 'none',
     });
@@ -268,7 +339,11 @@ describe('GetObjectOutline', () => {
       tool: 'GetObjectOutline',
       variant: 'onprem',
       stand: 'recording',
-      args: { object_type: 'CLAS/OC', object_name: 'ZMCP_NOT_THERE' },
+      args: {
+        object_type: 'CLAS/OC',
+        object_name: 'ZMCP_NOT_THERE',
+        detail: 'medium',
+      },
       answers: [
         {
           status: 404,
@@ -286,7 +361,11 @@ describe('GetObjectOutline', () => {
       tool: 'GetObjectOutline',
       variant: 'onprem',
       stand: 'recording',
-      args: { object_type: 'CLAS/OC', object_name: 'ZMCP_D1_9E25_CL' },
+      args: {
+        object_type: 'CLAS/OC',
+        object_name: 'ZMCP_D1_9E25_CL',
+        detail: 'medium',
+      },
       answers: [{ status: 200, data: '' }],
       expected: 'none',
     });
@@ -294,12 +373,38 @@ describe('GetObjectOutline', () => {
     assert.ok(result.text.includes('no outline document'));
   });
 
+  // The parse is the level's (OUTLINE_READS): raw answers what SAP sent,
+  // read or not; every other level reads it, and refuses what is not one.
+  it('raw answers a 200 that is not an outline as it came; terse refuses it', async () => {
+    const at = (detail: 'raw' | 'terse') =>
+      run({
+        tool: 'GetObjectOutline',
+        variant: 'onprem',
+        stand: 'recording',
+        args: {
+          object_type: 'CLAS/OC',
+          object_name: 'ZMCP_D1_9E25_CL',
+          detail,
+        },
+        answers: [{ status: 200, data: '<not-an-outline/>' }],
+        expected: 'none',
+      });
+    const raw = await at('raw');
+    assert.equal(raw.isError, false);
+    assert.equal(raw.text, '<not-an-outline/>');
+    assert.equal((await at('terse')).isError, true);
+  });
+
   it('on the cloud a program is refused before anything is sent', async () => {
     const recorded = await recordCase({
       tool: 'GetObjectOutline',
       variant: 'cloud',
       stand: 'recording',
-      args: { object_type: 'PROG/P', object_name: 'ZMCP_D1_9E25_PR' },
+      args: {
+        object_type: 'PROG/P',
+        object_name: 'ZMCP_D1_9E25_PR',
+        detail: 'medium',
+      },
       expected: 'nothing-sent',
       refusal: 'thrown',
     });

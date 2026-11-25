@@ -1,4 +1,13 @@
 import * as z from 'zod';
+import { purpose, toolDescription } from '../../../lib/description';
+import {
+  about,
+  bullets,
+  listAnswerAt,
+  type RowSchemas,
+  type Written,
+  writeListing,
+} from '../../../lib/detail';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * Handler for retrieving ADT object structure and returning a compact tree.
@@ -8,9 +17,10 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
@@ -18,16 +28,18 @@ import {
   child,
   childAt,
   isList,
-  type XmlList,
-  type XmlNode,
   type XmlRead,
 } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectStructure',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Returns the ADT structure of the repository object named by objecttype and objectname as a compact JSON tree.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the structure of an ABAP repository object, such as a CDS view: its parts and their parts, down to the last level.',
+    ),
+  }),
   inputSchema: z.object({
     objecttype: z.string().describe('ADT object type (e.g. DDLS/DF)'),
     objectname: z.string().describe('ADT object name (e.g. /CBY/ACQ_DDL)'),
@@ -51,6 +63,8 @@ interface ObjectStructureTreeNode {
   description?: string | undefined;
   isfolder: boolean;
   children: ObjectStructureTreeNode[];
+  /** The object asked for, which SAP does not send: no node of the document. */
+  synthetic?: true;
 }
 
 /**
@@ -92,27 +106,61 @@ function buildNestedTree(
   flatNodes: FlatObjectStructureNode[],
   root?: { objecttype: string; objectname: string },
 ): ObjectStructureTreeNode[] {
-  const nodeMap: Record<string, ObjectStructureTreeNode> = {};
-  flatNodes.forEach((node) => {
-    nodeMap[String(node.nodeid)] = {
+  // Every node of the document is one node of the tree: by its place in the
+  // document, so two sharing an id stay two; a parent is the first node of
+  // its id, taken only when that makes no cycle — a node whose parents loop
+  // back to it is a root — so every node is reached from a root (plan 9.7).
+  const nodes = flatNodes.map(
+    (node): ObjectStructureTreeNode => ({
       objecttype: node.objecttype,
       objectname: node.objectname,
       description: node.description,
       isfolder: node.isfolder,
       children: [],
-    };
+    }),
+  );
+  const byId = new Map<string, number>();
+  flatNodes.forEach((node, index) => {
+    const id = String(node.nodeid);
+    if (!byId.has(id)) byId.set(id, index);
   });
+  const parentOf = new Map<number, number>();
+  const ancestors = (index: number): Set<number> => {
+    const seen = new Set<number>();
+    for (
+      let at = parentOf.get(index);
+      at !== undefined;
+      at = parentOf.get(at)
+    ) {
+      if (seen.has(at)) break;
+      seen.add(at);
+    }
+    return seen;
+  };
   const roots: ObjectStructureTreeNode[] = [];
   const synthetic: ObjectStructureTreeNode | undefined = root
-    ? { ...root, isfolder: false, children: [] }
+    ? { ...root, isfolder: false, children: [], synthetic: true }
     : undefined;
-  flatNodes.forEach((node) => {
-    if (node.parentid && nodeMap[node.parentid]) {
-      nodeMap[node.parentid].children.push(nodeMap[String(node.nodeid)]);
-    } else if (node.parentid && synthetic) {
-      synthetic.children.push(nodeMap[String(node.nodeid)]);
+  flatNodes.forEach((node, index) => {
+    const own = nodes[index];
+    if (own === undefined) return;
+    const parent =
+      node.parentid === undefined || node.parentid === ''
+        ? undefined
+        : byId.get(node.parentid);
+    const parentNode = parent === undefined ? undefined : nodes[parent];
+    if (
+      parent !== undefined &&
+      parentNode !== undefined &&
+      parent !== index &&
+      !ancestors(parent).has(index)
+    ) {
+      parentOf.set(index, parent);
+      parentNode.children.push(own);
+    } else if (node.parentid && parent === undefined && synthetic) {
+      synthetic.children.push(own);
     } else {
-      roots.push(nodeMap[String(node.nodeid)]);
+      roots.push(own);
     }
   });
   if (synthetic && synthetic.children.length > 0) roots.unshift(synthetic);
@@ -127,10 +175,11 @@ function buildNestedTree(
  * has only that. An include owner is kept in parentheses, since it is where
  * the code lives; the class as owner of its own attribute says nothing.
  */
-function labelOf(node: ObjectStructureTreeNode): string {
+function labelOf(node: ObjectStructureTreeNode, withOwner: boolean): string {
   if (node.isfolder) return `${node.objecttype} [${node.description ?? ''}]`;
   const name = node.description || node.objectname || '';
   const owner =
+    withOwner &&
     node.objectname &&
     node.description &&
     node.objectname !== node.description &&
@@ -138,20 +187,6 @@ function labelOf(node: ObjectStructureTreeNode): string {
       ? ` (${node.objectname})`
       : '';
   return `${node.objecttype}: ${name}${owner}`;
-}
-
-function serializeTree(
-  tree: ObjectStructureTreeNode[],
-  indent: string = '',
-): string {
-  let result = '';
-  for (const node of tree) {
-    result += `${indent}- ${labelOf(node)}\n`;
-    if (node.children && node.children.length > 0) {
-      result += serializeTree(node.children, `${indent}  `);
-    }
-  }
-  return result;
 }
 
 /**
@@ -181,20 +216,73 @@ export function assertObjectStructurePresent(value: XmlRead): void {
   }
 }
 
+/** The tree's nodes below a node, as bullets one level deeper. */
+function bulletSchemas(
+  withOwner: boolean,
+): RowSchemas<ObjectStructureTreeNode> {
+  const schemas: RowSchemas<ObjectStructureTreeNode> = {
+    children: bullets(
+      'children',
+      (node: ObjectStructureTreeNode) => labelOf(node, withOwner),
+      {
+        get lists() {
+          return schemas;
+        },
+      },
+    ),
+  };
+  return schemas;
+}
+
 /**
- * Exported so `GetObjectStructureLow` (`src/handlers/system/low/`) can answer
- * the same tree text without a second copy of `flatNodesOf`/`buildNestedTree`/
- * `serializeTree` — both tools read the same `projectexplorer:objectstructure`
- * document through the same `ourUtils.objectStructure` (`structured`) reading.
+ * The lists an object structure's listing writes: what its description
+ * states — each node by its type and its name or description.
  */
-export function treeText(
+export function objectStructureLists(
+  withOwner: boolean,
+): RowSchemas<{ tree: ObjectStructureTreeNode[] }> {
+  return {
+    tree: about(
+      'each part of the object, such as an element, an association or an annotation, is named by its type and its name or description, at its depth',
+      bullets(
+        'tree',
+        (node: ObjectStructureTreeNode) => labelOf(node, withOwner),
+        {
+          synthetic: (node: ObjectStructureTreeNode) => node.synthetic === true,
+          lists: bulletSchemas(withOwner),
+        },
+      ),
+    ),
+  };
+}
+
+/**
+ * {@link treeText}, written by the listing writer: every node of the
+ * document a bullet, depth first; the object asked, which SAP did not
+ * send, the root and no item.
+ */
+function completeTreeText(
   value: XmlRead,
-  root?: { objecttype: string; objectname: string },
-): string {
+  root: { objecttype: string; objectname: string },
+  withOwner: boolean,
+): Written<string> {
   assertObjectStructurePresent(value);
   const nodes = flatNodesOf(value);
-  if (nodes.length === 0) return 'No nodes found in object structure response.';
-  return `tree:\n${serializeTree(buildNestedTree(nodes, root))}`;
+  if (nodes.length === 0) {
+    return writeListing({
+      heads: [],
+      reading: {},
+      lists: {},
+      title: 'No nodes found in object structure response.',
+    });
+  }
+  return writeListing({
+    heads: [],
+    reading: { tree: buildNestedTree(nodes, root) },
+    lists: objectStructureLists(withOwner),
+    title: 'tree:',
+    end: '',
+  });
 }
 
 export async function handleGetObjectStructure(
@@ -222,6 +310,21 @@ export async function handleGetObjectStructure(
 
   logger?.info(`Fetching object structure for ${objectType}/${objectName}`);
   const detail = detailOf(args);
+  const level = levelOf(args);
+  const root = { objecttype: objectType, objectname: objectName };
+  // What GetObjectStructure answers at each level, selected before the call
+  // (`src/lib/detail`): terse the tree without the include each component's
+  // code lives in; medium the tree with it (the former terse); full the
+  // parse; raw the document.
+  const shown = listAnswerAt<AdtReading<XmlRead>, XmlRead | string>(
+    {
+      terse: (reading) => completeTreeText(reading.value, root, false),
+      medium: (reading) => completeTreeText(reading.value, root, true),
+      full: (reading) => reading.value ?? reading.raw,
+      raw: (reading) => reading.raw,
+    },
+    levelOf(args),
+  );
 
   // `getObjectStructure` takes `analyseException` (adt-clients 23), which
   // reads only an exception document. The presence check runs
@@ -236,13 +339,11 @@ export async function handleGetObjectStructure(
         .getObjectStructure(code, objectName, {
           analyse: analyseException,
         });
-      if (detail === 'terse' && response.ok) {
+      if ((level === 'terse' || level === 'medium') && response.ok) {
         assertObjectStructurePresent(response.getResult().value.value);
       }
       return response;
     },
-    project(detail, (value) =>
-      treeText(value, { objecttype: objectType, objectname: objectName }),
-    ),
+    shown,
   );
 }

@@ -69,15 +69,13 @@ const TRANSPORTS: readonly ServedTransport[] = ['stdio', 'http', 'sse'];
 const isCompact = (kind: ToolSetKind) =>
   kind === 'compact' || kind === 'compact-ro';
 
-// The spec's words (§3; the batch end's and HandlerBatch answers' answer as §5.3 and §6 have it), copied here, never imported: the test is the copy.
-const BEGIN_WORDS =
-  'Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).';
-const END_WORDS =
-  "Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.";
-const ANSWERS_WORDS =
-  "Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.";
+// HandlerBatch's words, copied here, never imported: the test is the copy.
+const PURPOSE_WORDS =
+  "Begins recording the calls of the tools that allow it, ends the recording and sends the recorded calls to SAP together, reads each recorded call's answer by its number.";
+const HANDLE_WORDS =
+  'Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).';
 const RECORDABLE_TAIL =
-  'recordable: in batch mode a call is recorded under the next number and answers with empty content; its answer is read by number after the batch ends.';
+  'recordable: in batch mode a call is recorded under the next number, and its answer comes back under that number after the batch ends.';
 const ELIGIBLE_WORDS = `Recordable: ${RECORDABLE_TAIL.slice('recordable: '.length)}`;
 const OUTSIDE_WORDS = 'Runs outside batch mode.';
 
@@ -258,13 +256,15 @@ describe('the batch tools on the surface', () => {
           assert.ok(
             byName
               .get('HandlerLock')
-              ?.includes(' When object_type is one of CLASS,'),
+              ?.includes(
+                'action is lock (absent reads as lock) and object_type is one of CLASS,',
+              ),
           );
           assert.ok(
             byName
               .get('HandlerLock')
               ?.includes(
-                `; or object_type is PACKAGE and the connection is HTTP, ${RECORDABLE_TAIL}`,
+                'action is unlock and object_type is PACKAGE and lock_handle is given and the connection is HTTP',
               ),
           );
           assert.ok(
@@ -309,7 +309,7 @@ describe('the batch tools on the surface', () => {
     const byName = new Map(tools.map((t) => [t.name, t.description]));
     assert.equal(
       byName.get('HandlerBatch'),
-      `[read-only] action 'begin': ${BEGIN_WORDS} action 'end': ${END_WORDS} action 'answers' (with number or numbers): ${ANSWERS_WORDS}`,
+      `[read-only] ${PURPOSE_WORDS} ${HANDLE_WORDS}`,
     );
   });
 

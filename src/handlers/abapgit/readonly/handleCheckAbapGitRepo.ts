@@ -14,18 +14,23 @@ import {
   credentialOption,
 } from '../../../lib/abapGit/client';
 import { statusAnswer } from '../../../lib/abapGit/formats';
+import { checkTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'CheckAbapGitRepo',
-  description:
-    "[read-only] Checks that the system reaches the repository's remote and is let in. Answers facts only: SAP's status; a refusal answers the status, SAP's message class and number and, on cloud, the git host's HTTP status.",
+  description: checkTool({
+    tag: 'read-only',
+    purpose: purpose(
+      "Checks that the system reaches an abapGit repository's remote and is let in.",
+    ),
+  }),
   inputSchema: z.object({ repository_key: REPOSITORY_KEY_FIELD }),
 } as const;
 
 export async function handleCheckAbapGitRepo(
   context: HandlerContext,
-  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+  _args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return answer(
     { tool: 'CheckAbapGitRepo', detail: 'terse' },

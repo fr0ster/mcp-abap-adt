@@ -26,6 +26,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -41,8 +42,11 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
   available_in: ['onprem'] as const,
-  description:
-    'Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.',
+  description: updateTool({
+    object: 'the source code of an existing ABAP program or report',
+    how: ', activating it when asked',
+    transported: true,
+  }),
   inputSchema: z.object({
     program_name: z
       .string()

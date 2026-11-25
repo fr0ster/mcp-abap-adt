@@ -14,9 +14,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   handleGetTransport,
   NOT_THE_TRANSPORT_ASKED,
-  transportKind,
 } from '../../handlers/transport/readonly/handleGetTransport';
-import { parseStructure } from '../../lib/strategies/reading';
 import { assertMatchObject } from '../helpers/assertions';
 import {
   EMPTY_TASK,
@@ -335,16 +333,17 @@ describe('GetTransport', () => {
     }
   }
 
-  it('reads no blank number as any transport, numberless elements included', () => {
-    const numberless = parseStructure(
+  it('reads no blank-padded number as any transport, numberless elements included', async () => {
+    for (const document of [
       '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:request/></tm:root>',
-    );
-    const taskWithoutTask = parseStructure(
       '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:object_type="T"><tm:request/></tm:root>',
-    );
-    for (const blank of ['', '   ']) {
-      assert.equal(transportKind(numberless, blank), undefined);
-      assert.equal(transportKind(taskWithoutTask, blank), undefined);
+    ]) {
+      const { connection } = connectionAnswering(document);
+      const result: any = await handleGetTransport(
+        { connection, logger: undefined } as any,
+        { transport_number: ` ${TASK} ` },
+      );
+      assert.equal(result.content[0].text, NOT_THE_TRANSPORT_ASKED);
     }
   });
 });

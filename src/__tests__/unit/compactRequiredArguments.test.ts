@@ -24,6 +24,7 @@ import {
   TOOL_DEFINITION as ValidateServiceBinding,
 } from '../../handlers/service_binding/high/handleValidateServiceBinding';
 import type { ProjectionVariant } from '../../lib/adtProjections';
+import { memberTokens } from '../../lib/compact/compactDescriptions';
 import { defineTool, type HandlerContext } from '../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
@@ -176,17 +177,13 @@ describe('the arguments a compact tool needs for one object type', () => {
   for (const [_tool, _type, variant, need] of cases) {
     it(
       format(
-        '%s %s on %s: the description names the arguments',
+        '%s %s on %s: the member table names the arguments',
         _tool,
         _type,
         variant,
       ),
       () => {
-        assert.ok(
-          TOOLS[need.tool].definition.variants[variant].description.includes(
-            need.token,
-          ),
-        );
+        assert.ok(memberTokens(need.tool, variant).includes(need.token));
       },
     );
   }
@@ -263,7 +260,7 @@ describe('HandlerValidate and HandlerCheckRun take a table type', () => {
       const connection = recordingConnection();
       declareSystemKind(connection, variant);
       assert.ok(
-        HandlerValidate.variants[variant].description.includes(
+        memberTokens('HandlerValidate', variant).includes(
           'TABLE_TYPE(object_name*, description)',
         ),
       );
@@ -286,7 +283,7 @@ describe('HandlerValidate and HandlerCheckRun take a table type', () => {
       const connection = recordingConnection();
       declareSystemKind(connection, variant);
       assert.ok(
-        HandlerCheckRun.variants[variant].description.includes(
+        memberTokens('HandlerCheckRun', variant).includes(
           'TABLE_TYPE(object_name*)',
         ),
       );

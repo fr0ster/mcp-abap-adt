@@ -16,6 +16,7 @@ import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOf,
   okResponse,
+  reading,
   recordAnalyse,
   refusedResponse,
 } from '../helpers/fakeClient';
@@ -100,6 +101,23 @@ describe('UpdateDomainLow', () => {
   // document reaches the member, and the config carries the object's name
   // and nothing that looks like a body. Verified against
   // `AdtDomain.updateMetadata()`, which reads `options?.source` only.
+  // The answer is `terseWrite` over the write's reading (Codex P2): SUCCESS
+  // for SAP's 2xx, not a constant.
+  it('answers what terseWrite makes of the write, not a fixed SUCCESS', async () => {
+    const currentXml =
+      '<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" adtcore:description="before"/>';
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(currentXml),
+      updateMetadata: async () => okResponse(reading(undefined, '', 302)),
+    });
+    const result: any = await handleUpdateDomain(context as any, {
+      domain_name: 'zd',
+      properties: { description: 'after' },
+      lock_handle: 'h',
+    });
+    assert.notEqual(result.content[0].text, 'SUCCESS');
+  });
+
   it('passes the patched document via options.source, and the config names the object only', async () => {
     const currentXml =
       '<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" adtcore:description="before"/>';
@@ -108,7 +126,7 @@ describe('UpdateDomainLow', () => {
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (config: unknown, options: unknown) => {
         updateCall = { config, options };
-        return okResponse(undefined);
+        return okResponse(reading(undefined, '', 200));
       },
     });
 
@@ -119,6 +137,8 @@ describe('UpdateDomainLow', () => {
     });
 
     assert.equal(result.isError, false);
+    // A write with nothing to report answers SUCCESS, as every low update.
+    assert.equal(result.content[0].text, 'SUCCESS');
 
     // The request the member actually builds from this: options carries the
     // whole patched document beside the lock handle and the strategy; config
@@ -154,7 +174,7 @@ describe('UpdateDomainLow', () => {
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (config: unknown, options: unknown) => {
         updateCall = { config, options };
-        return okResponse(undefined);
+        return okResponse(reading(undefined, '', 200));
       },
     });
 
@@ -178,7 +198,7 @@ describe('UpdateDomainLow', () => {
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (_config: unknown, options: { source: string }) => {
         source = options.source;
-        return okResponse(undefined);
+        return okResponse(reading(undefined, '', 200));
       },
     });
 
@@ -200,7 +220,7 @@ describe('UpdateDomainLow', () => {
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (config: unknown, options: unknown) => {
         updateCall = { config, options };
-        return okResponse(undefined);
+        return okResponse(reading(undefined, '', 200));
       },
     });
 

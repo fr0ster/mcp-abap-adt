@@ -20,15 +20,20 @@ import {
   ABAPGIT_DETAIL_SHAPE,
   RUN_LOG_ANSWERS,
 } from '../../../lib/abapGit/formats';
-import { answerAt } from '../../../lib/detail';
+import { purpose, toolDescription } from '../../../lib/description';
+import { listAnswerAt } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
 export const TOOL_DEFINITION = {
   name: 'GetAbapGitErrorLog',
   available_in: ['cloud'] as const,
-  description:
-    "[read-only] Reads the log of the repository's last pull or push, by the run log key the repository list answers for it. Answers facts only: each object of the run with its type, name, package, status and SAP's message type (S, I, W, E or A).",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the error log of the last abapGit pull or push of a repository, object by object.',
+    ),
+  }),
   inputSchema: z.object({
     repository_key: REPOSITORY_KEY_FIELD,
     app_log_key: APP_LOG_KEY_FIELD,
@@ -40,7 +45,7 @@ export async function handleGetAbapGitErrorLog(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const format = answerAt(RUN_LOG_ANSWERS, levelOf(args));
+  const format = listAnswerAt(RUN_LOG_ANSWERS, levelOf(args));
   return answer(
     { tool: 'GetAbapGitErrorLog', detail: detailOf(args) },
     async () => {

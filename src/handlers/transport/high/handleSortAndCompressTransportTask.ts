@@ -21,6 +21,8 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
@@ -30,8 +32,13 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'SortAndCompressTransportTask',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Sorts the object list of the transport task named by transport_number and merges its duplicate entries. A task holding the same entry twice refuses removing an entry until this has run.',
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        'Sorts the objects of a transport task and merges its duplicates.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     transport_number: z
       .string()
@@ -59,11 +66,7 @@ export async function handleSortAndCompressTransportTask(
   // No `success`, for the reason `RemoveTransportObject` gives: the answer is
   // an empty `200` and says nothing about the list, so `success` would claim
   // what nobody measured. `accepted` and the re-read that settles it instead.
-  const terseSort = () => ({
-    accepted: true,
-    transport_number: args.transport_number,
-    confirm_with: `ReadTransportObjects on ${args.transport_number} — this answer only says the request was understood; it carries no object list.`,
-  });
+  const terseSort = () => transportSort(args.transport_number);
 
   return answer(
     { tool: 'SortAndCompressTransportTask', detail },
@@ -73,4 +76,13 @@ export async function handleSortAndCompressTransportTask(
         .sortAndCompress(args.transport_number, { analyse: analyseException }),
     project(detail, terseSort),
   );
+}
+
+/** What a sort answers: SAP took it, the task, and where to confirm it. */
+export function transportSort(transportNumber: string) {
+  return {
+    accepted: true,
+    transport_number: transportNumber,
+    confirm_with: `ReadTransportObjects on ${transportNumber} — this answer only says the request was understood; it carries no object list.`,
+  };
 }

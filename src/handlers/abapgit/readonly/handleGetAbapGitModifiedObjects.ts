@@ -24,15 +24,20 @@ import {
   ABAPGIT_DETAIL_SHAPE,
   MODIFIED_OBJECTS_ANSWERS,
 } from '../../../lib/abapGit/formats';
-import { answerAt } from '../../../lib/detail';
+import { purpose, toolDescription } from '../../../lib/description';
+import { listAnswerAt } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 
 export const TOOL_DEFINITION = {
   name: 'GetAbapGitModifiedObjects',
   available_in: ['cloud'] as const,
-  description:
-    "[read-only] Reads what a pull of the repository would change in the system: every changed object (changed in the remote, in the system or in both, added or deleted on either side), the repository's own package left out, and as package warnings the objects whose package in the system differs from the package their path maps to. Answers facts only: each object with its type, name, package, URI and SAP's action: 1 add, 2 update (changed only in the remote), 3 overwrite (changed in the system), 4 delete, 5 delete and re-create, 6 package move; SAP leaves a package warning with action 5 out of every selection.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the objects a pull of an abapGit repository would modify in the system, before it runs.',
+    ),
+  }),
   inputSchema: z.object({
     repository_key: REPOSITORY_KEY_FIELD,
     ...ABAPGIT_DETAIL_SHAPE,
@@ -43,7 +48,7 @@ export async function handleGetAbapGitModifiedObjects(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const format = answerAt(MODIFIED_OBJECTS_ANSWERS, levelOf(args));
+  const format = listAnswerAt(MODIFIED_OBJECTS_ANSWERS, levelOf(args));
   return answer(
     { tool: 'GetAbapGitModifiedObjects', detail: detailOf(args) },
     async () => {

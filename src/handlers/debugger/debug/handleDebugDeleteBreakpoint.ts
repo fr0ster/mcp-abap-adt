@@ -3,14 +3,22 @@ import * as z from 'zod';
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugDeleteBreakpoint',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. An id outside the session's set is refused.",
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Deletes one breakpoint of an ABAP debug session by its id, the rest staying armed.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     breakpoint_id: z.string().describe('Breakpoint id.'),

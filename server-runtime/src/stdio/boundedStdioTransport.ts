@@ -55,9 +55,11 @@ export const STDIO_MESSAGE_LIMIT = STDIO_DEFAULT_MAX_BUFFER_SIZE;
  * 1 MiB. Verified per client, each reading less:
  * - Node (the SDK's `StdioClientTransport`): at most 65,536 bytes a chunk —
  *   libuv hands every read a 64 KiB buffer (`uv__read`, `src/unix/stream.c`;
- *   on Unix a child's stdio is a socket; Windows `src/win/pipe.c`, source
- *   only). Measured on Linux (2026-11-22, Node 26): 8 MiB from a child's
- *   stdout arrived in chunks of at most 65,536 bytes.
+ *   on Unix a child's stdio is a socket; on Windows a pipe, `src/win/pipe.c`).
+ *   Measured on Linux (2026-11-22, Node 26): 8 MiB from a child's stdout
+ *   arrived in chunks of at most 65,536 bytes. Measured on Windows
+ *   (2026-11-23, Node v24.22.1): 20 MiB from a child's stdout arrived in 320
+ *   chunks, each 65,536 bytes.
  * - Python MCP over AnyIO: `StreamReader.read(65536)`.
  * - The TS SDK hosted on Bun (Claude Code ships as a Bun binary): 262,144
  *   bytes a chunk, measured on Linux (2026-11-22, Bun 1.3.13), 8 MiB from a

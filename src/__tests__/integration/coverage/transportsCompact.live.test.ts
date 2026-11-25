@@ -91,10 +91,7 @@ function transportablePackage(): string {
 async function tasksOf(request: string): Promise<string[]> {
   const read = succeeded(
     `GetTransport ${request}`,
-    await livePrepare('GetTransport', {
-      transport_number: request,
-      detail: 'medium',
-    }),
+    await livePrepare('GetTransport', { transport_number: request }),
   );
   const tasks = member(payloadOf(read), 'tasks');
   return Array.isArray(tasks)
@@ -143,10 +140,7 @@ async function configuredTarget(): Promise<string> {
   if (configured === undefined) return '';
   const read = succeeded(
     'GetTransport of the configured request',
-    await livePrepare('GetTransport', {
-      transport_number: configured,
-      detail: 'medium',
-    }),
+    await livePrepare('GetTransport', { transport_number: configured }),
   );
   const kept = member(member(payloadOf(read), 'transport'), 'target_system');
   const target = typeof kept === 'string' ? kept.trim() : '';
@@ -193,14 +187,12 @@ async function ownRequest(
   if (typeof request !== 'string') throw new Error('no request number');
   const read = succeeded(
     `GetTransport ${request}`,
-    await livePrepare('GetTransport', {
-      transport_number: request,
-      detail: 'medium',
-    }),
+    await livePrepare('GetTransport', { transport_number: request }),
   );
   assert.equal(
     member(member(payloadOf(read), 'transport'), 'description'),
     plan.description,
+    read.text,
   );
   const tasks = await tasksOf(request);
   assert.equal(tasks.length, 1, `${request} holds ${tasks.length} tasks`);
@@ -362,16 +354,14 @@ liveSuite(['onprem'], 'Compact transport create with a typed task', () => {
     // Repair (measured on premise).
     const read = succeeded(
       `GetTransport ${request}`,
-      await livePrepare('GetTransport', {
-        transport_number: request,
-        detail: 'medium',
-      }),
+      await livePrepare('GetTransport', { transport_number: request }),
     );
     const tasks = member(payloadOf(read), 'tasks');
     const listed = Array.isArray(tasks) ? tasks : [];
     assert.deepEqual(
       listed.map((entry) => [member(entry, 'number'), member(entry, 'type')]),
       [[task, 'Repair']],
+      read.text,
     );
   });
 });

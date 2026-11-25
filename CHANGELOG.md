@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-11-24
+## [Unreleased] - 2026-11-25
 
 ### Added
 
@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **On premise, a gateway error's detail reads its header.** `RuntimeGetGatewayErrorLog` with `opid` and `detail_kind` answered "the answer names no gateway error" for every on-premise error: SAP names that page's header section `HEADER`, the cloud's `HEADER_INFO`, and only the cloud's was read. `@mcp-abap-adt/adt-strategies` 0.28.3 reads both.
 - **`HandlerUnlock` is now `HandlerLock` with `action: unlock`.** The compact `HandlerLock` takes `action` (`lock`, the default, or `unlock`) and, for `unlock`, the `lock_handle` the lock gave; each action answers as before. `HandlerUnlock` is gone from the compact sets. A deny list narrows the action: `HandlerLock.unlock` and `HandlerLock.lock` each close one, both leave HandlerLock out; `HandlerUnlock` and a prefix naming it (`HandlerUn*`) close the unlock, and a value entry on it (`HandlerUnlock.CLASS`) stops the start, naming its replacements ([Access restrictions](docs/user-guide/ACCESS_RESTRICTIONS.md)). An unlock without `lock_handle` is refused by the schema, before any connection is opened.
 - **`GetTransport` reads a transport task as well as a request.** `transport_number` is a request or a task number (the two cannot be told apart by their form), and the answer's `kind` says which was read, from the document's `tm:root/@tm:object_type` (`T` a task). SAP's one handler answers both (`CL_CTS_ADT_TM_RES_REQUEST_CONT->fetch_request_data`, the same on premise and on the cloud; measured `200` on both, 2026-11-22). A task answers its own header from `tm:task`, its parent request's header apart as `parent_request`, and its objects with their positions.
 - **`GetTransport` takes `detail` (`terse` by default, `full`, `raw`)**, as the other transport reads do. Terse answers what the model acts on: a request's header (number, description, type, status, owner, target system) and its tasks as rows (number, owner, status, description, object count), without objects — a task is read by its number for them; a task's header (number, parent, description, type, status, owner), `parent_request` (number, type, status, target system) and its objects as rows of pgmid, type, name and position, with `object_count` (`LIMU` or `R3TR` decides what a move or a removal addresses). Full is the whole parse and raw the document. A terse request no longer lists objects, and the fields beyond these (status text, change dates, client, CTS project, each object's description) are read with `detail: full`. `include_objects` and `include_tasks` stay for compatibility, as terse's choice to leave a task's object rows or a request's task rows out; their counts are answered either way.

@@ -153,8 +153,9 @@ liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
       'HandlerValidate.DOMAIN',
       'HandlerCheckRun.DOMAIN',
       'HandlerLock.INTERFACE',
+      // Both actions of HandlerLock: the lock and the unlock of INTERFACE
+      // (24.0.0: a HandlerUnlock.<TYPE> entry stops the start).
       'HandlerUpdate.INTERFACE',
-      'HandlerUnlock.INTERFACE',
     ),
     () => {
       it('each denied value refused at the parse', async () => {

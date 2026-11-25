@@ -537,9 +537,21 @@ describe('batched reads timed against the sequential path on the system the test
       );
       return;
     }
-    if (packages.length < 2) {
+    // Two distinct parents, upper-cased as the tool reads them: the
+    // default package, the super package and the shared objects' package,
+    // in that order. One package named twice is one parent (no envelope).
+    const shared: unknown = getSharedDependenciesConfig()?.package;
+    const parents = [
+      ...new Set(
+        [...packages.map((p) => p.name), shared]
+          .filter((name): name is string => typeof name === 'string')
+          .map((name) => name.trim().toUpperCase())
+          .filter((name) => name !== ''),
+      ),
+    ].slice(0, 2);
+    if (parents.length < 2) {
       skipRunningTest(
-        'GetObjectsList on both packages: the config names no shared_dependencies.super_package',
+        `GetObjectsList on both packages: the config names one distinct package (${parents.join(', ')}); two are needed`,
       );
       return;
     }
@@ -547,12 +559,12 @@ describe('batched reads timed against the sequential path on the system the test
     await timeBothPaths(
       connection,
       'GetObjectsList',
-      'both packages',
+      `both packages (${parents.join(', ')})`,
       (context) =>
         handleGetObjectsList(context, {
-          objects: packages.map((p) => ({
+          objects: parents.map((name) => ({
             parent_type: 'DEVC/K',
-            parent_name: p.name,
+            parent_name: name,
           })),
         }),
     );

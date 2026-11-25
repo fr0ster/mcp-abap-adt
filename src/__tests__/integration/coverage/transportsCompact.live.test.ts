@@ -87,6 +87,32 @@ function transportablePackage(): string {
   return accepted;
 }
 
+/**
+ * The attributes of every `tm:task` element in GetTransport's full answer
+ * (SAP's document as JSON: each element's attributes under `@`).
+ */
+function taskAttributesIn(node: unknown): unknown[] {
+  const found: unknown[] = [];
+  const pending: unknown[] = [node];
+  while (pending.length > 0) {
+    const each = pending.pop();
+    if (Array.isArray(each)) {
+      pending.push(...each);
+      continue;
+    }
+    if (typeof each !== 'object' || each === null) continue;
+    for (const [key, value] of Object.entries(each)) {
+      if (key === 'tm:task') {
+        for (const task of Array.isArray(value) ? value : [value]) {
+          found.push(member(task, '@'));
+        }
+      }
+      pending.push(value);
+    }
+  }
+  return found;
+}
+
 /** A request's tasks, by number, as GetTransport answers them. */
 async function tasksOf(request: string): Promise<string[]> {
   const read = succeeded(
@@ -108,7 +134,10 @@ async function entriesOn(
 ): Promise<Array<{ type: string; position: string; pgmid: string }>> {
   const read = succeeded(
     `ReadTransportObjects ${task}`,
-    await livePrepare('ReadTransportObjects', { transport_number: task }),
+    await livePrepare('ReadTransportObjects', {
+      transport_number: task,
+      detail: 'medium',
+    }),
   );
   const objects = member(payloadOf(read), 'objects');
   return (Array.isArray(objects) ? objects : []).flatMap((object) => {
@@ -170,10 +199,16 @@ async function ownRequest(
   created: LiveAnswer,
 ): Promise<OwnRequest> {
   await reconcileRequestCreate(plan, created);
+  // The terse answer states the numbers, and a task_type_error only when
+  // the task could not be typed as asked (S, Development/Correction).
   const answered = payloadOf(created);
-  assert.equal(member(answered, 'success'), true);
-  // The task SAP created with the request, typed Development/Correction.
-  assert.equal(member(answered, 'task_type'), 'S');
+  assert.equal(
+    typeof member(answered, 'transport_number'),
+    'string',
+    created.text,
+  );
+  assert.notEqual(member(answered, 'transport_number'), '', created.text);
+  assert.equal(member(answered, 'task_type_error'), undefined, created.text);
   const request = member(answered, 'transport_number');
   if (typeof request !== 'string') throw new Error('no request number');
   const read = succeeded(
@@ -183,6 +218,7 @@ async function ownRequest(
   assert.equal(
     member(member(payloadOf(read), 'transport'), 'description'),
     plan.description,
+    read.text,
   );
   const tasks = await tasksOf(request);
   assert.equal(tasks.length, 1, `${request} holds ${tasks.length} tasks`);
@@ -260,7 +296,7 @@ liveSuite(['onprem', 'cloud'], 'Compact transports', () => {
   });
 
   it("ListTransports lists the session user's modifiable requests, the one just created among them", async () => {
-    const answered = await liveCall('ListTransports', {});
+    const answered = await liveCall('ListTransports', { detail: 'medium' });
     const listed = payloadOf(succeeded('ListTransports', answered));
     assert.equal(member(listed, 'success'), true);
     const transports = member(listed, 'transports');
@@ -304,6 +340,7 @@ liveSuite(['onprem', 'cloud'], 'Compact transports', () => {
         'accepted',
       ),
       true,
+      sorted.text,
     );
     if (configuredSystemKind() === 'onprem') {
       assert.equal((await entriesOn(mine.task, SORTED)).length, 1);
@@ -328,26 +365,34 @@ liveSuite(['onprem'], 'Compact transport create with a typed task', () => {
       transport_type: 'workbench',
       target_system: target,
       task_type: 'R',
+      // The task type read below: the JSON of detail medium.
+      detail: 'medium',
     });
     await reconcileRequestCreate(plan, created);
     const answered = payloadOf(created);
-    assert.equal(member(answered, 'task_type'), 'R');
+    assert.equal(member(answered, 'task_type'), 'R', created.text);
     const request = member(answered, 'transport_number');
     if (typeof request !== 'string') throw new Error('no request number');
     const task = member(answered, 'task_number');
     if (typeof task !== 'string') throw new Error('no task number');
     recordCreatedRequest(task);
-    // Read back: the request's one task, of type R — GetTransport names it
-    // Repair (measured on premise).
+    // Read back: the request's one task, of type R — SAP writes it Repair
+    // (measured on premise). The terse task rows carry no type, so the
+    // request is read at full: SAP's document, each task's attributes.
     const read = succeeded(
       `GetTransport ${request}`,
-      await livePrepare('GetTransport', { transport_number: request }),
+      await livePrepare('GetTransport', {
+        transport_number: request,
+        detail: 'full',
+      }),
     );
-    const tasks = member(payloadOf(read), 'tasks');
-    const listed = Array.isArray(tasks) ? tasks : [];
     assert.deepEqual(
-      listed.map((entry) => [member(entry, 'number'), member(entry, 'type')]),
+      taskAttributesIn(payloadOf(read)).map((attributes) => [
+        member(attributes, 'tm:number'),
+        member(attributes, 'tm:type'),
+      ]),
       [[task, 'Repair']],
+      read.text,
     );
   });
 });
@@ -406,6 +451,7 @@ liveSuite(
           'accepted',
         ),
         true,
+        moved.text,
       );
       assert.equal((await entriesOn(source.task, MOVED)).length, 0);
       assert.equal((await entriesOn(destination.task, MOVED)).length, 1);
@@ -416,7 +462,7 @@ liveSuite(
 /** A listing of the session user's modifiable requests: its count, each number, each status D, L or unstated. */
 function expectModifiableListing(answer: LiveAnswer): void {
   const listed = payloadOf(succeeded('HandlerSystem transports', answer));
-  assert.equal(member(listed, 'success'), true);
+  assert.equal(member(listed, 'success'), true, answer.text);
   const transports = member(listed, 'transports');
   if (!Array.isArray(transports)) throw new Error('no transports list');
   assert.equal(member(listed, 'count'), transports.length);
@@ -439,6 +485,8 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem transports', () => {
       const answer = await liveCall('HandlerSystem', {
         action: 'transports',
         background: false,
+        // The fields read below: the JSON of detail medium.
+        detail: 'medium',
       });
       expectModifiableListing(answer);
     });
@@ -446,6 +494,7 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem transports', () => {
     it('without background it starts a run, whose answer HandlerBackgroundRunGet reads once', async () => {
       const started = await liveCall('HandlerSystem', {
         action: 'transports',
+        detail: 'medium',
       });
       expectModifiableListing(await finishedRun(startedRun(started)));
     });

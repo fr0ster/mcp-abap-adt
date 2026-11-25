@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { readerParts, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -13,8 +14,12 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 export const TOOL_DEFINITION = {
   name: 'GetTableType',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the ABAP table type named by table_type_name in one request: its ADT metadata document (row type, access, key, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.',
+  description: toolDescription(
+    readerParts({
+      object: 'an ABAP table type',
+      holding: 'its element type, access, key, package and description',
+    }),
+  ),
   inputSchema: z.object({
     table_type_name: requiredText('table_type_name is required').describe(
       'Table type name.',

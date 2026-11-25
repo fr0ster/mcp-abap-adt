@@ -5,6 +5,7 @@ import {
   feedDocuments,
   profilerDocuments,
   programExecutorDocuments,
+  serviceDocuments,
   utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import {
@@ -31,22 +32,46 @@ import {
   traceSchedulingTypes,
   unitTestRunId,
   utilActivationRunId,
+  utilNodeContents,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { XmlNode } from '../xml/node';
-import { nodeLevel } from './packageWalk';
-import { type AdtReading, statusOnly, structured, verbatim } from './reading';
+import {
+  type AdtReading,
+  rawOf,
+  statusOnly,
+  structured,
+  verbatim,
+} from './reading';
 import { sqlPreview } from './sqlPreview';
+import { whereUsedListReading } from './whereUsedList';
+
+/**
+ * A version feed read: the versions as adt-strategies reads them
+ * (`objectVersions`) and the document as it came — the history at
+ * `detail: 'raw'`.
+ */
+export interface VersionFeed {
+  versions: IObjectVersion[];
+  document: string;
+}
+
+/** The `versions` slot's reading: the typed list and its document. */
+export function versionFeed(answer: IAdtWireResponse): VersionFeed {
+  return { versions: objectVersions(answer), document: rawOf(answer) };
+}
 
 /**
  * What a strategy of the table reads an answer into: a reading of the
  * document (`verbatim`, `structured`, `statusOnly`), the text as it came
- * (`asItCame`), or the version list (`objectVersions`).
+ * (`asItCame`), or the version feed (`versionFeed`: the list and its
+ * document).
  */
 type TableReading =
   | AdtReading<string | XmlNode | null | undefined>
   | string
-  | readonly IObjectVersion[];
+  | VersionFeed;
 
 /**
  * Which reading a result-set slot wants — keyed on the slot, because that is
@@ -166,15 +191,13 @@ export const READING_BY_SLOT = {
   addedObject: structured,
   createdTask: structured,
   actionLog: structured,
-  // `objects` is the one a call site keeps rather than stamps: the package parses the entries and, with
-  // them, the `tm:position` that `removeObject` requires. Stamped with
-  // `structured` it would hand back a parsed document and leave a caller
-  // digging a position out of it — which is the work `readObjects` exists to
-  // end. `ReadTransportObjects` therefore calls
-  // `resultsFor(transportDocuments, ['objects'])`. The table still declares
-  // the slot, because the ratchet in `resultSets.test.ts` asks for a reading
-  // per slot and a call site that forgets the keep-list should get something
-  // rather than a throw.
+  // `objects` is stamped `structured` like its neighbours, and that is what
+  // `ReadTransportObjects` reads (plain `resultsFor(transportDocuments)`): it
+  // walks the parse for each entry's `tm:position` and the task it is on,
+  // which adt-strategies' `transportObjectEntries` does not answer (no task
+  // number, and a request's `tm:all_objects` read beside its tasks' entries,
+  // every object twice). `CreateTransport` passes a reading of its own for
+  // the slot (`firstTaskOf`, over `transportTree`).
   objects: structured,
   // Arrived with adt-clients 22.0.0, on `changeTaskType`. `structured` for the
   // same reason the echoes above are: the answer is the task document read
@@ -197,11 +220,12 @@ export const READING_BY_SLOT = {
   // Arrived with adt-clients 23.0.0 in every versionable type's set. The
   // library stopped reading them (MIGRATION-23 §4): `versions` is the feed as
   // it came unless a reading is given, so the list is `objectVersions`'
-  // (`IObjectVersion[]`, what `getVersions` answered in 22.x), and a version's
+  // (`IObjectVersion[]`, what `getVersions` answered in 22.x) beside the
+  // document (`versionFeed`, for `detail: 'raw'`), and a version's
   // source is the text as it came — `asItCame`, the 22.x default. Without
   // them `resultsFor` threw for every versionable type's set, which is nearly
   // every handler here.
-  versions: objectVersions,
+  versions: versionFeed,
   versionSource: asItCame,
 
   // Arrived with adt-clients 23.0.0, when the runtime, executor, abapGit and
@@ -369,9 +393,9 @@ export function resultsFor(
 }
 
 /**
- * The util set, with our own node reading — `nodeLevel` keeps the descriptions
- * the shipped `nodeContents` drops, and a tree without them is a tree a caller
- * has to walk again. `activation` is kept as shipped: `activationRunId` reads
+ * The util set, its node reading adt-strategies' `utilNodeContents` (0.28.1:
+ * descriptions, incomplete objects and the nodes SAP could not load kept).
+ * `activation` is kept as shipped: `activationRunId` reads
  * the `Location` header a started activation run answers with, which is not a
  * question `structured` (the table's default for the slot name `activation`)
  * can even see.
@@ -382,7 +406,9 @@ export const ourUtils = {
   // reading now, and `utilActivationRunId` is the one that looks at the
   // `Location` header (MIGRATION-23 §4).
   activation: utilActivationRunId,
-  node: nodeLevel,
+  // One level of the repository tree as adt-strategies reads it (0.28.1):
+  // complete and incomplete objects, the nodes SAP could not load.
+  node: utilNodeContents,
   // `query` for the same reason as `node`: the generic `structured` parse has
   // never carried `dataPreview:columns` or `dataPreview:data` in its
   // repeatable list, so a preview read through it collapses a column's cells
@@ -395,6 +421,35 @@ export const ourUtils = {
   // `GetTableContents` reads the same `/datapreview/freestyle` document
   // through a different slot, and carried the same regular expression.
   contents: sqlPreview,
+  // The where-used scope is a document to edit, not a parse to read:
+  // `modifyWhereUsedScope` edits its text and `whereUsedScopeTypesOf` reads
+  // the types out of it, so the structured parse was thrown away.
+  whereUsedScope: verbatim,
+  // The where-used list as adt-strategies reads it (0.28.0), in the fields
+  // the tools answer, with its document.
+  whereUsed: whereUsedListReading,
+};
+
+/**
+ * The service-binding set of the reads (`ListServiceBindingTypes`,
+ * `GetServiceBindingPreviewUrl`): the binding types and the service group are
+ * read as their documents — the tools answer the types' text in the format
+ * asked, and the preview URL reads the group's category URLs out of its text.
+ */
+export const ourServiceBindingReads = {
+  ...resultsFor(serviceDocuments),
+  bindingTypes: verbatim,
+  odata: verbatim,
+};
+
+/**
+ * The service-binding set of `CreateServiceBinding`: the service group read
+ * after the activation is a check — a refusal is answered, a success only
+ * says it was readable, and the answer is the create's own.
+ */
+export const ourServiceBindingWrites = {
+  ...resultsFor(serviceDocuments),
+  odata: statusOnly,
 };
 
 /**
@@ -424,12 +479,21 @@ export const ourUnitTest = {
  */
 export const ourAtc = {
   ...atcDocuments,
+  // The documents as text, a `Buffer` body as its UTF-8 (`verbatim` over
+  // our `rawOf`), never its numbers (Codex round 7).
+  findings: verbatimText,
+  result: verbatimText,
   checkVariant: atcSystemCheckVariant,
   worklist: atcWorklistId,
   startedRun: atcStartedRun,
   waitingRun: atcWaitingRun,
   runStatus: atcRunStatus,
 };
+
+/** A document as text: the body as our `rawOf` reads it. */
+function verbatimText(answer: IAdtWireResponse): string {
+  return rawOf(answer);
+}
 
 /**
  * The profiler set with the readings adt-clients 22 applied by default

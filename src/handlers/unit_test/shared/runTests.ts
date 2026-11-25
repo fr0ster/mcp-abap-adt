@@ -34,7 +34,7 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import type { XmlRead } from '../../../lib/xml/tree';
-import { type RunOutcome, readStartedRun, unfinishedRun } from './pollRun';
+import { type RunOutcome, readStartedRun, runOutcomeAnswer } from './pollRun';
 
 /** The object types a run can be started for, each with its own runner. */
 export type TestCarrier =
@@ -160,20 +160,14 @@ export async function waitForRun(
  * What a run tool answers: the result of a run SAP answered `FINISHED`; the
  * run id and SAP's status for a run a long-polled read answered
  * `NOT_STARTED`; the run id
- * alone for a run it did not wait for. `raw` answers the wire document,
- * `terse` and `full` the parse — no fixture proves a further reduction of a
+ * alone for a run it did not wait for. Every level reached here answers
+ * the parse (`raw` is the run's wire documents, `wireAnswer`) — no fixture proves a further reduction of a
  * test-run result is safe.
  */
 export function projectRun(detail: 'terse' | 'full' | 'raw') {
   return (run: StartedRun) => {
     const waited = run.waited;
     if (waited === undefined) return { success: true, run_id: run.runId };
-    if (!waited.finished) return unfinishedRun(run.runId, waited.runStatus);
-    return {
-      success: true,
-      run_id: run.runId,
-      finished: true,
-      run_result: detail === 'raw' ? waited.result.raw : waited.result.value,
-    };
+    return runOutcomeAnswer(run.runId, waited);
   };
 }

@@ -1,4 +1,9 @@
 import * as z from 'zod';
+import {
+  longRunning,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 /**
@@ -10,6 +15,7 @@ import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 
 import {
   answerFailure,
+  type FailureEntry,
   failureEntry,
   isCredentialPayload,
   thrownEntry,
@@ -19,8 +25,34 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  about,
+  type Column,
+  entries,
+  type Head,
+  type JsonSchemas,
+  jsonText,
+  type ListAnswerTable,
+  type Listing,
+  listAnswerAt,
+  listWrittenAt,
+  partsOf,
+  type RowSchemas,
+  rows,
+  type Written,
+  wireAnswer,
+  writeJsonList,
+  writeJsonRoot,
+  writeListing,
+  writeWhole,
+  writtenValues,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { withLongToolAdvice } from '../../../lib/longTools';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
   assembleTree,
@@ -30,6 +62,7 @@ import {
   type NodeAnswer,
   type NodeRequest,
   nodeStructureOn,
+  type PackageNode,
   readNode,
   type WalkedItem,
   walkPackage,
@@ -78,6 +111,7 @@ const FIELDS = {
     .describe(
       'Include diagnostic metadata in response (counts, types, hierarchy info). Default: false',
     ),
+  ...ASSEMBLED_DETAIL_SHAPE,
 };
 
 /** Exactly one of `package_name` and a non-empty `package_names`. */
@@ -105,12 +139,25 @@ function onePackageForm(
   }
 }
 
+/**
+ * The lists below a package's own row: `described` with each object's
+ * description (`include_descriptions`), `bare` without.
+ */
+export const PACKAGE_TREE_LISTS = {
+  described: treeSchemas(true),
+  bare: treeSchemas(false),
+} as const;
+
 export const TOOL_DEFINITION = {
   name: 'GetPackageTree',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time.',
-  ),
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the whole hierarchy of one or more ABAP packages: each package with its subpackages and their objects, down to the last level.',
+    ),
+    notes: [longRunning],
+  }),
   inputSchema: withInCallSchema(
     z
       .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
@@ -377,13 +424,265 @@ function treeOf(
 }
 
 /**
+ * A tree row's columns: the type and the name; for an object SAP listed
+ * without a name its technical name and URI, what tells it apart; the
+ * description where asked.
+ */
+function treeColumns(descriptions: boolean): Column<PackageNode>[] {
+  const nameless = (node: PackageNode) => node.name === '';
+  const columns: Column<PackageNode>[] = [
+    { name: 'type', means: 'its type', cell: (node) => node.type },
+    { name: 'name', means: 'its name', cell: (node) => node.name },
+    {
+      name: 'tech_name',
+      means: 'its technical name when SAP lists it nameless',
+      cell: (node) => node.techName ?? '',
+      when: nameless,
+    },
+    {
+      name: 'uri',
+      means: 'its URI when SAP lists it nameless',
+      cell: (node) => node.uri ?? '',
+      when: nameless,
+    },
+  ];
+  return descriptions
+    ? [
+        ...columns,
+        {
+          name: 'description',
+          means: 'its description, with descriptions asked',
+          cell: (node) => node.description ?? '',
+        },
+      ]
+    : columns;
+}
+
+/** The tree's rows below its root, every node at its depth (terse). */
+function treeSchemas(descriptions: boolean): RowSchemas<PackageNode> {
+  const schemas: RowSchemas<PackageNode> = {
+    children: about(
+      'for each subpackage and object below it, at its depth',
+      rows('children', {
+        columns: treeColumns(descriptions),
+        header: 'none',
+        get lists() {
+          return schemas;
+        },
+      }),
+    ),
+  };
+  return schemas;
+}
+
+/** A tree node with every field the walk read, no derived or backup field (medium). */
+const mediumEntry = (node: PackageNode) => ({
+  name: node.name,
+  type: node.type,
+  ...(node.techName !== undefined ? { tech_name: node.techName } : {}),
+  ...(node.uri !== undefined ? { uri: node.uri } : {}),
+  ...(node.description !== undefined ? { description: node.description } : {}),
+  ...(node.notLoaded === true ? { not_loaded: true as const } : {}),
+});
+
+/** The tree's nodes below a node, medium: a leaf without its empty `children`. */
+const mediumSchemas: JsonSchemas<PackageNode> = {
+  children: entries('children', mediumEntry, {
+    omitEmpty: true,
+    get lists() {
+      return mediumSchemas;
+    },
+  }),
+};
+
+/** A package's tree as one level answers it: the arguments of {@link treeOf}. */
+interface TreeAnswerRead {
+  packageName: string;
+  walked: WalkedItem[];
+  options: TreeOptions;
+}
+
+/**
+ * What GetPackageTree answers of one package at each `detail`, selected
+ * before the reads (`src/lib/detail`): terse the tree as indented
+ * `type\tname` lines; medium the tree with every field the walk read, no
+ * kind, isPackage, codeFormat, restoreStatus or empty children; full the
+ * answer before `detail`. A walk reads many documents, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
+ */
+type TreeAnswer = string | object;
+
+/** The terse tree: the package's own row, then every node at its depth. */
+const treeListing = ({
+  packageName,
+  walked,
+  options,
+}: TreeAnswerRead): Listing<PackageNode> =>
+  treeListingOf(assembleTree(packageName, walked), options.includeDescriptions);
+
+/** An assembled tree's terse listing: its root a row, every node below it. */
+const treeListingOf = (
+  tree: PackageNode,
+  includeDescriptions: boolean,
+): Listing<PackageNode> => ({
+  heads: [],
+  reading: tree,
+  root: { columns: treeColumns(includeDescriptions) },
+  lists: PACKAGE_TREE_LISTS[includeDescriptions ? 'described' : 'bare'],
+});
+
+// Every level written from the assembled tree, every node of the walk in
+// it (`assembleTree`): the writers write one row or entry per node.
+const TREE_ANSWERS: ListAnswerTable<TreeAnswerRead, TreeAnswer> = {
+  // With include_descriptions, each row's description beside its type and
+  // name; the package's own row is the root, the rows below it its nodes.
+  terse: (read) => writeListing(treeListing(read)),
+  medium: ({ packageName, walked }) =>
+    writeJsonRoot(
+      assembleTree(packageName, walked),
+      mediumEntry,
+      mediumSchemas,
+    ),
+  // The whole parse, as it is.
+  full: ({ packageName, walked, options }) => ({
+    package_name: packageName,
+    tree: assembleTree(packageName, walked),
+    metadata: {
+      include_subpackages: options.includeSubpackages,
+      max_depth: options.maxDepth,
+      include_descriptions: options.includeDescriptions,
+    },
+  }),
+  raw: ({ packageName, walked, options }) =>
+    treeOf(packageName, walked, options),
+};
+
+/** One package's read, or its failure entry. */
+type TreeOutcome =
+  | { readonly read: TreeAnswerRead }
+  | {
+      readonly package_name: string;
+      readonly error: FailureEntry;
+      readonly read?: undefined;
+    };
+
+/**
+ * One package asked by a list call, as its terse part reads it: its name,
+ * its failure, or its assembled tree and whether rows carry descriptions.
+ */
+interface AskedTree {
+  readonly name: string;
+  readonly failed:
+    | { readonly package_name: string; readonly error: FailureEntry }
+    | undefined;
+  readonly tree: PackageNode | undefined;
+  readonly includeDescriptions: boolean;
+}
+
+/** What a list call answers from: the packages asked, each one's outcome. */
+interface TreeList {
+  readonly packageNames: readonly string[];
+  readonly outcomes: readonly TreeOutcome[];
+  readonly shown: (read: TreeAnswerRead) => Written<TreeAnswer>;
+}
+
+/** A list call's entries as a JSON array. */
+const jsonTrees = ({ outcomes, shown }: TreeList) =>
+  jsonText(
+    writeJsonList(
+      { outcomes },
+      writtenValues('outcomes', (outcome: TreeOutcome) =>
+        outcome.read === undefined ? writeWhole(outcome) : shown(outcome.read),
+      ),
+    ),
+  );
+
+/**
+ * A list call's answer at each `detail`, selected through the table like
+ * every other answer: terse one text written by the listing writer, each tree
+ * under its escaped `# asked` line; the other levels a JSON array.
+ */
+const TREE_LISTS: ListAnswerTable<TreeList, string> = {
+  terse: ({ packageNames, outcomes }) =>
+    writeListing({
+      heads: [],
+      reading: {
+        asked: outcomes.map(
+          (outcome, i): AskedTree => ({
+            name: packageNames[i] ?? '',
+            failed: outcome.read === undefined ? outcome : undefined,
+            tree:
+              outcome.read === undefined
+                ? undefined
+                : assembleTree(outcome.read.packageName, outcome.read.walked),
+            includeDescriptions:
+              outcome.read?.options.includeDescriptions === true,
+          }),
+        ),
+      },
+      lists: {
+        asked: partsOf(
+          'asked',
+          ({ name, failed }: AskedTree): Head[] => [
+            { head: 'asked', value: name },
+            ...(failed === undefined
+              ? []
+              : [{ head: 'error', value: JSON.stringify(failed) }]),
+          ],
+          'tree',
+          {
+            // Each package's tree, its descriptions where the call asked.
+            variants: {
+              plain: {
+                lists: PACKAGE_TREE_LISTS.bare,
+                root: { columns: treeColumns(false) },
+              },
+              described: {
+                lists: PACKAGE_TREE_LISTS.described,
+                root: { columns: treeColumns(true) },
+              },
+            },
+            frame: (_tree, { includeDescriptions }) => ({
+              variant: includeDescriptions ? 'described' : 'plain',
+            }),
+          },
+        ),
+      },
+    }),
+  medium: jsonTrees,
+  full: (list) => jsonTrees(list).answer,
+  raw: (list) => jsonTrees(list).answer,
+};
+
+/**
  * Main handler for GetPackageTree MCP tool
+ *
+ * At `raw` what ADT sent: the documents the call's reads answered, read
+ * with the tool at full (`wireAnswer`, `src/lib/detail/wire.ts`).
  */
 export async function handleGetPackageTree(
   context: HandlerContext,
   args: GetPackageTreeArgs,
 ) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetPackageTree',
+        shape: 'assembled',
+      },
+      () => answeredGetPackageTree(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetPackageTree(context, args);
+}
+
+async function answeredGetPackageTree(
+  context: HandlerContext,
+  args: GetPackageTreeArgs,
+) {
   const { logger } = context;
+  const shown = listAnswerAt(TREE_ANSWERS, levelOf(args));
   try {
     // The schema holds the rule: exactly one of the two forms.
     const single = stated(args.package_name) ? args.package_name : undefined;
@@ -428,7 +727,7 @@ export async function handleGetPackageTree(
         // The method's error as it is, with the step it arose at.
         return answerFailure(
           withStep(failedMetadata.value.getError(), 'read package metadata'),
-          { tool: 'GetPackageTree', detail: 'terse' },
+          { tool: 'GetPackageTree', detail: detailOf(args) },
         );
       }
     }
@@ -437,16 +736,18 @@ export async function handleGetPackageTree(
       const walked = walkOf(reads[0], packageNames[0]);
       if (!walked.ok) throw walked.error;
       logger?.debug(`Package tree fetched successfully for ${single}`);
+      const answer = shown({
+        packageName: packageNames[0],
+        walked: walked.value,
+        options,
+      });
       return return_response({
-        data: JSON.stringify(
-          treeOf(packageNames[0], walked.value, options),
-          null,
-          2,
-        ),
+        data: typeof answer === 'string' ? answer : JSON.stringify(answer),
       });
     }
 
-    const entries = reads.map((read, i) => {
+    // Each package's read, or its failure entry.
+    const outcomes = reads.map((read, i) => {
       const package_name = packageNames[i];
       const metadata = read.metadata;
       if (!metadata.ok) {
@@ -466,14 +767,28 @@ export async function handleGetPackageTree(
       }
       const walked = walkOf(read, package_name);
       return walked.ok
-        ? treeOf(package_name, walked.value, options)
+        ? {
+            read: {
+              packageName: package_name,
+              walked: walked.value,
+              options,
+            },
+          }
         : {
             package_name,
             error: thrownEntry(walked.error, 'read package node structure'),
           };
     });
+    // Through the list table, like every other answer.
     return return_response({
-      data: JSON.stringify(entries, null, 2),
+      data: listAnswerAt(
+        TREE_LISTS,
+        levelOf(args),
+      )({
+        packageNames,
+        outcomes,
+        shown: listWrittenAt(TREE_ANSWERS, levelOf(args)),
+      }),
     });
   } catch (error) {
     logger?.error('Failed to fetch package tree', error);

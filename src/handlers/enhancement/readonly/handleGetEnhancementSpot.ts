@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { failureEntry, isCredentialPayload } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { readerParts, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { readEnhancementSpotMetadata } from '../../../lib/strategies/metadataReads';
 import {
@@ -17,8 +18,12 @@ import { enhancementTypeOf, notThroughAdt } from './enhancementAvailability';
 export const TOOL_DEFINITION = {
   name: 'GetEnhancementSpot',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Retrieve metadata and list of implementations for a specific enhancement spot, at its active version.',
+  description: toolDescription(
+    readerParts({
+      object: 'an enhancement spot',
+      at: 'at its active version',
+    }),
+  ),
   inputSchema: z.object({
     enhancement_spot: z.string().describe('Name of the enhancement spot'),
   }),

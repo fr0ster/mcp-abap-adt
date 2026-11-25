@@ -100,8 +100,10 @@ import { sessionContext } from '../../lib/utils';
 import { corpusBody } from '../helpers/adtCorpus';
 import { assertMatchObject } from '../helpers/assertions';
 import {
+  answerThrough,
   fakeClientOf,
   fakeClientOfWithFactory,
+  fakeClientThroughSet,
   okResponse,
   reading as readingOf,
   recordAnalyse,
@@ -1006,7 +1008,7 @@ describe('data_element', () => {
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (config: unknown, options: unknown) => {
         updateCall = { config, options };
-        return okResponse(undefined);
+        return okResponse(readingOf(''));
       },
     });
     fakeClient = double.client;
@@ -1047,7 +1049,7 @@ describe('data_element', () => {
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (_config: any, options: any) => {
         patched = options.source;
-        return okResponse(undefined);
+        return okResponse(readingOf(''));
       },
     });
 
@@ -1072,7 +1074,7 @@ describe('data_element', () => {
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (_config: unknown, options: { source: string }) => {
         patched = options.source;
-        return okResponse(undefined);
+        return okResponse(readingOf(''));
       },
     });
 
@@ -1211,19 +1213,20 @@ describe('system — three getUtils() reads, each given analyseException (interf
     ]);
   });
 
-  it('GetNodeStructureLow reads the real read-object-tree-structure fixture (fixture 05, the one with descriptions) through the nodeLevel reading', async () => {
+  it('GetNodeStructureLow reads the real read-object-tree-structure fixture (fixture 05, the one with descriptions) through the node reading', async () => {
     const document = corpusBody('read-object-tree-structure--05-nodestructure');
     const calls: string[] = [];
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       fetchNodeStructure: async () => {
         calls.push('fetchNodeStructure');
-        return okResponse(document);
+        // Read by the handler's own node reading.
+        return answerThrough(set, 'node', document);
       },
       readMetadata: async () => {
         calls.push('readMetadata');
         return okResponse('<pak:package/>');
       },
-    });
+    }));
 
     const result: any = await handleGetNodeStructure(context as any, {
       parent_type: 'DEVC/K',
@@ -1272,10 +1275,11 @@ describe('system — three getUtils() reads, each given analyseException (interf
     );
     assert.equal(document, '');
     const calls: string[] = [];
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       fetchNodeStructure: async () => {
         calls.push('fetchNodeStructure');
-        return okResponse(document);
+        // Read by the handler's own node reading.
+        return answerThrough(set, 'node', document);
       },
       readMetadata: async () => {
         calls.push('readMetadata');
@@ -1287,7 +1291,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
           corpusBody('read-metadata-package--01-packages-zmcpshrpkg'),
         );
       },
-    });
+    }));
 
     const result: any = await handleGetNodeStructure(context as any, {
       parent_type: 'DEVC/K',
@@ -1308,10 +1312,11 @@ describe('system — three getUtils() reads, each given analyseException (interf
     );
     assert.equal(document, '');
     const calls: string[] = [];
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       fetchNodeStructure: async () => {
         calls.push('fetchNodeStructure');
-        return okResponse(document);
+        // Read by the handler's own node reading.
+        return answerThrough(set, 'node', document);
       },
       readMetadata: async () => {
         calls.push('readMetadata');
@@ -1319,7 +1324,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
           origin: 'refusal',
         });
       },
-    });
+    }));
 
     const result: any = await handleGetNodeStructure(context as any, {
       parent_type: 'DEVC/K',
@@ -1346,16 +1351,17 @@ describe('system — three getUtils() reads, each given analyseException (interf
   // an ordinary correct request with a defect report.
   it('GetNodeStructureLow answers an empty listing on a blank body for a non-package parent type, and pays no existence check for one', async () => {
     const calls: string[] = [];
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       fetchNodeStructure: async () => {
         calls.push('fetchNodeStructure');
-        return okResponse('');
+        // Read by the handler's own node reading.
+        return answerThrough(set, 'node', '');
       },
       readMetadata: async () => {
         calls.push('readMetadata');
         return okResponse('<pak:package/>');
       },
-    });
+    }));
 
     const result: any = await handleGetNodeStructure(context as any, {
       parent_type: 'CLAS/OC',
@@ -1474,7 +1480,7 @@ describe('package — no Activate tool (a package is a container, no activation)
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (config: unknown, options: unknown) => {
         updateCall = { config, options };
-        return okResponse(undefined);
+        return okResponse(readingOf(''));
       },
     });
     fakeClient = double.client;

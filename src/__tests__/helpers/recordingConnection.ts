@@ -28,6 +28,8 @@ export interface RecordedRequest {
 
 export interface RecordingConnection extends IAbapConnection {
   readonly requests: RecordedRequest[];
+  /** Every body this connection answered, in order, as text (the discovery included). */
+  readonly served: string[];
 }
 
 /** A real captured `LOCK` response body (`lock-success--01-lock.body.xml`
@@ -76,10 +78,12 @@ export function recordingConnection(
   answers: Array<Partial<IAdtWireResponse> | undefined> = [],
 ): RecordingConnection {
   const requests: RecordedRequest[] = [];
+  const served: string[] = [];
   let index = 0;
 
   return {
     requests,
+    served,
     async connect() {},
     async getBaseUrl() {
       return 'https://example.com';
@@ -109,6 +113,7 @@ export function recordingConnection(
             ? { headers: withoutRequestIdValue(options.headers) }
             : {}),
         });
+        served.push(RUNS_DISCOVERY);
         return {
           data: RUNS_DISCOVERY,
           status: 200,
@@ -127,8 +132,10 @@ export function recordingConnection(
       index += 1;
       const isLock =
         typeof options.url === 'string' && options.url.includes('_action=LOCK');
+      const data = answer?.data ?? (isLock ? LOCK_SUCCESS_XML : '');
+      served.push(typeof data === 'string' ? data : JSON.stringify(data));
       return {
-        data: answer?.data ?? (isLock ? LOCK_SUCCESS_XML : ''),
+        data,
         status: answer?.status ?? 200,
         statusText: answer?.statusText ?? 'OK',
         headers: answer?.headers ?? {},

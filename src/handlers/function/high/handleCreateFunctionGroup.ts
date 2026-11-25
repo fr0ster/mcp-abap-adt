@@ -36,6 +36,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { hasT100Key, type T100Key } from '../../../lib/messageKeys';
 import { detailOf } from '../../../lib/strategies/detail';
@@ -49,8 +50,11 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'CreateFunctionGroup',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Create a new ABAP function group in SAP system. Function groups serve as containers for function modules.',
+  description: createTool({
+    object: 'an ABAP function group',
+    how: ', with its description, activating it when asked',
+    transported: true,
+  }),
   inputSchema: createArguments('CreateFunctionGroup', {
     function_group_name: z
       .string()

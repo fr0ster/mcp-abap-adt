@@ -32,7 +32,8 @@ describe('bodyTextOf', () => {
     ['a number', 42, '42'],
     ['an object', { a: 1 }, '[object Object]'],
     ['a list', [1, 2], '1,2'],
-    ['bytes', new Uint8Array([1, 2]), '1,2'],
+    // Bytes are their UTF-8 text, never their numbers (Codex round 7).
+    ['bytes', new TextEncoder().encode('<ä/>'), '<ä/>'],
   ];
   for (const [name, value, text] of cases) {
     it(`writes ${name} as String does, reading data once`, () => {

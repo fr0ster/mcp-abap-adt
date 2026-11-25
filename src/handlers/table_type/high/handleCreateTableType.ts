@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { createArguments } from '../../../lib/handlers/createArguments';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { ASSEMBLED_DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTableType Handler - ABAP Table Type Creation via ADT API
  *
@@ -35,10 +35,12 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { answer } from '../../../lib/answer';
+import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
+import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import { tableTypeChanges } from '../../../lib/strategies/documentChanges';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -49,6 +51,7 @@ import { atStep } from '../../../lib/strategies/step';
 import {
   readStoredDefinition,
   type StoredDefinitionAnswer,
+  storedAt,
 } from '../../../lib/strategies/tableTypeStored';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
@@ -144,8 +147,11 @@ export const TABLE_TYPE_DEFINITION_PROPERTIES = {
 export const TOOL_DEFINITION = {
   name: 'CreateTableType',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false, a refused check or a refused activation, the inactive version, read after the write. A definition whose read failed is answered with SAP's answer to that read.",
+  description: createTool({
+    object: 'an ABAP table type',
+    how: ', with the type it holds, its access type and primary key, activating it when asked',
+    transported: true,
+  }),
   inputSchema: createArguments('CreateTableType', {
     table_type_name: z.string().describe('Table type name.'),
     package_name: z.string().describe('Package the table type is created in.'),
@@ -167,7 +173,7 @@ export const TOOL_DEFINITION = {
       .default(true)
       .optional()
       .describe('Activate the table type after creation (default: true).'),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -175,10 +181,31 @@ export const TOOL_DEFINITION = {
  * required one may be absent and is refused below. */
 type CreateTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent (`wireAnswer`): every response
+ * its requests got — the writes, and the metadata read back after them.
+ */
 export async function handleCreateTableType(
   context: HandlerContext,
   args: CreateTableTypeArgs,
-) {
+): Promise<McpResult> {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'CreateTableType',
+        shape: 'assembled',
+      },
+      () => answeredCreateTableType(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredCreateTableType(context, args);
+}
+
+async function answeredCreateTableType(
+  context: HandlerContext,
+  args: CreateTableTypeArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
 
   if (!args.table_type_name) {
@@ -199,7 +226,11 @@ export async function handleCreateTableType(
   return answer(
     // The definition SAP stored rides along a success and a failure after
     // the wait alike; a chain that ended before the wait has none.
-    { tool: 'CreateTableType', detail, beside: () => stored },
+    {
+      tool: 'CreateTableType',
+      detail,
+      beside: () => storedAt(levelOf(args), stored),
+    },
     async () => {
       const obj = createAdtClient(connection, logger).getTableType(
         resultsFor(tableTypeDocuments),

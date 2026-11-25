@@ -178,22 +178,24 @@ describe('the MCP tool surface', () => {
       // tool that took one root object takes several, read in the same
       // envelopes: the list argument arrives beside the single one, exactly
       // one of them given (the handler checks it), so the single one stops
-      // being required. Each pair below is that move and nothing else.
+      // being required. Each pair below is that move and nothing else —
+      // and, with terse answers (24.2.0, step 3), `detail` where the tool
+      // gained it.
       const LIST_ARGUMENTS: Record<
         string,
         { relaxed: string[]; added: string[] }
       > = {
         'readonly/GetPackageContents': {
           relaxed: ['package_name'],
-          added: ['package_names'],
+          added: ['detail', 'package_names'],
         },
         'system/GetPackageTree': {
           relaxed: ['package_name'],
-          added: ['package_names'],
+          added: ['detail', 'package_names'],
         },
         'search/GetObjectsList': {
           relaxed: ['parent_name', 'parent_tech_name', 'parent_type'],
-          added: ['objects'],
+          added: ['detail', 'objects'],
         },
         'system/GetObjectInfo': {
           relaxed: ['parent_type', 'parent_name'],
@@ -201,21 +203,21 @@ describe('the MCP tool surface', () => {
         },
         'readonly/GetIncludesList': {
           relaxed: ['object_name', 'object_type'],
-          added: ['objects'],
+          added: ['detail', 'objects'],
         },
         'readonly/GetStructuresList': {
           relaxed: ['structure_name'],
-          added: ['structure_names'],
+          added: ['detail', 'structure_names'],
         },
         'readonly/GetEnhancements': {
           relaxed: ['object_name', 'object_type'],
-          added: ['objects'],
+          added: ['detail', 'objects'],
         },
         // `container` names whose text elements PROG/PX is (optional: required
         // with PROG/PX alone, the code it arrived with).
         'system/GetWhereUsed': {
           relaxed: ['object_name', 'object_type'],
-          added: ['container', 'objects'],
+          added: ['container', 'detail', 'objects'],
         },
       };
       const listed = LIST_ARGUMENTS[tool];
@@ -316,6 +318,7 @@ describe('the MCP tool surface', () => {
         // 19.0.0, several feeds per call (spec §11): `feed_types` beside
         // `feed_type`, which was never required.
         'system/RuntimeListFeeds': [
+          'detail',
           'runtime_error',
           'exception',
           'object_name',
@@ -350,7 +353,11 @@ describe('the MCP tool surface', () => {
         'system/GetObjectInfo': ['include_descriptions'],
         // 24.0.0 (DO23): SearchSource's answer level and its hit limit,
         // both optional — without them the answer is as before.
-        'search/SearchSource': ['answer', 'max_hits'],
+        'search/SearchSource': ['answer', 'detail', 'max_hits'],
+        // 24.2.0 (adt-strategies 0.28.0): the gateway error log reads an
+        // error's detail by its OPID under the kind the list answers, both
+        // optional — without them the tool lists, as before.
+        'system/RuntimeGetGatewayErrorLog': ['detail', 'opid', 'detail_kind'],
         // 19.0.0: one Get<Type> per type; a type with a source reads one
         // part per call, `part` (source | metadata, default source), optional.
         'high/GetClass': ['part', 'start_line', 'end_line'],
@@ -595,6 +602,14 @@ describe('the MCP tool surface', () => {
     );
   });
 
+  /**
+   * **24.2.0: `RuntimeGetGatewayErrorLog` is served on the cloud too.** The
+   * gateway error feed answers there (adt-strategies 0.28.0 reads its cloud
+   * ids, `{kind}/{opid}/{timestamp}`); the tool was on premise only.
+   */
+  const WIDENED: Record<string, string> = {
+    'system/RuntimeGetGatewayErrorLog': 'cloud, onprem',
+  };
   it('changes no tool availability', () => {
     const now = availability(current);
     for (const [tool, before] of availability(frozen)) {
@@ -602,7 +617,7 @@ describe('the MCP tool surface', () => {
         { tool, available_in: now.get(tool) },
         {
           tool,
-          available_in: before,
+          available_in: WIDENED[tool] ?? before,
         },
       );
     }

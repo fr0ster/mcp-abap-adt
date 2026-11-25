@@ -39,6 +39,7 @@ import {
   createOnPremAdtClient,
   variantOf,
 } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionForPackageLock } from '../../../lib/packageSessions';
 import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
@@ -50,11 +51,20 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { lockSubResource } from './subResourceLocks';
 
+/** What a lock answers: the handle the update and the unlock take. */
+export interface LockAnswer {
+  readonly lock_handle: string;
+}
+
 export const TOOL_DEFINITION = {
   name: 'LockObjectLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Lock an ABAP object for modification. Returns the lock handle the update and the unlock take; the lock stays in the instance’s session until the unlock or the instance’s end.',
+  description: toolDescription({
+    tag: 'low-level',
+    purpose: purpose(
+      "Locks an ABAP object for modification in this instance's session, until it is unlocked or the instance ends.",
+    ),
+  }),
   inputSchema: z.object({
     object_name: z
       .string()
@@ -115,7 +125,13 @@ export async function handleLockObject(
 }
 
 /** One object of a kind checked at the tool's boundary. */
-export async function lockObject(
+/**
+ * The lock request for `args`, as its object's API sends it, answering the
+ * lock handle typed — or the words refusing the arguments before anything is
+ * sent. `lockObject` answers it; compact `HandlerLock` answers it with the
+ * instance's `state_handle`.
+ */
+export function lockRequest(
   context: HandlerContext,
   args: Omit<LockObjectArgs, 'object_type'> & { object_type: LockKind },
 ) {
@@ -123,7 +139,7 @@ export async function lockObject(
   const { object_name, object_type } = args;
 
   if (!object_name || !object_type) {
-    return return_error(new Error('object_name and object_type are required'));
+    return { refused: 'object_name and object_type are required' } as const;
   }
 
   const objectType = object_type;
@@ -135,9 +151,9 @@ export async function lockObject(
   let functionModuleName = '';
   if (objectType === 'function_module') {
     if (!object_name.toUpperCase().includes('|')) {
-      return return_error(
-        new Error('Function module name must be in format GROUP|FM_NAME'),
-      );
+      return {
+        refused: 'Function module name must be in format GROUP|FM_NAME',
+      } as const;
     }
     [functionGroupName, functionModuleName] = object_name
       .toUpperCase()
@@ -167,9 +183,8 @@ export async function lockObject(
     }
   };
 
-  return answer(
-    { tool: 'LockObjectLow', detail: 'terse' },
-    () => {
+  return {
+    call: () => {
       switch (objectType) {
         case 'class':
           return client
@@ -274,12 +289,44 @@ export async function lockObject(
           return lockSubResource(context, objectType, objectName);
       }
     },
-    (lockHandle: string) => ({
-      success: true,
-      object_name: objectName,
-      object_type: objectType,
-      lock_handle: lockHandle,
-      message: `Object ${objectName} locked successfully. Use this lock_handle for the update and the unlock.`,
-    }),
+  } as const;
+}
+
+/**
+ * A lock answered by `tool`: the lock request, `locked` told the handle SAP
+ * answered once the lock is taken, and the answer `shown` of that handle,
+ * typed — never a parse of an answer already written.
+ */
+export async function lockObjectAnswering<A>(
+  context: HandlerContext,
+  args: Omit<LockObjectArgs, 'object_type'> & { object_type: LockKind },
+  tool: string,
+  shown: (lockHandle: string) => A,
+  locked: (lockHandle: string) => void = () => undefined,
+) {
+  const request = lockRequest(context, args);
+  if ('refused' in request) return return_error(new Error(request.refused));
+  return answer(
+    { tool, detail: 'terse' },
+    async () => {
+      const response = await request.call();
+      if (response.ok) locked(response.getResult().value);
+      return response;
+    },
+    shown,
+  );
+}
+
+export async function lockObject(
+  context: HandlerContext,
+  args: Omit<LockObjectArgs, 'object_type'> & { object_type: LockKind },
+) {
+  // What the update and the unlock need, and nothing sent back: the name and
+  // the type are the caller's own, and the prose said what a handle is for.
+  return lockObjectAnswering(
+    context,
+    args,
+    'LockObjectLow',
+    (lockHandle): LockAnswer => ({ lock_handle: lockHandle }),
   );
 }

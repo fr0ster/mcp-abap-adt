@@ -43,6 +43,8 @@ import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { profilerTraceParameters } from '../../../lib/profilerTraceParameters';
 import { newTraceAfter } from '../../../lib/strategies/newTrace';
@@ -58,8 +60,13 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'RuntimeRunClass',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.',
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        'Runs an ABAP class implementing if_oo_adt_classrun and gives its console output, under the ABAP profiler when asked.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     class_name: z.string().describe('ABAP class name to execute.'),
     background: BACKGROUND_FIELD,

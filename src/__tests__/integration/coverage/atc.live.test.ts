@@ -174,6 +174,8 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem ATC reads', () => {
 
     it('atc_findings with background false reads the run worklist in the call', async () => {
       const answer = await liveCall('HandlerSystem', {
+        // The fields read below: the JSON of detail medium.
+        detail: 'medium',
         action: 'atc_findings',
         worklist_id: await worklist(),
         background: false,
@@ -183,6 +185,8 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem ATC reads', () => {
 
     it('atc_findings without background starts a run, whose answer HandlerBackgroundRunGet reads once', async () => {
       const started = await liveCall('HandlerSystem', {
+        // The fields read below: the JSON of detail medium.
+        detail: 'medium',
         action: 'atc_findings',
         worklist_id: await worklist(),
       });
@@ -192,6 +196,8 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem ATC reads', () => {
     it('atc_results with background false lists the run result in the call', async () => {
       await worklist();
       const answer = await liveCall('HandlerSystem', {
+        // The fields read below: the JSON of detail medium.
+        detail: 'medium',
         action: 'atc_results',
         created_by: '*',
         age_min: 0,
@@ -204,6 +210,8 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem ATC reads', () => {
     it('atc_results without background starts a run, whose answer HandlerBackgroundRunGet reads once', async () => {
       await worklist();
       const started = await liveCall('HandlerSystem', {
+        // The fields read below: the JSON of detail medium.
+        detail: 'medium',
         action: 'atc_results',
         created_by: '*',
         age_min: 0,
@@ -214,6 +222,8 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem ATC reads', () => {
 
     it('atc_result with background false reads the stored result in the call', async () => {
       const answer = await liveCall('HandlerSystem', {
+        // The fields read below: the JSON of detail medium.
+        detail: 'medium',
         action: 'atc_result',
         display_id: await storedResult(),
         background: false,
@@ -223,6 +233,8 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem ATC reads', () => {
 
     it('atc_result without background starts a run, whose answer HandlerBackgroundRunGet reads once', async () => {
       const started = await liveCall('HandlerSystem', {
+        // The fields read below: the JSON of detail medium.
+        detail: 'medium',
         action: 'atc_result',
         display_id: await storedResult(),
       });

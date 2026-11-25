@@ -108,7 +108,6 @@ const CHANGING_BY_NAME: ReadonlySet<string> = new Set([
   'HandlerDelete',
   'HandlerActivate',
   'HandlerLock',
-  'HandlerUnlock',
   'HandlerTransportCreate',
   'HandlerTransportSortAndCompress',
   'HandlerTransportMoveObjects',

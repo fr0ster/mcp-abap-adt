@@ -113,6 +113,24 @@ export const SCAN_OBJECT_TYPES = [
 /** The scan targets of a walk. */
 export interface EnumeratedTargets {
   targets: EnumeratedObject[];
+  /** The type nodes SAP could not load in a scanned package: what was not scanned. */
+  notLoaded?: NotLoadedNode[];
+  /** The objects SAP listed without a name: what could not be read, so was not scanned. */
+  incomplete?: IncompleteTarget[];
+}
+
+/** An object SAP listed without a name, in its package: what tells it apart. */
+export interface IncompleteTarget {
+  package: string;
+  type: string;
+  tech_name?: string;
+  uri?: string;
+}
+
+/** A type node SAP could not load, in its package. */
+export interface NotLoadedNode {
+  package: string;
+  type: string;
 }
 
 export async function enumerateScanTargets(
@@ -123,6 +141,8 @@ export async function enumerateScanTargets(
   const filter = input.object_filter;
   const seen = new Set<string>();
   const out: EnumeratedObject[] = [];
+  const notLoaded: NotLoadedNode[] = [];
+  const incomplete: IncompleteTarget[] = [];
 
   for (const pkg of input.packages) {
     // A failed read of the walk is decided at its place (the walker's
@@ -132,11 +152,38 @@ export async function enumerateScanTargets(
       includeSubpackages: input.include_subpackages,
     });
     for (const item of items) {
-      if (item.isPackage) continue;
+      if (item.notLoaded === true) {
+        notLoaded.push({ package: item.packageName, type: item.type });
+        continue;
+      }
+      // A subpackage SAP listed without a name: never read, listed.
+      if (item.isPackage) {
+        if (item.name === '') {
+          incomplete.push({
+            package: item.packageName,
+            type: item.type,
+            ...(item.techName !== undefined
+              ? { tech_name: item.techName }
+              : {}),
+            ...(item.uri !== undefined ? { uri: item.uri } : {}),
+          });
+        }
+        continue;
+      }
       const code = scanCodeOf(item.type);
       if (code === undefined) continue;
       const family = FAMILY_OF[code];
       if (!wantedFamilies.has(family)) continue;
+      // A target with no name cannot be read: it is listed, never scanned.
+      if (item.name === '') {
+        incomplete.push({
+          package: item.packageName,
+          type: item.type,
+          ...(item.techName !== undefined ? { tech_name: item.techName } : {}),
+          ...(item.uri !== undefined ? { uri: item.uri } : {}),
+        });
+        continue;
+      }
       if (filter && !globMatches(filter, item.name)) continue;
       const key = `${item.packageName} ${family} ${item.name}`;
       if (seen.has(key)) continue;
@@ -157,7 +204,11 @@ export async function enumerateScanTargets(
     return a.object_name < b.object_name ? -1 : 1;
   });
 
-  return { targets: out };
+  return {
+    targets: out,
+    ...(notLoaded.length > 0 ? { notLoaded } : {}),
+    ...(incomplete.length > 0 ? { incomplete } : {}),
+  };
 }
 
 /**

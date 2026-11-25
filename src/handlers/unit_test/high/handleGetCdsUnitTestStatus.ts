@@ -1,18 +1,22 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { toolDescription } from '../../../lib/description';
+import { unitTestRead } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
 import type { XmlRead } from '../../../lib/xml/tree';
-import { runIsFinished, runProgressStatus } from '../shared/pollRun';
+import { runStatusAnswer } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestStatus',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[read-only] Retrieve CDS unit test run status for a run_id. ',
+  description: toolDescription(
+    unitTestRead('the status', 'a CDS unit test run'),
+  ),
   inputSchema: z.object({
     run_id: z.string().describe('Run identifier returned by unit test run.'),
     with_long_polling: z
@@ -42,11 +46,7 @@ export async function handleGetCdsUnitTestStatus(
   // Task 28 fix round 1 — same finding, same fix as `GetUnitTestStatus`:
   // `getStatus`'s result is `structured` (a real `AdtReading`), and `detail`
   // was missing while the projection always answered the whole parse.
-  const terseRunStatus = (value: XmlRead) => ({
-    run_id,
-    finished: runIsFinished(value),
-    run_status: runProgressStatus(value),
-  });
+  const terseRunStatus = (value: XmlRead) => runStatusAnswer(run_id, value);
 
   return answer(
     { tool: 'GetCdsUnitTestStatus', detail },

@@ -329,6 +329,35 @@ describe('CreateTableType', () => {
     );
   });
 
+  // Codex round 7: raw is every response the call got — the metadata read
+  // back after the write and after the activation too.
+  it('raw: every response, the metadata read-backs included', async () => {
+    const connection = recordingConnection([
+      undefined,
+      undefined,
+      undefined,
+      { data: STRING_TABLE },
+    ]);
+    const result = await handleCreateTableType(
+      { connection, logger: undefined },
+      {
+        table_type_name: 'ztt_x',
+        package_name: 'ZP',
+        description: 'A table type',
+        transport_request: 'K1',
+        row_type_kind: 'dictionaryType',
+        row_type_name: 'MARA',
+        detail: 'raw',
+      },
+    );
+    assert.equal(result.isError, false, textOf(result));
+    const responses: Array<{ status: number; body: string }> = JSON.parse(
+      textOf(result),
+    );
+    assert.equal(responses.length, connection.requests.length);
+    assert.equal(responses[3]?.body, STRING_TABLE);
+  });
+
   it('writes every definition property given into the document SAP created', async () => {
     const connection = created();
     await handleCreateTableType(
@@ -736,10 +765,17 @@ describe('the definition SAP stored, read at a stated version', () => {
           `POST ${ACTIVATE_URL}`,
           `GET ${ACTIVE_URL}`,
         ]);
-        assertMatchObject(answerOf(result), {
-          stored_definition: STORED_HASHED_DEFINITION,
-          stored_version: 'active',
-        });
+        // The definition SAP stored at full; at the other levels the
+        // version it was read at alone (terse answers, step 5).
+        if (detail === 'full') {
+          assertMatchObject(answerOf(result), {
+            stored_definition: STORED_HASHED_DEFINITION,
+            stored_version: 'active',
+          });
+        } else {
+          assertMatchObject(answerOf(result), { stored_version: 'active' });
+          assert.equal('stored_definition' in Object(answerOf(result)), false);
+        }
       },
     );
   }
@@ -748,13 +784,16 @@ describe('the definition SAP stored, read at a stated version', () => {
     const connection = created({ data: STORED_HASHED });
     const result = await handleCreateTableType(
       { connection, logger: undefined },
-      { table_type_name: 'ZTT_X', package_name: 'ZP', activate: false },
+      {
+        table_type_name: 'ZTT_X',
+        package_name: 'ZP',
+        activate: false,
+      },
     );
     assert.equal(connection.requests.length, 8);
     assert.equal(connection.requests[6]?.url, WAIT_URL);
     assert.deepStrictEqual(answerOf(result), {
       result: 'SUCCESS',
-      stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
     });
   });
@@ -782,10 +821,17 @@ describe('the definition SAP stored, read at a stated version', () => {
           `POST ${ACTIVATE_URL}`,
           `GET ${ACTIVE_URL}`,
         ]);
-        assertMatchObject(answerOf(result), {
-          stored_definition: STORED_HASHED_DEFINITION,
-          stored_version: 'active',
-        });
+        // The definition SAP stored at full; at the other levels the
+        // version it was read at alone (terse answers, step 5).
+        if (detail === 'full') {
+          assertMatchObject(answerOf(result), {
+            stored_definition: STORED_HASHED_DEFINITION,
+            stored_version: 'active',
+          });
+        } else {
+          assertMatchObject(answerOf(result), { stored_version: 'active' });
+          assert.equal('stored_definition' in Object(answerOf(result)), false);
+        }
       },
     );
   }
@@ -800,7 +846,6 @@ describe('the definition SAP stored, read at a stated version', () => {
     assert.equal(connection.requests[5]?.url, WAIT_URL);
     assert.deepStrictEqual(answerOf(result), {
       result: 'SUCCESS',
-      stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
     });
   });
@@ -817,7 +862,6 @@ describe('the definition SAP stored, read at a stated version', () => {
       status: 403,
       raw_body: REFUSED.data,
       step: 'activate',
-      stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
     });
   });
@@ -843,7 +887,6 @@ describe('the definition SAP stored, read at a stated version', () => {
       status: 403,
       raw_body: REFUSED.data,
       step: 'check',
-      stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
     });
   });
@@ -860,7 +903,6 @@ describe('the definition SAP stored, read at a stated version', () => {
       status: 403,
       raw_body: REFUSED.data,
       step: 'activate',
-      stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
     });
   });
@@ -884,22 +926,6 @@ describe('the definition SAP stored, read at a stated version', () => {
     const answered = answerOf(result);
     assertNoProperty(answered, 'stored_definition');
     assertNoProperty(answered, 'stored_version');
-  });
-
-  it('the descriptions say which version each answers, per tool', () => {
-    const create = CreateTableType_Tool.description;
-    const update = UpdateTableType_Tool.description;
-    // Create checks after the wait: a refused check carries the inactive
-    // definition. Update checks under the lock, before the read.
-    assert.equal(
-      create.includes('a refused check or a refused activation'),
-      true,
-    );
-    assert.equal(
-      update.includes('activate false or a refused activation'),
-      true,
-    );
-    assert.equal(update.includes('a refused check is answered alone'), true);
   });
 
   it('a write refused before the wait answers no stored definition', async () => {

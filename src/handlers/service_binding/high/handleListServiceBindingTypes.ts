@@ -1,21 +1,21 @@
-import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
-import {
-  parseServiceBindingPayload,
-  type ServiceBindingResponseFormat,
-} from './serviceBindingPayloadUtils';
+import { ourServiceBindingReads } from '../../../lib/strategies/resultSets';
+import { parseServiceBindingPayload } from './serviceBindingPayloadUtils';
 
 export const TOOL_DEFINITION = {
   name: 'ListServiceBindingTypes',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Lists the available service binding types (for example ODataV2/ODataV4) from the ADT Business Services endpoint, in the response_format given.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Lists the service binding types the system offers, such as OData V2 and OData V4, in the format asked.',
+    ),
+  }),
   inputSchema: z.object({
     response_format: z
       .enum(['xml', 'json', 'plain'])
@@ -36,7 +36,7 @@ export async function handleListServiceBindingTypes(
   const { connection, logger } = context;
   const responseFormat = args.response_format ?? 'xml';
   const obj = createAdtClient(connection, logger).getServiceBinding(
-    resultsFor(serviceDocuments),
+    ourServiceBindingReads,
   );
 
   // `getServiceBindingTypes(options?)` takes nothing but `analyse`, which

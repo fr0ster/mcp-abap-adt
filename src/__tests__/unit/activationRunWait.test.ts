@@ -19,7 +19,7 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
+import { handleActivateObject as handleActivateObjectOf } from '../../handlers/common/low/handleActivateObject';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
@@ -33,6 +33,12 @@ import {
   RUNS_DISCOVERY,
   recordingConnection,
 } from '../helpers/recordingConnection';
+
+/** handleActivateObject at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleActivateObject = (
+  context: Parameters<typeof handleActivateObjectOf>[0],
+  args: Parameters<typeof handleActivateObjectOf>[1],
+) => handleActivateObjectOf(context, { detail: 'full', ...args });
 
 const RUN_ID = 'RUN0001';
 const RUNS = 'xmlns:runs="http://www.sap.com/adt/activation/runs"';
@@ -121,6 +127,18 @@ describe('a group activation waits for its run on long polling alone', () => {
       `GET ${STATUS_URL}`,
       `GET ${RESULTS_URL}`,
     ]);
+  });
+
+  it('terse, by default: the run answers its verdict alone, no objects and no prose', async () => {
+    const connection = runAnswering(3);
+    const answered = await handleActivateObjectOf(
+      { connection },
+      { objects: OBJECTS },
+    );
+    assert.equal(answered.isError, false);
+    assert.deepStrictEqual(JSON.parse(answered.content[0]?.text ?? ''), {
+      activated: true,
+    });
   });
 
   it('no timer runs between reads', async () => {

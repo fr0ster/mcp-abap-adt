@@ -1,11 +1,19 @@
 import * as z from 'zod';
 import { answerBackgroundList } from '../../../lib/backgroundRuns/answers';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'ListBackgroundRuns',
-  description:
-    "[read-only] [runtime] Lists your background runs: run_handle, tool, object, when it started, and its state: running, finished or cancelled. A run's output is read by its run_handle; a read run leaves the list once its answer was read.",
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        "Lists the caller's background runs, running, finished and cancelled.",
+      ),
+    }),
+  ),
   inputSchema: z.object({}),
 } as const;
 

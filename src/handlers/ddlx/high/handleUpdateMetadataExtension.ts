@@ -27,6 +27,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -41,8 +42,11 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.',
+  description: updateTool({
+    object: 'the source code of an existing CDS metadata extension',
+    how: ', activating it when asked',
+    transported: true,
+  }),
   inputSchema: z.object({
     name: z.string().describe('Metadata Extension name'),
     source_code: z.string().describe('New source code'),

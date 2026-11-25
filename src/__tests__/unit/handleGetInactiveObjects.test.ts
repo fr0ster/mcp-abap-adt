@@ -22,10 +22,10 @@ const ONE_INACTIVE_BDEF =
 const TWO_INACTIVE =
   '<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects">' +
   '<ioc:entry><ioc:object ioc:user="OKYSLYTSIA" ioc:deleted="false">' +
-  '<ioc:ref adtcore:type="BDEF/BDO" adtcore:name="ZI_MCP_SHR_ROOT" xmlns:adtcore="http://www.sap.com/adt/core"/>' +
+  '<ioc:ref adtcore:uri="/sap/bc/adt/bo/behaviordefinitions/zi_mcp_shr_root" adtcore:type="BDEF/BDO" adtcore:name="ZI_MCP_SHR_ROOT" xmlns:adtcore="http://www.sap.com/adt/core"/>' +
   '</ioc:object><ioc:transport/></ioc:entry>' +
   '<ioc:entry><ioc:object ioc:user="OKYSLYTSIA" ioc:deleted="false">' +
-  '<ioc:ref adtcore:type="FUGR/F" adtcore:name="ZMCP_SHR_FGRP" xmlns:adtcore="http://www.sap.com/adt/core"/>' +
+  '<ioc:ref adtcore:uri="/sap/bc/adt/functions/groups/zmcp_shr_fgrp" adtcore:type="FUGR/F" adtcore:name="ZMCP_SHR_FGRP" xmlns:adtcore="http://www.sap.com/adt/core"/>' +
   '</ioc:object><ioc:transport/></ioc:entry></ioc:inactiveObjects>';
 
 const NONE =
@@ -35,13 +35,49 @@ async function run(body: string) {
   const conn = recordingConnection([{ data: body }]);
   const result: any = await handleGetInactiveObjects(
     { connection: conn, logger: undefined } as any,
-    {},
+    { detail: 'medium' },
   );
   assert.equal(result.isError, false);
   return JSON.parse(result.content[0].text);
 }
 
 describe('GetInactiveObjects', () => {
+  it('terse, by default: a TSV row per object, its type, name and owner', async () => {
+    const conn = recordingConnection([{ data: TWO_INACTIVE }]);
+    const result: any = await handleGetInactiveObjects(
+      { connection: conn, logger: undefined } as any,
+      {},
+    );
+    assert.equal(
+      result.content[0].text,
+      [
+        '# count 2',
+        'type\tname\tparent',
+        'BDEF/BDO\tZI_MCP_SHR_ROOT\t',
+        'FUGR/F\tZMCP_SHR_FGRP\t',
+      ].join('\n'),
+    );
+  });
+
+  // adt-strategies 0.28.0 refuses a list holding a reference with no address
+  // (neither uri nor parentUri): an activation is matched by it, and a
+  // reference dropped would read as activated.
+  it('refuses a list whose reference names no address', async () => {
+    const conn = recordingConnection([
+      {
+        data: TWO_INACTIVE.replace(
+          ' adtcore:uri="/sap/bc/adt/functions/groups/zmcp_shr_fgrp"',
+          '',
+        ),
+      },
+    ]);
+    const result: any = await handleGetInactiveObjects(
+      { connection: conn, logger: undefined } as any,
+      {},
+    );
+    assert.equal(result.isError, true);
+  });
+
   it('lists an inactive object (on premise answer, one entry)', async () => {
     assert.deepStrictEqual(await run(ONE_INACTIVE_BDEF), {
       success: true,

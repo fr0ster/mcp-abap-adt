@@ -3,13 +3,22 @@ import * as z from 'zod';
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugDeleteWatchpoint',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[debug] Removes a watchpoint.',
+  description: toolDescription(
+    runParts({
+      tag: 'debug',
+      purpose: purpose(
+        'Deletes a watchpoint of the stopped ABAP debuggee by its id.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     ...STATE_HANDLE_PROPERTY,
     watchpoint_id: z.string().describe('Watchpoint id.'),

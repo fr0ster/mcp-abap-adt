@@ -1,13 +1,21 @@
 import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugBatchAnswers.ts
 import { answersOf } from '../../../lib/batch/tools';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugBatchAnswers',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] [debug] Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.",
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads the outcome of each recorded debugger call of the last sending, by its number.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     number: z
       .number()

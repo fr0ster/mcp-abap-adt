@@ -799,7 +799,6 @@ const COMPACT_RW = [
   'HandlerTransportCreate',
   'HandlerTransportMoveObjects',
   'HandlerTransportSortAndCompress',
-  'HandlerUnlock',
   'HandlerUpdate',
 ];
 const COMPACT_DEBUG = [
@@ -1045,14 +1044,14 @@ for (const transportName of [
             },
           );
         }
-        // compact: the 28, the four debugger tools, HandlerDebugBatch, the
+        // compact: the 27 (HandlerUnlock is HandlerLock's action unlock), the four debugger tools, HandlerDebugBatch, the
         // three background-run tools beside the run tool, HandlerBatch, and on
         // stdio the leftover-session list and logoff (no set serves a resume);
-        // without --enable-data-tools, not HandlerGetData: 27 of the 28;
+        // without --enable-data-tools, not HandlerGetData: 26 of the 27;
         // HandlerAbapGitGet and HandlerAbapGit, always listed.
         assert.equal(
           compact.tools.length,
-          27 + 4 + 1 + 3 + 1 + 2 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
+          26 + 4 + 1 + 3 + 1 + 2 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
         );
         {
           const actual = compact.tools;

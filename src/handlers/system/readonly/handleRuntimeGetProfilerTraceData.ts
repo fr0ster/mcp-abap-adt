@@ -7,19 +7,28 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import {
+  longRunning,
+  purpose,
+  toolDescription,
+} from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeGetProfilerTraceData',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload.',
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Reads one view of an ABAP profiler trace: its hit list, its statements or its database accesses.',
+      ),
+      notes: [longRunning],
+    }),
   ),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
@@ -81,14 +90,8 @@ export async function handleRuntimeGetProfilerTraceData(
   // `IAbapTraceStatements` / `IAbapTraceDbAccesses`, adt-strategies' readings
   // of the three views) all the way to `answer()`; the projection takes any
   // of the three and reads no field of it.
-  const project = (
-    payload: IAbapTraceHitList | IAbapTraceStatements | IAbapTraceDbAccesses,
-  ) => ({
-    success: true,
-    view,
-    trace_id_or_uri: traceIdOrUri,
-    payload,
-  });
+  const project = (payload: TraceViewData) =>
+    traceDataAnswer(traceIdOrUri, view, payload);
   const ctx = { tool: 'RuntimeGetProfilerTraceData', detail: 'terse' as const };
 
   if (view === 'hitlist') {
@@ -125,4 +128,19 @@ export async function handleRuntimeGetProfilerTraceData(
       }),
     project,
   );
+}
+
+/** A trace view's data as the profiler reads it. */
+type TraceViewData =
+  | IAbapTraceHitList
+  | IAbapTraceStatements
+  | IAbapTraceDbAccesses;
+
+/** What a trace read answers: the trace, the view, and the view's data. */
+export function traceDataAnswer(
+  traceIdOrUri: string,
+  view: 'hitlist' | 'statements' | 'db_accesses',
+  payload: TraceViewData,
+) {
+  return { success: true, view, trace_id_or_uri: traceIdOrUri, payload };
 }

@@ -28,6 +28,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -42,8 +43,11 @@ import type { XmlRead } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'UpdateBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.',
+  description: updateTool({
+    object: 'the source code of an existing RAP behavior definition',
+    how: ', activating it when asked',
+    transported: true,
+  }),
   inputSchema: z.object({
     name: z.string().describe('Behavior Definition name'),
     source_code: z.string().describe('New source code'),

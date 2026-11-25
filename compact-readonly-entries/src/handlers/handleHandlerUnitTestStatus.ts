@@ -1,13 +1,18 @@
-import { compactUnitTestStatusSchema } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactOf,
+  compactUnitTestStatusSchema,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleGetUnitTestStatus } from '@mcp-abap-adt/lib/handlers/read';
+import {
+  handleGetUnitTestStatus,
+  READ_DEFINITIONS,
+} from '@mcp-abap-adt/lib/handlers/read';
 import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestStatus',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the status of the ABAP Unit test run named by run_id. Required: run_id*. Optional: with_long_polling. Response: JSON.',
+  description: compactOf(READ_DEFINITIONS.GetUnitTestStatus.description),
   inputSchema: compactUnitTestStatusSchema,
 } as const;
 

@@ -4,28 +4,68 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * Handler for retrieving all valid ADT object types.
  */
 
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type INamedItem,
+  utilNamedItems,
+} from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
-import { ourUtils } from '../../../lib/strategies/resultSets';
+import { purpose, toolDescription } from '../../../lib/description';
 import {
-  child,
-  childAt,
-  isList,
-  text,
-  type XmlList,
-  type XmlNode,
-  type XmlRead,
-} from '../../../lib/xml/tree';
+  about,
+  answered,
+  fullLevel,
+  headShape,
+  type ListDetailTable,
+  type RowSchemas,
+  rawLevel,
+  readingAt,
+  rows,
+  writeListing,
+  writeWhole,
+  written,
+} from '../../../lib/detail';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
+import { ourUtils } from '../../../lib/strategies/resultSets';
+import type { XmlNode } from '../../../lib/xml/node';
+
+/** The lists the type listing writes: what its description states. */
+export const TYPES_LISTS: RowSchemas<{ items: INamedItem[] }> = {
+  items: about(
+    'for each object type',
+    rows('items', {
+      columns: [
+        {
+          name: 'name',
+          means: 'its code',
+          cell: (item: INamedItem) => item.name,
+        },
+        {
+          name: 'description',
+          means: 'its description',
+          cell: (item: INamedItem) =>
+            (item.description ?? '').split('\n')[0] ?? '',
+        },
+      ],
+      header: 'always',
+    }),
+  ),
+};
+
+/** The head the type listing opens with. */
+export const TYPES_HEADS = [headShape('count', 'how many there are')];
 
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Retrieve all valid ADT object types (CLAS, TABL, PROG, DEVC, FUGR, INTF, DDLS, DTEL, DOMA, SRVD, SRVB, BDEF, DDLX, etc.) or validate a specific type name.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the repository object types the ABAP system knows, by their type codes.',
+    ),
+  }),
   inputSchema: z.object({
     validate_type: z
       .string()
@@ -35,31 +75,29 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface NamedItem {
-  name: string;
-  description: string | undefined;
-}
-
 /**
- * `nameditem:namedItemList/nameditem:namedItem` — the same document
- * `@mcp-abap-adt/adt-clients`' own (shipped, but overridden here by the
- * generic `structured` reading — see `resultSets.ts`) `namedItems` strategy
- * reads; field names verified against `core/shared/allTypes.js`'s
- * `parseNamedItems`. Not forced into an array by the shared `structured`
- * reading's `REPEATABLE` set — `namedItem` isn't a member of it — so a system
- * with exactly one type would hand back a bare object; normalised here the
- * same way the pre-migration handler already did.
+ * What `GetAdtTypes` answers at each `detail`: the reading the type list is
+ * read with, selected before the call (`src/lib/detail`) — terse a
+ * `name\tdescription` row per type, the description's first line (a group
+ * type lists its members on the lines after it); medium the named items
+ * as adt-strategies reads them, each description whole; full the parse;
+ * raw the document. The items are adt-strategies' `utilNamedItems` (since
+ * 0.28.0 a name as written, an absent description absent).
  */
-function extractNamedItems(value: XmlRead): NamedItem[] {
-  const raw = childAt(value, 'nameditem:namedItemList', 'nameditem:namedItem');
-  const items = raw ? (isList(raw) ? raw : [raw]) : [];
-  return items.flatMap((item) => {
-    const name = text(child(item, 'nameditem:name'));
-    return name === undefined || name === ''
-      ? []
-      : [{ name, description: text(child(item, 'nameditem:description')) }];
-  });
-}
+const TYPE_READINGS: ListDetailTable<INamedItem[] | XmlNode | string> = {
+  // Every type the list held, written by the listing writer.
+  terse: written(utilNamedItems, (items: INamedItem[]) =>
+    writeListing({
+      heads: [{ head: 'count', value: String(items.length) }],
+      reading: { items },
+      lists: TYPES_LISTS,
+    }),
+  ),
+  // The named items whole, as read.
+  medium: written(utilNamedItems, (items) => writeWhole(items)),
+  full: fullLevel,
+  raw: rawLevel,
+};
 
 export async function handleGetAdtTypes(
   context: HandlerContext,
@@ -74,8 +112,11 @@ export async function handleGetAdtTypes(
     { tool: 'GetAdtTypes', detail },
     () =>
       createAdtClient(connection, logger)
-        .getUtils(ourUtils)
+        .getUtils({
+          ...ourUtils,
+          types: readingAt(TYPE_READINGS, levelOf(args)),
+        })
         .getAllTypes(999, '*', 'usedByProvider', { analyse: analyseException }),
-    project(detail, (value) => extractNamedItems(value)),
+    answered,
   );
 }

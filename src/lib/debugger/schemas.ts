@@ -87,8 +87,7 @@ export const BREAKPOINT_ITEM = z.object({
 });
 
 /** The words of `breakpoints` where any number is taken. */
-export const BREAKPOINTS_WORDS =
-  'Breakpoints: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.';
+export const BREAKPOINTS_WORDS = `Breakpoints: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. ${SHARED_SET_SENTENCE}`;
 
 /** `breakpoints` where the tool requires it and takes any number. */
 export const BREAKPOINTS_PROPERTY = {
@@ -104,7 +103,7 @@ export const AMDP_BREAKPOINTS_PROPERTY = {
       }),
     )
     .min(1)
-    .describe('Lines in SQLScript methods of a class.'),
+    .describe(`Lines in SQLScript methods of a class. ${AMDP_CATCH_SENTENCE}`),
 };
 
 export const RUN_PROPERTY = {
@@ -122,7 +121,7 @@ export const START_BREAKPOINTS_PROPERTY = {
     .array(BREAKPOINT_ITEM)
     .min(1)
     .describe(
-      'Breakpoints, at least one: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.',
+      `Breakpoints, at least one breakpoint: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. ${SHARED_SET_SENTENCE}`,
     ),
 };
 

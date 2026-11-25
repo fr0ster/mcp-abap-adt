@@ -27,6 +27,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -38,8 +39,11 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'CreateBehaviorImplementation',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Creates the RAP behavior implementation class named by class_name for the behavior definition named by behavior_definition, in initial state: the FOR BEHAVIOR OF main source and the implementations include are written afterwards, the main source as a class source and the implementations include under the class lock.',
+  description: createTool({
+    object: 'the RAP behavior implementation class of a behavior definition',
+    how: ', with its description',
+    transported: true,
+  }),
   inputSchema: createArguments('CreateBehaviorImplementation', {
     class_name: z.string().describe('Behavior Implementation class name.'),
     behavior_definition: z

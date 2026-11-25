@@ -31,6 +31,7 @@ import {
 import type { LaunchedServer } from '../helpers/launchedServers';
 import { liveConnection, liveSuite } from '../helpers/live';
 import { skipRunningTest } from '../helpers/runningTest';
+import { headOf, terseOf } from '../helpers/terseAnswer';
 import {
   destinationArgs,
   getHardModeConfig,
@@ -152,10 +153,12 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
     }
     const server = await launched();
     try {
+      // The whole answer (detail full): terse fits the limit, below.
       await assert.rejects(
         server.call('GetWhereUsed', {
           object_name: name,
           object_type: 'CLAS/OC',
+          detail: 'full',
           background: false,
         }),
         (error: unknown) =>
@@ -163,6 +166,47 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
       );
       const next = await searchRows(server, name);
       assert.equal(next.rows, 1, next.text);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('terse, the default, answers every usage within the limit', async () => {
+    const name = oversizedClass();
+    if (name === undefined) {
+      skipRunningTest(
+        'the config names no whereused_readonly.test_whereused.oversized_class',
+      );
+      return;
+    }
+    const server = await launched();
+    try {
+      const text = textOf(
+        'GetWhereUsed',
+        await server.call('GetWhereUsed', {
+          object_name: name,
+          object_type: 'CLAS/OC',
+          background: false,
+        }),
+      );
+      const answer = terseOf(text);
+      const shown = text.slice(0, 2000);
+      const total = `# total ${headOf(answer, 'total') ?? ''}`;
+      assert.ok(Number.isFinite(Number(headOf(answer, 'total'))), shown);
+      // The usages SAP answered, as rows under their package, each read by
+      // the header's column names; a usage names its object (a nameless one
+      // by its uri), its type SAP's, which a reference may lack (SAP lists
+      // local test classes without one, measured on premise).
+      for (const column of ['type', 'name', 'usage']) {
+        assert.ok(answer.columns.includes(column), shown);
+      }
+      assert.ok(answer.rows.length > 0, shown);
+      for (const row of answer.rows.slice(0, 50)) {
+        assert.ok(row.name || row.uri, JSON.stringify(row));
+      }
+      console.log(
+        `[readToolBugs] GetWhereUsed ${name} terse: ${text.length} characters, ${total}`,
+      );
     } finally {
       await server.close();
     }
@@ -195,12 +239,25 @@ liveSuite(
       } finally {
         await server.close();
       }
-      const rows: unknown = JSON.parse(text);
-      assert.ok(Array.isArray(rows), text.slice(0, 2000));
-      const keys = rows.map(
-        (row) =>
-          `${String(member(row, 'type'))} ${String(member(row, 'name'))} in ${String(member(row, 'packageName'))}`,
-      );
+      // Terse, the default: `type\tname\ttech_name` rows under `# package` lines.
+      const keys: string[] = [];
+      let owner = '';
+      for (const line of text.split('\n')) {
+        if (line.startsWith('# package ')) {
+          owner = line.slice('# package '.length);
+          continue;
+        }
+        if (
+          line === '' ||
+          line.startsWith('#') ||
+          line.startsWith('type\tname')
+        ) {
+          continue;
+        }
+        const [type, rowName] = line.split('\t');
+        keys.push(`${type} ${rowName} in ${owner}`);
+      }
+      assert.ok(keys.length > 0, text.slice(0, 2000));
       assert.deepEqual(
         keys.filter((key, i) => keys.indexOf(key) !== i),
         [],

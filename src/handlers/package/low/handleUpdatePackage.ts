@@ -40,9 +40,12 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, messageCarriedBy } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
@@ -50,8 +53,11 @@ import { return_error, return_response } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdatePackageLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.',
+  description: updateTool({
+    tag: 'low-level',
+    object: 'the description of an existing ABAP package',
+    how: ', under a lock the caller holds',
+  }),
   inputSchema: z.object({
     package_name: z
       .string()
@@ -132,7 +138,7 @@ export async function handleUpdatePackage(
           ),
         atStep('update metadata', (document) =>
           withAdtHeaders(context, 'package.updateMetadata', (headers) =>
-            client.getPackage(packageDocuments).updateMetadata(
+            client.getPackage(resultsFor(packageDocuments)).updateMetadata(
               {
                 packageName,
                 ...(transport_request && {
@@ -164,21 +170,13 @@ export async function handleUpdatePackage(
 
       logger?.info(`✅ UpdatePackage completed: ${packageName}`);
 
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            package_name: packageName,
-            ...(super_package && {
-              super_package: super_package.toUpperCase(),
-            }),
-            updated_description,
-            message: `Package ${packageName} updated successfully. Remember to unlock using UnlockObject.`,
-          },
-          null,
-          2,
-        ),
-      });
+      // A write with nothing to report answers as every other low update
+      // does: `terseWrite` over the write's reading (SAP's status).
+      return answer(
+        { tool: 'UpdatePackageLow', detail: 'terse' },
+        async () => written,
+        project('terse', terseWrite),
+      );
     } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is

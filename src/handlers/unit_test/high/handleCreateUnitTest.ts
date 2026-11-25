@@ -8,6 +8,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  */
 
 import { answer } from '../../../lib/answer';
+import { createTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -17,8 +18,11 @@ import { writeClassTests } from '../shared/writeTests';
 export const TOOL_DEFINITION = {
   name: 'CreateUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Creates the ABAP Unit test classes of the ABAP class named by class_name, from test_class_source. They are written as the class's local test classes, and the class is activated.",
+  description: createTool({
+    purpose: purpose(
+      'Creates the ABAP Unit test classes of an ABAP class from the test class source given, as its local test classes, and activates the class.',
+    ),
+  }),
   inputSchema: createArguments('CreateUnitTest', {
     class_name: z
       .string()

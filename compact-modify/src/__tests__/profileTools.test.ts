@@ -14,7 +14,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, mock } from 'node:test';
+import { describe, it } from 'node:test';
 import { format } from 'node:util';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { assertNoProperty } from '../../../src/__tests__/helpers/assertions';

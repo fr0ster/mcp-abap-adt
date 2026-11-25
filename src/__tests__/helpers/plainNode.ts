@@ -106,6 +106,16 @@ export function runPlainNode(
           parsed = undefined;
         }
         settleWhenGone(() => {
+          // A report counts only from a child that ended well: one that
+          // failed after writing it is a failure.
+          if (parsed !== undefined && error !== null) {
+            reject(
+              new Error(
+                `the scenario failed after its report (exit ${String(error.code ?? error.signal)}): ${stderr.slice(-2000)}`,
+              ),
+            );
+            return;
+          }
           if (parsed !== undefined) {
             resolve(parsed);
             return;

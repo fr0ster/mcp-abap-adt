@@ -2,9 +2,10 @@ import {
   acceptedOf,
   byVariant,
   COMPACT_CREATE,
-  compactCreateDescription,
+  compactCreateParts,
   compactCreateSchemaFor,
   supported,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { chainCreateRefusal } from '@mcp-abap-adt/lib/handlers/write';
@@ -16,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerCreate',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactCreateDescription(variant),
+    description: toolDescription(compactCreateParts(variant)),
     inputSchema: compactCreateSchemaFor(COMPACT_CREATE[variant]),
     members: COMPACT_CREATE[variant],
   })),

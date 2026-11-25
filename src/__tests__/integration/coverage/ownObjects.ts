@@ -90,7 +90,7 @@ export function lockReleased(handle: string): void {
  */
 export async function releaseHeldLocks(): Promise<void> {
   await heldLocks.releaseAll(
-    (lock) => livePrepare('HandlerUnlock', { ...lock }),
+    (lock) => livePrepare('HandlerLock', { action: 'unlock', ...lock }),
     (line) => console.log(`[held locks] ${line}`),
   );
 }

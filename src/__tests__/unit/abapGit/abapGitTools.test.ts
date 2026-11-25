@@ -312,8 +312,8 @@ describe('the abapGit tools: requests', () => {
     assert.equal(String(request.data).includes(REPO_URL), true);
     assert.equal(String(request.data).includes('alias.invalid'), false);
     assert.deepEqual(text.split('\n'), [
-      'name\tis_head',
       '# access_mode PRIVATE',
+      'name\tis_head',
       'refs/heads/main\tX',
     ]);
   });

@@ -38,7 +38,6 @@ beforeEach(async () => {
     'ActivateClass',
     'GetClass',
     'HandlerLock',
-    'HandlerUnlock',
     'HandlerCheckRun',
   ]);
 });
@@ -120,8 +119,13 @@ it("after compact's HandlerLock", async () => {
 it("after compact's HandlerUnlock", async () => {
   await s.call('HandlerLock', { object_type: 'CLASS', object_name: NAME });
   await ran(
-    'HandlerUnlock',
-    { object_type: 'CLASS', object_name: NAME, lock_handle: HANDLE },
+    'HandlerLock',
+    {
+      action: 'unlock',
+      object_type: 'CLASS',
+      object_name: NAME,
+      lock_handle: HANDLE,
+    },
     statefulUnlock,
   );
   await expectTheNextReadStateless();

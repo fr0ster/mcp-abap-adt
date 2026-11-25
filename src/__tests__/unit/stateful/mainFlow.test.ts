@@ -198,7 +198,7 @@ describe('one main flow per instance', () => {
         });
         return { armed: false, open, opened };
       })();
-    const s = await statefulStand(['HandlerLock', 'HandlerUnlock'], {
+    const s = await statefulStand(['HandlerLock'], {
       credential: (basic: IAuthProvider): IAuthProvider => ({
         kind: basic.kind,
         prepare: () => basic.prepare(),
@@ -225,7 +225,8 @@ describe('one main flow per instance', () => {
       });
       await held.arrived;
       gate.armed = true;
-      const unlock = s.call('HandlerUnlock', {
+      const unlock = s.call('HandlerLock', {
+        action: 'unlock',
         object_type: 'CLASS',
         object_name: 'ZCL_A',
         lock_handle: HANDLE,

@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { ASSEMBLED_DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateTableType Handler - Update an Existing ABAP Table Type
  *
@@ -33,10 +33,12 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { answer } from '../../../lib/answer';
+import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
+import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import { tableTypeChanges } from '../../../lib/strategies/documentChanges';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -47,6 +49,7 @@ import { atStep } from '../../../lib/strategies/step';
 import {
   readStoredDefinition,
   type StoredDefinitionAnswer,
+  storedAt,
 } from '../../../lib/strategies/tableTypeStored';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
@@ -61,8 +64,10 @@ import {
 export const TOOL_DEFINITION = {
   name: 'UpdateTableType',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false or a refused activation, the inactive version, read after the unlock. The write is checked under the lock, before that read: a refused check is answered alone. A definition whose read failed is answered with SAP's answer to that read.",
+  description: updateTool({
+    object: 'the definition of an existing ABAP table type',
+    how: ': its description, the type it holds, its access type and primary key, activating it when asked',
+  }),
   inputSchema: z.object({
     table_type_name: z
       .string()
@@ -80,7 +85,7 @@ export const TOOL_DEFINITION = {
       .default(true)
       .optional()
       .describe('Activate the table type after the update (default: true).'),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -88,10 +93,31 @@ export const TOOL_DEFINITION = {
  * required one may be absent and is refused below. */
 type UpdateTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent (`wireAnswer`): every response
+ * its requests got — the writes, and the metadata read back after them.
+ */
 export async function handleUpdateTableType(
   context: HandlerContext,
   args: UpdateTableTypeArgs,
-) {
+): Promise<McpResult> {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'UpdateTableType',
+        shape: 'assembled',
+      },
+      () => answeredUpdateTableType(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredUpdateTableType(context, args);
+}
+
+async function answeredUpdateTableType(
+  context: HandlerContext,
+  args: UpdateTableTypeArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
 
   if (!args.table_type_name) {
@@ -107,7 +133,11 @@ export async function handleUpdateTableType(
   return answer(
     // The definition SAP stored rides along a success and a failure after
     // the wait alike; a chain that ended before the wait has none.
-    { tool: 'UpdateTableType', detail, beside: () => stored },
+    {
+      tool: 'UpdateTableType',
+      detail,
+      beside: () => storedAt(levelOf(args), stored),
+    },
     async () => {
       const obj = createAdtClient(connection, logger).getTableType(
         resultsFor(tableTypeDocuments),

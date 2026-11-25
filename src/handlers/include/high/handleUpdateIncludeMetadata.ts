@@ -14,6 +14,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -26,8 +27,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateIncludeMetadata',
   available_in: ['onprem'] as const,
-  description:
-    "Writes the given metadata document as the whole stored metadata of the ABAP include named by include_name: locks it, writes, unlocks. Returns SAP's answer to the write.",
+  description: updateTool({
+    object: 'the stored metadata of an existing ABAP include',
+    how: ', replacing it whole',
+    transported: true,
+  }),
   inputSchema: z.object({
     include_name: z
       .string()

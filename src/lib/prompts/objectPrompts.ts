@@ -303,16 +303,18 @@ export interface LockTools {
   readonly unlock: ListedPromptTool;
 }
 
-/** The lock and unlock tools for a write of `type`, when both are listed and offer its lock target. */
+/**
+ * The lock and unlock tools for a write of `type`, when listed and offering
+ * its lock target: one tool, `HandlerLock`, whose `action` picks the unlock.
+ */
 export function lockToolsFor(
   source: PromptSource,
   type: PromptObjectType,
 ): LockTools | undefined {
   const target = lockTargetOf(type);
   const lock = listed(source, 'HandlerLock');
-  const unlock = listed(source, 'HandlerUnlock');
-  return offers(source, lock, target) && offers(source, unlock, target)
-    ? { target, lock, unlock }
+  return offers(source, lock, target)
+    ? { target, lock, unlock: lock }
     : undefined;
 }
 
@@ -364,6 +366,7 @@ export function underLock(
     ...nameArguments(locks.lock, locks.target, 'object_name', named),
   ];
   const unlockNamed: StepArguments = [
+    ['action', userValue('unlock')],
     ['object_type', userValue(locks.target)],
     ...nameArguments(locks.unlock, locks.target, 'object_name', named),
   ];
@@ -579,7 +582,7 @@ export function deletePrompt(source: PromptSource): AbapPrompt | undefined {
     },
     (row) =>
       row.family === 'compact' && deletedUnderLock(row.type)
-        ? ['HandlerLock', 'HandlerUnlock']
+        ? ['HandlerLock']
         : [],
   );
 }

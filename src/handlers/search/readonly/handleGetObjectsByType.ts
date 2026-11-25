@@ -1,11 +1,182 @@
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type IRepositoryNodeChild,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtAnsweredObject } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
+import { answer } from '../../../lib/answer';
+import { createAdtClient, variantOf } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import {
+  about,
+  type Column,
+  headShape,
+  marks,
+  type RowSchemas,
+  rows,
+  writeListing,
+} from '../../../lib/detail';
+import {
+  type CachedObject,
+  objectsListCache,
+} from '../../../lib/getObjectsListCache';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  NOT_LOADED_BY_SAP,
+  type NodeLevel,
+  nodeItemsOf,
+} from '../../../lib/strategies/packageWalk';
+import { ourUtils } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
+
+/**
+ * TSV under `# parent`, `# node_id` and `# count` lines, built off `ourUtils.node` (adt-strategies' `utilNodeContents`,
+ * 0.28.1: complete and incomplete objects, each listed) instead of a
+ * hand-rolled regex over the raw node-structure XML. The cached rows carry
+ * `TECH_NAME`/`OBJECT_URI` where the node does. `format: 'raw'` stays
+ * unserved: the reading keeps no document.
+ */
+function formatObjects(
+  level: NodeLevel,
+  nodeId: string,
+  parentType: string,
+  parentName: string,
+  descriptions: boolean,
+): { text: string; cached: CachedObject[] } {
+  const objects = nodeItemsOf(level);
+  const cached = objects.map((o) => ({
+    OBJECT_TYPE: o.type,
+    OBJECT_NAME: o.name,
+    ...(o.techName ? { TECH_NAME: o.techName } : {}),
+    ...(o.uri ? { OBJECT_URI: o.uri } : {}),
+    ...(o.description ? { DESCRIPTION: o.description } : {}),
+  }));
+
+  // Every entry SAP listed under the node — its objects, complete or not,
+  // each node it could not load, each child node — written by the writer
+  // from the level's own lists (`writeListing`): one row or line each, no
+  // list left without a schema.
+  const notLoaded = level.notLoaded ?? [];
+  const text = writeListing({
+    heads: [
+      { head: 'parent', value: `${parentType} ${parentName}` },
+      { head: 'node_id', value: nodeId },
+      { head: 'count', value: String(objects.length + notLoaded.length) },
+    ],
+    reading: level,
+    lists: OBJECTS_BY_TYPE_LISTS[descriptions ? 'described' : 'bare'],
+  }).answer;
+  return { text, cached };
+}
+
+/** An entry of a level, complete or not: what a row reads. */
+type LevelEntry = IAdtAnsweredObject & {
+  readonly objectName?: string | undefined;
+  readonly techName?: string | undefined;
+  readonly objectUri?: string | undefined;
+  readonly description?: string | undefined;
+};
+
+/**
+ * The columns of a row: the type, the name, the technical name where it is
+ * not the name, the URI of a nameless object, the description where asked.
+ */
+function columnsOf(descriptions: boolean): Column<LevelEntry>[] {
+  const name = (o: LevelEntry) => o.objectName ?? '';
+  const columns: Column<LevelEntry>[] = [
+    { name: 'type', means: 'its type', cell: (o) => o.type ?? o.unknownType },
+    { name: 'name', means: 'its name', cell: name },
+    {
+      name: 'tech_name',
+      means: 'its technical name where it differs',
+      cell: (o) => {
+        const techName = o.techName || undefined;
+        return techName !== undefined && techName !== name(o) ? techName : '';
+      },
+    },
+    {
+      name: 'uri',
+      means: 'its URI when SAP lists it nameless',
+      cell: (o) => (name(o) === '' ? (o.objectUri ?? '') : ''),
+    },
+  ];
+  return descriptions
+    ? [
+        ...columns,
+        {
+          name: 'description',
+          means: 'its short description, by default',
+          cell: (o) => o.description ?? '',
+        },
+      ]
+    : columns;
+}
+
+/** What each listed object is, complete or not. */
+const OBJECT_NOUN = 'for each object of the type';
+
+/** The lists one type's listing writes, with its descriptions or without. */
+function objectsByTypeLists(descriptions: boolean): RowSchemas<NodeLevel> {
+  return {
+    objects: about(
+      OBJECT_NOUN,
+      rows('objects', {
+        columns: columnsOf(descriptions),
+        header: 'always',
+      }),
+    ),
+    incompleteObjects: about(
+      OBJECT_NOUN,
+      rows('incompleteObjects', {
+        columns: columnsOf(descriptions),
+        header: 'none',
+      }),
+    ),
+    notLoaded: about(
+      'the nodes SAP left unloaded are named',
+      marks(
+        'notLoaded',
+        NOT_LOADED_BY_SAP,
+        (_node: NonNullable<NodeLevel['notLoaded']>[number]) => [],
+      ),
+    ),
+    childNodes: about(
+      'the nodes below it are named by their type and node ID',
+      marks('childNodes', 'child_node', (node: IRepositoryNodeChild) => [
+        node.type ?? node.unknownType,
+        node.nodeId,
+      ]),
+    ),
+  };
+}
+
+/**
+ * The lists of a type's listing: `described` with short descriptions (the
+ * default), `bare` with `with_short_descriptions` false.
+ */
+export const OBJECTS_BY_TYPE_LISTS = {
+  described: objectsByTypeLists(true),
+  bare: objectsByTypeLists(false),
+} as const;
+
+/** The heads every type's listing opens with. */
+export const OBJECTS_BY_TYPE_HEADS = [
+  headShape('parent', "parent's type and name"),
+  headShape('node_id', 'node ID'),
+  headShape('count', 'number of objects'),
+];
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectsByType',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the objects of one type, such as classes, tables, programs or interfaces, in an ABAP package or other composite object.',
+    ),
+  }),
   inputSchema: z.object({
     parent_name: z.string().describe('[read-only] Parent object name'),
     parent_tech_name: z.string().describe('[read-only] Parent technical name'),
@@ -15,93 +186,16 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe(
-        "[read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on `nodeLevel` below.",
+        "[read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility and answers the same TSV.",
       ),
     with_short_descriptions: z
       .boolean()
       .optional()
-      .describe('[read-only] Include short descriptions'),
+      .describe(
+        '[read-only] Include short descriptions (default true): a description column on each row',
+      ),
   }),
 } as const;
-
-import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { answer } from '../../../lib/answer';
-import { createAdtClient, variantOf } from '../../../lib/clients';
-import {
-  type CachedObject,
-  objectsListCache,
-} from '../../../lib/getObjectsListCache';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { NodeLevel } from '../../../lib/strategies/packageWalk';
-import { ourUtils } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
-
-/**
- * Grouped, human-readable text — the same shape this tool answered before the
- * migration, built off `ourUtils.node` (`nodeLevel`) instead of a hand-rolled
- * regex over the raw node-structure XML.
- *
- * `ourUtils` deliberately keeps its OWN `node` reading (`resultSets.ts`:
- * "ourUtils... keeps our own node reading") — `nodeLevel` in
- * `packageWalk.ts` — rather than the shipped `nodeContents`, but that
- * reading carries `techName`/`uri` too (added the description; never traded
- * either away — see that file's own doc), so the cached rows below carry
- * `TECH_NAME`/`OBJECT_URI` from it, matching `IRepositoryObjectNode`'s field
- * set. `format: 'raw'` stays unserved: there is no raw XML behind
- * `NodeLevel`, only `objects`/`childNodes`, and restoring it needs a reading
- * that carries the document itself, not more fields — deferred, not
- * attempted here.
- */
-function formatObjects(
-  level: NodeLevel,
-  nodeId: string,
-  parentType: string,
-  parentName: string,
-): { text: string; cached: CachedObject[] } {
-  const objects = level.objects;
-  const cached = objects.map((o) => ({
-    OBJECT_TYPE: o.type,
-    OBJECT_NAME: o.name,
-    ...(o.techName ? { TECH_NAME: o.techName } : {}),
-    ...(o.uri ? { OBJECT_URI: o.uri } : {}),
-  }));
-
-  if (objects.length === 0) {
-    return {
-      text: `No objects found for node_id '${nodeId}' in ${parentType} '${parentName}'.`,
-      cached,
-    };
-  }
-
-  let responseText = `Found ${objects.length} objects for node_id '${nodeId}' in ${parentType} '${parentName}':\n\n`;
-  const objectTypes = [...new Set(objects.map((o) => o.type))];
-
-  if (objectTypes.length > 1) {
-    for (const objType of objectTypes) {
-      const typeObjects = objects.filter((o) => o.type === objType);
-      responseText += `Type: ${objType} (${typeObjects.length} objects)\n`;
-      for (const o of typeObjects) {
-        responseText += `   - ${o.name}\n`;
-      }
-      responseText += '\n';
-    }
-  } else {
-    responseText += `Object Type: ${objectTypes[0]}\n\n`;
-    for (const o of objects) {
-      responseText += `   - ${o.name}\n`;
-    }
-  }
-
-  responseText += `\nSummary: ${objects.length} objects found\n`;
-  if (objectTypes.length > 1) {
-    for (const objType of objectTypes) {
-      const count = objects.filter((o) => o.type === objType).length;
-      responseText += `   ${objType}: ${count} objects\n`;
-    }
-  }
-
-  return { text: responseText, cached };
-}
 
 export async function handleGetObjectsByType(
   context: HandlerContext,
@@ -159,11 +253,9 @@ export async function handleGetObjectsByType(
   // `analyseException` in its options since adt-clients 23.
   //
   // Task 28: why this tool carries no `detail`. The node-level family's
-  // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
-  // `nodeLevel` parses `answer.data` and returns only the reduced
-  // `NodeLevel` it builds, never keeping the wire text beside it — there is
-  // no `.raw` for `detail: 'raw'` to answer without changing that shared
-  // strategy.
+  // shape (`ourUtils.node`, adt-strategies' `utilNodeContents`): the
+  // reading keeps no wire text beside the level — there is no `.raw` for
+  // `detail: 'raw'` to answer.
   const variant = variantOf(connection);
   const parentType = tableTypeOf(parent_type, variant);
   if (parentType === undefined) {
@@ -190,6 +282,7 @@ export async function handleGetObjectsByType(
         node_id,
         parent_type,
         parent_name,
+        withDescriptions,
       );
       const listing = {
         isError: false,

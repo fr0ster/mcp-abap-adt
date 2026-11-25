@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { createArguments } from '../../../lib/handlers/createArguments';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { ASSEMBLED_DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTransport Handler - Create ABAP Transport Request
  *
@@ -23,6 +23,7 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
   type ICreatedTransport,
+  readTransportItem,
   transportCreated,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -31,18 +32,31 @@ import {
   answer,
   type FailureEntry,
   failureEntry,
+  isCredentialFailure,
   isCredentialPayload,
+  type McpResult,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
+import {
+  type DetailTable,
+  type LevelReading,
+  readingAt,
+  wireAnswer,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
-import { verbatim } from '../../../lib/strategies/reading';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
+import {
+  parseStructure,
+  rawOf,
+  statusOnly,
+} from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { failed, succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
-import { parseTransportXml } from '../readonly/handleGetTransport';
+import type { XmlNode } from '../../../lib/xml/node';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
 export const REQUEST_TASK_TYPES = ['S', 'R', 'X'] as const;
@@ -54,13 +68,40 @@ interface TypedTask {
   /** `null`: no task was found, so no type was applied. */
   type: TaskType | null;
   error?: FailureEntry;
+  /**
+   * The created request could not be read back, and why: SAP refused the
+   * credentials, refused otherwise, or answered what is not the request.
+   */
+  readBackFailed?: ReadBackFailure;
+  /** The request read back, as SAP sent it, when it was read. */
+  readBack?: string;
+}
+
+/** Why a created request's read-back failed. */
+type ReadBackFailure = 'authentication' | 'server' | 'malformed';
+
+/**
+ * The note of a created request whose read-back failed, in fixed words with
+ * the number SAP answered and the kind of failure: the request exists, and
+ * this is how to read it.
+ */
+export function readBackFailedNote(
+  number: string,
+  failure: ReadBackFailure,
+): string {
+  return `the request ${number} was created, but reading it back failed (${failure}): read it with GetTransport, transport_number ${number}`;
 }
 
 export const TOOL_DEFINITION = {
   name: 'CreateTransport',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Creates a transport request and gives the task SAP creates with it the type task_type (default S, Development/Correction). Response: JSON with transport_number, task_number and task_type.',
+  description: toolDescription(
+    runParts({
+      purpose: purpose(
+        'Creates a workbench or customizing transport with its description, and gives the task SAP creates with it the type asked.',
+      ),
+    }),
+  ),
   inputSchema: createArguments('CreateTransport', {
     transport_type: z
       .enum(['workbench', 'customizing'])
@@ -89,16 +130,41 @@ export const TOOL_DEFINITION = {
       .describe(
         "The type given to the request's task: S — Development/Correction (default), R — Repair, X — Unclassified, as SAP creates it.",
       ),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
 type CreateTransportArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent (`wireAnswer`): the documents
+ * the call's requests answered — the create's, and the request read back,
+ * so a failed read-back shows as the missing document.
+ */
 export async function handleCreateTransport(
   context: HandlerContext,
   args: CreateTransportArgs,
-) {
+): Promise<McpResult> {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'CreateTransport',
+        shape: 'assembled',
+        // A failed read-back, the response SAP gave (if any) in the array
+        // and the same note full explains beside it.
+        explainedBy: 'read_back',
+      },
+      () => answeredCreateTransport(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredCreateTransport(context, args);
+}
+
+async function answeredCreateTransport(
+  context: HandlerContext,
+  args: CreateTransportArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
 
   if (!args?.description) {
@@ -119,7 +185,10 @@ export async function handleCreateTransport(
   // creation, it is said in the answer.
   let task: TypedTask = { number: null, type: null };
 
-  const terseCreatedTransport = (created: ICreatedTransport) => {
+  const terseCreatedTransport = (
+    created: ICreatedTransport,
+    task: TypedTask,
+  ) => {
     return {
       success: true,
       transport_number: created.transportNumber,
@@ -130,21 +199,80 @@ export async function handleCreateTransport(
       task_number: task.number,
       task_type: task.type,
       ...(task.error ? { task_type_error: task.error } : {}),
-      ...(task.number === null
+      ...(task.readBackFailed !== undefined
         ? {
-            note: 'the request exists, but its read showed no task, so no task type was applied',
+            note: readBackFailedNote(
+              created.transportNumber,
+              task.readBackFailed,
+            ),
           }
-        : {}),
+        : task.number === null
+          ? {
+              note: 'the request exists, but its read showed no task, so no task type was applied',
+            }
+          : {}),
       message: `Transport request ${created.transportNumber} created successfully.`,
     };
   };
+
+  // What the create answers at each level, selected before the call: every
+  // level reads the created request (its number is the next request's
+  // address); terse answers it with the task the following requests settle,
+  // the others the document as it came.
+  // Terse what the next call needs: the request's and its task's numbers,
+  // and why the task is untyped when it is; medium the request as created
+  // (the former terse).
+  const terseNumbers = (created: ICreatedTransport, settled: TypedTask) =>
+    createdTransportNumbers(terseCreatedTransport(created, settled));
+  const createdReadings: DetailTable<CreatedAnswer<Terse>> = {
+    terse: createdAt((created) => (settled) => terseNumbers(created, settled)),
+    medium: createdAt(
+      (created) => (settled) => terseCreatedTransport(created, settled),
+    ),
+    // full the parse of the create's answer, a failed read-back's note
+    // beside it.
+    full: createdAt((created, raw) => (settled) => {
+      const parsed = parseStructure(raw) ?? raw;
+      return settled.readBackFailed === undefined
+        ? parsed
+        : {
+            create: parsed,
+            read_back: readBackFailedNote(
+              created.transportNumber,
+              settled.readBackFailed,
+            ),
+          };
+    }),
+    // Never reached: raw is what ADT sent, recorded by `wireAnswer` (the
+    // handler, above).
+    raw: createdAt((created) => (settled) => terseNumbers(created, settled)),
+  };
+  type Terse =
+    | ReturnType<typeof terseCreatedTransport>
+    | ReturnType<typeof terseNumbers>
+    | XmlNode
+    | string
+    | { create: XmlNode | string; read_back: string };
+
+  // The request read back as adt-strategies reads it by its number
+  // (`readTransportItem`), the reading made for that number.
+  const readBack = (number: string) =>
+    atStep('read request task', () =>
+      createAdtClient(connection, logger)
+        .getRequest({
+          ...resultsFor(transportDocuments),
+          objects: firstTaskOf(number),
+        })
+        .readObjects(number, { analyse: analyseException }),
+    )();
 
   return answer(
     { tool: 'CreateTransport', detail },
     async () => {
       const request = createAdtClient(connection, logger).getRequest({
         ...resultsFor(transportDocuments),
-        created: createdReading,
+        created: readingAt(createdReadings, levelOf(args)),
+        taskTypeChanged: statusOnly,
       });
       const created = await withAdtHeaders(
         context,
@@ -161,28 +289,49 @@ export async function handleCreateTransport(
           ),
       );
       if (!created.ok) return created;
-      const number = created.getResult().value.created().transportNumber;
-      const read = await atStep('read request task', () =>
-        request.readObjects(number, { analyse: analyseException }),
-      )();
-      if (!read.ok) {
-        return refusedAfterCreate(
-          created.getResult().value,
-          read.getError(),
-          'read request task',
-        );
-      }
-      const tasks = parseTransportXml(
-        read.getResult().value.raw,
-        false,
-        true,
-      ).tasks;
-      const first = tasks?.[0]?.number;
-      if (typeof first !== 'string' || first === '') {
-        task = { number: null, type: null };
+      const number = created.getResult().value.value.created.transportNumber;
+      let read: Awaited<ReturnType<typeof readBack>>;
+      try {
+        read = await readBack(number);
+      } catch (thrown) {
+        // A read-back the connection refused, or that threw on the way: the
+        // request exists all the same.
+        task = {
+          number: null,
+          type: null,
+          readBackFailed: isCredentialFailure(thrown)
+            ? 'authentication'
+            : 'server',
+        };
         return created;
       }
-      task = { number: first, type: 'X' };
+      // Once SAP has created the request its number is never lost: a
+      // read-back that fails — its credentials refused, refused otherwise,
+      // or not the request — is the created request, with a note naming the
+      // failure and how to read it again.
+      if (!read.ok) {
+        const refusal = failureEntry(read.getError(), 'read request task');
+        task = {
+          number: null,
+          type: null,
+          readBackFailed: isCredentialPayload(refusal)
+            ? 'authentication'
+            : 'server',
+        };
+        return created;
+      }
+      const taskRead = read.getResult().value;
+      if (taskRead.kind === 'threw') {
+        task = { number: null, type: null, readBackFailed: 'malformed' };
+        return created;
+      }
+      const first = taskRead.first;
+      const readBackDocument = taskRead.document;
+      if (first === undefined) {
+        task = { number: null, type: null, readBack: readBackDocument };
+        return created;
+      }
+      task = { number: first, type: 'X', readBack: readBackDocument };
       if (taskType === 'X') return created;
       const taskNumber = first;
       const changed = await withAdtHeaders(
@@ -195,12 +344,17 @@ export async function handleCreateTransport(
           }),
       );
       if (changed.ok) {
-        task = { number: taskNumber, type: taskType };
+        task = {
+          number: taskNumber,
+          type: taskType,
+          readBack: readBackDocument,
+        };
         return created;
       }
       task = {
         number: taskNumber,
         type: 'X',
+        readBack: readBackDocument,
         error: failureEntry(changed.getError(), 'change task type'),
       };
       return refusedAfterCreate(
@@ -209,10 +363,10 @@ export async function handleCreateTransport(
         'change task type',
       );
     },
-    (reading) =>
-      project(detail, (_value: typeof reading.value) =>
-        terseCreatedTransport(reading.created()),
-      )(reading),
+    // The answer composes the typed facts of several requests — the create,
+    // and the reads and the type change after it — through the level's
+    // reading of the create; it does not reshape one reading.
+    (reading) => reading.value.answer(task),
   );
 }
 
@@ -236,14 +390,78 @@ function refusedAfterCreate<T>(
 }
 
 /**
- * `created` read as the table reads it (`verbatim`: the body is the value),
- * with the created request beside it: adt-strategies' `transportCreated` over
- * the same answer, asked only by the terse projection — the body is parsed
- * once it is needed, as it was, and `full` and `raw` read the body alone.
+ * What a create's reading holds at every level: the created request, as
+ * adt-strategies reads the answer (`transportCreated`), and the level's
+ * answer — a pure function of the task the requests after the create settle.
  */
-function createdReading(answer: IAdtWireResponse) {
+interface CreatedAnswer<A> {
+  created: ICreatedTransport;
+  answer: (task: TypedTask) => A;
+}
+
+/** A level's reading of the create: the request read, and the answer `shown` makes of it and the document. */
+function createdAt<A>(
+  shown: (created: ICreatedTransport, raw: string) => (task: TypedTask) => A,
+): LevelReading<CreatedAnswer<A>> {
+  return (answer) => {
+    const raw = rawOf(answer);
+    const created = transportCreated(answer);
+    return {
+      value: { created, answer: shown(created, raw) },
+      raw,
+      status: answer.status,
+    };
+  };
+}
+
+/**
+ * The request read back, as adt-strategies reads it by its number
+ * (`readTransportItem`, 0.28.0): its first task's number, `undefined` when it
+ * holds none; or what the reading threw for an answer that is not the
+ * request asked for, in fixed words with nothing of the document. The throw
+ * is carried, not thrown, so it leaves the call after the read's own
+ * verdict, where the read it replaced threw it.
+ */
+type TaskRead =
+  | {
+      readonly kind: 'read';
+      readonly first: string | undefined;
+      /** The read-back's document, as SAP sent it. */
+      readonly document: string;
+    }
+  | { readonly kind: 'threw'; readonly thrown: unknown };
+
+function firstTaskOf(number: string) {
+  return (answer: IAdtWireResponse): TaskRead => {
+    try {
+      const document = rawOf(answer);
+      const item = readTransportItem(document, number);
+      const first =
+        item.kind === 'request' ? item.tasks[0]?.header.number : undefined;
+      return {
+        kind: 'read',
+        first: first !== undefined && first !== '' ? first : undefined,
+        document,
+      };
+    } catch (thrown) {
+      return { kind: 'threw', thrown };
+    }
+  };
+}
+
+/** What a created transport answers at terse: its number, its task's, and why the task is untyped when it is. */
+export function createdTransportNumbers(answered: {
+  readonly transport_number: string;
+  readonly task_number: string | null;
+  readonly task_type_error?: FailureEntry | undefined;
+  readonly note?: string | undefined;
+}) {
   return {
-    ...verbatim(answer),
-    created: (): ICreatedTransport => transportCreated(answer),
+    transport_number: answered.transport_number,
+    task_number: answered.task_number,
+    ...(answered.task_type_error === undefined
+      ? {}
+      : { task_type_error: answered.task_type_error }),
+    ...(answered.note === undefined ? {} : { note: answered.note }),
   };
 }

@@ -1,9 +1,12 @@
 /**
  * The detail mechanism every handler shares: `./levels` maps each level of
  * `detail` to the reading passed into the adt-clients member (selected before
- * the call), and `./tsv` writes the terse list format.
+ * the call), `./tsv` writes the terse list format, `./wire` answers
+ * `raw` as what ADT sent, and `./listing` writes every terse and medium
+ * list from the reading's own lists, complete by construction.
  */
 
+export type { Line } from './complete';
 export {
   type AnswerTable,
   answerAt,
@@ -14,8 +17,82 @@ export {
   formatted,
   fullLevel,
   type LevelReading,
+  type ListAnswerTable,
+  type ListDetailTable,
+  listAnswerAt,
   rawLevel,
   readingAt,
   structuredValue,
+  type WrittenLevel,
+  whole,
+  written,
 } from './levels';
-export { groupedTsv, type TsvGroup, tsv } from './tsv';
+export {
+  about,
+  asContentResult,
+  asJsonResult,
+  asTextResult,
+  type Bound,
+  bullets,
+  byListing,
+  type Column,
+  entries,
+  type Group,
+  type Head,
+  type HeadShape,
+  headLines,
+  headShape,
+  type JsonBound,
+  type JsonSchemas,
+  jsonText,
+  type KindShape,
+  type KindSpec,
+  kinds,
+  type Listing,
+  type ListKeys,
+  type ListShape,
+  listWrittenAt,
+  type Mark,
+  marks,
+  member,
+  type Nested,
+  type NestSpec,
+  nest,
+  node,
+  type Omitting,
+  omitted,
+  omitting,
+  parts,
+  partsOf,
+  type Root,
+  type RowSchemas,
+  type RowSpec,
+  rows,
+  type SchemaKeys,
+  sections,
+  shownBeside,
+  type TextResult,
+  values,
+  Written,
+  wholeEntries,
+  wholeMarks,
+  within,
+  writeJson,
+  writeJsonList,
+  writeJsonRoot,
+  writeListing,
+  writeWhole,
+  writtenValues,
+} from './listing';
+export { cellsOf } from './tsvCells';
+export {
+  notOneDocumentWords,
+  partStatuses,
+  recordedBody,
+  recordedWire,
+  type WireOf,
+  type WireResponse,
+  type WireShape,
+  wireAnswer,
+  wireText,
+} from './wire';

@@ -142,7 +142,8 @@ describe('the coverage ledger guard', () => {
     // HandlerSystem (D25), one fewer. A table's technical settings and the
     // text elements: their reads and writes, four more. abapGit, always
     // listed: thirteen full tools and two compact ones, fifteen more.
-    assert.equal(new Set(served.map((tool) => tool.name)).size, 330);
+    // HandlerUnlock is HandlerLock's action unlock: one fewer.
+    assert.equal(new Set(served.map((tool) => tool.name)).size, 329);
     assertEquals(of(findings, 'served-mismatch'), []);
   });
 

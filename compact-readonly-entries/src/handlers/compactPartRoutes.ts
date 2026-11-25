@@ -19,12 +19,7 @@ import {
   type CompactObjectType,
   dispatchCompact,
   HANDLER_GET_DRAFT_TYPES,
-  isArgList,
-  isJsonObject,
   isSourceless,
-  type JsonValue,
-  jsonAt,
-  jsonOf,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { ToolResultLike } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -97,74 +92,10 @@ const packageContents = defineTool(
 export const compactContentsRoutes: Partial<
   Record<CompactObjectType, CompactHandler>
 > = {
-  PACKAGE: packageContentsLines,
+  // GetPackageContents' answer at the level asked (compact parity): every
+  // member, nothing cut.
+  PACKAGE: packageContents,
 };
-
-/** A member's field as its listing line shows it: `''` when absent. */
-function fieldOf(item: JsonValue, name: string): string {
-  return String(jsonAt(item, name) ?? '');
-}
-
-/**
- * A package's members, one per line: name, type, description — the shape a
- * search answers — capped at `max`. The core reader answers pretty-printed
- * JSON that repeats the package's own name and the type's kind on every row;
- * for a package with a few hundred members that is tens of kilobytes
- * carrying three facts per object.
- */
-function contentsLines(items: readonly JsonValue[], max: number): string {
-  const lines = ['name\ttype\tdescription'];
-  for (const item of items.slice(0, max)) {
-    lines.push(
-      `${fieldOf(item, 'name')}\t${fieldOf(item, 'type')}\t${fieldOf(item, 'description')}`,
-    );
-  }
-  if (items.length > max) {
-    lines.push(`(${max} of ${items.length} shown; raise max_results for more)`);
-  }
-  return lines.join('\n');
-}
-
-/**
- * The members as lines: for `package_name`, one listing; for
- * `package_names`, one entry per package, in the order given —
- * `{ package_name, contents }` with its listing, or `{ package_name, error }`.
- */
-async function packageContentsLines(
-  context: HandlerContext,
-  args: ToolArgs,
-): Promise<ToolResultLike> {
-  const answered = await packageContents(context, args);
-  const text = answered.content[0]?.text;
-  if (answered.isError || typeof text !== 'string') return answered;
-  // Capped like a where-used list: a structure package's members are its
-  // sub-packages, and on the cloud trial one had 5,813 of them.
-  const max =
-    typeof args.max_results === 'number' && args.max_results > 0
-      ? args.max_results
-      : 100;
-  const parsed = jsonOf(text);
-  if (!Array.isArray(parsed)) return answered;
-  const listed = isArgList(args.package_names)
-    ? JSON.stringify(
-        parsed.map((entry) => {
-          const objects = jsonAt(entry, 'objects');
-          return isJsonObject(entry) && Array.isArray(objects)
-            ? {
-                package_name: entry.package_name,
-                contents: contentsLines(objects, max),
-              }
-            : entry;
-        }),
-        null,
-        2,
-      )
-    : contentsLines(parsed, max);
-  return {
-    ...answered,
-    content: [{ type: 'text', text: listed }],
-  };
-}
 
 /** A system type of `COMPACT_MAIN_PROGRAMS`. */
 type MainProgramsVariant = keyof typeof COMPACT_MAIN_PROGRAMS;

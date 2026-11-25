@@ -47,7 +47,6 @@ const PACKAGE_CREATE_TOOLS: ReadonlySet<string> = new Set([
  */
 const PACKAGE_OBJECT_TOOLS: ReadonlySet<string> = new Set([
   'HandlerLock',
-  'HandlerUnlock',
   'LockObjectLow',
   'UnlockObjectLow',
 ]);

@@ -33,7 +33,6 @@ const KIND_OF: Readonly<Record<string, typeof WRITES | typeof READS>> = {
   HandlerCreate: WRITES,
   HandlerDelete: WRITES,
   HandlerLock: WRITES,
-  HandlerUnlock: WRITES,
   HandlerUpdate: WRITES,
   HandlerTransportCreate: WRITES,
   HandlerTransportMoveObjects: WRITES,

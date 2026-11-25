@@ -1259,33 +1259,6 @@
       "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
     }
   },
-  "HandlerUnlock#CLASS_TEXT_ELEMENTS": {
-    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
-    "live": {
-      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
-      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
-    }
-  },
-  "HandlerUnlock#FUNCTION_GROUP_TEXT_ELEMENTS": {
-    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
-    "live": {
-      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
-      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
-    }
-  },
-  "HandlerUnlock#PROGRAM_TEXT_ELEMENTS": {
-    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
-    "live": {
-      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts"
-    }
-  },
-  "HandlerUnlock#TABLE_SETTINGS": {
-    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
-    "live": {
-      "onprem": "src/__tests__/integration/coverage/tableSettings.live.test.ts",
-      "cloud": "src/__tests__/integration/coverage/tableSettings.live.test.ts"
-    }
-  },
   "HandlerUpdate#CLASS_TEXT_ELEMENTS": {
     "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
     "live": {

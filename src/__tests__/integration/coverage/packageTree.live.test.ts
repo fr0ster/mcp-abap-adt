@@ -18,7 +18,7 @@ import {
   liveSuite,
   throughServer,
 } from '../helpers/live';
-import { member, payloadOf, succeeded } from './ownObjects';
+import { member, succeeded } from './ownObjects';
 import { finishedRun, startedRun } from './systemRuns';
 
 /** The shared package the configuration names. */
@@ -30,13 +30,19 @@ function sharedPackage(): string {
   return named.toUpperCase();
 }
 
-/** The shared package's tree: its name, and children under its root. */
+/**
+ * The shared package's tree, as terse answers it (the default): indented
+ * `type\tname` rows, the package itself first, its children indented below.
+ */
 function expectSharedTree(answer: LiveAnswer): void {
-  const payload = payloadOf(succeeded('HandlerSystem package_tree', answer));
-  assert.equal(member(payload, 'package_name'), sharedPackage());
-  const children = member(member(payload, 'tree'), 'children');
+  const rows = succeeded('HandlerSystem package_tree', answer).text.split('\n');
+  assert.equal(
+    rows[0],
+    `DEVC/K\t${sharedPackage()}`,
+    answer.text.slice(0, 2000),
+  );
   assert.ok(
-    Array.isArray(children) && children.length > 0,
+    rows.slice(1).some((row) => row.startsWith('  ')),
     `the tree of ${sharedPackage()} has no children: ${answer.text.slice(0, 2000)}`,
   );
 }

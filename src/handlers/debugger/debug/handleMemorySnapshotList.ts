@@ -2,7 +2,13 @@ import { MemorySnapshots } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { debugAnswer } from '../../../lib/debugger/answer';
-import { readSnapshotList } from '../../../lib/debugger/memoryReadings';
+import {
+  NO_SNAPSHOT_AUTHORIZATION,
+  readSnapshotList,
+  terseSnapshotList,
+} from '../../../lib/debugger/memoryReadings';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { carryingFailure } from '../../../lib/strategies/step';
 import type { HandlerContext } from '../../interfaces';
@@ -10,8 +16,14 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'MemorySnapshotList',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] [debug] Memory snapshots the system lists. Empty when the user lacks the memory snapshot authorization.',
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose(
+        'Lists the memory snapshots the system holds, of one user when asked.',
+      ),
+    }),
+  ),
   inputSchema: z.object({
     user: z
       .string()
@@ -20,9 +32,6 @@ export const TOOL_DEFINITION = {
     ...DETAIL_SHAPE,
   }),
 } as const;
-
-const NO_AUTHORIZATION =
-  'an empty list is also the answer without the memory snapshot authorization';
 
 export async function handleMemorySnapshotList(
   context: HandlerContext,
@@ -48,18 +57,12 @@ export async function handleMemorySnapshotList(
       const raw = String(answer.getResult().value ?? '');
       return { value: raw, raw };
     },
-    (xml) => {
-      // Terse drops only the file name; the id, user and time tell the snapshots apart.
-      const list = readSnapshotList(xml).map(({ fileName: _f, ...s }) => s);
-      return list.length > 0
-        ? list
-        : { snapshots: [], authorization: NO_AUTHORIZATION };
-    },
+    terseSnapshotList,
     (xml) => {
       const list = readSnapshotList(xml);
       return list.length > 0
         ? list
-        : { snapshots: [], authorization: NO_AUTHORIZATION };
+        : { snapshots: [], authorization: NO_SNAPSHOT_AUTHORIZATION };
     },
   );
 }

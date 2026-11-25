@@ -25,6 +25,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { checkTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
@@ -34,8 +35,7 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'CheckPackageLow',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[low-level] Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages. super_package is accepted but not read by the check endpoint — see its own parameter description.',
+  description: checkTool({ tag: 'low-level', object: 'an ABAP package' }),
   inputSchema: z.object({
     package_name: z.string().describe('Package name.'),
     super_package: z

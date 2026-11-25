@@ -1,6 +1,11 @@
 import * as z from 'zod';
+import { purpose, toolDescription } from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 /**
  * ReadTransportObjects — what a transport request or task holds.
  *
@@ -12,46 +17,109 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * document for the number themselves, which is the work the member exists to
  * end.
  *
- * **The slot is stamped, not kept, and that is a deliberate reversal.** The
- * shipped reading answers the entries already parsed, which is what a
- * consumer of the library wants — but it answers them *instead of* an
- * `AdtReading`, so there is no document left for `detail: 'raw'` to give and
- * no status to carry. Keeping it would buy a parse we can do in eight lines
- * and cost a caller the raw answer, which is the one thing they cannot
- * reconstruct.
- *
- * So `structured` stamps the slot like its neighbours, and the entries are
- * read out of the parsed document here. That is this repository's half of the
- * split: the package answers a consumer-agnostic reading, and shaping it for
- * an LLM — positions promoted, nulls where the server said nothing — belongs
- * on this side.
+ * **The entries are adt-strategies' `transportObjectEntryList`** (0.28.2):
+ * each entry once, with its task and its position — a request's aggregate
+ * `tm:all_objects` is not read beside its tasks' entries — and each entry
+ * SAP lists without a name or a type apart, in `incompleteEntries`, answered
+ * at every level with every identity field it carries. Each `detail`
+ * level is the reading passed to the call: terse and medium over those
+ * entries, full the parse, raw the document.
  */
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type ITransportIncompleteEntry,
+  type ITransportObjectEntry,
+  type ITransportObjectEntryList,
+  transportObjectEntryList,
+} from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
-import { resultsFor } from '../../../lib/strategies/resultSets';
 import {
-  attr,
-  child,
-  type Element,
+  about,
+  answered,
   entries,
-  isElement,
-  isList,
-  type XmlList,
-  type XmlNode,
-  type XmlRead,
-} from '../../../lib/xml/tree';
+  fullLevel,
+  headShape,
+  type ListDetailTable,
+  marks,
+  type RowSchemas,
+  rawLevel,
+  readingAt,
+  rows,
+  type Written,
+  writeJson,
+  writeListing,
+  written,
+} from '../../../lib/detail';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import type { XmlNode } from '../../../lib/xml/node';
+
+/** An incomplete entry's words: every identity field it carries, `field=value`. */
+const incompleteWords = (entry: ITransportIncompleteEntry) =>
+  incompleteFields(entry).map(([field, value]) => `${field}=${value}`);
+
+/** The lists the transport objects listing writes: what its description states. */
+export const TRANSPORT_OBJECTS_LISTS: RowSchemas<ITransportObjectEntryList> = {
+  entries: about(
+    'for each object, under its task and its program ID',
+    rows('entries', {
+      columns: [
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (entry: ITransportObjectEntry) => entry.type,
+        },
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (entry: ITransportObjectEntry) => entry.name,
+        },
+        {
+          name: 'position',
+          means: 'its position, which a removal names',
+          cell: (entry: ITransportObjectEntry) => entry.position ?? '',
+        },
+      ],
+      header: 'always',
+      groups: [
+        {
+          label: 'task',
+          of: (entry: ITransportObjectEntry) => entry.task ?? '',
+          mode: 'run',
+          unless: '',
+        },
+        {
+          label: 'pgmid',
+          of: (entry: ITransportObjectEntry) => entry.pgmid ?? 'R3TR',
+          mode: 'run',
+        },
+      ],
+    }),
+  ),
+  incompleteEntries: about(
+    'the objects SAP lists nameless or untyped are named by what they carry',
+    marks('incompleteEntries', 'incomplete', incompleteWords),
+  ),
+};
+
+/** The heads the transport objects listing opens with. */
+export const TRANSPORT_OBJECTS_HEADS = [
+  headShape('transport', 'transport number'),
+  headShape('count', 'number of objects'),
+];
 
 export const TOOL_DEFINITION = {
   name: 'ReadTransportObjects',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] Lists the objects the transport request or task named by transport_number holds, each with its `position`, which a removal of the entry names. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the objects a transport or one of its tasks holds, each with the position a removal names.',
+    ),
+  }),
   inputSchema: z.object({
     transport_number: requiredText('transport_number is required').describe(
       'Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.',
@@ -76,84 +144,51 @@ export interface ReadTransportEntry {
   lock_status?: string;
 }
 
-/** One entry, as this tool reads it. */
-interface Entry {
-  name: string;
-  type: string;
-  pgmid?: string | undefined;
-  description?: string | undefined;
-  position?: string | undefined;
-  lockStatus?: string | undefined;
-  /** The task the entry is on, when a request was read. */
-  task?: string | undefined;
-}
-
 /**
- * Every `tm:abap_object` in the parsed document, with the task it is on.
- *
- * A walk rather than a path: a task document holds its objects on
- * `tm:root/tm:task`, a request document on each `tm:request/tm:task`, and a
- * user action echoes one under `tm:request`. **A request document also
- * carries `tm:all_objects`** — the request's aggregate list, every object
- * once more beside its task's entry (measured: 342 there and 342 on the one
- * task, read twice as 684) — so that subtree is not collected: a request's
- * objects are its tasks' entries, each once, each with its task number.
+ * The entries as TSV (terse): `# transport N` and `# count`, the header
+ * `type\tname\tposition`, then `# task T` and `# pgmid P` group lines before
+ * the rows they hold — a removal names the task, the pgmid, the type, the
+ * name and the position. Every entry is answered.
  */
-function collect(
-  node: XmlRead,
-  found: { attributes: Element; task?: string | undefined }[],
-  task?: string | undefined,
-  inRequest = false,
-): void {
-  if (isList(node)) {
-    for (const member of node) collect(member, found, task, inRequest);
-    return;
-  }
-  for (const [key, value] of entries(node)) {
-    if (key === '@' || key === 'tm:all_objects') continue;
-    if (key === 'tm:abap_object') {
-      for (const entry of isList(value) ? value : [value]) {
-        const attributes = child(entry, '@');
-        if (isElement(attributes)) found.push({ attributes, task });
-      }
-      continue;
-    }
-    if (key === 'tm:task' && inRequest) {
-      // A task of the request: its entries carry its number.
-      for (const member of isList(value) ? value : [value]) {
-        const number = attr(child(member, '@'), 'tm:number');
-        collect(member, found, text(number), false);
-      }
-      continue;
-    }
-    collect(value, found, task, key === 'tm:request');
-  }
+
+function transportRows(
+  transportNumber: string,
+  list: ITransportObjectEntryList,
+): Written<string> {
+  const incomplete = list.incompleteEntries ?? [];
+  return writeListing({
+    heads: [
+      { head: 'transport', value: transportNumber },
+      { head: 'count', value: String(list.entries.length + incomplete.length) },
+    ],
+    reading: list,
+    lists: TRANSPORT_OBJECTS_LISTS,
+  });
 }
 
-const text = (value: string | undefined): string | undefined =>
-  value === undefined || value === '' ? undefined : value;
+/** An incomplete entry as the medium answer writes it: the fields it carries. */
+interface IncompleteObject {
+  task?: string;
+  pgmid?: string;
+  type?: string;
+  name?: string;
+  position?: string;
+}
 
-function entriesOf(value: XmlRead): Entry[] {
-  const found: { attributes: Element; task?: string | undefined }[] = [];
-  collect(value, found);
-  const read: Entry[] = [];
-  for (const { attributes, task } of found) {
-    const name = text(attr(attributes, 'tm:name'));
-    const type = text(attr(attributes, 'tm:type'));
-    // Nothing can be done with a nameless entry, and a caller counting
-    // objects should not count a hole.
-    if (name === undefined || type === undefined) continue;
-    read.push({
-      name,
-      type,
-      pgmid: text(attr(attributes, 'tm:pgmid')),
-      description: text(attr(attributes, 'tm:obj_desc')),
-      position: text(attr(attributes, 'tm:position')),
-      lockStatus: text(attr(attributes, 'tm:lock_status')),
-      task,
-    });
-  }
-  return read;
+/** An incomplete entry's identity fields that are present, in a fixed order. */
+function incompleteFields(
+  entry: ITransportIncompleteEntry,
+): Array<[string, string]> {
+  const fields: Array<[string, string | undefined]> = [
+    ['task', entry.task],
+    ['pgmid', entry.pgmid],
+    ['type', entry.type],
+    ['name', entry.name],
+    ['position', entry.position],
+  ];
+  return fields.flatMap(([field, value]) =>
+    value === undefined || value === '' ? [] : [[field, value]],
+  );
 }
 
 export async function handleReadTransportObjects(
@@ -164,35 +199,66 @@ export async function handleReadTransportObjects(
 
   const detail = detailOf(args);
 
-  const terseObjects = (value: XmlRead) => {
-    const entries = entriesOf(value);
-    return {
+  const mediumObjects = (list: ITransportObjectEntryList) => {
+    const incomplete = list.incompleteEntries ?? [];
+    const rest = {
       success: true,
       transport_number: args.transport_number,
-      count: entries.length,
-      objects: entries.map(
-        (entry): ReadTransportEntry => ({
+      count: list.entries.length + incomplete.length,
+    };
+    return writeJson(rest, list, {
+      // The incomplete ones first, then the objects.
+      incompleteEntries: entries(
+        'incompleteEntries',
+        (entry: ITransportIncompleteEntry): IncompleteObject =>
+          Object.fromEntries(incompleteFields(entry)),
+        { as: 'incomplete_objects', omitEmpty: true },
+      ),
+      entries: entries(
+        'entries',
+        (entry: ITransportObjectEntry): ReadTransportEntry => ({
           pgmid: entry.pgmid ?? 'R3TR',
           type: entry.type,
           name: entry.name,
-          // Optional, and said so: an entry the server described without one
-          // cannot be removed, and inventing an empty string would produce a
-          // call that answers 200 and removes nothing.
+          // Optional, and said so: an entry the server described without
+          // one cannot be removed, and inventing an empty string would
+          // produce a call that answers 200 and removes nothing.
           position: entry.position ?? null,
           ...(entry.task ? { task: entry.task } : {}),
           ...(entry.description ? { description: entry.description } : {}),
           ...(entry.lockStatus ? { lock_status: entry.lockStatus } : {}),
         }),
+        { as: 'objects' },
       ),
-    };
+    });
+  };
+
+  // What the entries answer at each level: the reading the slot is given,
+  // selected before the call (`src/lib/detail`) — terse and medium over
+  // adt-strategies' `transportObjectEntryList` (each entry once, with its
+  // task and position; the incomplete ones apart, since 0.28.2), full the
+  // parse, raw the document.
+  // Each level writes every entry it was given, by the listing writers.
+  const readings: ListDetailTable<
+    string | XmlNode | ReturnType<typeof mediumObjects>['answer']
+  > = {
+    terse: written(transportObjectEntryList, (list) =>
+      transportRows(args.transport_number, list),
+    ),
+    medium: written(transportObjectEntryList, mediumObjects),
+    full: fullLevel,
+    raw: rawLevel,
   };
 
   return answer(
     { tool: 'ReadTransportObjects', detail },
     () =>
       createAdtClient(connection, logger)
-        .getRequest(resultsFor(transportDocuments))
+        .getRequest({
+          ...resultsFor(transportDocuments),
+          objects: readingAt(readings, levelOf(args)),
+        })
         .readObjects(args.transport_number, { analyse: analyseException }),
-    project(detail, terseObjects),
+    answered,
   );
 }

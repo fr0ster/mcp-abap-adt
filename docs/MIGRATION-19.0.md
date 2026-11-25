@@ -684,6 +684,11 @@ What changed in the public surface:
 
 ## The low set leaves the full binaries
 
+> **Note (24.0.0):** `HandlerUnlock` is now `HandlerLock` with `action: unlock` (and the
+> `lock_handle` the lock gave). Where the table below gives `HandlerUnlock`, call `HandlerLock`
+> with `action: unlock`; the table of today's calls is
+> [MIGRATION-24.0](MIGRATION-24.0.md#former-users-of-the-low-set-each-low-tool-and-its-compact-call-today).
+
 **`mcp-abap-adt`, `mcp-abap-adt-http` and `mcp-abap-adt-sse` serve no low set.**
 `--exposition=…,low` — alone or beside any other word, in the CLI or the YAML form — stops the start
 (as every `--exposition` does, see above), with this sentence:

@@ -359,7 +359,11 @@ export const sentUrls = (fake: Fake): string[] => [
   }),
 ];
 
-/** `SearchSource` through the handler on the fake, bounded by event-loop turns. */
+/**
+ * `SearchSource` through the handler on the fake, bounded by event-loop
+ * turns, at `detail: 'full'` — the JSON answer these cases read (terse
+ * answers, step 3) — unless a case states its own.
+ */
 export const searchOn = (
   fake: Fake,
   args: Record<string, unknown>,
@@ -367,10 +371,10 @@ export const searchOn = (
   turns = 400,
 ) =>
   withinTurns(
-    handleSearchSource(
-      contextOn(fake, absent ? 'absent' : 'served'),
-      args as never,
-    ),
+    handleSearchSource(contextOn(fake, absent ? 'absent' : 'served'), {
+      detail: 'full',
+      ...args,
+    } as never),
     turns,
   );
 

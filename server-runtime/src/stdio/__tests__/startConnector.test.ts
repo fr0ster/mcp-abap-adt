@@ -258,7 +258,7 @@ it('one leftover session: picked up before the transport opens, with no tool cal
 
     const before = standIn.requests.length;
     assert.ok(
-      (await s.call('ListLeftoverSessions')).text.includes('"sessions": []'),
+      (await s.call('ListLeftoverSessions')).text.includes('"sessions":[]'),
     );
     assert.equal(standIn.requests.length, before);
     const read = await s.call('GetClass', { class_name: 'ZCL_AFTER_START' });

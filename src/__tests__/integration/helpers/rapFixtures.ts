@@ -268,7 +268,9 @@ export async function stillInactive(
   context: HandlerContext,
   targets: ActivationTarget[],
 ): Promise<string[]> {
-  const answer = (await handleGetInactiveObjects(context, {})) as HandlerAnswer;
+  const answer = (await handleGetInactiveObjects(context, {
+    detail: 'medium',
+  })) as HandlerAnswer;
   if (answer.isError) {
     throw new Error(
       `could not read the inactive objects: ${extractErrorMessage(answer)}`,

@@ -1,11 +1,12 @@
 import * as z from 'zod';
+import { TOOL_DEFINITION as ListBackgroundRuns } from '../../../handlers/background_run/readonly/handleListBackgroundRuns';
 import { answerBackgroundList } from '../../backgroundRuns/answers';
+import { compactOf } from '../../description/index';
 import type { HandlerContext } from '../../handlers/index';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerBackgroundRunList',
-  description:
-    "[read-only] Lists your background runs: run_handle, tool, object, when it started, and its state: running, finished or cancelled. A run's output is read by its run_handle; a read run leaves the list once its answer was read.",
+  description: compactOf(ListBackgroundRuns.description),
   inputSchema: z.object({}),
 } as const;
 

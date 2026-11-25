@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { checkTool } from '../../../lib/description';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -25,8 +26,11 @@ import { handleCheckTable as handleCheckTableLow } from '../low/handleCheckTable
 export const TOOL_DEFINITION = {
   name: 'CheckTable',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Runs a syntax check on the ABAP database table named by table_name. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.',
+  description: checkTool({
+    tag: 'read-only',
+    object: 'an ABAP database table',
+    how: 'as stored or as the source given',
+  }),
   inputSchema: z.object({
     table_name: z.string().describe('Table name.'),
     version: z

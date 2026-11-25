@@ -18,7 +18,6 @@ import {
   COMPACT_SYSTEM_TAKES,
   SYSTEM_ACTION_TOOLS,
   SYSTEM_ACTIONS,
-  type SystemAction,
 } from '../../../lib/compact';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
 import { READ_DEFINITIONS } from '../../../lib/handlers/read';
@@ -148,38 +147,14 @@ describe('the listed schema declares each action’s arguments once', () => {
 });
 
 describe('the description', () => {
-  /** Each action's arguments its full tool requires, in the compact form. */
-  const REQUIRED: Readonly<Record<SystemAction, string>> = {
-    search_source: 'search_source(query*, packages*',
-    search_object: 'search_object(object_name*',
-    where_used: 'where_used(object_name* and object_type*, or objects*',
-    package_tree: 'package_tree(package_name* or package_names*',
-    transports: 'transports(user, modifiable_only, detail)',
-    atc_findings: 'atc_findings(worklist_id*',
-    atc_results: 'atc_results(created_by*',
-    atc_result: 'atc_result(display_id*',
-  };
-
   it('starts with what it reads, marked read-only', () => {
     assert.equal(
       TOOL_DEFINITION.description.startsWith(
-        '[read-only] Reads across the ABAP system, one read per action: ',
+        '[read-only] Searches the source code of packages (DEVC) for text, ',
       ),
       true,
     );
   });
-
-  for (const action of SYSTEM_ACTIONS) {
-    it(format("names %s's required arguments", action), () => {
-      for (const variant of VARIANTS) {
-        assert.ok(
-          TOOL_DEFINITION.variants[variant].description.includes(
-            REQUIRED[action],
-          ),
-        );
-      }
-    });
-  }
 });
 
 const BINARIES: ReadonlyArray<readonly [ServedTransport, ToolSetKind]> = [

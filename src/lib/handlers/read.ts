@@ -82,6 +82,7 @@ export { handleRuntimeAnalyzeProfilerTrace } from '../../handlers/system/readonl
 export { handleRuntimeGetDumpById } from '../../handlers/system/readonly/handleRuntimeGetDumpById.js';
 export { handleRuntimeGetProfilerTraceData } from '../../handlers/system/readonly/handleRuntimeGetProfilerTraceData.js';
 export {
+  FEED_PAGE_PARTS,
   handleRuntimeListFeedPage,
   handleRuntimeListFeeds,
 } from '../../handlers/system/readonly/handleRuntimeListFeeds.js';
@@ -107,5 +108,7 @@ export {
   handleGetUnitTestResultOnce,
 } from '../../handlers/unit_test/high/handleGetUnitTestResult.js';
 export { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus.js';
+// A unit-test run's result read once: what the compact reads state.
+export { RESULT_ONCE_PARTS } from '../../handlers/unit_test/shared/resultOnce.js';
 // The read tools' definitions, for the compact routes' entries.
 export { READ_DEFINITIONS } from './readDefinitions.js';

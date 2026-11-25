@@ -5,6 +5,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  */
 
 import { answer } from '../../../lib/answer';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -14,8 +15,11 @@ import { writeClassTests } from '../shared/writeTests';
 export const TOOL_DEFINITION = {
   name: 'UpdateUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "Writes test_class_source as the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are rewritten, and the class is activated.",
+  description: updateTool({
+    object: 'the ABAP Unit test classes of an ABAP class',
+    how: 'from the test class source given, activating the class',
+    transported: true,
+  }),
   inputSchema: z.object({
     class_name: z
       .string()

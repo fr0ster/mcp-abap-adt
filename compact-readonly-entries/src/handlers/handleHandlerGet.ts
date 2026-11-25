@@ -4,11 +4,12 @@ import {
   byVariant,
   COMPACT_MAIN_PROGRAMS,
   COMPACT_READ,
-  compactGetDescription,
+  compactGetParts,
   compactGetSchemaWithNamesFor,
   HANDLER_GET_DRAFT_TYPES,
   subResourceRefusal,
   supported,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { ToolArgs, ToolResultLike } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -69,7 +70,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerGet',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactGetDescription(variant),
+    description: toolDescription(compactGetParts(variant)),
     inputSchema: schemaOn(variant),
     members: COMPACT_READ[variant],
   })),
@@ -139,7 +140,13 @@ function addressReadOf(part: string, args: ToolArgs): AddressRead {
   // GetObjectStructure's own arguments: `objecttype`, `objectname`.
   return {
     target: 'object_structure',
-    args: { objecttype: args.object_adt_type, objectname: args.object_name },
+    // `detail` too: the part answers as GetObjectStructure answers, at the
+    // level asked.
+    args: {
+      objecttype: args.object_adt_type,
+      objectname: args.object_name,
+      detail: args.detail,
+    },
   };
 }
 

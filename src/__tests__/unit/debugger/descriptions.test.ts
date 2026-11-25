@@ -61,10 +61,10 @@ describe('the debugger descriptions', () => {
     for (const name of ['DebugSetBreakpoints', ...START_TOOLS]) {
       const tool = coreDebugTools().find((t) => t.name === name)!;
       assert.match(
-        tool.description,
+        textsOf(tool).join('\n'),
         /shared by every IDE of the same SAP user \(in user mode, debugging the same request user; in terminal mode, whatever its ids\)/,
       );
-      assert.match(tool.description, /rewrites that set as a whole/);
+      assert.match(textsOf(tool).join('\n'), /rewrites that set as a whole/);
     }
   });
 
@@ -112,7 +112,7 @@ describe('the debugger descriptions', () => {
         );
     for (const name of ['AmdpDebugStart', 'AmdpDebugSetBreakpoints'])
       assert.match(
-        amdp.find((t) => t.name === name)!.description,
+        textsOf(amdp.find((t) => t.name === name)!).join('\n'),
         /every request of the connected SAP user/,
       );
   });
@@ -123,11 +123,11 @@ describe('the debugger descriptions', () => {
         .toolDefinition.description as string;
     assert.match(
       description('HandlerDebugBreakpoints'),
-      /In user mode the breakpoints catch every request of the request user/,
+      /sets the ABAP breakpoints of this debugging identity/i,
     );
     assert.match(
       description('HandlerDebugSession'),
-      /kind amdp: start opens an AMDP session for the connected SAP user/,
+      /starts an AMDP debug session/,
     );
   });
 
@@ -145,7 +145,7 @@ describe('the debugger descriptions', () => {
         name,
       );
       assert.equal(jsonAt(schema, 'breakpoints').minItems, 1);
-      assert.match(tool.description, /at least one breakpoint/);
+      assert.match(textsOf(tool).join('\n'), /at least one breakpoint/);
     }
   });
 });

@@ -29,6 +29,7 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../../helpers/sessionHelpers';
+import { headOf, terseOf, terseText } from '../../helpers/terseAnswer';
 import { readCaseParams, type TestCase } from '../../helpers/testConfigSchema';
 import {
   callTool,
@@ -76,6 +77,27 @@ const describe = servedSuite([
   'ListFunctionGroupIncludes',
   'ListFunctionModules',
 ]);
+
+/**
+ * A function group list's terse answer (the default) read back: its
+ * `# function_group` and `# total` heads, then its rows, each `name` read
+ * by the header's column name.
+ */
+function terseGroupList(response: { content: Array<{ text?: string }> }): {
+  group: string;
+  total: number;
+  names: string[];
+  text: string;
+} {
+  const answer = terseOf(terseText(response));
+  assert.ok(answer.columns.includes('name'), answer.text);
+  return {
+    group: headOf(answer, 'function_group') ?? '',
+    total: Number(headOf(answer, 'total') ?? Number.NaN),
+    names: answer.rows.map((row) => (row.name ?? '').toUpperCase()),
+    text: answer.text,
+  };
+}
 
 describe('FunctionInclude ReadOnly Handlers Integration', () => {
   let connection: IAbapConnection | null = null;
@@ -268,28 +290,21 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       throw new Error(`ListFunctionGroupIncludes failed: ${errorMsg}`);
     }
 
-    const data = handlerAnswer(
-      response,
-      z.looseObject({
-        function_group_name: z.unknown(),
-        includes: z.unknown(),
-        success: z.unknown(),
-        total: z.unknown(),
-      }),
+    const data = terseGroupList(response);
+    assert.equal(
+      data.group.toUpperCase(),
+      functionGroupName.toUpperCase(),
+      data.text,
     );
-    assert.equal(data.success, true);
-    assert.equal(data.function_group_name, functionGroupName.toUpperCase());
-    assert.equal(Array.isArray(data.includes), true);
+    assert.equal(data.total, data.names.length, data.text);
 
-    const includeNames = (data.includes as any[]).map((inc) =>
-      String(typeof inc === 'string' ? inc : (inc?.name ?? inc)).toUpperCase(),
-    );
+    const includeNames = data.names;
     const topInclude = `L${functionGroupName.toUpperCase()}TOP`;
 
     // The TOP include must be present. ListFunctionGroupIncludes returns ALL
     // FUGR/I includes faithfully (including the generated L<FUGR>UXX collector);
     // filtering the collector is a backup-tool concern, not this read tool's.
-    assert.ok(includeNames.includes(topInclude));
+    assert.ok(includeNames.includes(topInclude), data.text);
 
     testLogger?.info(
       `✅ ListFunctionGroupIncludes completed: ${data.total} include(s)`,
@@ -353,23 +368,16 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       throw new Error(`ListFunctionModules failed: ${errorMsg}`);
     }
 
-    const data = handlerAnswer(
-      response,
-      z.looseObject({
-        function_group_name: z.unknown(),
-        function_modules: z.unknown(),
-        success: z.unknown(),
-        total: z.unknown(),
-      }),
+    const data = terseGroupList(response);
+    assert.equal(
+      data.group.toUpperCase(),
+      functionGroupName.toUpperCase(),
+      data.text,
     );
-    assert.equal(data.success, true);
-    assert.equal(data.function_group_name, functionGroupName.toUpperCase());
-    assert.equal(Array.isArray(data.function_modules), true);
+    assert.equal(data.total, data.names.length, data.text);
 
-    const moduleNames = (data.function_modules as any[]).map((fm) =>
-      String(typeof fm === 'string' ? fm : (fm?.name ?? fm)).toUpperCase(),
-    );
-    assert.ok(moduleNames.includes(expectedFm.toUpperCase()));
+    const moduleNames = data.names;
+    assert.ok(moduleNames.includes(expectedFm.toUpperCase()), data.text);
 
     testLogger?.info(
       `✅ ListFunctionModules completed: ${data.total} module(s)`,

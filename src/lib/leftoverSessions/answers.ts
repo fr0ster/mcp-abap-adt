@@ -7,6 +7,7 @@
 import type { HandlerContext } from '../../handlers/interfaces';
 import type { IAnswerSerializer } from '../answerSerializer';
 import { ServerRefusal } from '../auth/serverRefusal';
+import type { LeftoverListing } from './LeftoverSessions';
 import type { LeftoverSessionTools } from './port';
 
 export interface LeftoverAnswer {
@@ -19,7 +20,7 @@ const answers: IAnswerSerializer<LeftoverAnswer> = {
   json<P>(payload: P, isError = false): LeftoverAnswer {
     return {
       isError,
-      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify(payload) }],
     };
   },
 };
@@ -35,8 +36,7 @@ function portOf(context: HandlerContext): LeftoverSessionTools {
 export async function answerLeftoverList(
   context: HandlerContext,
 ): Promise<LeftoverAnswer> {
-  const sessions = await portOf(context).list();
-  return answers.json({ sessions });
+  return answers.json(leftoverListAnswer(await portOf(context).list()));
 }
 
 export async function answerLeftoverLogoff(
@@ -44,4 +44,9 @@ export async function answerLeftoverLogoff(
   handle: string,
 ): Promise<LeftoverAnswer> {
   return answers.json(await portOf(context).logoff(handle));
+}
+
+/** What the list answers: each leftover session of the caller. */
+export function leftoverListAnswer(sessions: LeftoverListing[]) {
+  return { sessions };
 }

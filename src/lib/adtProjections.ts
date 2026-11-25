@@ -1347,7 +1347,7 @@ export const COMPACT_LOCK_ROUTES = {
   CLASS_TEXT_ELEMENTS: { api: 'textElements', operation: 'lock' },
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtNeed>>>;
 
-/** What `HandlerUnlock` unlocks, each with its API. */
+/** What `HandlerLock` with `action: 'unlock'` unlocks, each with its API. */
 export const COMPACT_UNLOCK_ROUTES = {
   CLASS: { api: 'class', operation: 'unlock' },
   PROGRAM: { api: 'program', operation: 'unlock' },
@@ -1422,7 +1422,7 @@ export const COMPACT_LOCK = projected<
   ),
 });
 
-/** HandlerUnlock's `object_type`. */
+/** HandlerLock's `object_type` with `action: 'unlock'`. */
 export const COMPACT_UNLOCK = projected<
   ServedName<'onprem', typeof COMPACT_UNLOCK_ROUTES>,
   Exclude<

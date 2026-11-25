@@ -1,0 +1,171 @@
+{
+  "queries": {
+    "GetPackage": [
+      "read package ZMY_PKG",
+      "what is package ZMY_PKG?",
+      "прочитай пакет ZMY_PKG",
+      "що за пакет ZMY_PKG?",
+      "who is responsible for package ZMY_PKG?"
+    ],
+    "ListAbapGitRepos": [
+      "list the abapGit repositories in the system",
+      "which git repository is linked to package ZMY_PKG?",
+      "покажи abapGit репозиторії",
+      "який git репозиторій прив'язаний до пакета ZMY_PKG?"
+    ],
+    "CheckAbapGitExternalRepo": [
+      "check the git repository https://github.com/acme/abap before linking it",
+      "is the remote repository public or private, and what branches does it have?",
+      "перевір зовнішній git репозиторій перед підключенням",
+      "які гілки є у віддаленому репозиторії?"
+    ],
+    "GetAbapGitBranchInfo": [
+      "get the branch info of the remote repository for package ZMY_PKG",
+      "what folder logic does branch main have?",
+      "покажи інформацію про гілку main для пакета ZMY_PKG",
+      "яка логіка папок у гілки main?"
+    ],
+    "GetAbapGitModifiedObjects": [
+      "what would a pull of the abapGit repository change?",
+      "which objects would the pull overwrite?",
+      "що змінить pull abapGit репозиторію?",
+      "які об'єкти буде перезаписано при pull?"
+    ],
+    "GetAbapGitStaging": [
+      "show the abapGit staging of the repository",
+      "what changed and can be pushed to git?",
+      "покажи staging abapGit репозиторію",
+      "що змінилось і що можна закомітити в git?"
+    ],
+    "GetAbapGitErrorLog": [
+      "show the error log of the last abapGit pull",
+      "why did the abapGit push fail?",
+      "покажи журнал помилок останнього pull abapGit",
+      "чому не вдався push в abapGit?"
+    ],
+    "GetIncludesList": [
+      "which includes does program ZMY_PROG use?",
+      "list all includes of ZMY_PROG",
+      "які інклуди використовує програма ZMY_PROG?",
+      "покажи всі інклуди програми ZMY_PROG"
+    ],
+    "ListFunctionModules": [
+      "which function modules are in function group ZMY_FG?",
+      "list the function modules of ZMY_FG",
+      "які функціональні модулі є в групі функцій ZMY_FG?",
+      "покажи функціональні модулі групи ZMY_FG"
+    ],
+    "ListFunctionGroupIncludes": [
+      "list the includes of function group ZMY_FG",
+      "what is the TOP include of function group ZMY_FG?",
+      "покажи інклуди групи функцій ZMY_FG",
+      "які інклуди має група функцій ZMY_FG?"
+    ],
+    "GetMainPrograms": [
+      "which programs include ZMY_INC?",
+      "find the main program of include ZMY_INC",
+      "які програми включають інклуд ZMY_INC?",
+      "знайди головну програму інклуда ZMY_INC"
+    ],
+    "SearchSource": [
+      "find where the text AUTHORITY-CHECK appears in the code of package ZMY_PKG",
+      "search the source code of package ZMY_PKG for SELECT FROM mara",
+      "знайди в коді пакета ZMY_PKG текст AUTHORITY-CHECK",
+      "де у вихідному коді пакета ZMY_PKG викликається BAPI_TRANSACTION_COMMIT?"
+    ],
+    "SearchObject": [
+      "find the class ZCL_MY_CLASS",
+      "does table ZMY_TABLE exist?",
+      "search for objects whose name starts with ZMY_",
+      "знайди клас ZCL_MY_CLASS",
+      "чи існує таблиця ZMY_TABLE?"
+    ],
+    "DescribeByList": [
+      "what are ZCL_A, ZMY_TABLE and ZMY_PROG, and which package is each in?",
+      "describe these objects: ZCL_A, ZIF_B, ZMY_TABLE",
+      "що це за об'єкти ZCL_A, ZMY_TABLE і ZMY_PROG і в яких вони пакетах?",
+      "опиши об'єкти ZCL_A, ZIF_B, ZMY_TABLE"
+    ],
+    "GetWhereUsed": [
+      "where is class ZCL_MY_CLASS used?",
+      "which objects call function module Z_MY_FM?",
+      "де використовується клас ZCL_MY_CLASS?",
+      "хто викликає функціональний модуль Z_MY_FM?"
+    ],
+    "GetObjectsList": [
+      "list every object inside program ZMY_PROG, its includes and subcomponents",
+      "show all the parts of class ZCL_MY_CLASS",
+      "покажи всі складові програми ZMY_PROG",
+      "з чого складається клас ZCL_MY_CLASS?"
+    ],
+    "GetObjectsByType": [
+      "list the classes of package ZMY_PKG",
+      "which tables are in package ZMY_PKG?",
+      "покажи класи пакета ZMY_PKG",
+      "які таблиці є в пакеті ZMY_PKG?"
+    ],
+    "GetAdtTypes": [
+      "which object types does the system know?",
+      "list all ADT object types",
+      "які типи об'єктів знає система?",
+      "покажи всі типи об'єктів ADT"
+    ],
+    "GetPackageContents": [
+      "what objects are in package ZMY_PKG?",
+      "list the contents of package ZMY_PKG with its subpackages",
+      "які об'єкти є в пакеті ZMY_PKG?",
+      "покажи вміст пакета ZMY_PKG разом з підпакетами"
+    ]
+  },
+  "siblings": {},
+  "misses": [
+    "GetPackage: read package ZMY_PKG",
+    "GetPackage: what is package ZMY_PKG?",
+    "GetPackage: прочитай пакет ZMY_PKG",
+    "GetPackage: що за пакет ZMY_PKG?",
+    "GetPackage: who is responsible for package ZMY_PKG?",
+    "GetAbapGitBranchInfo: яка логіка папок у гілки main?",
+    "GetAbapGitErrorLog: why did the abapGit push fail?",
+    "GetAbapGitErrorLog: чому не вдався push в abapGit?",
+    "GetIncludesList: which includes does program ZMY_PROG use?",
+    "GetIncludesList: list all includes of ZMY_PROG",
+    "GetIncludesList: які інклуди використовує програма ZMY_PROG?",
+    "GetIncludesList: покажи всі інклуди програми ZMY_PROG",
+    "ListFunctionModules: which function modules are in function group ZMY_FG?",
+    "ListFunctionModules: які функціональні модулі є в групі функцій ZMY_FG?",
+    "ListFunctionGroupIncludes: list the includes of function group ZMY_FG",
+    "ListFunctionGroupIncludes: покажи інклуди групи функцій ZMY_FG",
+    "ListFunctionGroupIncludes: які інклуди має група функцій ZMY_FG?",
+    "GetMainPrograms: які програми включають інклуд ZMY_INC?",
+    "SearchSource: find where the text AUTHORITY-CHECK appears in the code of package ZMY_PKG",
+    "SearchSource: search the source code of package ZMY_PKG for SELECT FROM mara",
+    "SearchSource: знайди в коді пакета ZMY_PKG текст AUTHORITY-CHECK",
+    "SearchSource: де у вихідному коді пакета ZMY_PKG викликається BAPI_TRANSACTION_COMMIT?",
+    "SearchObject: find the class ZCL_MY_CLASS",
+    "SearchObject: does table ZMY_TABLE exist?",
+    "SearchObject: search for objects whose name starts with ZMY_",
+    "SearchObject: знайди клас ZCL_MY_CLASS",
+    "SearchObject: чи існує таблиця ZMY_TABLE?",
+    "DescribeByList: what are ZCL_A, ZMY_TABLE and ZMY_PROG, and which package is each in?",
+    "DescribeByList: describe these objects: ZCL_A, ZIF_B, ZMY_TABLE",
+    "DescribeByList: що це за об'єкти ZCL_A, ZMY_TABLE і ZMY_PROG і в яких вони пакетах?",
+    "DescribeByList: опиши об'єкти ZCL_A, ZIF_B, ZMY_TABLE",
+    "GetWhereUsed: where is class ZCL_MY_CLASS used?",
+    "GetWhereUsed: which objects call function module Z_MY_FM?",
+    "GetWhereUsed: де використовується клас ZCL_MY_CLASS?",
+    "GetWhereUsed: хто викликає функціональний модуль Z_MY_FM?",
+    "GetObjectsList: show all the parts of class ZCL_MY_CLASS",
+    "GetObjectsList: покажи всі складові програми ZMY_PROG",
+    "GetObjectsList: з чого складається клас ZCL_MY_CLASS?",
+    "GetObjectsByType: list the classes of package ZMY_PKG",
+    "GetObjectsByType: which tables are in package ZMY_PKG?",
+    "GetObjectsByType: покажи класи пакета ZMY_PKG",
+    "GetObjectsByType: які таблиці є в пакеті ZMY_PKG?",
+    "GetAdtTypes: list all ADT object types",
+    "GetAdtTypes: покажи всі типи об'єктів ADT",
+    "GetPackageContents: what objects are in package ZMY_PKG?",
+    "GetPackageContents: list the contents of package ZMY_PKG with its subpackages",
+    "GetPackageContents: які об'єкти є в пакеті ZMY_PKG?",
+    "GetPackageContents: покажи вміст пакета ZMY_PKG разом з підпакетами"
+  ]
+}

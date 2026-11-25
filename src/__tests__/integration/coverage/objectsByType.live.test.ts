@@ -121,8 +121,12 @@ liveSuite(['onprem', 'cloud'], 'Object tree reads', () => {
         node_id: classNode,
       });
       const text = succeeded('GetObjectsByType', listed).text;
-      assert.ok(text.includes('Object Type: CLAS/OC'), text);
-      assert.ok(text.includes(`   - ${SHARED_CLASS}\n`), text);
+      assert.ok(
+        text
+          .split('\n')
+          .some((line) => line.startsWith(`CLAS/OC\t${SHARED_CLASS}\t`)),
+        text,
+      );
     });
 
     it('GetObjectNodeFromCache answers the cached node of the shared class and reads its object', async () => {

@@ -6,7 +6,7 @@
  * session lives in that session until its UNLOCK or the session's logoff, so
  * the write and the unlock under it must reach the same instance: compact
  * `HandlerLock` keeps the handle it answered here (the instance then holds
- * state and answers its `state_handle`), and `HandlerUpdate` / `HandlerUnlock`
+ * state and answers its `state_handle`), and `HandlerUpdate` / `HandlerLock` unlock
  * write and unlock only under a handle kept here. The state ends at the
  * UNLOCK; the instance's logoff (its end, the idle bound's terminal close)
  * ends it in SAP. No clock of its own.

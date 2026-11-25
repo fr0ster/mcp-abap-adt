@@ -28,6 +28,7 @@ import {
 } from '../../lib/strategies/packageWalk';
 import { failed, succeeded } from '../../lib/strategies/stepResponse';
 import { rejectionOf } from '../helpers/assertions';
+import { levelOf } from '../helpers/nodeLevels';
 
 /** The walk's failures, classified as `SearchSource` classifies them (SAP answers skipped). */
 const classified = (failure: unknown, place: WalkFailurePlace) =>
@@ -38,25 +39,25 @@ const classified = (failure: unknown, place: WalkFailurePlace) =>
  * `SA` (one program) and `SB` (one program).
  */
 const LEVELS: Record<string, NodeLevel> = {
-  'P|root': {
-    objects: [],
-    childNodes: [
+  'P|root': levelOf(
+    [],
+    [
       { type: 'DEVC/K', nodeId: '1' },
       { type: 'PROG/P', nodeId: '2' },
     ],
-  },
-  'P|1': {
-    objects: [
+  ),
+  'P|1': levelOf(
+    [
       { name: 'SA', type: 'DEVC/K' },
       { name: 'SB', type: 'DEVC/K' },
     ],
-    childNodes: [],
-  },
-  'P|2': { objects: [{ name: 'PPROG', type: 'PROG/P' }], childNodes: [] },
-  'SA|root': { objects: [], childNodes: [{ type: 'PROG/P', nodeId: '2' }] },
-  'SA|2': { objects: [{ name: 'SAPROG', type: 'PROG/P' }], childNodes: [] },
-  'SB|root': { objects: [], childNodes: [{ type: 'PROG/P', nodeId: '2' }] },
-  'SB|2': { objects: [{ name: 'SBPROG', type: 'PROG/P' }], childNodes: [] },
+    [],
+  ),
+  'P|2': levelOf([{ name: 'PPROG', type: 'PROG/P' }], []),
+  'SA|root': levelOf([], [{ type: 'PROG/P', nodeId: '2' }]),
+  'SA|2': levelOf([{ name: 'SAPROG', type: 'PROG/P' }], []),
+  'SB|root': levelOf([], [{ type: 'PROG/P', nodeId: '2' }]),
+  'SB|2': levelOf([{ name: 'SBPROG', type: 'PROG/P' }], []),
 };
 
 /** The answer of a level, or SAP's refusal of it with `status`. */
@@ -72,7 +73,7 @@ function answerOf(
       response: { status, statusText: 'Refused', headers: {}, data: '' },
     });
   }
-  return succeeded(LEVELS[key] ?? { objects: [], childNodes: [] });
+  return succeeded(LEVELS[key] ?? levelOf([], []));
 }
 
 const keyOf = (name: string, nodeId?: string) => `${name}|${nodeId ?? 'root'}`;
@@ -301,13 +302,13 @@ describe('a level of any size', () => {
     type: 'PROG/P',
   }));
   const big: Record<string, NodeLevel> = {
-    'P|root': { objects: [], childNodes: [{ type: 'DEVC/K', nodeId: '1' }] },
-    'P|1': { objects: [{ name: 'S', type: 'DEVC/K' }], childNodes: [] },
-    'S|root': { objects: [], childNodes: [{ type: 'PROG/P', nodeId: '2' }] },
-    'S|2': { objects: huge, childNodes: [] },
+    'P|root': levelOf([], [{ type: 'DEVC/K', nodeId: '1' }]),
+    'P|1': levelOf([{ name: 'S', type: 'DEVC/K' }], []),
+    'S|root': levelOf([], [{ type: 'PROG/P', nodeId: '2' }]),
+    'S|2': levelOf(huge, []),
   };
   const level = (key: string): NodeAnswer =>
-    succeeded(big[key] ?? { objects: [], childNodes: [] });
+    succeeded(big[key] ?? levelOf([], []));
 
   it('walkPackage answers every object', async () => {
     const utils: NodeStructureSource = {

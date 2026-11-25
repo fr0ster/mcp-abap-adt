@@ -182,7 +182,6 @@ const COMPACT: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['HandlerUpdate', ['package_name', 'transport_request']],
   ['HandlerDelete', ['package_name', 'transport_request']],
   ['HandlerLock', ['object_name']],
-  ['HandlerUnlock', ['object_name']],
   [
     'HandlerTransportMoveObjects',
     ['objects[].object_name', 'transport_number', 'target_number'],

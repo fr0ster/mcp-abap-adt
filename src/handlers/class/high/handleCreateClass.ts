@@ -27,6 +27,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -36,8 +37,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'CreateClass',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Creates the ABAP class named by class_name in the package named by package_name, in initial state: the class object alone; its source code is written by an update of the class.',
+  description: createTool({
+    object: 'an ABAP class',
+    how: ', with its description, its superclass and its FINAL and CREATE PROTECTED settings',
+    transported: true,
+  }),
   inputSchema: createArguments('CreateClass', {
     class_name: z.string().describe('Class name.'),
     description: z

@@ -3,13 +3,20 @@ import * as z from 'zod';
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import { purpose, toolDescription } from '../../../lib/description';
+import { runParts } from '../../../lib/description/runs';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugListBreakpoints',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[read-only] [debug] Breakpoints a debug session armed.',
+  description: toolDescription(
+    runParts({
+      tag: 'read-only',
+      purpose: purpose('Lists the breakpoints an ABAP debug session armed.'),
+    }),
+  ),
   inputSchema: z.object({ ...STATE_HANDLE_PROPERTY, ...DETAIL_SHAPE }),
 } as const;
 

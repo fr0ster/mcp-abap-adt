@@ -1,8 +1,9 @@
 import {
   byVariant,
   COMPACT_DELETION_CHECK,
-  compactDeletionCheckDescription,
+  compactDeletionCheckParts,
   compactDeletionCheckSchemaFor,
+  toolDescription,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleDeletionCheck } from '@mcp-abap-adt/lib/handlers/read';
@@ -12,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerDeletionCheck',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: compactDeletionCheckDescription(variant),
+    description: toolDescription(compactDeletionCheckParts(variant)),
     inputSchema: compactDeletionCheckSchemaFor(COMPACT_DELETION_CHECK[variant]),
     members: COMPACT_DELETION_CHECK[variant],
   })),

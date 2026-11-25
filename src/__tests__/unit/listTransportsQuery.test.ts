@@ -9,7 +9,7 @@
 
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
-import { handleListTransports } from '../../handlers/transport/readonly/handleListTransports';
+import { handleListTransports as handleListTransportsOf } from '../../handlers/transport/readonly/handleListTransports';
 import { runWithRequestContext } from '../../lib/requestContext';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
@@ -17,6 +17,12 @@ import { corpusBody } from '../helpers/adtCorpus';
 import { assertMatchObject } from '../helpers/assertions';
 import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
+
+/** handleListTransports at `detail: 'medium'`, the answer these cases compare (terse answers, step 3). */
+const handleListTransports = (
+  context: Parameters<typeof handleListTransportsOf>[0],
+  args: Parameters<typeof handleListTransportsOf>[1],
+) => handleListTransportsOf(context, { detail: 'medium', ...args });
 
 const COLLECTION = '/sap/bc/adt/cts/transportrequests';
 
@@ -60,6 +66,28 @@ describe('ListTransports sends the query by user', () => {
     resetSystemContextCache();
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
+  });
+
+  // Each level's reading is pure (Codex P2): it reads the answer and
+  // nothing else, the logger included.
+  it('the reading logs nothing: a logger refusing its lines changes nothing', async () => {
+    const connection = recordingConnection([{ data: LISTING }]);
+    declareSystemKind(connection, 'onprem');
+    const logger = {
+      debug() {},
+      warn() {},
+      error() {},
+      info(message: unknown) {
+        if (String(message).startsWith('ListTransports')) {
+          throw new Error('the reading logged');
+        }
+      },
+    };
+    const answered = await runWithRequestContext(
+      { login: 'session_user' },
+      () => handleListTransportsOf({ connection, logger } as never, {}),
+    );
+    assert.equal(answered.isError === true, false, JSON.stringify(answered));
   });
 
   it("the session's login, not the responsible: modifiable requests of every type", async () => {

@@ -72,7 +72,7 @@ describe('the texts (spec §2.5)', () => {
       [
         'Remove the CLASS "SOME_CLASS" from the task "SOME_TASK".',
         '1. Read the task\'s entries: call ReadTransportObjects with transport_number: "SOME_TASK". Take the entry whose name is "SOME_CLASS", type "CLAS" and pgmid "R3TR".',
-        '2. Call RemoveTransportObject with transport_number: "SOME_TASK", object_name: the name from step 1, object_type: the type from step 1, position: the position from step 1, pgmid: the pgmid from step 1. An entry whose position is null is named to the user and left out of the call.',
+        '2. Call RemoveTransportObject with transport_number: "SOME_TASK", object_name: the name from step 1, object_type: the type from step 1, position: the position from step 1, pgmid: the pgmid from step 1. An entry the read answers without a position is named to the user and left out of the call.',
       ].join('\n'),
     );
   });
@@ -87,7 +87,7 @@ describe('the texts (spec §2.5)', () => {
       [
         'Move entries of the task "SOME_TASK" to the task "OTHER_TASK".',
         '1. Read the task\'s entries: call HandlerGet with object_type: "TRANSPORT", transport_number: "SOME_TASK", background: false.',
-        '2. Call HandlerTransportMoveObjects with transport_number: "SOME_TASK", target_number: "OTHER_TASK", objects: the entries to move from step 1, each as { object_name: the entry\'s name, object_type: the entry\'s type, position: the entry\'s position, pgmid: the entry\'s pgmid }. The entries to move are chosen with the user. An entry whose position is null is named to the user and left out of the call.',
+        '2. Call HandlerTransportMoveObjects with transport_number: "SOME_TASK", target_number: "OTHER_TASK", objects: the entries to move from step 1, each as { object_name: the entry\'s name, object_type: the entry\'s type, position: the entry\'s position, pgmid: the entry\'s pgmid }. The entries to move are chosen with the user. An entry the read answers without a position is named to the user and left out of the call.',
       ].join('\n'),
     );
   });

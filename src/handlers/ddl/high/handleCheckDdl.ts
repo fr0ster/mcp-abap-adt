@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { checkTool } from '../../../lib/description';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -25,8 +26,11 @@ import { handleCheckDdl as handleCheckDdlLow } from '../low/handleCheckDdl';
 export const TOOL_DEFINITION = {
   name: 'CheckDdl',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Runs a syntax check on the CDS view named by ddl_name. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.',
+  description: checkTool({
+    tag: 'read-only',
+    object: 'a CDS view',
+    how: 'as stored or as the source given',
+  }),
   inputSchema: z.object({
     ddl_name: z
       .string()

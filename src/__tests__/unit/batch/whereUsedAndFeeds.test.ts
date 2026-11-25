@@ -335,9 +335,17 @@ const TURNS = 20000;
 
 type Handler = (context: HandlerContext, args: any) => Promise<unknown>;
 
-/** The handlers, taking any arguments: a case may give a malformed call. */
-const handleGetWhereUsed = getWhereUsed as Handler;
-const handleRuntimeListFeeds = runtimeListFeeds as Handler;
+/**
+ * The handlers, taking any arguments: a case may give a malformed call.
+ * Where-used is asked at `detail: 'full'`, the answer before `detail` that
+ * these cases compare (terse answers, step 3), unless a case states its own.
+ */
+const handleGetWhereUsed: Handler = (context, args) =>
+  getWhereUsed(context, { detail: 'full', ...args });
+const handleRuntimeListFeeds: Handler = (context, args) =>
+  runtimeListFeeds(context, { detail: 'full', ...args } as Parameters<
+    typeof runtimeListFeeds
+  >[1]);
 
 /** The batched answer and the sequential one, of the same call on the same model. */
 async function bothWays(
@@ -1131,15 +1139,21 @@ describe('RuntimeListFeeds', () => {
   it('feed_types through the registered schema arrives alone; feed_type absent reads descriptors', async () => {
     const schema = RUNTIME_LIST_FEEDS.inputSchema;
     const listed = schema.parse({ feed_types: PAGED });
-    assert.deepStrictEqual(listed, { feed_types: PAGED });
+    assert.deepStrictEqual(listed, { feed_types: PAGED, detail: 'terse' });
     const fake = system();
     const result = await withinTurns(
       handleRuntimeListFeeds(contextOn(fake), listed as never),
       TURNS,
     );
     assert.ok(!(result as { isError?: boolean }).isError);
-    assert.equal(payloadOf(result).length, PAGED.length);
-    assert.deepStrictEqual(schema.parse({}), {});
+    // The schema's default is terse: one `# feed` block per feed, in order.
+    assert.deepStrictEqual(
+      textOf(result)
+        .split('\n')
+        .filter((line) => line.startsWith('# feed ')),
+      PAGED.map((feed) => `# feed ${feed}`),
+    );
+    assert.deepStrictEqual(schema.parse({}), { detail: 'terse' });
     const absent = await withinTurns(
       handleRuntimeListFeeds(contextOn(system()), {}),
       TURNS,

@@ -248,8 +248,13 @@ describe('eligible', () => {
     });
     assert.deepStrictEqual(
       eligible(
-        'HandlerUnlock',
-        { object_type: 'PACKAGE', object_name: 'PKG_A', lock_handle: LOCK },
+        'HandlerLock',
+        {
+          action: 'unlock',
+          object_type: 'PACKAGE',
+          object_name: 'PKG_A',
+          lock_handle: LOCK,
+        },
         'rfc',
       ),
       { ok: false, reason: 'connection' },

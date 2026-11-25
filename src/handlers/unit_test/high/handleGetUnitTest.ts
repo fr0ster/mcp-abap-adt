@@ -1,26 +1,55 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { toolDescription } from '../../../lib/description';
+import { unitTestRead } from '../../../lib/description/runs';
+import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
-import { readGivenRun, unfinishedRun } from '../shared/pollRun';
+import { readGivenRun, runOutcomeWithStatus } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
+  description: toolDescription(
+    unitTestRead('the status and result', 'an ABAP Unit test run', 'waits'),
+  ),
   inputSchema: z.object({
     run_id: z.string().describe('Run identifier returned by RunUnitTest.'),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
 type GetUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetUnitTest(
+  context: HandlerContext,
+  args: GetUnitTestArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetUnitTest',
+        shape: 'assembled',
+      },
+      () => answeredGetUnitTest(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetUnitTest(context, args);
+}
+
+async function answeredGetUnitTest(
   context: HandlerContext,
   args: GetUnitTestArgs,
 ) {
@@ -49,26 +78,10 @@ export async function handleGetUnitTest(
         run_id,
         () => unitTest.getResult(run_id, { analyse: analyseException }),
       ),
-    // Task 28 fix round 1: `status` and, once finished, `result` are both
-    // `structured` `AdtReading`s (`getResult`'s slot is `structured` in
-    // `READING_BY_SLOT`, same as `getStatus`'s) — a real reading was behind
-    // this answer all along, and `detail` was owed. `raw` answers the wire
-    // documents; `terse` and `full` both answer the parse, because no
+    // Every level reached here answers the parse of both readings: no
     // fixture in the corpus proves a further reduction of a test-run result
-    // is safe (see `GetCdsUnitTestResult`'s own doc comment on the same
-    // point) — `detail` is still genuinely different at `raw`, which is
-    // what makes the parameter real rather than decorative.
-    (outcome) =>
-      !outcome.finished
-        ? unfinishedRun(run_id, outcome.runStatus)
-        : {
-            success: true,
-            run_id,
-            finished: true,
-            run_status:
-              detail === 'raw' ? outcome.status.raw : outcome.status.value,
-            run_result:
-              detail === 'raw' ? outcome.result.raw : outcome.result.value,
-          },
+    // is safe. `raw` never reaches here — the status and result documents
+    // are answered as SAP sent them (`wireAnswer`, above).
+    (outcome) => runOutcomeWithStatus(run_id, outcome),
   );
 }

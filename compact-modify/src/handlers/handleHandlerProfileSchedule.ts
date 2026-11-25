@@ -1,15 +1,28 @@
-import { compactProfileScheduleSchema } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactOf,
+  compactProfileScheduleSchema,
+  purpose,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   handleScheduleProfilerTraceOnce,
   type ScheduleProfilerTraceArgs,
+  WRITE_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/write';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileSchedule',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Schedules an ABAP profiler trace in one request. Optional: description, profiling flags (all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing). Response: JSON { success, profiler_id }, profiler_id the id of the scheduled trace.',
+  // Its action is the schedule: the purpose says so; the rest is the full
+  // tool's.
+  description: compactOf(
+    WRITE_DEFINITIONS.RuntimeCreateProfilerTraceParameters.description,
+    {
+      purpose: purpose(
+        'Schedules an ABAP profiler trace for a later profiled run of a class or a report, with the parameters given.',
+      ),
+    },
+  ),
   inputSchema: compactProfileScheduleSchema,
 } as const;
 

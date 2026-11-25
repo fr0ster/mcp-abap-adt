@@ -168,10 +168,11 @@ const SOURCE = 'placeholder source';
 
 const UNDER_LOCK: Array<[string, UnderLock]> = [
   [
-    'HandlerUnlock',
+    'HandlerLock',
     {
       lock: { object_type: 'CLASS', object_name: 'ZCL_HELD' },
       args: (lock_handle) => ({
+        action: 'unlock',
         object_type: 'CLASS',
         object_name: 'ZCL_HELD',
         lock_handle,
@@ -331,12 +332,18 @@ for (const [_transport, standOf] of TRANSPORTS) {
         object_name: 'ZCL_HELD',
         lock_handle: handle,
       };
-      const first = await session.call('HandlerUnlock', unlock);
+      const first = await session.call('HandlerLock', {
+        action: 'unlock',
+        ...unlock,
+      });
       assert.equal(first.isError, false);
       assert.equal(owners[0]?.holds(handle), false);
       await s.released();
       const before = s.adt.requests.length;
-      const second = await session.call('HandlerUnlock', unlock);
+      const second = await session.call('HandlerLock', {
+        action: 'unlock',
+        ...unlock,
+      });
       assert.equal(second.isError, true);
       assert.deepStrictEqual(sent(s.adt.requests.slice(before)), []);
     });

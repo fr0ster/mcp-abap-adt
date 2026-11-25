@@ -3318,8 +3318,17 @@
     "semantic": "Log off a leftover SAP session so that its locks are released."
   },
   "HandlerLock": {
-    "keywords": ["lock", "lock object", "lock handle", "enqueue", "edit lock"],
-    "semantic": "Lock an object before changing it and get its lock handle."
+    "keywords": [
+      "lock",
+      "lock object",
+      "lock handle",
+      "enqueue",
+      "edit lock",
+      "unlock",
+      "release lock",
+      "dequeue"
+    ],
+    "semantic": "Lock an object before changing it and get its lock handle, or release that lock after changing it."
   },
   "HandlerProfileList": {
     "keywords": [
@@ -3470,10 +3479,6 @@
       "progress"
     ],
     "semantic": "Check whether an ABAP Unit test run has finished."
-  },
-  "HandlerUnlock": {
-    "keywords": ["unlock", "release lock", "lock handle", "dequeue"],
-    "semantic": "Release the lock on an object after changing it."
   },
   "HandlerUpdate": {
     "keywords": [

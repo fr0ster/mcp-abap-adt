@@ -17,6 +17,8 @@
  *   which learns the destination's verdict from its first envelope), their
  *   order alternating per repetition;
  * - every answer equals the reference (compared after the timing is written),
+ *   each read at `detail: 'full'`, where every object's error is a field the
+ *   comparison reads,
  *   the sequential reads send no envelope, and the batched reads send at
  *   least one;
  * - recorded per read: wall time, the requests sent (round trips: envelopes
@@ -175,12 +177,6 @@ type Case = {
   tool: string;
   read: (name: string) => (context: HandlerContext) => Promise<unknown>;
   /**
-   * One package is one object for this tool: its batched path sends no
-   * envelope (it reads one parent as single requests, an implementation
-   * choice).
-   */
-  alone?: true;
-  /**
    * Whether the batched path has independent reads to put together, read
    * off the sequential reference's answer: where it has none, it sends no
    * envelope. Absent: it always has.
@@ -195,12 +191,13 @@ const CASES: Case[] = [
       handleGetPackageContents(context, {
         package_name: name,
         include_subpackages: true,
+        detail: 'full',
       }),
   },
   {
     tool: 'GetPackageTree',
     read: (name) => (context) =>
-      handleGetPackageTree(context, { package_name: name }),
+      handleGetPackageTree(context, { package_name: name, detail: 'full' }),
   },
   {
     tool: 'GetObjectsList',
@@ -209,8 +206,8 @@ const CASES: Case[] = [
         parent_type: 'DEVC/K',
         parent_name: name,
         parent_tech_name: name,
+        detail: 'full',
       }),
-    alone: true,
   },
   {
     tool: 'GetObjectInfo',
@@ -236,6 +233,7 @@ const CASES: Case[] = [
       handleSearchSource(context, {
         query: 'DATA',
         packages: [name],
+        detail: 'full',
       }),
     // One target or none (a package of one object, or an empty one) is read
     // as single requests, by the code's choice: an envelope only with two
@@ -320,6 +318,7 @@ const SHARED_CASES: SharedCase[] = [
       if (typeof groups === 'string') return groups;
       return (context) =>
         handleGetIncludesList(context, {
+          detail: 'full',
           objects: groups.map((name) => ({
             object_name: name,
             object_type: 'FUGR/F',
@@ -333,7 +332,10 @@ const SHARED_CASES: SharedCase[] = [
       const structures = two('structures');
       if (typeof structures === 'string') return structures;
       return (context) =>
-        handleGetStructuresList(context, { structure_names: structures });
+        handleGetStructuresList(context, {
+          structure_names: structures,
+          detail: 'full',
+        });
     },
   },
   {
@@ -343,6 +345,7 @@ const SHARED_CASES: SharedCase[] = [
       if (typeof classes === 'string') return classes;
       return (context) =>
         handleGetEnhancements(context, {
+          detail: 'full',
           objects: classes.map((name) => ({
             object_name: name,
             object_type: 'CLAS/OC',
@@ -361,6 +364,7 @@ const SHARED_CASES: SharedCase[] = [
       }
       return (context) =>
         handleDescribeByList(context, {
+          detail: 'full',
           objects: [
             { name: cls, type: 'CLAS/OC' },
             { name: table, type: 'TABL/DT' },
@@ -376,6 +380,7 @@ const SHARED_CASES: SharedCase[] = [
       if (typeof tables === 'string') return tables;
       return (context) =>
         handleGetWhereUsed(context, {
+          detail: 'full',
           objects: tables.map((name) => ({
             object_name: name,
             object_type: 'TABL/DT',
@@ -388,6 +393,7 @@ const SHARED_CASES: SharedCase[] = [
     prepare: () => (context) =>
       handleRuntimeListFeeds(context, {
         feed_types: ['dumps', 'system_messages'],
+        detail: 'full',
         from: '20261001000000',
         to: '20261002000000',
         max_results: 20,
@@ -451,7 +457,6 @@ async function timeBothPaths(
   tool: string,
   scope: string,
   read: (context: HandlerContext) => Promise<unknown>,
-  alone = false,
   batches?: (reference: unknown) => boolean,
 ): Promise<void> {
   const reference = await measured(connection, 'sequential', read);
@@ -468,7 +473,7 @@ async function timeBothPaths(
     `${tool} on ${scope}, the sequential reference: ${answerText(reference.answer)}`,
   );
   assert.equal(reference.measure.envelopes, 0);
-  const single = alone || (batches !== undefined && !batches(reference.answer));
+  const single = batches !== undefined && !batches(reference.answer);
 
   const runs: Record<Path, Measure[]> = { sequential: [], batched: [] };
   // Compared once every repetition is timed, so a differing answer
@@ -556,14 +561,7 @@ describe('batched reads timed against the sequential path on the system the test
         }
         const read = tool.read(target.name);
 
-        await timeBothPaths(
-          connection,
-          tool.tool,
-          scope,
-          read,
-          tool.alone === true,
-          tool.batches,
-        );
+        await timeBothPaths(connection, tool.tool, scope, read, tool.batches);
       });
     }
   }

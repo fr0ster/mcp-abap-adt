@@ -20,6 +20,12 @@ export interface DeniedEntry {
   readonly valueIsPrefix: boolean;
 }
 
+/**
+ * The 23.x unlock tool, now HandlerLock's action unlock: an entry naming it
+ * (`HandlerUnlock`, a prefix of it) denies that action.
+ */
+export const UNLOCK_TOOL = 'HandlerUnlock';
+
 /** The denied actions of a start: none when nothing is configured. */
 export type DeniedActions = readonly DeniedEntry[];
 
@@ -106,6 +112,16 @@ export function parseDeniedEntry(text: string, name: string): DeniedEntry {
       name,
       text,
       'a value holds ASCII letters, digits, "_" and "/" only, and "*" only at its end',
+    );
+  }
+  // 24.0.0: HandlerUnlock is HandlerLock's action unlock. A value entry on
+  // it would deny an unlock of one type, which no schema states: refused,
+  // so that it never fails open.
+  if (tool.body === UNLOCK_TOOL) {
+    throw refused(
+      name,
+      text,
+      "HandlerUnlock is HandlerLock's action unlock: deny HandlerLock.unlock for every unlock, or HandlerLock.<TYPE> for both actions on a type",
     );
   }
   return {

@@ -1,7 +1,7 @@
 /**
  * The compact member tokens are exported accessors, and each compact
- * description names its members through them: a prompt that quotes a member's
- * token quotes the description's own words.
+ * tool's member table (`memberTokens`) names its members through them: a
+ * prompt that quotes a member's token quotes the table's own words.
  */
 
 import assert from 'node:assert/strict';
@@ -20,19 +20,11 @@ import {
 import {
   activateToken,
   checkToken,
-  compactActivateDescription,
-  compactCheckRunDescription,
-  compactCreateDescription,
-  compactDeleteDescription,
-  compactGetDescription,
-  compactLockDescription,
-  compactUnlockDescription,
-  compactUpdateDescription,
   createToken,
   deleteToken,
   lockToken,
+  memberTokens,
   readToken,
-  unlockToken,
   updateToken,
 } from '../../../lib/compact/compactDescriptions';
 
@@ -46,42 +38,37 @@ type ToolTokens = {
 const TOOLS: readonly ToolTokens[] = [
   {
     tool: 'HandlerCreate',
-    description: (v) => compactCreateDescription(v),
+    description: (v) => memberTokens('HandlerCreate', v),
     tokens: (v) => COMPACT_CREATE[v].map(createToken),
   },
   {
     tool: 'HandlerGet',
-    description: (v) => compactGetDescription(v),
+    description: (v) => memberTokens('HandlerGet', v),
     tokens: (v) => COMPACT_READ[v].map(readToken),
   },
   {
     tool: 'HandlerUpdate',
-    description: (v) => compactUpdateDescription(v),
+    description: (v) => memberTokens('HandlerUpdate', v),
     tokens: (v) => COMPACT_UPDATE[v].map(updateToken),
   },
   {
     tool: 'HandlerDelete',
-    description: (v) => compactDeleteDescription(v),
+    description: (v) => memberTokens('HandlerDelete', v),
     tokens: (v) => COMPACT_DELETE[v].map(deleteToken),
   },
   {
     tool: 'HandlerLock',
-    description: (v) => compactLockDescription(v),
+    description: (v) => memberTokens('HandlerLock', v),
     tokens: (v) => COMPACT_LOCK[v].map(lockToken),
   },
   {
-    tool: 'HandlerUnlock',
-    description: (v) => compactUnlockDescription(v),
-    tokens: (v) => COMPACT_UNLOCK[v].map(unlockToken),
-  },
-  {
     tool: 'HandlerCheckRun',
-    description: (v) => compactCheckRunDescription(v),
+    description: (v) => memberTokens('HandlerCheckRun', v),
     tokens: (v) => COMPACT_CHECK[v].map(checkToken),
   },
   {
     tool: 'HandlerActivate',
-    description: (v) => compactActivateDescription(v),
+    description: (v) => memberTokens('HandlerActivate', v),
     tokens: (v) => COMPACT_ACTIVATE[v].map(activateToken),
   },
 ];
@@ -89,7 +76,7 @@ const TOOLS: readonly ToolTokens[] = [
 for (const variant of ['onprem', 'cloud'] as const) {
   describe(`compact member tokens (${variant})`, () => {
     for (const { tool, description, tokens } of TOOLS) {
-      it(`${tool}: every member's token is in the description`, () => {
+      it(`${tool}: every member's token is in the member table`, () => {
         const text = description(variant);
         const listed = tokens(variant);
         assert.ok(listed.length > 0);
@@ -114,7 +101,6 @@ describe('a token names its member with the arguments it takes', () => {
     );
     assert.equal(lockToken('CLASS'), 'CLASS(object_name*)');
     assert.equal(lockToken('PACKAGE'), 'PACKAGE(object_name*, super_package)');
-    assert.equal(unlockToken('CLASS'), 'CLASS(object_name*, lock_handle*)');
     assert.equal(checkToken('CLASS'), 'CLASS(object_name*)');
     assert.equal(readToken('CLASS'), 'CLASS(class_name*)');
     assert.equal(activateToken('CLASS'), 'CLASS');

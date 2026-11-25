@@ -154,7 +154,7 @@ function notSentRefusal(names: string[]) {
       : `${names.join(', ')} are not sent`;
   return return_error(
     new Error(
-      `HandlerCreate sends the create request alone: ${named} — leave it out; then HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock and HandlerActivate`,
+      `HandlerCreate sends the create request alone: ${named} — leave it out; then HandlerLock, HandlerUpdate with the lock_handle, HandlerLock with action unlock and HandlerActivate`,
     ),
   );
 }

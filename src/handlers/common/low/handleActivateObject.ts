@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { type AnswerTable, answerAt, wireAnswer } from '../../../lib/detail';
 import { DETAIL_LEVELS } from '../../../lib/detail/levels';
 /**
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
@@ -109,12 +110,13 @@ import {
   namesItsParent,
   notAccepted,
 } from '../../../lib/adtTypeCode';
-import { answer } from '../../../lib/answer';
+import { answer, type McpResult } from '../../../lib/answer';
 import {
   createAdtClient,
   createOnPremAdtClient,
   variantOf,
 } from '../../../lib/clients';
+import { activateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { activationRunsOffered } from '../../../lib/strategies/activationEndpoint';
 import {
@@ -124,7 +126,11 @@ import {
   awaitActivationRun,
   isRefusal,
 } from '../../../lib/strategies/activationRun';
-import { detailOf } from '../../../lib/strategies/detail';
+import {
+  DETAIL_WORDS,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { checkModuleReferences } from '../../../lib/strategies/functionModuleGroup';
 import { projectActivation } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -182,8 +188,11 @@ export const TOOL_DEFINITION = {
   name: 'ActivateObjectLow',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description:
-      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.',
+    description: activateTool({
+      tag: 'low-level',
+      object: 'one or several ABAP repository objects of any type together',
+      how: ', each by its name and type',
+    }),
     inputSchema: activateObjectSchema(variant),
   })),
 } as const;
@@ -211,9 +220,7 @@ function activateObjectSchema(variant: ProjectionVariant) {
       .enum(DETAIL_LEVELS)
       .default('terse')
       .optional()
-      .describe(
-        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored when a group activation (more than one object, or a type this tool cannot map to a single family) runs in the background: that path answers a run and its messages, with no single document behind them.',
-      ),
+      .describe(DETAIL_WORDS),
   });
 }
 
@@ -608,7 +615,7 @@ export async function handleActivateObject(
   context: HandlerContext,
   params: ActivateObjectArgs,
   tool: string = TOOL_DEFINITION.name,
-) {
+): Promise<McpResult> {
   const { connection, logger } = context;
   const args = params;
 
@@ -658,9 +665,19 @@ export async function handleActivateObject(
   }));
 
   const plan = activationPlan(activationObjects, variantOf(connection));
+  const runShown = answerAt(runAnswers(activationObjects), levelOf(args));
   if (typeof plan === 'string') return return_error(new Error(plan));
 
   logger?.info(`Starting activation of ${activationObjects.length} object(s)`);
+
+  // An activation assembles its reads (a group's discovery, its run and
+  // results; one object's activation): at `raw` the documents, as SAP sent
+  // them, in read order — the tool's shape, whichever path the call takes.
+  if (detail === 'raw') {
+    return wireAnswer({ connection, tool, shape: 'assembled' }, () =>
+      handleActivateObject(context, { ...params, detail: 'full' }, tool),
+    );
+  }
 
   if ('single' in plan)
     return activateSingle(context, plan.single, detail, preaudit, tool);
@@ -734,7 +751,7 @@ export async function handleActivateObject(
     (answered) =>
       'synchronous' in answered
         ? projectActivation(detail)(answered.synchronous)
-        : runAnswer(answered.runs, activationObjects),
+        : runShown(answered.runs),
   );
 }
 
@@ -796,7 +813,47 @@ function refusedRun(
   };
 }
 
-/** A finished run, as `ActivateObjectLow` answers it. */
+/**
+ * A finished run at each `detail` (terse answers, step 5): terse its verdict
+ * as the synchronous activation answers it — `activated`, and
+ * `nothing_to_activate` and SAP's messages only when there are any; medium
+ * the run with its id, status and messages; full the answer before `detail`,
+ * which repeats the objects sent and explains itself in prose.
+ */
+function runAnswers(
+  activationObjects: readonly ActivationObject[],
+): AnswerTable<ActivationRunOutcome, object> {
+  const full = (outcome: ActivationRunOutcome) =>
+    runAnswer(outcome, activationObjects);
+  return {
+    terse: (outcome) => {
+      const answered = full(outcome);
+      if (!answered.accepted) return { accepted: false, activated: null };
+      return {
+        activated: answered.activated,
+        ...(answered.nothing_to_activate === true
+          ? { nothing_to_activate: true }
+          : {}),
+        ...(answered.messages.length > 0
+          ? { messages: answered.messages }
+          : {}),
+      };
+    },
+    medium: (outcome) => {
+      const {
+        objects: _objects,
+        message: _message,
+        ...answered
+      } = full(outcome);
+      return answered;
+    },
+    full,
+    // Never reached: a group's `raw` is its wire documents (`wireAnswer`).
+    raw: full,
+  };
+}
+
+/** A finished run, as `ActivateObjectLow` answered it before `detail` (full). */
 function runAnswer(
   outcome: ActivationRunOutcome,
   activationObjects: readonly ActivationObject[],
@@ -953,6 +1010,11 @@ export async function activatePlanOnce(
       }
       return succeededWith(runId);
     },
-    (runId: string) => ({ run_id: runId }),
+    startedActivationAnswer,
   );
+}
+
+/** A started activation run's answer: the id its status and results are read by. */
+export function startedActivationAnswer(runId: string) {
+  return { run_id: runId };
 }

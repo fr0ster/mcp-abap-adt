@@ -498,3 +498,16 @@ export function bodyFailureText(
   const told = [said, tags && `[${tags}]`].filter(Boolean).join(' ');
   return told ? `${message}: ${told}` : message;
 }
+
+/**
+ * The members read under their parents: every member keeps the id a further
+ * read takes as a parent; with several parents asked, the link to its parent
+ * too.
+ */
+export function terseChildVariables(r: VariablesReading, several: boolean) {
+  const variables = new Map(terseVariables(r).map((t) => [t.id, t]));
+  return r.children.map((c) => ({
+    ...(variables.get(c.child) ?? { id: c.child, label: c.label }),
+    ...(several ? { parent: c.parent } : {}),
+  }));
+}

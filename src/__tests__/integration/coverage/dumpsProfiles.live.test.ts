@@ -84,7 +84,10 @@ function entriesOf(step: string, answer: LiveAnswer): unknown[] {
 
 /** The dump ids the feed lists now. */
 async function listedDumps(): Promise<string[]> {
-  const listed = await livePrepare('HandlerDumpList', { top: FEED_TOP });
+  const listed = await livePrepare('HandlerDumpList', {
+    top: FEED_TOP,
+    detail: 'medium',
+  });
   return entriesOf('HandlerDumpList', listed)
     .map((entry) => member(entry, 'dump_id'))
     .filter((id): id is string => typeof id === 'string' && id !== '');
@@ -147,7 +150,7 @@ interface ListedTrace {
 }
 
 async function listedTraces(): Promise<ListedTrace[]> {
-  const listed = await livePrepare('HandlerProfileList', {});
+  const listed = await livePrepare('HandlerProfileList', { detail: 'medium' });
   return entriesOf('HandlerProfileList', listed).flatMap((entry) => {
     const id = member(entry, 'id');
     const objectName = member(entry, 'objectName');
@@ -197,7 +200,10 @@ liveSuite(['onprem', 'cloud'], 'Compact dumps and profiles', () => {
     const dump = await untilDumpListed(seen, className);
     found.dump = dump;
     found.dumpClass = className;
-    const listed = await liveCall('HandlerDumpList', { top: FEED_TOP });
+    const listed = await liveCall('HandlerDumpList', {
+      top: FEED_TOP,
+      detail: 'medium',
+    });
     const payload = payloadOf(succeeded('HandlerDumpList', listed));
     assert.equal(member(payload, 'feed_type'), 'dumps');
     const entries = entriesOf('HandlerDumpList', listed);
@@ -274,7 +280,7 @@ liveSuite(['onprem', 'cloud'], 'Compact dumps and profiles', () => {
 
     const trace = await untilTraceFinished(seen, className);
     found.trace = trace;
-    const listed = await liveCall('HandlerProfileList', {});
+    const listed = await liveCall('HandlerProfileList', { detail: 'medium' });
     const entries = entriesOf('HandlerProfileList', listed);
     assert.equal(member(payloadOf(listed), 'count'), entries.length);
     assert.ok(

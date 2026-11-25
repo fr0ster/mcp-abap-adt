@@ -48,6 +48,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import type { ProjectionVariant } from '../../../lib/adtProjections';
 import { answer } from '../../../lib/answer';
 import { adtClientOf } from '../../../lib/clients';
+import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -59,9 +60,6 @@ import { cleanupOf } from '../../../lib/strategies/stepResponse';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { byVariant } from '../../../lib/variantDefinition';
 import { AMDP_FLAG, SETTINGS_SHAPE } from '../tableSettingsFields';
-
-const DESCRIPTION =
-  'Writes technical settings of the existing database table named by table_name: each setting given is written over the stored one, every other setting keeps its stored value. Locks the settings, writes them, unlocks them, and activates the table when activate is true. Answers whether SAP saved the settings and, when activated, whether SAP activated the table, with its messages.';
 
 /** The fields every variant's schema ends with. */
 const TAIL = {
@@ -114,7 +112,11 @@ export const TOOL_DEFINITION = {
   name: 'UpdateTableSettings',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: DESCRIPTION,
+    description: updateTool({
+      object:
+        'the technical settings of an existing ABAP database table, its data class, size category, buffering and logging',
+      how: ', each given over the stored one',
+    }),
     inputSchema: settingsSchema(variant),
   })),
 } as const;

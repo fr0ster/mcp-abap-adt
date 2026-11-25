@@ -2,6 +2,10 @@
 
 This directory contains all documentation for the `mcp-abap-adt` project, organized by audience.
 
+Every tool answers what the next call needs: terse by default (TSV for a list, every row
+answered), with `detail` (`terse`, `medium`, `full`, `raw`) choosing the reading before the call.
+See the README's [Answers](../README.md#answers).
+
 ## 📁 Structure
 
 ### [installation/](installation/) - For Administrators

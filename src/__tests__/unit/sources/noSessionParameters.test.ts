@@ -108,9 +108,7 @@ describe('no tool takes session_id or session_state', () => {
 
   it('the shipped tools are seen, so the check is not vacuous', () => {
     assert.ok(tools.length > 200);
-    assert.ok(
-      tools.map((t) => t.toolDefinition.name).includes('HandlerUnlock'),
-    );
+    assert.ok(tools.map((t) => t.toolDefinition.name).includes('HandlerLock'));
   });
 
   it('no shipped tool declares either in its input schema, nor GetSession exists', () => {

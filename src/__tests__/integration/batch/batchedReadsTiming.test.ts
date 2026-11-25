@@ -174,6 +174,11 @@ const answerText = (answer: unknown): string => {
 type Case = {
   tool: string;
   read: (name: string) => (context: HandlerContext) => Promise<unknown>;
+  /**
+   * One package is one object for this tool: its batched path sends no
+   * envelope (a batch is for reads of several objects).
+   */
+  alone?: true;
 };
 
 const CASES: Case[] = [
@@ -198,6 +203,7 @@ const CASES: Case[] = [
         parent_name: name,
         parent_tech_name: name,
       }),
+    alone: true,
   },
   {
     tool: 'GetObjectInfo',
@@ -416,6 +422,7 @@ async function timeBothPaths(
   tool: string,
   scope: string,
   read: (context: HandlerContext) => Promise<unknown>,
+  alone = false,
 ): Promise<void> {
   const reference = await measured(connection, 'sequential', read);
   assert.equal(
@@ -436,8 +443,12 @@ async function timeBothPaths(
     for (const path of order) {
       const { answer, measure } = await measured(connection, path, read);
       answers.push({ path, answer });
-      if (path === 'sequential') assert.equal(measure.envelopes, 0);
-      else assert.ok(measure.envelopes > 0);
+      const counts = `${tool} on ${scope}, ${path}: envelopes=${measure.envelopes}, requests=${measure.requests}, parts=${measure.parts}`;
+      if (path === 'sequential' || alone) {
+        assert.equal(measure.envelopes, 0, counts);
+      } else {
+        assert.ok(measure.envelopes > 0, counts);
+      }
       runs[path].push(measure);
     }
   }
@@ -508,10 +519,44 @@ describe('batched reads timed against the sequential path on the system the test
         }
         const read = tool.read(target.name);
 
-        await timeBothPaths(connection, tool.tool, scope, read);
+        await timeBothPaths(
+          connection,
+          tool.tool,
+          scope,
+          read,
+          tool.alone === true,
+        );
       });
     }
   }
+
+  it('GetObjectsList on both packages: the same answer, timed on both paths', async () => {
+    if (!served || connection === null) {
+      skipRunningTest(
+        'runs only on the system the test config names, a served kind, with a connection',
+      );
+      return;
+    }
+    if (packages.length < 2) {
+      skipRunningTest(
+        'GetObjectsList on both packages: the config names no shared_dependencies.super_package',
+      );
+      return;
+    }
+    // Several parents: the batched path walks them in envelopes.
+    await timeBothPaths(
+      connection,
+      'GetObjectsList',
+      'both packages',
+      (context) =>
+        handleGetObjectsList(context, {
+          objects: packages.map((p) => ({
+            parent_type: 'DEVC/K',
+            parent_name: p.name,
+          })),
+        }),
+    );
+  });
 
   for (const shared of SHARED_CASES) {
     it(`${shared.tool} on the shared objects: the same answer, timed on both paths`, async () => {

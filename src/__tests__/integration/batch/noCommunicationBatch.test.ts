@@ -120,11 +120,15 @@ describe('the communication batch on the system the test config names', () => {
       return;
     }
     const packageName = resolvePackageName();
+    // The structure is read as single requests (node structures never go
+    // in an envelope); the leaves' metadata phase is the read that goes in
+    // envelopes, so the descriptions are asked for.
     const args = {
       parent_type: 'DEVC/K',
       parent_name: packageName,
       maxDepth: 1,
       enrich: false,
+      include_descriptions: true,
     };
 
     const batched = recording(connection);
@@ -136,9 +140,14 @@ describe('the communication batch on the system the test config names', () => {
     const first = await handleGetObjectInfo(context, args);
 
     const firstEnvelopes = envelopes(batched.urls);
-    assert.ok(firstEnvelopes > 0);
-    assert.equal(batched.urls[0], ENVELOPE_URL);
-    assert.ok(noted.length > 0);
+    assert.ok(
+      firstEnvelopes > 0,
+      `GetObjectInfo of ${packageName} with descriptions: envelopes=${firstEnvelopes}, requests=${batched.urls.length} (a package of fewer than two leaves has no metadata envelope)`,
+    );
+    // The structure's single requests come first; the first envelope is the
+    // metadata phase's.
+    assert.ok(batched.urls.includes(ENVELOPE_URL));
+    assert.ok(noted.length > 0, `outer statuses noted: ${noted.length}`);
     const outer = noted[0] as number;
     process.stderr.write(
       `communication batch: the first envelope's outer status is ${outer}\n`,

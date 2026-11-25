@@ -292,11 +292,18 @@ Time of each batch end, in milliseconds (the last run on each; recording a call 
 
 ## Reads of several objects inside one call
 
-A tool that reads the same kind of thing about several objects sends those reads in one envelope
-when no read needs another's answer; a read that does goes in a later envelope. Reads about one
-object go as single requests, never in an envelope: in the tools below, one object — or a list
-naming one — is read as the sequential version reads it, and `GetTypeInfo`'s probes of one name
-are single requests.
+Two rules decide what goes in an envelope:
+
+1. **Independence.** One envelope holds only calls that do not depend on each other; a call
+   that needs another's answer goes in a later envelope.
+2. **The node structure workaround.** Several node structure parts in one envelope cross-talk
+   their metadata (a part carries another part's `DESCRIPTION`, measured 2026-10-18), so the
+   metadata of the objects read is read separately, in a second phase of requests that do not
+   conflict.
+
+Within those rules, the tools below send a phase of one read — and, in some, the reads of one
+object — as single requests rather than as an envelope of one part. That is an implementation
+choice, not a rule: an envelope of one part would be as correct.
 
 - **Function module group checks.** A group activation (`ActivateObjects`, `HandlerActivate` with
   `objects`) and `GetWhereUsed` with several `GROUP|FM` targets check, before anything else, that
@@ -315,22 +322,24 @@ are single requests.
   `401` there included; a `401` on a probe the decision reaches ends the list there, as the
   sequential version ends it. Then every object's enhancements; with `include_nested`, an object's
   includes root only after its enhancements answered, in the next envelope. A phase left with one
-  object's reads sends them as single requests. One object — `object_name`, or `objects` naming
-  one — sends no envelope at all.
-- **`GetObjectsList`.** One parent (`parent_name`, or `objects` naming one) is walked as single
-  requests; several parents' node structures go in envelopes, level by level.
+  object's reads sends them as single requests, and one object — `object_name`, or `objects`
+  naming one — is read as the sequential version reads it (an implementation choice).
+- **`GetObjectsList`.** Several parents' node structures go in envelopes, level by level; one
+  parent (`parent_name`, or `objects` naming one) is walked as single requests (an implementation
+  choice).
 - **`GetObjectInfo`: the structure first, the descriptions second.** The structure comes back
-  first, each node structure sent as its own request whatever `include_descriptions` says — node
-  structures cross-talk inside an envelope. `include_descriptions: false` (the default) reads no
+  first, each node structure sent as its own request whatever `include_descriptions` says (rule 2:
+  node structures cross-talk inside an envelope). `include_descriptions: false` (the default) reads no
   object metadata; the enrichment (`enrich`, on by default) still runs its searches, one per node,
   in an envelope. With `include_descriptions: true` the server also runs the metadata phase itself:
-  every leaf's metadata, in envelopes (metadata reads do not cross-talk), and each leaf's
+  every leaf's metadata, in envelopes (the second phase of rule 2: metadata reads do not
+  conflict), and each leaf's
   description is its metadata's. The sequential version reads the same metadata, one request
   each, so both paths answer from one source. A leaf whose metadata read SAP refused — a `401`
   included — has no description, and the call answers, on both paths.
-- **`SearchSource`.** A single target, and any phase of one read (one mask's quickSearch, a walk
-  level of one node structure, a round of one source read), goes as single requests; several
-  targets' rounds go in envelopes.
+- **`SearchSource`.** Several targets' rounds go in envelopes; a single target, and any phase of
+  one read (one mask's quickSearch, a walk level of one node structure, a round of one source
+  read), goes as single requests (an implementation choice).
 - **At most 300 reads per envelope** (`READS_PER_ENVELOPE`, `src/lib/batch/phases.ts`): more
   independent reads go in consecutive envelopes of balanced size (`chunksOf`: 301 reads are 151 and
   150, never 300 and 1), each judged as it answers. Where a credential refusal ends the call — the

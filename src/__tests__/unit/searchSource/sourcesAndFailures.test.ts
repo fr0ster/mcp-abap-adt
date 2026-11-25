@@ -1018,7 +1018,7 @@ describe('D23b: package masks (DO12)', () => {
         );
         if (!sequential) {
           // Each round is a phase of its own, of one search: a single
-          // request each, never an envelope.
+          // request each.
           assert.equal(
             fake.envelopes.some((e) =>
               e.parts.some((p) => p.url.includes('/informationsystem/search')),

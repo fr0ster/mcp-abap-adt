@@ -454,8 +454,9 @@ export async function runPhaseOutcome<I, R>(
 /**
  * `runPhaseOutcome`, or — with `alone`, by default when there is only one
  * item — each item read as single requests on the call's connection, one
- * after another: a batch is for reads of several objects, and one read is
- * never an envelope. The settlements in item order; no envelope, so none
+ * after another, rather than an envelope of one part (an implementation
+ * choice; the envelope would be as correct). The settlements in item
+ * order; no envelope, so none
  * failed.
  */
 export async function runPhaseOrAlone<I, R>(

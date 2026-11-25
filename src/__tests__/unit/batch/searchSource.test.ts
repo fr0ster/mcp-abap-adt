@@ -153,7 +153,7 @@ describe('SearchSource on internal batches', () => {
       sources: 8,
       objects_with_hits: 5,
     });
-    // A phase of one read is a single request, never an envelope.
+    // A phase of one read goes as a single request.
     assert.deepStrictEqual(
       batched.directs.map((r) => keyOf(r.url, r.params)),
       ['SEARCH ZR*', nodeKey('ZSUB'), nodeKey('ZSUB', '40')],

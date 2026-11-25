@@ -14,10 +14,9 @@
 import { corpusBody } from '../../helpers/adtCorpus';
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
 
-/** The node structure of an empty package, in a batch envelope. */
 /**
- * The node structure of an empty package, as its own request: one package's
- * walk is one read per level, never an envelope.
+ * The node structure of an empty package, as its own request: one
+ * package's walk is one read per level, sent as a single request.
  */
 const EMPTY_PACKAGE_ALONE = {
   status: 200,

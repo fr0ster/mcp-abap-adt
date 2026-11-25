@@ -1980,8 +1980,8 @@ export async function handleGetEnhancements(
   const listed = args?.objects;
   try {
     // One object — its probes, its enhancements, its includes — is read
-    // in single requests, never in a batch envelope: a batch is for reads
-    // of several objects.
+    // in single requests, as the sequential version reads it (an
+    // implementation choice; envelopes would be as correct).
     if (listed === undefined) return await enhancementsOf(context, args);
     if (
       args.object_name !== undefined ||

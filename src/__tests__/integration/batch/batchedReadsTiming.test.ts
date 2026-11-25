@@ -176,7 +176,8 @@ type Case = {
   read: (name: string) => (context: HandlerContext) => Promise<unknown>;
   /**
    * One package is one object for this tool: its batched path sends no
-   * envelope (a batch is for reads of several objects).
+   * envelope (it reads one parent as single requests, an implementation
+   * choice).
    */
   alone?: true;
 };

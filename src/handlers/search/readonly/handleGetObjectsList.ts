@@ -519,8 +519,8 @@ export async function handleGetObjectsList(
   // `detail: 'raw'` to answer without changing that shared strategy, and
   // this tool's own answer besides is a composite assembled from a
   // recursive walk over many such calls, not one reading.
-  // One parent is read as single requests, never in an envelope: a batch
-  // is for reads of several objects.
+  // One parent is read as single requests, as the sequential version
+  // reads it (an implementation choice; an envelope would be as correct).
   return answer(
     { tool: 'GetObjectsList', detail: 'terse' },
     () =>

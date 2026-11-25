@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/compact-modify",
   "version": "24.2.0",
-  "description": "The compact ABAP ADT tools that write, lock, activate or execute, abapGit's included: one tool per operation, the object in the arguments.",
+  "description": "The compact ABAP ADT tools that write, lock, activate or execute, the abapGit writes included: one tool per operation, the object in the arguments.",
   "license": "Apache-2.0",
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
   "repository": {

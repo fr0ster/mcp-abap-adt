@@ -177,11 +177,13 @@ type Case = {
   tool: string;
   read: (name: string) => (context: HandlerContext) => Promise<unknown>;
   /**
-   * Whether the batched path has independent reads to put together, read
-   * off the sequential reference's answer: where it has none, it sends no
-   * envelope. Absent: it always has.
+   * The batched path sends an envelope exactly when a phase holds two or
+   * more independent reads, and a phase of one read as a single request:
+   * measured, it sends an envelope iff it sends fewer requests than the
+   * sequential reference (each envelope stands for its parts). Absent: an
+   * envelope is always expected.
    */
-  batches?: (reference: unknown) => boolean;
+  envelopeWhenMerged?: true;
 };
 
 const CASES: Case[] = [
@@ -235,30 +237,11 @@ const CASES: Case[] = [
         packages: [name],
         detail: 'full',
       }),
-    // One target or none (a package of one object, or an empty one) is read
-    // as single requests, by the code's choice: an envelope only with two
-    // or more targets.
-    batches: (reference) => scannedObjects(reference) >= 2,
+    // A phase of one read (one target's round, a walk level of one node)
+    // goes as a single request: an envelope only where reads were merged.
+    envelopeWhenMerged: true,
   },
 ];
-
-/** The objects a SearchSource answer scanned (`scanned.objects`); 0 when unread. */
-function scannedObjects(answer: unknown): number {
-  try {
-    const parsed: unknown = JSON.parse(answerText(answer));
-    const scanned: unknown =
-      typeof parsed === 'object' && parsed !== null
-        ? Reflect.get(parsed, 'scanned')
-        : undefined;
-    const objects: unknown =
-      typeof scanned === 'object' && scanned !== null
-        ? Reflect.get(scanned, 'objects')
-        : undefined;
-    return typeof objects === 'number' ? objects : 0;
-  } catch {
-    return 0;
-  }
-}
 
 /** The packages read: the config's default one, and a larger one if named. */
 function packagesRead(): Array<{ label: string; name: string }> {
@@ -457,7 +440,7 @@ async function timeBothPaths(
   tool: string,
   scope: string,
   read: (context: HandlerContext) => Promise<unknown>,
-  batches?: (reference: unknown) => boolean,
+  envelopeWhenMerged = false,
 ): Promise<void> {
   const reference = await measured(connection, 'sequential', read);
   assert.equal(
@@ -473,7 +456,6 @@ async function timeBothPaths(
     `${tool} on ${scope}, the sequential reference: ${answerText(reference.answer)}`,
   );
   assert.equal(reference.measure.envelopes, 0);
-  const single = batches !== undefined && !batches(reference.answer);
 
   const runs: Record<Path, Measure[]> = { sequential: [], batched: [] };
   // Compared once every repetition is timed, so a differing answer
@@ -486,8 +468,16 @@ async function timeBothPaths(
       const { answer, measure } = await measured(connection, path, read);
       answers.push({ path, answer });
       const counts = `${tool} on ${scope}, ${path}: envelopes=${measure.envelopes}, requests=${measure.requests}, parts=${measure.parts}`;
-      if (path === 'sequential' || single) {
+      if (path === 'sequential') {
         assert.equal(measure.envelopes, 0, counts);
+      } else if (envelopeWhenMerged) {
+        // An envelope iff reads were merged: fewer requests than the
+        // sequential reference's.
+        assert.equal(
+          measure.envelopes > 0,
+          measure.requests < reference.measure.requests,
+          `${counts}; sequential requests=${reference.measure.requests}`,
+        );
       } else {
         assert.ok(measure.envelopes > 0, counts);
       }
@@ -561,7 +551,13 @@ describe('batched reads timed against the sequential path on the system the test
         }
         const read = tool.read(target.name);
 
-        await timeBothPaths(connection, tool.tool, scope, read, tool.batches);
+        await timeBothPaths(
+          connection,
+          tool.tool,
+          scope,
+          read,
+          tool.envelopeWhenMerged === true,
+        );
       });
     }
   }

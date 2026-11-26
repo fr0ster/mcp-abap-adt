@@ -3,7 +3,7 @@
  * compact `HandlerGetData`, which delegates to them — over the captured
  * freestyle preview and a real adt-clients run on a recording connection:
  * terse a row per record under the column names, after how many records
- * the selection holds; medium the rows with each column's type and
+ * the selection holds where SAP reports it; medium the rows with each column's type and
  * description; full that with the whole document parsed; raw the document.
  */
 

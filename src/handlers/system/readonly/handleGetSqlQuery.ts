@@ -158,7 +158,10 @@ function dataLists(columns: readonly string[]): RowSchemas<DataListing> {
 
 /** The head the data listing opens with. */
 export const DATA_HEADS = [
-  headShape('total_rows', 'how many records the selection holds'),
+  headShape(
+    'total_rows',
+    'how many records the selection holds, when SAP reports it',
+  ),
 ];
 
 /** The answer of a data read before `detail` shaped it: the rows, and each column's type and description. */
@@ -178,7 +181,8 @@ function dataAnswerOf({ sqlQuery, rowNumber, reading }: DataRead) {
  * What a data read answers at each `detail` (`src/lib/detail`), shared by
  * `GetSqlQuery` and `GetTableContents`, which read the same document: terse
  * a row per record under the column names, after how many records the
- * selection holds, written by the listing writer; medium the rows with each
+ * selection holds when SAP reports it (`# total_rows`, absent when it does
+ * not — the record count never stands in), written by the listing writer; medium the rows with each
  * column's type and description; full that with the whole document parsed
  * beside it (`keyAttribute`, `colType`, `isKeyFigure` and whatever SAP adds
  * next); raw the document as SAP sent it.

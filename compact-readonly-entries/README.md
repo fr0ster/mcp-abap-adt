@@ -1,8 +1,8 @@
 # @mcp-abap-adt/compact-readonly-entries
 
-Compact read-only tools — 16 tools that change nothing (the data tool `HandlerGetData` among them, opt-in).
+Compact read-only tools that change nothing: 16 by default, 17 with the data tool `HandlerGetData` on (`--enable-data-tools`).
 
-> **A library, not a server.** To run the compact server, install [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) (`mcp-abap-adt-compact`); to run a server of these 16 tools alone, [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro) (`mcp-abap-adt-compact-ro`, and `-compact-http-ro`, `-compact-sse-ro`); see [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants).
+> **A library, not a server.** To run the compact server, install [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) (`mcp-abap-adt-compact`); to run a server of these tools alone (16 by default, 17 with the data tool on), [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro) (`mcp-abap-adt-compact-ro`, and `-compact-http-ro`, `-compact-sse-ro`); see [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants).
 >
 > **Renamed in 19.0.0** from `@mcp-abap-adt/compact-readonly`, so it is not confused with `@mcp-abap-adt/compact-ro`, the server. The exports are unchanged.
 

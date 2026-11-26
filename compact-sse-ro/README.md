@@ -8,18 +8,19 @@ It is [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)'s l
 
 ## The tools
 
-- the **16 compact tools that change nothing**, one per operation with the object in
+- the **17 compact tools that change nothing**, one per operation with the object in
   `object_type`: `HandlerGet`, `HandlerGetData` (a data
   tool: served only with `--enable-data-tools`, off by default),
   `HandlerValidate`, `HandlerCheckRun`, `HandlerDeletionCheck`, the unit-test and CDS unit-test status and result, the
   profiler list and view, the dump list and view, the service-binding type list and validation;
   and `HandlerSystem`, the system-wide reads by `action` (source search, object search,
-  where-used, package tree, transports, ATC findings and results)
+  where-used, package tree, transports, ATC findings and results), and `HandlerAbapGitGet`, the abapGit reads
+  (repositories, an external repository, modified objects, staging, checks, a file, the error log)
   (from [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries));
 - the **background-run tools** (`HandlerBackgroundRunGet`, `HandlerBackgroundRunList`, `HandlerBackgroundRunDiscard`): a long read runs in the background by default and is read, listed and cancelled by them;
 - **`HandlerBatch`** (`action: 'begin' | 'end' | 'answers'`): batch mode.
 
-19 tools in all (one more, `HandlerGetData`, with `--enable-data-tools`) (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
+20 tools in all (one more, `HandlerGetData`, with `--enable-data-tools`) (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
 is in the tool list at all, so a client cannot call one; nor the four debugger tools — those are `mcp-abap-adt-compact-sse`'s ([`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse)).
 
 **No leftover-session tools, no session files (19.0.0).** One server holds the sessions of many

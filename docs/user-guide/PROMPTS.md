@@ -8,6 +8,18 @@ A prompt is a ready-made request the MCP client offers the user. Claude Code, in
 
 Nine prompts: `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`. The object prompts take `object_type` and `name` (a function module also takes `function_group`, except in `unit_test`, whose run names the module alone and covers the ABAP Unit tests of its whole function group); `object_type`, `transport`'s `action` and `where_used`'s `container` complete in lower case and are accepted in any case. Each binary lists the prompts its tools serve, and the `object_type` values its tools serve on the system kind.
 
+## Autocompletion
+
+A client that supports MCP completion (`completion/complete`) completes a prompt's closed arguments with exactly what this binary serves, matching what the user typed without regard to case:
+
+- `object_type` (every object prompt, `unit_test`, `where_used`): the values this binary's tools serve on the system kind, after `--deny-actions`, in lower case.
+- `transport` `action`: the actions this binary serves.
+- `transport` `object_type`: the transport object types, when the action given takes one (or no action is given yet).
+- `where_used` `container`: the values the where-used tool lists, while the `object_type` given so far is `text_elements` or none is given yet.
+- `unit_test` `include_subpackages`: `true`, `false`.
+
+The lists per binary and kind below are these completions.
+
 ## Refusal
 
 A `prompts/get` with an `object_type` the binary does not serve (unknown, not served on the system kind, or denied) is refused with the protocol's invalid-params error and no instruction: `<prompt>: object_type "<value>" is not served by this server; it serves <list>.` A required argument that is absent or blank is refused the same way: `<prompt>: <argument> is required.` So is a `function_group` given for an `object_type` whose steps read none: `<prompt>: function_group is read with object_type function_module only.`.

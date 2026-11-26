@@ -29,13 +29,14 @@ run outside batch mode — see
 [Batch Mode](BATCH_MODE.md).
 
 Tool counts (the tool sets as registered, by the tests and `fullToolSet` / `fullReadOnlyToolSet`),
-on premise, stdio / Streamable HTTP / SSE: core 267 / 267 / 265 (with the debugger batch's 3);
-core-ro 71 / 72 / 70 (each with the 3 background-run tools); compact 38 / 37 / 36 (27 of the 28 +
-4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 20 / 20 / 19
-(15 of the 16 + 3 background-run + `HandlerBatch`). On cloud, stdio: core 256 (the include writes and the program writes are on
-premise only), core-ro 73, compact 38, compact-ro 20. Each count is without the data tools:
+on premise, stdio / Streamable HTTP / SSE: core 281 / 281 / 279 (with the debugger batch's 3);
+core-ro 78 / 79 / 77 (each with the 3 background-run tools); compact 39 / 38 / 37 (28 of the 29 +
+4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 21 / 21 / 20
+(16 of the 17 + 3 background-run + `HandlerBatch`). On cloud, stdio: core 269 (the include writes and the program writes are on
+premise only; `GetAbapGitBranchInfo`, `GetAbapGitModifiedObjects` and `GetAbapGitErrorLog` on the cloud only,
+`SwitchAbapGitBranch` on premise only), core-ro 78, compact 39, compact-ro 21. Each count is without the data tools:
 `--enable-data-tools` adds `GetSqlQuery` and `GetTableContents` to core and core-ro, and
-`HandlerGetData` (the 28th, the 16th) to compact and compact-ro. stdio adds the leftover-session tools — list and logoff in the full sets, the
+`HandlerGetData` (the 29th, the 17th) to compact and compact-ro. stdio adds the leftover-session tools — list and logoff in the full sets, the
 list alone in the read-only ones; Streamable HTTP
 adds the long session instead — `SessionOpen` and `SessionClose` in the full sets, `HandlerSession`
 in the compact ones — and declares an optional `state_handle` argument on every tool
@@ -68,9 +69,9 @@ in the compact ones — and declares an optional `state_handle` argument on ever
 4. **compact** - Compact facade operations — served by their own commands, `mcp-abap-adt-compact`
    (`@mcp-abap-adt/compact`, every tool below and four debugger tools: `HandlerDebugBreakpoints`,
    `HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`) and `mcp-abap-adt-compact-ro`
-   (`@mcp-abap-adt/compact-ro`, the 16 that change nothing: the reads, the system-wide reads,
+   (`@mcp-abap-adt/compact-ro`, the 17 that change nothing: the reads, the system-wide reads,
    checks and validations, the unit-test status and result reads, the profiler list and view,
-   the dump list and view and the service-binding type list).
+   the dump list and view, the service-binding type list and the abapGit reads).
    - `HandlerValidate`
    - `HandlerActivate`
    - `HandlerLock`
@@ -86,6 +87,7 @@ in the compact ones — and declares an optional `state_handle` argument on ever
    - `HandlerGet`
    - `HandlerSystem` — the system-wide reads by `action`: `search_source`, `search_object`, `where_used`, `package_tree`, `transports`, `atc_findings`, `atc_results`, `atc_result`, each one full tool's call (`SearchSource`, `SearchObject`, `GetWhereUsed`, `GetPackageTree`, `ListTransports`, `GetATCFindings`, `ListATCResults`, `GetATCResult`) with its arguments
    - `HandlerGetData` (a data tool: served only with `--enable-data-tools`)
+   - `HandlerAbapGitGet` (the abapGit reads), `HandlerAbapGit` (link, unlink, pull, push, branch switch and branch info) — see [abapGit](../../README.md#abapgit-the-git-loop-on-a-package)
    - `HandlerUpdate`
    - `HandlerDelete`
    - Contract:
@@ -96,7 +98,7 @@ in the compact ones — and declares an optional `state_handle` argument on ever
        `$metadata` and browser preview URLs and exists for a service binding
        alone; `contents` lists a package's members, one line each (`package_names`: several packages, one entry each, read together in ADT batch envelopes). A part an object type does not offer is refused by name and the
        refusal says which parts it does offer — never substituted with another.
-     - Lifecycle via `HandlerValidate|Activate|Lock|Unlock|CheckRun|DeletionCheck`
+     - Lifecycle via `HandlerValidate|Activate|Lock|CheckRun|DeletionCheck` (`HandlerLock` `action: lock | unlock`)
      - Runtime/tests/service-binding/transport via dedicated compact handlers
    - Source of truth for compact route coverage:
      - `src/handlers/compact/high/compactMatrix.ts`

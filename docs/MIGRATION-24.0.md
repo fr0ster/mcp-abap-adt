@@ -647,6 +647,10 @@ and answer the delete's document: `deleted`, `object` and SAP's message.
 
 ## Callers of the function-module tools: the function group is checked (#2)
 
+> **Note (24.2.0):** `HandlerUnlock` is now `HandlerLock` with `action: unlock` (and the
+> `lock_handle` the lock gave). Where this section names `HandlerUnlock`, call `HandlerLock`
+> with `action: unlock`.
+
 **Changed:** every tool that addresses an existing function module through a function group reads
 the module's metadata first and goes on only when the group the metadata names
 (`adtcore:containerRef`) is the group given: `GetFunctionModule`, `UpdateFunctionModule`,
@@ -699,6 +703,10 @@ with long polling, since the run it just started may not have begun yet.
   the result.
 
 ## Callers of the lock tools: a lock_handle is checked on every transport (#4)
+
+> **Note (24.2.0):** `HandlerUnlock` is now `HandlerLock` with `action: unlock` (and the
+> `lock_handle` the lock gave). Where this section names `HandlerUnlock`, call `HandlerLock`
+> with `action: unlock`.
 
 **Changed:** SAP releases the locking session's lock on an `UNLOCK` whatever handle it names, so
 the server checks the handle. Every transport's instance now keeps the handles its own

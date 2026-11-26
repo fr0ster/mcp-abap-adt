@@ -7,7 +7,7 @@ of its own.
 It is [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)'s launcher — the one in
 [`@mcp-abap-adt/server-runtime`](https://www.npmjs.com/package/@mcp-abap-adt/server-runtime) — with the
 compact tool set and nothing else: the same options, the same credentials, the same failures and
-shutdown as `mcp-abap-adt-sse`; only the tools differ. The 16 that change nothing alone are
+shutdown as `mcp-abap-adt-sse`; only the tools differ. The 17 that change nothing alone are
 [`@mcp-abap-adt/compact-sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse-ro)
 (`mcp-abap-adt-compact-sse-ro`): the binary fixes the tool set (19.0.0). stdio is
 [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact), the other HTTP
@@ -30,8 +30,8 @@ There is no `--transport`: a binary is its transport.
 **Credentials** come only from the `x-sap-*` headers of the `GET` that opens each SSE connection — `x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`; a `POST` is routed by its `sessionId` alone. Nothing is shared with another connection, and nothing outlives it. A request without them is answered `400`; so is one
 carrying `x-mcp-destination` (destinations are served only by `mcp-abap-adt`, stdio).
 
-**The tools are fixed by the binary**: all 28, the four debugger tools (`HandlerDebugBreakpoints`,
-`HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`), the debugger batch (`HandlerDebugBatch`), the background-run tools and `HandlerBatch` — 36; `HandlerGetData`, one of the 28, only with `--enable-data-tools` (37). `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
+**The tools are fixed by the binary**: all 29, the four debugger tools (`HandlerDebugBreakpoints`,
+`HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`), the debugger batch (`HandlerDebugBatch`), the background-run tools and `HandlerBatch` — 37; `HandlerGetData`, one of the 29, only with `--enable-data-tools` (38). `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
 `exposition` stop the start, naming the binary to install instead
 (`mcp-abap-adt-compact-sse-ro` for `ro`). No leftover-session tool and no runtime session file: one server holds the sessions of many
 users, so those are the stdio binaries' (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`); resuming

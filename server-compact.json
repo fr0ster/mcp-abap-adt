@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.fr0ster/mcp-abap-adt-compact",
-  "description": "Compact MCP server for SAP ABAP ADT over HTTP, RFC or SNC: one tool per operation, abapGit too",
+  "description": "Compact SAP ABAP ADT, onprem and BTP: CRUD, where-used, ATC, unit tests, transports, batch, abapGit",
   "repository": {
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "24.1.1",
+  "version": "24.2.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/compact",
-      "version": "24.1.1",
+      "version": "24.2.0",
       "transport": {
         "type": "stdio"
       },

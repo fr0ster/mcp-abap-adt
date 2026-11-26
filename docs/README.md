@@ -2,9 +2,24 @@
 
 This directory contains all documentation for the `mcp-abap-adt` project, organized by audience.
 
-Every tool answers what the next call needs: terse by default (TSV for a list, every row
-answered), with `detail` (`terse`, `medium`, `full`, `raw`) choosing the reading before the call.
-See the README's [Answers](../README.md#answers).
+## Features, and where each is described
+
+- **Read and analyse**: where-used, object and source search, every object's source and metadata, outlines, versions and diffs — [Read-only tools](user-guide/AVAILABLE_TOOLS_READONLY.md)
+- **Develop and change**: create, update, delete, check and activate the ABAP, DDIC, CDS and RAP objects — [High-level tools](user-guide/AVAILABLE_TOOLS_HIGH.md)
+- **Test and quality**: ATC runs and results, ABAP Unit per class, program, function group, CDS view or package — [ATC](user-guide/AVAILABLE_TOOLS.md#high-level-atc), [Unit tests](user-guide/AVAILABLE_TOOLS.md#high-level-unit-test)
+- **Transports**: requests and tasks, their objects and logs, moving objects — [Transport tools](user-guide/AVAILABLE_TOOLS.md#high-level-transport)
+- **Debugger**: ABAP and AMDP debug sessions in the write binaries — [Debugger](user-guide/DEBUGGER.md)
+- **abapGit** (new in 24.2.0): link, pull, stage and push a package with a git host, full and compact — [abapGit](../README.md#abapgit-the-git-loop-on-a-package)
+- **Access restrictions**: deny tools, allow only listed packages, requests or tables; draft detection — [Access restrictions](user-guide/ACCESS_RESTRICTIONS.md)
+- **Read-only and compact binaries**: the twelve binaries and the tools each serves — [Handler sets](user-guide/HANDLERS_MANAGEMENT.md), [Compact tools](../compact/docs/AVAILABLE_TOOLS.md)
+- **MCP prompts** (new in 24.2.0): nine slash-command prompts per binary and kind — [Prompts](user-guide/PROMPTS.md)
+- **Batch mode**: independent calls sent to SAP together (compact binaries) — [Batch Mode](user-guide/BATCH_MODE.md)
+- **Background long reads**: a handle at once, the result read or cancelled later — [Background runs](user-guide/README.md#background-runs-of-the-long-reads)
+- **Terse answers** (new in 24.2.0): TSV for a list, every row answered; `detail` (`terse`, `medium`, `full`, `raw`) chooses the reading — [Answers](../README.md#answers)
+- **Tool search**: keywords and semantic texts per tool — [Tool Search](user-guide/TOOL_SEARCH.md)
+- **Long session over Streamable HTTP**: one SAP session across calls by `state_handle` — [`@mcp-abap-adt/http`](../http/README.md#held-state-and-the-long-session)
+- **Data tools, off by default**: freestyle SQL and table preview only with `--enable-data-tools` — [The data tools](../README.md#the-data-tools-off-unless-enabled)
+- **Authentication**: basic, SNC, JWT with browser login; destinations — [Authentication](user-guide/AUTHENTICATION.md)
 
 ## 📁 Structure
 
@@ -28,6 +43,8 @@ Documentation for end users: configuration, usage, and available tools.
 - `CLI_OPTIONS.md` - Complete command-line options reference
 - `BATCH_MODE.md` - Batch mode (the compact binaries' `HandlerBatch`): independent calls recorded, sent together at the batch's end, answered by number; which calls are recorded
 - `PROMPTS.md` - The MCP prompts (`create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`) per binary and kind, their `object_type` values, how a client shows them, the refusal (generated)
+- `ACCESS_RESTRICTIONS.md` - Access restrictions: denied actions, allowed packages, requests and tables, the refusals, and `GetObjectDraft`
+- `HANDLERS_MANAGEMENT.md` - The twelve binaries and the tools each serves
 - `TOOL_SEARCH.md` - Tool search: the three texts per tool (`description`, `keywords` for BM25, `semantic` for vectors), where a client reads them
 - `DEBUGGER.md` - The debugger (the write binaries; no `-ro` one): debug sessions and their handle, the SAP ids, transports, what ends a session
 - abapGit - the git loop on a package (link, pull, stage, push, branches, checks, the run log), full and compact, per system: the tools in the [README](../README.md#abapgit-the-git-loop-on-a-package), the git credentials and approved endpoints per transport in `AUTHENTICATION.md` and `CLI_OPTIONS.md`, the link and pull refusal under restrictions in `ACCESS_RESTRICTIONS.md`
@@ -70,6 +87,7 @@ Documentation for developers: testing, development guides, and internal document
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
 - **Authentication**: [Destinations & Auth](user-guide/AUTHENTICATION.md)
 - **Installation variants** (full or compact; HTTP, RFC or SNC): [Installation Guide](installation/INSTALLATION.md#installation-variants) | [RFC Setup](installation/RFC_SETUP.md)
+- **Upgrading from 23.x**: [Migration to 24.0](MIGRATION-24.0.md)
 - **Upgrading from 22.x**: [Migration to 23.0](MIGRATION-23.0.md)
 - **Upgrading from 21.x**: [Migration to 22.0](MIGRATION-22.0.md)
 - **Upgrading from 19.x**: [Migration to 20.0](MIGRATION-20.0.md)

@@ -1,8 +1,8 @@
 {
   "name": "@mcp-abap-adt/http",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-http",
-  "version": "24.1.1",
-  "description": "The Streamable HTTP transport of the MCP ABAP ADT server: an Express app serving the ADT tools of @mcp-abap-adt/lib over MCP Streamable HTTP, with DNS rebinding protection and TLS.",
+  "version": "24.2.0",
+  "description": "MCP server for SAP ABAP ADT over Streamable HTTP, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: CRUD of ABAP, DDIC, CDS and RAP objects, where-used, ATC, unit tests, transports, the ABAP and AMDP debugger, abapGit, MCP prompts and access restrictions (deny lists, allowed packages, requests and tables), the data tools off by default. Credentials only from each request's x-sap-* headers; a long session by state_handle. DNS rebinding protection and TLS.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"
@@ -17,8 +17,20 @@
     "sap",
     "adt",
     "mcp",
-    "model-context-protocol",
     "mcp-server",
+    "model-context-protocol",
+    "abap-cloud",
+    "sap-btp",
+    "s4hana",
+    "on-premise",
+    "where-used",
+    "atc",
+    "abap-unit",
+    "transports",
+    "mcp-prompts",
+    "access-control",
+    "crud",
+    "debugger",
     "streamable-http"
   ],
   "engines": {
@@ -64,10 +76,10 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^24.1.1",
-    "@mcp-abap-adt/lib": "^24.1.1",
-    "@mcp-abap-adt/responsible-rules": "^24.1.1",
-    "@mcp-abap-adt/server-runtime": "^24.1.1"
+    "@mcp-abap-adt/background-runs-memory": "^24.2.0",
+    "@mcp-abap-adt/lib": "^24.2.0",
+    "@mcp-abap-adt/responsible-rules": "^24.2.0",
+    "@mcp-abap-adt/server-runtime": "^24.2.0"
   },
   "devDependencies": {
     "@types/express": "*",

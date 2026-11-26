@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.fr0ster/mcp-abap-adt-sse",
-  "description": "MCP server for SAP ABAP ADT over HTTP+SSE, abapGit included: x-sap-* header credentials",
+  "description": "SAP ABAP ADT over HTTP+SSE: CRUD, where-used, ATC, unit tests, transports, debugger, abapGit",
   "repository": {
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "24.1.1",
+  "version": "24.2.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/sse",
-      "version": "24.1.1",
+      "version": "24.2.0",
       "transport": {
         "type": "sse",
         "url": "http://localhost:{MCP_SSE_PORT}/sse",

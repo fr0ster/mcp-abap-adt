@@ -3,20 +3,61 @@
 
 `mcp-abap-adt` is an MCP server for ABAP ADT in SAP ECC/S/4HANA (on-premise) and SAP BTP ABAP Cloud systems. It gives agents controlled access to real ABAP repositories through ADT, so analysis and changes are grounded in system data instead of assumptions. It is built for AI-assisted pair programming (AIPNV: AI Pairing, Not Vibing), not autopilot vibe coding.
 
-**Primary workflows:**
-- **Deep ABAP analysis**: where-used, object metadata, repository navigation, object structure, semantic analysis, dependency and impact exploration.
-- **High-level ABAP development**: rapid CRUD and iterative updates for RAP and classic ABAP artifacts (classes, interfaces, function groups/modules, programs, DDIC, CDS/view/service artifacts), validated through ADT flows.
-- **The git loop with abapGit**: find a package's repository, link it, pull, see what changed, stage, commit and push, and read what went wrong — on premise and on ABAP Cloud, with any git host over HTTPS, the git credential kept out of every argument, log line and answer. See [abapGit](#abapgit-the-git-loop-on-a-package).
+## What it does
 
-**Why teams use it:**
-- **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
-- Works with **On-Premise (ECC/S/4HANA)** and **ABAP Cloud (BTP)** systems
-- Legacy systems (BASIS < 7.50) are **not supported at present**: that support is parked on the `parked/legacy-support` branch until it can be tried against a live legacy system
+What you can do, grouped by what you want; each item links to its page. Where it matters, an item
+names its binaries and systems: `-ro` is a read-only binary, compact a binary of the compact tool
+set, onprem an ECC or S/4HANA system, cloud SAP BTP ABAP Cloud. **New in 24.2.0** is marked.
+
+**Analyse code and its impact**
+- **Where-used and impact analysis**: find every object that uses a class, table, CDS view, function module or text element before you change it — [GetWhereUsed](docs/user-guide/AVAILABLE_TOOLS.md#read-only-system).
+- **Search objects and source text**: find objects by name and type, and search ABAP source inside packages — `SearchObject`, `SearchSource`, [Read-only tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md).
+- **Read any repository object**: source and metadata of classes, interfaces, programs, includes, function groups and modules, DDIC, CDS, RAP behavior, service definitions and bindings, message classes, enhancements (implementations onprem only) — [Read-only tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md).
+- **Structure and outline**: an object's components with the source lines each occupies, package trees and contents, includes and main programs — `GetObjectOutline`, `GetObjectStructure`, `GetPackageTree`.
+- **Versions and diffs**: list an object's versions, read an old version, compare two — [Common tools](docs/user-guide/AVAILABLE_TOOLS.md#high-level-common).
+- **Draft detection**: see whether an object holds an unactivated change, and whose — `GetObjectDraft` (compact `HandlerGet` `part: 'draft'`), [Access restrictions](docs/user-guide/ACCESS_RESTRICTIONS.md#getobjectdraft-and-handlerget-part-draft).
+
+**Develop and change**
+- **Full CRUD**: create, read, update, delete, check and activate classes (with their local includes), interfaces, programs and includes (onprem), function groups and modules, packages, domains, data elements, tables, structures, table types, CDS views, RAP behavior definitions and implementations, metadata extensions, service definitions and bindings, message classes — [High-level tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md), compact `HandlerCreate` / `HandlerUpdate` / `HandlerDelete`.
+- **Activation**: activate one object or a list together — `ActivateObjects`, compact `HandlerActivate`.
+- **Table settings and text elements**: read and write a table's technical settings, and the text symbols, selection texts and headings of a program, function group or class (onprem and cloud) — [Text elements](docs/user-guide/AVAILABLE_TOOLS.md#high-level-text-elements).
+- **Packages with no super package** (**new in 24.2.0**): a structure package or a local (LOCAL) package can be created, locked and unlocked with no super package — `CreatePackage`, compact `HandlerCreate` `PACKAGE`.
+- **abapGit** (**new in 24.2.0**): find a package's repository, link it, pull, see what changed, stage, commit and push, switch branches and read the run log — on premise and on ABAP Cloud, full and compact, with any git host over HTTPS, the git credential bound to approved endpoints and kept out of every argument, log line and answer — [abapGit](#abapgit-the-git-loop-on-a-package).
+
+**Test and quality**
+- **ATC**: run the ABAP Test Cockpit over several objects, read its findings, and list and read the stored ATC results — [ATC tools](docs/user-guide/AVAILABLE_TOOLS.md#high-level-atc).
+- **ABAP Unit**: create, update and run the tests of a class, program (onprem), function group, function module or CDS view, or run every test of a package — [Unit test tools](docs/user-guide/AVAILABLE_TOOLS.md#high-level-unit-test).
+- **Syntax checks**: check an object before activation — the `Check*` tools, compact `HandlerCheckRun`.
+
+**Transports**
+- **Transport requests**: create requests and tasks, list a user's requests, read a request's objects and action log, add, remove and move objects, sort and compress a task — [Transport tools](docs/user-guide/AVAILABLE_TOOLS.md#high-level-transport); the read half in every binary, `-ro` included.
+
+**Debug and runtime**
+- **ABAP and AMDP debugger**: breakpoints, stack, variables, watchpoints, steps and memory snapshots, a session kept between calls — [Debugger](docs/user-guide/DEBUGGER.md); the full and compact write binaries, no `-ro` one.
+- **Run and profile**: run a class (and a program, onprem), with a profiler trace if asked, and read the traces — `RuntimeRunClass`, `RuntimeRunProgram`, the `Runtime*Profiler*` tools.
+- **Dumps and feeds**: read short dumps, system messages and (onprem) the gateway error log — `RuntimeListFeeds`, `RuntimeGetDumpById`.
+
+**Govern and secure**
+- **Access restrictions**: deny tools or values (`--deny-actions`), and allow only listed packages, transport requests or tables (`--allowed-packages`, `--allowed-requests`, `--allowed-tables` / `--denied-tables`), set at start in every binary — [Access restrictions](docs/user-guide/ACCESS_RESTRICTIONS.md).
+- **Read-only binaries**: `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` and the compact `-ro` three serve nothing that changes the system — [Handler sets](docs/user-guide/HANDLERS_MANAGEMENT.md).
+- **Data tools off by default**: freestyle SQL and table preview (`GetSqlQuery`, `GetTableContents`, compact `HandlerGetData`) are not listed unless the server is started with `--enable-data-tools` — [The data tools](#the-data-tools-off-unless-enabled).
+- **SAP authorization stays the boundary**: every call runs as the connected SAP user, and the restrictions only take away — [Security](SECURITY.md).
+
+**Work with agents**
+- **MCP prompts** (**new in 24.2.0**): nine ready-made requests — `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport` — that a client shows as slash commands, each answering the tools to call in order; every binary on onprem and cloud (the `-ro` ones `get`, `where_used`, `transport`, compact `-ro` also `check`) — [MCP Prompts](docs/user-guide/PROMPTS.md).
+- **Terse answers** (**new in 24.2.0**): every tool answers what the next call needs — TSV for a list, every row answered — and `detail` (`terse`, `medium`, `full`, `raw`) chooses the reading before the call — [Answers](#answers).
+- **Batch mode**: record independent calls and send them to SAP together in one ADT batch request (compact binaries, `-ro` included) — [Batch Mode](docs/user-guide/BATCH_MODE.md).
+- **Background long reads**: where-used, search, package walks and other long reads answer a handle at once and are read or cancelled later, in every binary — [Background runs](docs/user-guide/README.md#background-runs-of-the-long-reads).
+- **Tool search texts**: every tool carries keywords for BM25 and a sentence for vector search beside its description — [Tool Search](docs/user-guide/TOOL_SEARCH.md).
+- **Long session by `state_handle`**: keep one SAP session across a run of calls over Streamable HTTP — `SessionOpen` / `SessionClose` (compact `HandlerSession`), the `-http` binaries — [Held state and the long session](http/README.md#held-state-and-the-long-session).
+- **Full or compact**: the full set has one tool per action and object type; the compact set has one tool per operation with the object type in the arguments — [Compact tools](compact/docs/AVAILABLE_TOOLS.md).
+- **Embeddable**: the tools and an MCP server as a library, `@mcp-abap-adt/lib` (Apache-2.0) — [Embeddable server](#2-embeddable-server-for-integration).
+
+**Connect and run**
+- Works with **On-Premise (ECC/S/4HANA)** and **ABAP Cloud (BTP)** systems; legacy systems (BASIS < 7.50) are **not supported at present**: that support is parked on the `parked/legacy-support` branch until it can be tried against a live legacy system
 - Three authentications over stdio: **basic** (HTTP or RFC), **SNC** (passwordless, RFC), **JWT with browser login** (service key, ABAP or XSUAA); a **JWT you already hold** goes in the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse`
 - Multiple transports: **stdio**, **HTTP**, **SSE**
 - Several installation variants: the **full** server (`@mcp-abap-adt/core`) or the **compact** one (`@mcp-abap-adt/compact`), each connecting to the system over **HTTP**, **RFC** or **SNC** — see [Installation variants](docs/installation/INSTALLATION.md#installation-variants)
-- Rich tool surface for ABAP objects, metadata, transports, and search
-- **abapGit through ADT**: link, pull, stage, push, branches and checks as tools (full and compact), each where the system's abapGit serves it; any git host over HTTPS; git credentials bound to approved endpoints, never a tool argument; answers are facts only
 
 **Authorization & Destinations (Important):** A *destination* is the filename of a service key stored locally. You place service keys in the service-keys directory, and use `--mcp=<destination>` to select which one to use. This is the primary auth model for on‑prem and BTP systems. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
@@ -24,19 +65,20 @@ You can configure MCP clients either manually (JSON/TOML) or via the configurato
 
 ## Table of Contents
 
-1. [Getting Started](#getting-started)
-2. [Architecture](#architecture)
-3. [Quick Start](#quick-start)
-4. [Use Cases](#use-cases)
-5. [Target Users](#target-users)
-6. [Capabilities (High-Level Focus)](#capabilities-high-level-focus)
-7. [Terminology](#terminology)
-8. [Authorization & Destinations](#authorization--destinations)
-9. [Registries](#registries)
-10. [Features](#features) — [abapGit](#abapgit-the-git-loop-on-a-package)
-11. [Documentation](#documentation)
-12. [Dependencies](#dependencies)
-13. [Running the Server](#running-the-server)
+1. [What it does](#what-it-does)
+2. [Getting Started](#getting-started)
+3. [Architecture](#architecture)
+4. [Quick Start](#quick-start)
+5. [Use Cases](#use-cases)
+6. [Target Users](#target-users)
+7. [Capabilities (High-Level Focus)](#capabilities-high-level-focus)
+8. [Terminology](#terminology)
+9. [Authorization & Destinations](#authorization--destinations)
+10. [Registries](#registries)
+11. [Features](#features) — [abapGit](#abapgit-the-git-loop-on-a-package)
+12. [Documentation](#documentation)
+13. [Dependencies](#dependencies)
+14. [Running the Server](#running-the-server)
 
 ## Getting Started
 
@@ -134,7 +176,7 @@ the obligations of a server that service never runs.
 | [`@mcp-abap-adt/background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory) | Apache-2.0 | The in-memory store of background runs (`IBackgroundRuns` of the library): the servers' store, for an embedder that keeps runs in its process. Every server package depends on it. |
 | [`@mcp-abap-adt/responsible-rules`](https://www.npmjs.com/package/@mcp-abap-adt/responsible-rules) | Apache-2.0 | The rules that name a call's responsible, user and system from `systeminformation` (`SystemContextRules` of the library), and the system type the binaries require. Every server package passes them; the library applies none, so an embedder opts in. |
 | [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro), [`http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/http-ro), [`sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/sse-ro) | AGPL-3.0-only | The read-only servers, `mcp-abap-adt-ro`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: `core`'s, `http`'s and `sse`'s launcher with the readonly tools (with system and search), the background runs of the long reads, batch mode and, on stdio, the leftover-session list — nothing that changes the system: no high, run, trace-schedule, debugger, leftover-session logoff or resume tool. |
-| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro), [`compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro), [`compact-sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse-ro) | AGPL-3.0-only | The read-only compact servers, `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro`: the 16 compact tools that change nothing, the background runs of the long reads, `HandlerBatch` and, on stdio, the leftover-session list. |
+| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro), [`compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro), [`compact-sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse-ro) | AGPL-3.0-only | The read-only compact servers, `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro`: the 17 compact tools that change nothing, the background runs of the long reads, `HandlerBatch` and, on stdio, the leftover-session list. |
 | [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes (`compact-readonly-entries` was `compact-readonly` before 19.0.0). |
 
 Eighteen packages, twelve binaries: four kinds of binary — core, core-ro, compact, compact-ro — on
@@ -221,10 +263,10 @@ Key examples of high-value workflows and tools:
 - **Repository and impact analysis**: `GetWhereUsed`, `DescribeByList`, `GetObjectStructure`, `GetObjectInfo`, `SearchObject`, `GetPackageTree`, `GetPackageContents`
 - **Code structure, as SAP states it**: `GetObjectOutline` (an object's components with the source lines each occupies), the `Get<Type>` source reads with `start_line`/`end_line` for just those lines, `GetIncludesList`
 - **RAP development**: `CreateBehaviorDefinition`, `UpdateBehaviorDefinition`, `CreateBehaviorImplementation`, `UpdateBehaviorImplementation`, `CreateServiceDefinition`, `UpdateServiceDefinition`, `CreateMetadataExtension`, `UpdateMetadataExtension`
-- **CDS/View development**: `CreateView`, `UpdateView`, `GetView`, `DeleteView`
+- **CDS development**: `CreateDdl`, `UpdateDdl`, `GetDdl`, `DeleteDdl`, `CheckDdl`, `ActivateDdl`
 - **ABAP OO CRUD**: `CreateClass`, `UpdateClass`, `GetClass`, `DeleteClass`, `CreateInterface`, `UpdateInterface`, `GetInterface`, `DeleteInterface`
 - **Function module/group CRUD**: `CreateFunctionGroup`, `UpdateFunctionGroup`, `GetFunctionGroup`, `DeleteFunctionGroup`, `CreateFunctionModule`, `UpdateFunctionModule`, `GetFunctionModule`, `DeleteFunctionModule`
-- **Transport and activation support**: `CreateTransport`, `GetTransport` (a transport request or a task, by its number: a request's header and tasks, a task's header, parent request and objects with their positions), `ActivateObject`
+- **Transport and activation support**: `CreateTransport`, `CreateTransportTask`, `GetTransport` (a transport request or a task, by its number: a request's header and tasks, a task's header, parent request and objects with their positions), `ListTransports`, `ReadTransportObjects`, `AddTransportObject`, `MoveTransportObjects`, `ActivateObjects`
 - **Quality and testing**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` (ABAP Test Cockpit — one run over several objects, findings read back by worklist), `ListATCResults`, `GetATCResult` (the stored ATC results — central and users' runs — listed by user, kind and age, one read by its Display ID), ABAP Unit per test carrier — `CreateUnitTest`/`UpdateUnitTest`/`DeleteUnitTest`/`RunUnitTest` for a class, `CreateCdsUnitTest`/`RunCdsUnitTest` for a CDS view, `CreateProgramUnitTest`/`RunProgramUnitTest` for a report, `CreateFunctionGroupUnitTest`/`RunFunctionGroupUnitTest`/`RunFunctionModuleUnitTest` for a function group (`runner: 'async'`, the default, starts the run; with `wait: true`, the default, the call reads the run's status at once and long-polls it while SAP answers it running, and once more when SAP answers that first read `NOT_STARTED` (the run it just started may not have begun yet), and answers the result of a run SAP answers finished, lasting as long as the run, or the `run_id` and `NOT_STARTED` when the long-polled read still answers it; `GetUnitTestResult`, given a `run_id`, answers `NOT_STARTED` at once; with `wait: false` it answers the `run_id` right after the start, which `GetUnitTestResult` reads — the way to start a long run under a client with a request time limit; `runner: 'sync'` is one request to `/abapunit/testruns` answering the finished result — for a system that has that endpoint alone; a function module's synchronous run takes `function_group_name` and covers every test of its group), and `RunAbapUnit` (with the same `wait`) for any ABAP Unit run target: an object of any type of the run registry (`CLAS/OCL`, `DDLS/DF`, …) or a package, with or without its subpackages; a CDS view's tests are assigned tests and execute with `scope.foreign_tests: true` — `CheckClass` and the rest of the `Check*` family
 
 ### Long reads run in the background
@@ -404,31 +446,57 @@ Published in the official MCP Registry and listed on Glama.ai.
 
 ## Features
 
-- **🏗️ Domain Management**: `GetDomain`, `CreateDomain`, `UpdateDomain` - Create, retrieve, and update ABAP domains
-- **📊 Data Element Management**: `GetDataElement`, `CreateDataElement`, `UpdateDataElement` - Create, retrieve, and update ABAP data elements
-- **📦 Table Management**: `GetTable`, `CreateTable` - Create and retrieve ABAP database tables; `GetTableContents` (the data preview) is a data tool, off unless enabled — see [The data tools](#the-data-tools-off-unless-enabled)
-- **🏛️ Structure Management**: `GetStructure`, `CreateStructure` - Create and retrieve ABAP structures
-- **🧾 Table Type Management**: `GetTableType`, `CreateTableType`, `UpdateTableType`, `DeleteTableType`, `CheckTableType`, `ActivateTableType`, `GetTableTypeVersions` - Create, read, change, check, activate and delete ABAP table types (on premise and cloud); the create and the update take the definition (row type, access, key) and answer the definition SAP stored
-- **👁️ View Management**: `GetView`, `CreateView`, `UpdateView` - Create and manage CDS Views and Classic Views
-- **🎓 Class Management**: `GetClass`, `CreateClass`, `UpdateClass` - Create, retrieve, and update ABAP classes
-- **📝 Program Management**: `GetProgram`, `CreateProgram`, `UpdateProgram` - Create, retrieve, and update ABAP programs
-- **🔧 Behavior Definition (BDEF) Management**: `GetBehaviorDefinition`, `CreateBehaviorDefinition`, `UpdateBehaviorDefinition` - Create and manage ABAP Behavior Definitions with support for Managed, Unmanaged, Abstract, and Projection types
-- **📋 Metadata Extension (DDLX) Management**: `CreateMetadataExtension`, `UpdateMetadataExtension` - Create and manage ABAP Metadata Extensions
-- **⚙️ Table Technical Settings**: `GetTableSettings`, `UpdateTableSettings` - Read a table's technical settings and write the settings given, the rest kept as stored; the update activates the table when asked (on premise and cloud)
-- **🔤 Text Elements**: `GetTextElements`, `UpdateTextElements` - Read and write the text symbols, selection texts and headings of a program, a function group or a class; each part given is written as its whole list, and the update activates the object together with its text elements when asked (on premise and cloud; on the cloud a function group's and a class's)
-- **⚡ Activation**: `ActivateObject` - Universal activation for any ABAP object
-- **🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create and retrieve transport requests
-- **🔍 Enhancement Analysis**: `GetEnhancements`, `GetEnhancementImpl`, `GetEnhancementSpot` - Enhancement discovery and analysis
-- **📋 Include Management**: `GetInclude` (source or metadata), `CreateInclude`, `UpdateInclude`, `UpdateIncludeMetadata`, `DeleteInclude`, `ActivateInclude` - Create, read, change and delete program includes (writes on premise); `GetIncludesList` - Recursive include discovery
-- **🔍 System Tools**: `GetInactiveObjects` - Monitor inactive objects waiting for activation
-- **🌐 Service Binding Preview**: `GetServiceBindingPreviewUrl` - The browser URL that opens a published service binding's Fiori preview, beside its OData service and `$metadata` URLs. Composed from the binding, its service definition and the exposed root view — no document carries it. OData V2 and V4; a Web API binding has no preview and says so. On SAP BTP the preview URL carries the browser host (`abap-web`), where the BTP logon answers, while the service URLs keep the ADT host
-- **🧪 Runtime Diagnostics**: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeGetDumpById` - Profiling and dump analysis with JSON payloads
-- **📡 Runtime Feeds**: `RuntimeListFeeds`, `RuntimeListSystemMessages`, `RuntimeGetGatewayErrorLog` - Feed reader (dumps — filtered by user, runtime error, exception, object, package or component, and read past SAP's 100 entries per request — system messages, gateway errors), SM02 system messages, Gateway error log
-- **🐞 Debugger** (in `mcp-abap-adt`, `-http`, `-sse` and the compact write binaries; in no `-ro` binary): ABAP and AMDP — breakpoints (line, exception, statement, message; a line breakpoint may carry a condition), a background run of a class or report caught at them, another user's requests and terminal mode, stack, variables, watchpoints, steps, leaving a debuggee running, the debugger settings, memory sizes and snapshots. A debug session is named by a `state_handle` and survives between tool calls on every transport. In user mode a breakpoint catches every request of the request user (the connected SAP user unless another is named): where that must not be possible, install a `-ro` binary. See [Debugger](docs/user-guide/DEBUGGER.md)
+The tools of the full binaries (`mcp-abap-adt`, `-http`, `-sse`) by family, as the generated
+[tool reference](docs/user-guide/AVAILABLE_TOOLS.md) lists them; the compact binaries serve the
+same operations with the object type in the arguments ([Compact tools](compact/docs/AVAILABLE_TOOLS.md)).
+A family on one system kind says so; the rest are onprem and cloud.
+
+**Repository objects** — each with `Get`, `Create`, `Update`, `Delete`, and where SAP has them `Check` and `Activate`:
+- **🎓 Classes**: `GetClass`, `CreateClass`, `UpdateClass`, `DeleteClass`, `CheckClass`, `ActivateClass`, and the local includes: `Get`/`Update`/`Delete` of `LocalDefinitions`, `LocalTypes`, `LocalMacros`, `LocalTestClass`
+- **🔌 Interfaces**: `GetInterface`, `CreateInterface`, `UpdateInterface`, `DeleteInterface`, `CheckInterface`, `ActivateInterface`
+- **📝 Programs** (onprem): `GetProgram`, `CreateProgram`, `UpdateProgram`, `DeleteProgram`, `CheckProgram`, `ActivateProgram`
+- **📋 Includes**: `GetInclude` (source or metadata), `GetIncludesList` (recursive), `GetMainPrograms` (onprem); writes onprem: `CreateInclude`, `UpdateInclude`, `UpdateIncludeMetadata`, `DeleteInclude`, `ActivateInclude`
+- **🧩 Function groups and modules**: `GetFunctionGroup`, `CreateFunctionGroup`, `UpdateFunctionGroup`, `DeleteFunctionGroup`, `CheckFunctionGroup`, `ActivateFunctionGroup`; `GetFunctionModule`, `CreateFunctionModule`, `UpdateFunctionModule`, `DeleteFunctionModule`, `CheckFunctionModule`, `ActivateFunctionModule`; function includes: `GetFunctionInclude`, `CreateFunctionInclude`, `UpdateFunctionInclude`, `DeleteFunctionInclude`, `ListFunctionGroupIncludes`, `ListFunctionModules`
+- **📦 Packages**: `GetPackage`, `GetPackageContents`, `GetPackageTree`, `CreatePackage` (a structure package or a local (LOCAL) package needs no `super_package`, new in 24.2.0), `UpdatePackage`, `DeletePackage`, `CheckPackage`
+- **🏗️ Domains and data elements**: `GetDomain`, `CreateDomain`, `UpdateDomain`, `DeleteDomain`, `CheckDomain`, `ActivateDomain`; `GetDataElement`, `CreateDataElement`, `UpdateDataElement`, `DeleteDataElement`, `CheckDataElement`, `ActivateDataElement`
+- **🗄️ Tables and structures**: `GetTable`, `CreateTable`, `UpdateTable`, `DeleteTable`, `CheckTable`, `ActivateTable`; `GetStructure`, `GetStructuresList`, `CreateStructure`, `UpdateStructure`, `DeleteStructure`, `CheckStructure`, `ActivateStructure`
+- **🧾 Table types**: `GetTableType`, `CreateTableType`, `UpdateTableType`, `DeleteTableType`, `CheckTableType`, `ActivateTableType` — the create and the update take the definition (row type, access, key) and answer the definition SAP stored
+- **⚙️ Table technical settings**: `GetTableSettings`, `UpdateTableSettings` — the settings given are written, the rest kept as stored; the update activates the table when asked
+- **🔤 Text elements**: `GetTextElements`, `UpdateTextElements` — the text symbols, selection texts and headings of a program, a function group or a class; each part given is written as its whole list (on the cloud a function group's and a class's)
+- **👁️ CDS data definitions**: `GetDdl`, `CreateDdl`, `UpdateDdl`, `DeleteDdl`, `CheckDdl`, `ActivateDdl`
+- **🔧 RAP behavior**: `GetBehaviorDefinition`, `CreateBehaviorDefinition`, `UpdateBehaviorDefinition`, `DeleteBehaviorDefinition`, `CheckBehaviorDefinition`, `ActivateBehaviorDefinition`; `GetBehaviorImplementation`, `CreateBehaviorImplementation`, `UpdateBehaviorImplementation`, `DeleteBehaviorImplementation`
+- **📋 Metadata extensions**: `GetMetadataExtension`, `CreateMetadataExtension`, `UpdateMetadataExtension`, `DeleteMetadataExtension`, `CheckMetadataExtension`, `ActivateMetadataExtension`
+- **🌐 Service definitions and bindings**: `GetServiceDefinition`, `CreateServiceDefinition`, `UpdateServiceDefinition`, `DeleteServiceDefinition`, `ActivateServiceDefinition`; `GetServiceBinding`, `CreateServiceBinding`, `UpdateServiceBinding`, `DeleteServiceBinding`, `ActivateServiceBinding`, `ValidateServiceBinding`, `ListServiceBindingTypes`; `GetServiceBindingPreviewUrl` — the browser URL of a published binding's Fiori preview, beside its OData service and `$metadata` URLs (OData V2 and V4)
+- **✉️ Message classes**: `GetMessageClass`, `CreateMessageClass`, `UpdateMessageClass`, `DeleteMessageClass`, and one message: `GetMessageClassMessage`, `CreateMessageClassMessage`, `UpdateMessageClassMessage`, `DeleteMessageClassMessage`
+- **🔍 Enhancements**: `GetEnhancements`, `GetEnhancementSpot`, `GetEnhancementImpl` (onprem)
+- **⚡ Activation**: `ActivateObjects` — one object or a list, together, text elements included; `GetInactiveObjects` lists what waits for activation
+- **🕓 Versions and drafts**: `GetObjectVersions`, `GetObjectVersionSource`, `GetObjectVersionDiff`, and per type (`Get<Type>Versions`, `…VersionSource`, `…VersionDiff`); `GetObjectDraft` — whether an object holds an unactivated change, and whose
+
+**Analysis and search**:
+- **🔎 Where-used and search**: `GetWhereUsed`, `SearchObject`, `SearchSource` (ABAP source text inside packages), `GetObjectsByType`, `GetObjectsList`
+- **🧭 Structure and metadata**: `GetObjectOutline` (components with their source lines), `GetObjectStructure`, `GetObjectInfo`, `DescribeByList`, `GetObjectNodeFromCache`, `GetTypeInfo`, `GetAdtTypes`, `GetTransaction`
+
+**Test and quality**:
+- **✅ ATC**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` — one run over several objects, findings read back by worklist; `ListATCResults`, `GetATCResult` — the stored ATC results, central and users' runs
+- **🧪 ABAP Unit**: per test carrier — `CreateUnitTest` / `UpdateUnitTest` / `DeleteUnitTest` / `RunUnitTest` for a class, `CreateCdsUnitTest` / `UpdateCdsUnitTest` / `DeleteCdsUnitTest` / `RunCdsUnitTest` for a CDS view, `CreateProgramUnitTest` / `UpdateProgramUnitTest` (onprem) / `RunProgramUnitTest` for a report, `CreateFunctionGroupUnitTest` / `UpdateFunctionGroupUnitTest` / `RunFunctionGroupUnitTest` / `RunFunctionModuleUnitTest` for a function group; `RunAbapUnit` for any run target, a package with or without its subpackages; `GetUnitTestResult` reads a run by its `run_id`. A run waits for its result by default (`wait`), or answers the `run_id` at once with `wait: false`
+
+**🚚 Transports**: `CreateTransport`, `CreateTransportTask`, `GetTransport`, `ListTransports` (a user's requests), `ReadTransportObjects`, `ReadTransportActionLog`, `AddTransportObject`, `RemoveTransportObject`, `MoveTransportObjects`, `SortAndCompressTransportTask`
+
+**Debug and runtime**:
+- **🐞 Debugger** (in `mcp-abap-adt`, `-http`, `-sse` and the compact write binaries; in no `-ro` binary): ABAP and AMDP — breakpoints (line, exception, statement, message; a line breakpoint may carry a condition), a background run of a class or report caught at them, another user's requests and terminal mode, stack, variables, watchpoints, steps, leaving a debuggee running, the debugger settings, memory sizes and snapshots (`Debug*`, `AmdpDebug*`, `MemorySnapshot*`). A debug session is named by a `state_handle` and survives between tool calls on every transport. In user mode a breakpoint catches every request of the request user (the connected SAP user unless another is named): where that must not be possible, install a `-ro` binary. See [Debugger](docs/user-guide/DEBUGGER.md)
+- **▶️ Runs and profiling**: `RuntimeRunClass`, `RuntimeRunProgram` (onprem), each optionally under a profiler trace, and `RuntimeCreateProfilerTraceParameters` (none of the three in a `-ro` binary); the trace reads `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`
+- **📡 Dumps and feeds**: `RuntimeListFeeds` (dumps — filtered by user, runtime error, exception, object, package or component, and read past SAP's 100 entries per request — system messages, gateway errors), `RuntimeGetDumpById`, `RuntimeListSystemMessages` (SM02), `RuntimeGetGatewayErrorLog` (onprem)
+
+**Server and sessions**:
+- **⏳ Background runs**: `GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun` — the long reads answer a `run_handle` at once (see [Long reads run in the background](#long-reads-run-in-the-background)); a class or program run may go on in the background too
 - **🔗 Long session over Streamable HTTP** (`mcp-abap-adt-http`, `-compact-http` and their `-ro`): every tool takes an optional `state_handle` argument that routes the call to the instance holding that state (a lock, a batch, a debug session); `SessionOpen` / `SessionClose` (compact: `HandlerSession`) keep one instance and its SAP session for a run of calls and log it off at the close, or at the idle bound. See [`@mcp-abap-adt/http`](http/README.md#held-state-and-the-long-session)
+- **🧹 Leftover sessions** (stdio binaries): `ListLeftoverSessions`, and in the write binaries `LogoffLeftoverSession` — the SAP sessions an ended process left
+- **📦 Batch mode** (compact binaries): `HandlerBatch` — see [Batch mode](#batch-mode)
+- **💬 MCP prompts** (new in 24.2.0): nine prompts beside the tools — see [Prompts](#prompts)
+- **🛡️ Access restrictions**: `--deny-actions`, `--allowed-packages`, `--allowed-requests`, `--denied-tables` / `--allowed-tables` — see [Access restrictions](#access-restrictions)
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destinations))
-- **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API; a data tool, off unless enabled — see [The data tools](#the-data-tools-off-unless-enabled)
+- **💾 Data tools, off unless enabled**: `GetSqlQuery` (freestyle ABAP SQL), `GetTableContents` (the data preview), compact `HandlerGetData` — see [The data tools](#the-data-tools-off-unless-enabled)
 
 - **🌿 abapGit**: `ListAbapGitRepos`, `CheckAbapGitExternalRepo`, `GetAbapGitBranchInfo`, `LinkAbapGitRepo`, `UnlinkAbapGitRepo`, `PullAbapGitRepo`, `GetAbapGitModifiedObjects`, `GetAbapGitStaging`, `PushAbapGitRepo`, `CheckAbapGitRepo`, `GetAbapGitFile`, `SwitchAbapGitBranch`, `GetAbapGitErrorLog`; compact `HandlerAbapGitGet` and `HandlerAbapGit` - The git loop on a package, see [abapGit](#abapgit-the-git-loop-on-a-package)
 

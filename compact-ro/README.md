@@ -8,13 +8,14 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 
 ## The tools
 
-- the **16 compact tools that change nothing**, one per operation with the object in
+- the **17 compact tools that change nothing**, one per operation with the object in
   `object_type`: `HandlerGet`, `HandlerGetData` (a data
   tool: served only with `--enable-data-tools`, off by default),
   `HandlerValidate`, `HandlerCheckRun`, `HandlerDeletionCheck`, the unit-test and CDS unit-test status and result, the
   profiler list and view, the dump list and view, the service-binding type list and validation;
   and `HandlerSystem`, the system-wide reads by `action` (source search, object search,
-  where-used, package tree, transports, ATC findings and results)
+  where-used, package tree, transports, ATC findings and results), and `HandlerAbapGitGet`, the abapGit reads
+  (repositories, an external repository, modified objects, staging, checks, a file, the error log)
   (from [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries));
 - the **leftover-session list** (`HandlerLeftoverSessionList`): the SAP sessions a killed server
   process left open, only the caller's own. Their logoff (`HandlerLeftoverSessionLogoff`)
@@ -22,7 +23,7 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 - the **background-run tools** (`HandlerBackgroundRunGet`, `HandlerBackgroundRunList`, `HandlerBackgroundRunDiscard`): a long read runs in the background by default and is read, listed and cancelled by them;
 - **`HandlerBatch`** (`action: 'begin' | 'end' | 'answers'`): batch mode.
 
-20 tools in all (one more, `HandlerGetData`, with `--enable-data-tools`) (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run, trace schedule, profiler run or leftover-session logoff
+21 tools in all (one more, `HandlerGetData`, with `--enable-data-tools`) (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run, trace schedule, profiler run or leftover-session logoff
 is in the tool list at all, so a client cannot call one; nor the four debugger tools — those are `mcp-abap-adt-compact`'s ([`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact)).
 
 ## Running it

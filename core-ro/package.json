@@ -1,8 +1,8 @@
 {
   "name": "@mcp-abap-adt/core-ro",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-ro",
-  "version": "24.1.1",
-  "description": "The read-only MCP server for SAP ABAP ADT over stdio: the readonly tools (with system and search) and the leftover-session list and logoff, no high, debugger, background-run or resume tool. One destination through the auth broker, as @mcp-abap-adt/core; connects over HTTP, RFC or SNC (RFC and SNC need the SAP NW RFC library at run time).",
+  "version": "24.2.0",
+  "description": "The read-only MCP server for SAP ABAP ADT over stdio, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: nothing that changes the system: where-used, search, source and metadata reads, ATC and unit-test results, transport reads, the abapGit reads, background long reads, MCP prompts and access restrictions, and the leftover-session list. One destination through the auth broker; connects over HTTP, RFC or SNC (RFC and SNC need the SAP NW RFC library at run time).",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"
@@ -13,11 +13,22 @@
     "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
   },
   "keywords": [
-    "sap",
     "abap",
+    "sap",
     "adt",
     "mcp",
     "mcp-server",
+    "model-context-protocol",
+    "abap-cloud",
+    "sap-btp",
+    "s4hana",
+    "on-premise",
+    "where-used",
+    "atc",
+    "abap-unit",
+    "transports",
+    "mcp-prompts",
+    "access-control",
     "read-only"
   ],
   "type": "commonjs",
@@ -57,10 +68,10 @@
     "start": "node ./bin/mcp-abap-adt-ro.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^24.1.1",
-    "@mcp-abap-adt/lib": "^24.1.1",
-    "@mcp-abap-adt/responsible-rules": "^24.1.1",
-    "@mcp-abap-adt/server-runtime": "^24.1.1"
+    "@mcp-abap-adt/background-runs-memory": "^24.2.0",
+    "@mcp-abap-adt/lib": "^24.2.0",
+    "@mcp-abap-adt/responsible-rules": "^24.2.0",
+    "@mcp-abap-adt/server-runtime": "^24.2.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

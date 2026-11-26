@@ -1,8 +1,8 @@
 {
   "name": "@mcp-abap-adt/http-ro",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-http-ro",
-  "version": "24.1.1",
-  "description": "The read-only MCP server for SAP ABAP ADT over Streamable HTTP: the readonly tools (with system and search), no high, debugger, background-run or leftover-session tool; credentials only from each request's x-sap-* headers. No auth broker, no stores.",
+  "version": "24.2.0",
+  "description": "The read-only MCP server for SAP ABAP ADT over Streamable HTTP, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: nothing that changes the system: where-used, search, source and metadata reads, ATC and unit-test results, transport reads, the abapGit reads, background long reads, MCP prompts and access restrictions. Credentials only from each request's x-sap-* headers; a long session by state_handle. No auth broker, no stores.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"
@@ -13,11 +13,22 @@
     "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
   },
   "keywords": [
-    "sap",
     "abap",
+    "sap",
     "adt",
     "mcp",
     "mcp-server",
+    "model-context-protocol",
+    "abap-cloud",
+    "sap-btp",
+    "s4hana",
+    "on-premise",
+    "where-used",
+    "atc",
+    "abap-unit",
+    "transports",
+    "mcp-prompts",
+    "access-control",
     "read-only",
     "streamable-http"
   ],
@@ -58,10 +69,10 @@
     "start": "node ./bin/mcp-abap-adt-http-ro.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^24.1.1",
-    "@mcp-abap-adt/lib": "^24.1.1",
-    "@mcp-abap-adt/responsible-rules": "^24.1.1",
-    "@mcp-abap-adt/server-runtime": "^24.1.1"
+    "@mcp-abap-adt/background-runs-memory": "^24.2.0",
+    "@mcp-abap-adt/lib": "^24.2.0",
+    "@mcp-abap-adt/responsible-rules": "^24.2.0",
+    "@mcp-abap-adt/server-runtime": "^24.2.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

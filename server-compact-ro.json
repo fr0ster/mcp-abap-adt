@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.fr0ster/mcp-abap-adt-compact-ro",
-  "description": "Read-only compact MCP server for SAP ABAP ADT: the compact tools that change nothing, abapGit reads",
+  "description": "Read-only compact SAP ABAP ADT for onprem and BTP: reads, where-used, checks, transports, abapGit",
   "repository": {
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "24.1.1",
+  "version": "24.2.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/compact-ro",
-      "version": "24.1.1",
+      "version": "24.2.0",
       "transport": {
         "type": "stdio"
       },

@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.fr0ster/mcp-abap-adt-compact-http-ro",
-  "description": "Read-only compact MCP server for SAP ABAP ADT over Streamable HTTP, abapGit reads: x-sap-*",
+  "description": "Read-only compact SAP ABAP ADT over Streamable HTTP: reads, where-used, checks, abapGit reads",
   "repository": {
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "24.1.1",
+  "version": "24.2.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/compact-http-ro",
-      "version": "24.1.1",
+      "version": "24.2.0",
       "transport": {
         "type": "streamable-http",
         "url": "http://localhost:{MCP_HTTP_PORT}/mcp/stream/http",

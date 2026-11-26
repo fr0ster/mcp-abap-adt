@@ -1,8 +1,8 @@
 {
   "name": "@mcp-abap-adt/compact-sse-ro",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-compact-sse-ro",
-  "version": "24.1.1",
-  "description": "The read-only compact MCP server for SAP ABAP ADT over HTTP+SSE: the 16 compact tools that change nothing, with credentials only from the x-sap-* headers of the request that opens each SSE connection. No auth broker, no stores.",
+  "version": "24.2.0",
+  "description": "The read-only compact MCP server for SAP ABAP ADT over HTTP+SSE, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: the compact tools that change nothing: reads, where-used, checks, transport reads, unit-test results, the abapGit reads, background long reads, batch mode, MCP prompts and access restrictions. Credentials only from the x-sap-* headers of the request that opens each SSE connection. No auth broker, no stores.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"
@@ -13,13 +13,25 @@
     "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
   },
   "keywords": [
-    "sap",
     "abap",
+    "sap",
     "adt",
     "mcp",
     "mcp-server",
-    "compact",
+    "model-context-protocol",
+    "abap-cloud",
+    "sap-btp",
+    "s4hana",
+    "on-premise",
+    "where-used",
+    "atc",
+    "abap-unit",
+    "transports",
+    "mcp-prompts",
+    "access-control",
     "read-only",
+    "compact",
+    "batch",
     "sse"
   ],
   "type": "commonjs",
@@ -59,11 +71,11 @@
     "start": "node ./bin/mcp-abap-adt-compact-sse-ro.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^24.1.1",
-    "@mcp-abap-adt/compact-readonly-entries": "^24.1.1",
-    "@mcp-abap-adt/lib": "^24.1.1",
-    "@mcp-abap-adt/responsible-rules": "^24.1.1",
-    "@mcp-abap-adt/server-runtime": "^24.1.1"
+    "@mcp-abap-adt/background-runs-memory": "^24.2.0",
+    "@mcp-abap-adt/compact-readonly-entries": "^24.2.0",
+    "@mcp-abap-adt/lib": "^24.2.0",
+    "@mcp-abap-adt/responsible-rules": "^24.2.0",
+    "@mcp-abap-adt/server-runtime": "^24.2.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

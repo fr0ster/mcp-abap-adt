@@ -2398,6 +2398,7 @@ function systemProperties(
           package_tree: DETAIL_WORDS,
           transports: DETAIL_WORDS,
           atc_findings: DETAIL_WORDS,
+          atc_results: DETAIL_WORDS,
           atc_result: DETAIL_WORDS,
         }),
       ),
@@ -2607,7 +2608,7 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
     ],
     transports: ['user', 'modifiable_only', 'detail'],
     atc_findings: ['worklist_id', 'detail'],
-    atc_results: ['created_by', 'central_only', 'age_min', 'age_max'],
+    atc_results: ['created_by', 'central_only', 'age_min', 'age_max', 'detail'],
     atc_result: ['display_id', 'detail'],
   },
 });

@@ -520,29 +520,32 @@ describe('completion', () => {
   });
 });
 
-describe('the description names the tools the prompt asks for', () => {
-  it('compact create asks for HandlerCreate', () => {
-    assert.equal(
-      promptOf(createPrompt, compactOnprem).description,
-      'Creates an ABAP object of object_type named name in package_name: asks the model to call HandlerCreate.',
-    );
+describe('the description states the function, the same on every binary', () => {
+  it('create on compact and core', () => {
+    for (const source of [compactOnprem, coreOnprem]) {
+      assert.equal(
+        promptOf(createPrompt, source).description,
+        'Creates an ABAP object of object_type named name in package_name.',
+      );
+    }
   });
 
-  it('compact delete asks for the delete and the lock tools', () => {
-    assert.equal(
-      promptOf(deletePrompt, compactOnprem).description,
-      'Deletes an ABAP object of object_type named name: asks the model to call HandlerDelete, HandlerLock.',
-    );
+  it('delete on compact and core', () => {
+    for (const source of [compactOnprem, coreOnprem]) {
+      assert.equal(
+        promptOf(deletePrompt, source).description,
+        'Deletes an ABAP object of object_type named name.',
+      );
+    }
   });
 
-  it('core get lists the per-type tools', () => {
-    const description = promptOf(getPrompt, coreOnprem).description;
-    assert.ok(
-      description.startsWith(
-        'Reads an ABAP object of object_type named name: asks the model to call GetPackage, ',
-      ),
-      description,
-    );
+  it('get on compact and core', () => {
+    for (const source of [compactOnprem, coreOnprem]) {
+      assert.equal(
+        promptOf(getPrompt, source).description,
+        'Reads an ABAP object of object_type named name.',
+      );
+    }
   });
 });
 

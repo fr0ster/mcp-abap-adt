@@ -2717,7 +2717,42 @@ describe('D23b: the caller sets how much the answer holds (DO23)', () => {
     );
   }
 
-  it('the batched path stops at a chunk boundary: no envelope of a later chunk is sent', async () => {
+  it("with the consumer's bound of 300 the batched path stops at a chunk boundary: no envelope of a later chunk is sent", async () => {
+    const names = Array.from(
+      { length: 305 },
+      (_, i) => `ZQ${String(i + 1).padStart(4, '0')}`,
+    );
+    const repo: Repository = {
+      nodes: {
+        [nodeKey('ZBIGL')]: { types: [{ type: 'PROG/P', nodeId: '000001' }] },
+        [nodeKey('ZBIGL', '1')]: {
+          objects: names.map((name) => ({ type: 'PROG/P', name })),
+        },
+      },
+      sources: Object.fromEntries(
+        names.map((name) => [`PROGRAM ${name}`, 'marker']),
+      ),
+      fugrChildren: {},
+      masks: {},
+    };
+    const batched = standOn(repo);
+    const sequential = standOn(repo);
+    const args = { query: 'marker', packages: ['ZBIGL'], max_hits: 2 };
+    const a = payloadOf(await searchOn(batched, args, false, 4000, 300));
+    const b = payloadOf(await searchOn(sequential, args, true, 4000));
+    assert.equal(sourceRequests(batched).length, 300);
+    assert.equal(sourceRequests(sequential).length, 2);
+    assert.deepStrictEqual(a.results, b.results);
+    assert.deepStrictEqual(a.truncated, {
+      by_object_cap: false,
+      by_max_hits: true,
+    });
+    assert.deepStrictEqual(b.truncated, a.truncated);
+    assert.equal(a.scanned.sources, 300);
+    assert.equal(b.scanned.sources, 2);
+  });
+
+  it('with no bound given every target is one chunk: the batched path reads all 305 before max_hits stops it', async () => {
     const names = Array.from(
       { length: 305 },
       (_, i) => `ZQ${String(i + 1).padStart(4, '0')}`,
@@ -2740,16 +2775,10 @@ describe('D23b: the caller sets how much the answer holds (DO23)', () => {
     const args = { query: 'marker', packages: ['ZBIGL'], max_hits: 2 };
     const a = payloadOf(await searchOn(batched, args, false, 4000));
     const b = payloadOf(await searchOn(sequential, args, true, 4000));
-    assert.equal(sourceRequests(batched).length, 300);
-    assert.equal(sourceRequests(sequential).length, 2);
+    assert.equal(sourceRequests(batched).length, 305);
     assert.deepStrictEqual(a.results, b.results);
-    assert.deepStrictEqual(a.truncated, {
-      by_object_cap: false,
-      by_max_hits: true,
-    });
-    assert.deepStrictEqual(b.truncated, a.truncated);
-    assert.equal(a.scanned.sources, 300);
-    assert.equal(b.scanned.sources, 2);
+    assert.deepStrictEqual(a.truncated, b.truncated);
+    assert.equal(a.scanned.sources, 305);
   });
 });
 

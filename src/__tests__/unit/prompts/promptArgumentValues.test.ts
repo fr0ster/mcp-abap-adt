@@ -3,7 +3,10 @@
  * values in its description: on every binary and declared system type, and
  * with `--deny-actions` applied as a launcher applies it, each closed
  * argument's description ends with exactly the values its completion
- * offers, in their order.
+ * offers, in their order. The argument a user picks (`object_type`, the
+ * transport `action`) is optional: a `prompts/get` without it, or with a
+ * value the binary does not serve (unknown, or denied), answers no error
+ * but one line listing exactly those values, the model told to ask.
  */
 
 import assert from 'node:assert/strict';
@@ -22,12 +25,78 @@ import {
 } from '../../../lib/toolSet';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import {
+  binaryClient,
   type DeclaredType,
+  declare,
+  KINDS,
   type ListedPrompt,
   listBinaryPrompts,
   type PromptListing,
   promptsOf,
 } from '../../helpers/servedTools';
+
+/** The argument a user picks from, per prompt. */
+const picked = (prompt: string): 'action' | 'object_type' =>
+  prompt === 'transport' ? 'action' : 'object_type';
+
+/** The one text message of a `prompts/get` answer. */
+function textOfAnswer(
+  messages: ReadonlyArray<{ content: { type: string } }>,
+): string {
+  assert.equal(messages.length, 1);
+  const [message] = messages;
+  // An answer over the wire: its content is read as the protocol gives it.
+  const content = message?.content;
+  assert.ok(content && 'text' in content && typeof content.text === 'string');
+  return content.text;
+}
+
+/**
+ * On `client`, `listed` answered with its picked argument absent, blank and
+ * set to `value`, every other argument it lists as required given: each a
+ * text naming it and listing exactly its completion's values. Answers the
+ * number of answers checked.
+ */
+async function assertAskedOver(
+  client: Client,
+  listed: ListedPrompt,
+  where: string,
+  value = 'not_served_here',
+): Promise<number> {
+  const { name } = listed.prompt;
+  const argument = picked(name);
+  const values = listed.completions[argument] ?? [];
+  assert.ok(values.length > 0, `${where} ${name} completes ${argument}`);
+  const required: Record<string, string> = Object.fromEntries(
+    (listed.prompt.arguments ?? [])
+      .filter((each) => each.required === true && each.name !== argument)
+      .map((each) => [each.name, `SOME_${each.name.toUpperCase()}`]),
+  );
+  assert.equal(
+    (listed.prompt.arguments ?? []).find((each) => each.name === argument)
+      ?.required,
+    false,
+    `${where} ${name} ${argument} is optional`,
+  );
+  const rest = `The ${name} prompt takes: ${values.join(', ')}. Ask the user which one they want, then call it again.`;
+  const cases: ReadonlyArray<readonly [Record<string, string>, string]> = [
+    [required, `No ${argument} was given. ${rest}`],
+    [{ ...required, [argument]: ' ' }, `No ${argument} was given. ${rest}`],
+    [
+      { ...required, [argument]: value },
+      `The ${argument} ${JSON.stringify(value)} is not served by this server. ${rest}`,
+    ],
+  ];
+  for (const [args, expected] of cases) {
+    const { messages } = await client.getPrompt({ name, arguments: args });
+    assert.equal(
+      textOfAnswer(messages),
+      expected,
+      `${where} ${name} ${JSON.stringify(args)}`,
+    );
+  }
+  return cases.length;
+}
 
 /** The closed arguments of each prompt: those that complete from a closed set. */
 const CLOSED: Readonly<Record<string, readonly string[]>> = {
@@ -161,6 +230,26 @@ describe('a closed prompt argument lists its completion values in its descriptio
       'class',
     ],
     [fullToolSet, 'core', 'CreateTransport', 'transport', 'action', 'create'],
+    [fullToolSet, 'core', 'GetProgram', 'get', 'object_type', 'program'],
+    [fullToolSet, 'core', 'UpdateProgram', 'update', 'object_type', 'program'],
+    [fullToolSet, 'core', 'DeleteProgram', 'delete', 'object_type', 'program'],
+    [
+      fullToolSet,
+      'core',
+      'ActivateProgram',
+      'activate',
+      'object_type',
+      'program',
+    ],
+    [fullToolSet, 'core', 'CheckProgram', 'check', 'object_type', 'program'],
+    [
+      fullToolSet,
+      'core',
+      'RunProgramUnitTest',
+      'unit_test',
+      'object_type',
+      'program',
+    ],
   ] as const) {
     it(`with --deny-actions ${denied} on ${family}: ${prompt} ${argument} lists no ${gone}`, async () => {
       process.env.SAP_SYSTEM_TYPE = 'onprem';
@@ -174,6 +263,29 @@ describe('a closed prompt argument lists its completion values in its descriptio
       const values = listed.completions[argument] ?? [];
       assert.ok(values.length > 0, `${prompt} ${argument} completes`);
       assert.ok(!values.includes(gone), `${gone} is denied`);
+      await assertAskedOver(client, listed, `${family} denied ${denied}`, gone);
     });
   }
+
+  it('a picked argument absent, blank or not served asks the user, on every stdio binary and kind', async () => {
+    let answers = 0;
+    for (const systemType of LISTED_TYPES) {
+      declare(systemType);
+      for (const kind of KINDS) {
+        const { client, close } = await binaryClient('stdio', kind, standIn);
+        try {
+          for (const listed of await promptsOf(client)) {
+            answers += await assertAskedOver(
+              client,
+              listed,
+              `${systemType} ${kind}`,
+            );
+          }
+        } finally {
+          await close();
+        }
+      }
+    }
+    assert.ok(answers > 200, `${answers} answers checked`);
+  });
 });

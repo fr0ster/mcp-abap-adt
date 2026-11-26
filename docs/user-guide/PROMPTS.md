@@ -18,6 +18,8 @@ A client that supports MCP completion (`completion/complete`) completes a prompt
 - `where_used` `container`: the values the where-used tool lists, while the `object_type` given so far is `text_elements` or none is given yet.
 - `unit_test` `include_subpackages`: `true`, `false`.
 
+A client without completion reads the same values in the argument's description: each closed argument's description is a short sentence followed by exactly the values its completion offers, from the one list both are built from, e.g. `What to do with transport requests: create, create_task, list, …`. The `transport` `object_type` description names the actions that read it. A prompt's own description states what it does; the tools it asks the model to call are named in its instruction and on the tool pages.
+
 The lists per binary and kind below are these completions.
 
 ## Refusal

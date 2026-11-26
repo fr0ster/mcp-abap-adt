@@ -168,6 +168,12 @@ export interface StreamableHttpServerOptions {
    * launcher's: the shipped `substringLineMatch`). Absent: the handler's default.
    */
   lineMatchStrategy?: LineMatchStrategy | undefined;
+  /**
+   * The consumer's bound on the reads one ADT batch envelope of a call
+   * carries (`--batch-reads-per-envelope`), handed to every instance.
+   * Absent: no bound.
+   */
+  readsPerEnvelope?: number | undefined;
 }
 
 /** What the pool keeps of a per-request server, and what the request handler drives on it. */
@@ -264,6 +270,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     | undefined;
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
+  private readonly readsPerEnvelope: number | undefined;
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
 
   constructor(
@@ -298,6 +305,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.instanceAbapGitRestrictions = opts?.abapGitRestrictions;
     this.sapAnswerStrategy = opts?.sapAnswerStrategy;
     this.lineMatchStrategy = opts?.lineMatchStrategy;
+    this.readsPerEnvelope = opts?.readsPerEnvelope;
     this.batchSettings =
       opts?.batch === undefined
         ? undefined
@@ -643,6 +651,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           backgroundRunOwner?: BackgroundRunOwner;
           sapAnswerStrategy?: SapAnswerStrategy;
           lineMatchStrategy?: LineMatchStrategy;
+          readsPerEnvelope?: number;
           batch?: InstanceBatch;
           heldLocks?: HeldLocks;
           longSession?: LongSession;
@@ -711,6 +720,9 @@ export class StreamableHttpServer extends BaseMcpServer {
         }),
         ...(this.lineMatchStrategy !== undefined && {
           lineMatchStrategy: this.lineMatchStrategy,
+        }),
+        ...(this.readsPerEnvelope !== undefined && {
+          readsPerEnvelope: this.readsPerEnvelope,
         }),
         ...(this.instanceAccessChecks !== undefined && {
           accessChecks: this.instanceAccessChecks,

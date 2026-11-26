@@ -1004,6 +1004,10 @@ async function launchStdio(
       // SearchSource's strategies: the shipped ones (DO22, DO24).
       sapAnswerStrategy: skipSapAnswers,
       lineMatchStrategy: substringLineMatch,
+      // --batch-reads-per-envelope: the consumer's bound; absent, none.
+      ...(config.batchReadsPerEnvelope !== undefined && {
+        readsPerEnvelope: config.batchReadsPerEnvelope,
+      }),
       ...(restricted.accessChecks !== undefined && {
         accessChecks: restricted.accessChecks,
       }),

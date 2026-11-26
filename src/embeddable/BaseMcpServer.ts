@@ -97,6 +97,7 @@ import type {
   InstanceBatch,
   OpenBatch,
 } from '../lib/batch/InstanceBatch.js';
+import { readsPerEnvelopeOf } from '../lib/batch/phases.js';
 import { createRecorder, untilSent } from '../lib/batch/recorder.js';
 import {
   OUTSIDE_BATCH_SENTENCE,
@@ -468,6 +469,8 @@ export abstract class BaseMcpServer extends McpServer {
   private readonly searchSapAnswers: SapAnswerStrategy | undefined;
   /** `SearchSource`'s line-match strategy, from the options; absent, none set. */
   private readonly searchLineMatch: LineMatchStrategy | undefined;
+  /** The consumer's bound on the reads of one envelope, from the options; absent, none. */
+  private readonly envelopeBound: number | undefined;
 
   /**
    * The running runs, by `run_handle`: each one's control over its one
@@ -610,6 +613,13 @@ export abstract class BaseMcpServer extends McpServer {
      */
     lineMatchStrategy?: LineMatchStrategy | undefined;
     /**
+     * The consumer's bound on the reads one ADT batch envelope of a call
+     * carries (`--batch-reads-per-envelope`): a whole number from 2, else
+     * the constructor throws. Absent: no bound — a phase's independent
+     * reads go in one envelope, and what SAP answers to it is SAP's.
+     */
+    readsPerEnvelope?: number | undefined;
+    /**
      * The owner of the running background runs (their controls, by
      * `run_handle`): handed by a host that serves one client through several
      * instances (Streamable HTTP's per-request instances, SSE's per-stream
@@ -741,6 +751,10 @@ export abstract class BaseMcpServer extends McpServer {
     this.backgroundRuns = options.backgroundRuns;
     this.searchSapAnswers = options.sapAnswerStrategy;
     this.searchLineMatch = options.lineMatchStrategy;
+    this.envelopeBound =
+      options.readsPerEnvelope === undefined
+        ? undefined
+        : readsPerEnvelopeOf(options.readsPerEnvelope, 'readsPerEnvelope');
     this.runOwner = options.backgroundRunOwner ?? new BackgroundRunOwner();
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
@@ -1354,15 +1368,18 @@ export abstract class BaseMcpServer extends McpServer {
    * (a host's injected one).
    */
   /**
-   * The `SearchSource` strategies this server was given, for every context
-   * it builds: a field per strategy given, none for one absent (the
-   * handler's default then answers).
+   * The `SearchSource` strategies and the envelope bound this server was
+   * given, for every context it builds: a field per one given, none for one
+   * absent (the handler's default — for the bound, none — then answers).
    */
   private searchStrategies(): Pick<
     HandlerContext,
-    'sapAnswerStrategy' | 'lineMatchStrategy'
+    'sapAnswerStrategy' | 'lineMatchStrategy' | 'readsPerEnvelope'
   > {
     return {
+      ...(this.envelopeBound !== undefined && {
+        readsPerEnvelope: this.envelopeBound,
+      }),
       ...(this.searchSapAnswers !== undefined && {
         sapAnswerStrategy: this.searchSapAnswers,
       }),

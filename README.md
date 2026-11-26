@@ -427,8 +427,11 @@ answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`
 `HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerLock` `action: unlock`. A value the user did
 not give is listed in the instruction as still to fill.
 
-A `prompts/get` with an `object_type` the binary does not serve is refused with the protocol's
-invalid-params error and names the types it serves. `BaseMcpServer` and `EmbeddableMcpServer`
+`object_type` and `transport`'s `action` are optional. With the other required arguments given
+(`name`; an absent one is refused invalid-params by the SDK's argument check), a `prompts/get`
+without one, or with a value the binary does not serve, answers no error but one line naming the values it takes and
+telling the model to ask the user, e.g. `No action was given. The transport prompt takes: create,
+create_task, list, …. Ask the user which one they want, then call it again.` `BaseMcpServer` and `EmbeddableMcpServer`
 register the prompts after the tools; the option `prompts: false` registers none. A plain
 registration on an SDK `McpServer` registers none of its own accord;
 `registerAbapPrompts(server, registry)` adds them

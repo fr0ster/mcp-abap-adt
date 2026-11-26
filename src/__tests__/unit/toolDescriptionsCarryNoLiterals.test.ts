@@ -254,10 +254,11 @@ describe('descriptions carry no incidental literals', () => {
 
 /**
  * Test 7 of the prompts: a prompt's description and its arguments'
- * descriptions follow the same rule, on every binary and kind; and every
- * tool a prompt's description names is a tool that binary lists.
+ * descriptions follow the same rule, on every binary and kind; and a
+ * prompt's description states its function and names no tool, as a tool's
+ * description names no other tool (its instruction names the tools).
  */
-describe('prompt descriptions carry no incidental literals and name only listed tools', () => {
+describe('prompt descriptions carry no incidental literals and name no tool', () => {
   const listings = TRANSPORTS.flatMap((transport) =>
     Object.entries(toolSets[transport]).flatMap(([kind, set]) =>
       (['onprem', 'cloud', undefined] as const).map((systemKind) => ({
@@ -316,17 +317,12 @@ describe('prompt descriptions carry no incidental literals and name only listed 
     });
   }
 
-  it('a prompt description names only tools its binary lists', () => {
-    const offenders = prompts.flatMap(({ listing, source, prompt }) =>
-      toolsNamed(prompt.description, known)
-        .filter((tool) => !source.tools.has(tool))
-        .map((tool) => `${listing} ${prompt.name}: ${tool}`),
-    );
-    assert.deepStrictEqual(offenders, []);
-    assert.ok(
-      prompts.every(
-        ({ prompt }) => toolsNamed(prompt.description, known).length > 0,
+  it('a prompt description names no tool any binary lists', () => {
+    const offenders = prompts.flatMap(({ listing, prompt }) =>
+      toolsNamed(prompt.description, known).map(
+        (tool) => `${listing} ${prompt.name}: ${tool}`,
       ),
     );
+    assert.deepStrictEqual(offenders, []);
   });
 });

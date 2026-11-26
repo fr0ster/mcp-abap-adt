@@ -18,6 +18,7 @@ import {
 import { abapPrompts } from '../../../lib/prompts/prompts';
 import { requiredArguments } from '../../../lib/prompts/source';
 import type { AbapPrompt, PromptSource } from '../../../lib/prompts/types';
+import { updatePrompt } from '../../../lib/prompts/updatePrompt';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import {
   fullReadOnlyToolSet,
@@ -25,6 +26,7 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 import {
+  assertAsked,
   assertRefused,
   completionOf,
   promptOf,
@@ -240,13 +242,11 @@ describe('the types one family serves stay out', () => {
     [getPrompt, 'class_text_elements'],
     [activatePrompt, 'program_text_elements'],
   ] as const) {
-    it(`${type} is refused on compact onprem`, () => {
-      const prompt = promptOf(factory, compactOnprem);
-      assertRefused(
-        prompt,
+    it(`${type} is answered with the served types on compact onprem`, async () => {
+      await assertAsked(
+        promptOf(factory, compactOnprem),
         { object_type: type, name: 'SOME_OBJECT' },
-        `${prompt.name}: object_type "${type}" is not served by this server; it serves `,
-        true,
+        'object_type',
       );
     });
   }
@@ -349,50 +349,66 @@ describe('served counts (spec §6)', () => {
   });
 });
 
-describe('refusals (test 3)', () => {
-  const NOT_SERVED = (value: string) =>
-    `create: object_type "${value}" is not served by this server; it serves `;
-
-  it('an unknown type', () => {
-    assertRefused(
+describe('an object_type absent or not served asks the user (test 3)', () => {
+  it('an unknown type', async () => {
+    await assertAsked(
       promptOf(createPrompt, coreOnprem),
       { object_type: 'unknown_type', name: 'SOME_OBJECT' },
-      NOT_SERVED('unknown_type'),
-      true,
+      'object_type',
     );
   });
 
-  it('a program on cloud', () => {
-    assertRefused(
+  it('a program on cloud', async () => {
+    await assertAsked(
       promptOf(createPrompt, sourceOf(fullToolSet, 'cloud')),
       { object_type: 'program', name: 'SOME_PROGRAM' },
-      NOT_SERVED('program'),
-      true,
+      'object_type',
     );
   });
 
-  it('a class with CreateClass denied', () => {
+  it('a class with CreateClass denied', async () => {
     const prompt = promptOf(
       createPrompt,
       sourceOf(fullToolSet, 'onprem', ['CreateClass']),
     );
-    assertRefused(
+    assert.ok(!(await completionOf(prompt, 'object_type')).includes('class'));
+    await assertAsked(
       prompt,
       { object_type: 'class', name: 'SOME_CLASS' },
-      NOT_SERVED('class'),
-      true,
+      'object_type',
     );
   });
 
-  it('the not-served words list the served types in lowercase', async () => {
-    const prompt = promptOf(createPrompt, compactOnprem);
-    const served = await completionOf(prompt, 'object_type');
-    assertRefused(
-      prompt,
-      { object_type: 'unknown_type', name: 'SOME_OBJECT' },
-      `${NOT_SERVED('unknown_type')}${served.join(', ')}.`,
+  it('the words list the served types in lowercase', () => {
+    assert.ok(
+      textOf(promptOf(createPrompt, compactOnprem), {
+        object_type: 'unknown_type',
+        name: 'SOME_OBJECT',
+      }).startsWith(
+        'The object_type "unknown_type" is not served by this server. The create prompt takes: package, domain, data_element, ',
+      ),
     );
   });
+
+  for (const [name, factory] of [
+    ['create', createPrompt],
+    ['get', getPrompt],
+    ['update', updatePrompt],
+    ['delete', deletePrompt],
+    ['activate', activatePrompt],
+    ['check', checkPrompt],
+  ] as const) {
+    for (const [family, source] of [
+      ['core', coreOnprem],
+      ['compact', compactOnprem],
+    ] as const) {
+      it(`${name} on ${family}: an absent object_type, a name given or not`, async () => {
+        const prompt = promptOf(factory, source);
+        await assertAsked(prompt, {}, 'object_type');
+        await assertAsked(prompt, { name: 'SOME_OBJECT' }, 'object_type');
+      });
+    }
+  }
 
   it('a missing name', () => {
     assertRefused(
@@ -423,12 +439,11 @@ describe('get: prototype keys and blank values (review focus 1 and 3)', () => {
     'toString',
     'hasOwnProperty',
   ]) {
-    it(`object_type ${key} is refused as not served`, () => {
-      assertRefused(
+    it(`object_type ${key} is answered as not served`, async () => {
+      await assertAsked(
         prompt,
         { object_type: key, name: 'SOME_CLASS' },
-        `get: object_type "${key}" is not served by this server; it serves `,
-        true,
+        'object_type',
       );
     });
   }
@@ -450,11 +465,11 @@ describe('get: prototype keys and blank values (review focus 1 and 3)', () => {
       );
     });
 
-    it(`object_type ${JSON.stringify(blank)} is absent`, () => {
-      assertRefused(
+    it(`object_type ${JSON.stringify(blank)} is absent`, async () => {
+      await assertAsked(
         prompt,
         { object_type: blank, name: 'SOME_CLASS' },
-        'get: object_type is required.',
+        'object_type',
       );
     });
   }
@@ -520,29 +535,32 @@ describe('completion', () => {
   });
 });
 
-describe('the description names the tools the prompt asks for', () => {
-  it('compact create asks for HandlerCreate', () => {
-    assert.equal(
-      promptOf(createPrompt, compactOnprem).description,
-      'Creates an ABAP object of object_type named name in package_name: asks the model to call HandlerCreate.',
-    );
+describe('the description states the function, the same on every binary', () => {
+  it('create on compact and core', () => {
+    for (const source of [compactOnprem, coreOnprem]) {
+      assert.equal(
+        promptOf(createPrompt, source).description,
+        'Creates an ABAP object of object_type named name in package_name.',
+      );
+    }
   });
 
-  it('compact delete asks for the delete and the lock tools', () => {
-    assert.equal(
-      promptOf(deletePrompt, compactOnprem).description,
-      'Deletes an ABAP object of object_type named name: asks the model to call HandlerDelete, HandlerLock.',
-    );
+  it('delete on compact and core', () => {
+    for (const source of [compactOnprem, coreOnprem]) {
+      assert.equal(
+        promptOf(deletePrompt, source).description,
+        'Deletes an ABAP object of object_type named name.',
+      );
+    }
   });
 
-  it('core get lists the per-type tools', () => {
-    const description = promptOf(getPrompt, coreOnprem).description;
-    assert.ok(
-      description.startsWith(
-        'Reads an ABAP object of object_type named name: asks the model to call GetPackage, ',
-      ),
-      description,
-    );
+  it('get on compact and core', () => {
+    for (const source of [compactOnprem, coreOnprem]) {
+      assert.equal(
+        promptOf(getPrompt, source).description,
+        'Reads an ABAP object of object_type named name.',
+      );
+    }
   });
 });
 

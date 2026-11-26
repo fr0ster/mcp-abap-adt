@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-11-26
+
+### Changed
+
+- **A closed prompt argument lists its values in its description.** A client without completion (`completion/complete`) saw only generic words, e.g. `transport` `action`: "What to do with transport requests." Each closed argument's description is now a short sentence followed by exactly the values its completion offers, both built from the one list (per binary, per system kind, after `--deny-actions`): `object_type` on every object prompt, `unit_test` and `where_used`; `transport` `action` ("What to do with transport requests: create, create_task, list, …"); `transport` `object_type`, which also names the actions that read it ("The object's type (read by add_object, remove_object, move_objects): class, interface, …"); `where_used` `container`; `unit_test` `include_subpackages` ("…: true, false."). Completion is unchanged. See [MCP Prompts](docs/user-guide/PROMPTS.md#autocompletion).
+- **A prompt's description states what it does and names no tool.** The descriptions listed every tool the prompt may call (on the full binaries some twenty names), and `update` paired the reads and writes in a muddled order ("read it and write it with UpdatePackage, GetPackage, …"). Each now says what the prompt does, `update` its steps in words ("reads the object, then writes its new content"), as the tool descriptions do; the tools stay named in the prompt's instruction and on the tool pages' prompt pointers.
+
 ## [24.2.0] - 2026-11-26
 
 ### Highlights

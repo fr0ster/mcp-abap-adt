@@ -132,7 +132,9 @@ async function whereUsed(
 
 /** The terse rows after the header, each by the header's column names. */
 function terseRows(text: string): Array<Record<string, string>> {
-  const lines = text.split('\n').filter((line) => !line.startsWith('#'));
+  const lines = text
+    .split('\n')
+    .filter((line) => line !== '' && !line.startsWith('#'));
   const [header, ...rows] = lines;
   const columns = (header ?? '').split('\t');
   return rows.map((row) => {
@@ -336,6 +338,105 @@ describe('GetWhereUsed: a usage inside an element of another object', () => {
         element: medium.element,
       },
       { type: '', name: 'RUN', element: undefined },
+    );
+  });
+
+  // Two candidate owners: ZCL_SHR (whose URI is a prefix of the element's)
+  // listed first, the real owner ZCL_SHR_OWNER after its element — only
+  // parentUri picks it.
+  it('the owner is the node at parentUri, not one whose URI is a prefix, wherever it is listed', async () => {
+    const decoy = '/sap/bc/adt/oo/classes/zcl_shr';
+    const owner = '/sap/bc/adt/oo/classes/zcl_shr_owner';
+    const document = documentOf([
+      { uri: decoy, name: 'ZCL_SHR', type: 'CLAS/OC', pkg: 'ZMCP_SHR_PKG' },
+      {
+        uri: `${owner}/source/main#type=CLAS%2FOM;name=RUN`,
+        parentUri: owner,
+        usage: 'gradeElement,includeProductive',
+        name: 'RUN',
+      },
+      {
+        uri: owner,
+        name: 'ZCL_SHR_OWNER',
+        type: 'CLAS/OC',
+        pkg: 'ZMCP_SHR_PKG',
+      },
+    ]);
+    assert.deepStrictEqual(
+      terseRows(await whereUsed('terse', document)).map(
+        ({ type, name, element }) => ({ type, name, element }),
+      ),
+      [{ type: 'CLAS/OC', name: 'ZCL_SHR_OWNER', element: 'RUN' }],
+    );
+  });
+
+  // Several objects: each answer is resolved against its own list. The
+  // second answer names the class at parentUri but does not list it.
+  it('several objects: an element is resolved against its own answer, not another', async () => {
+    const second = documentOf([
+      {
+        uri: MAIN_URI,
+        parentUri: CLASS_URI,
+        usage: 'gradeElement,includeProductive',
+        name: 'IF_OO_ADT_CLASSRUN~MAIN',
+      },
+    ]);
+    const connection = recordingConnection([
+      { data: DOCUMENT },
+      { data: second },
+    ]);
+    declareSystemKind(connection, 'cloud');
+    const result = await handleGetWhereUsed(
+      { connection, logger: undefined, batchAvailability: noBatch() },
+      {
+        objects: [
+          { object_name: 'IF_OO_ADT_CLASSRUN', object_type: 'INTF/OI' },
+          { object_name: 'IF_OO_ADT_CLASSRUN', object_type: 'INTF/OI' },
+        ],
+        detail: 'terse',
+      },
+    );
+    assert.equal(result.isError, false, result.content[0]?.text);
+    const text = result.content[0]?.text ?? '';
+    // Each object's answer under its `# object` line, that line left out.
+    const sections = text
+      .split('# object ')
+      .slice(1)
+      .map((section) => section.slice(section.indexOf('\n') + 1));
+    assert.equal(sections.length, 2, text);
+    assert.deepStrictEqual(
+      terseRows(sections[0] ?? '').map(({ type, name, element }) => ({
+        type,
+        name,
+        element,
+      })),
+      [
+        {
+          type: 'CLAS/OC',
+          name: 'ZMCP_SHR_DUMP_CLS',
+          element: 'IF_OO_ADT_CLASSRUN~MAIN',
+        },
+        { type: 'CLAS/OC', name: 'ZMCP_SHR_DUMP_CLS', element: 'CONSTRUCTOR' },
+        { type: 'PROG/P', name: 'ZMCP_SHR_PROG', element: '' },
+      ],
+      text,
+    );
+    assert.deepStrictEqual(
+      terseRows(sections[1] ?? '').map(({ type, name, element, uri }) => ({
+        type,
+        name,
+        element,
+        uri,
+      })),
+      [
+        {
+          type: '',
+          name: 'IF_OO_ADT_CLASSRUN~MAIN',
+          element: '',
+          uri: MAIN_URI,
+        },
+      ],
+      text,
     );
   });
 });

@@ -24,7 +24,10 @@
  */
 
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import {
   type AdtHeadersContext,
@@ -33,7 +36,16 @@ import {
 import { requestErrorOf, requestFailureOf } from '../answer';
 import { wireValueOf } from '../wireValue';
 import { parseXml } from '../xml/node';
-import { attr, child, listOf, text, walk } from '../xml/tree';
+import { isWellFormed } from '../xml/ordered';
+import {
+  attr,
+  child,
+  isElement,
+  listOf,
+  text,
+  walk,
+  type XmlRead,
+} from '../xml/tree';
 import { failed, succeeded } from './stepResponse';
 
 /** Where the code lines are read. */
@@ -63,7 +75,65 @@ export interface UsageSnippetsSource {
   ): Promise<IAdtResponse<UsageSnippets, IAdtError>>;
 }
 
-/** The reader: SAP's text kept as it came, the prefixes gone. */
+/** The named references XML defines, by name. */
+const NAMED_REFERENCES: ReadonlyMap<string, string> = new Map([
+  ['lt', '<'],
+  ['gt', '>'],
+  ['amp', '&'],
+  ['quot', '"'],
+  ['apos', "'"],
+]);
+
+/** A character reference's code (`#38`, `#x26`) as its character, else `undefined`. */
+function characterOf(reference: string): string | undefined {
+  const hex = reference.startsWith('#x') || reference.startsWith('#X');
+  const digits = reference.slice(hex ? 2 : 1);
+  if (digits === '') return undefined;
+  const allowed = hex ? '0123456789abcdefABCDEF' : '0123456789';
+  for (const digit of digits) if (!allowed.includes(digit)) return undefined;
+  const code = Number.parseInt(digits, hex ? 16 : 10);
+  if (!Number.isSafeInteger(code) || code > 0x10ffff) return undefined;
+  return String.fromCodePoint(code);
+}
+
+/**
+ * `value` with its references decoded in one pass, as an XML parser decodes
+ * them — the five named ones and every character reference, decimal or
+ * hexadecimal (`&#38;`, `&#x26;`) —, as adt-strategies' readers decode the
+ * where-used answer (`XML_TEXT_OPTIONS`), so an identifier reads the same
+ * in both answers. A reference not so defined stays as written. Plain code:
+ * no regular expression over SAP's text.
+ */
+export function decodeXmlReferences(value: string): string {
+  let decoded = '';
+  let at = 0;
+  while (at < value.length) {
+    const amp = value.indexOf('&', at);
+    if (amp < 0) break;
+    const semi = value.indexOf(';', amp + 1);
+    if (semi < 0) break;
+    const reference = value.slice(amp + 1, semi);
+    const character = reference.startsWith('#')
+      ? characterOf(reference)
+      : NAMED_REFERENCES.get(reference);
+    decoded += value.slice(at, amp);
+    if (character === undefined) {
+      decoded += '&';
+      at = amp + 1;
+    } else {
+      decoded += character;
+      at = semi + 1;
+    }
+  }
+  return decoded + value.slice(at);
+}
+
+/**
+ * The reader: the prefixes gone, values as text, each reference decoded
+ * once by {@link decodeXmlReferences} (the parser's own entity handling
+ * leaves character references as written), a CDATA section kept apart, as
+ * written.
+ */
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
@@ -71,7 +141,31 @@ const parser = new XMLParser({
   parseTagValue: false,
   trimValues: false,
   removeNSPrefix: true,
+  processEntities: false,
+  cdataPropName: '#cdata',
+  tagValueProcessor: (_name: string, value: string) =>
+    decodeXmlReferences(value),
+  attributeValueProcessor: (_name: string, value: string) =>
+    decodeXmlReferences(value),
 });
+
+/** An element's own text: its text, then its CDATA sections as written. */
+function ownText(value: XmlRead): string | undefined {
+  if (typeof value === 'string') return value;
+  if (!isElement(value)) return undefined;
+  const written = text(value);
+  const sections = listOf(child(value, '#cdata')).flatMap((section) => {
+    const read = text(section);
+    return read === undefined ? [] : [read];
+  });
+  if (written === undefined && sections.length === 0) {
+    // An empty element: its text is empty.
+    return Object.keys(value).every((key) => key.startsWith('@_'))
+      ? ''
+      : undefined;
+  }
+  return (written ?? '') + sections.join('');
+}
 
 /** `value` escaped for an XML text node. */
 function escaped(value: string): string {
@@ -84,7 +178,14 @@ function escaped(value: string): string {
     .join('&gt;');
 }
 
-/** The request body: every identifier, in the order given. */
+/**
+ * The request body, as Eclipse sends it (its trace, 2026-11-26): every
+ * identifier, `optional="false"`, then `affectedObjects`, then the grade
+ * with `definitions`, `elements` and `indirectReferences` all true — direct
+ * and indirect usages, as the owner's example names them ("1 direct usage,
+ * 1 indirect usage"). Sent for one using object's usages only (`in_object`),
+ * as Eclipse sends it for the node opened: one identifier took SAP 0.17 s.
+ */
 export function usageSnippetsRequest(identifiers: readonly string[]): string {
   const listed = identifiers
     .map(
@@ -92,28 +193,36 @@ export function usageSnippetsRequest(identifiers: readonly string[]): string {
         `<usagereferences:objectIdentifier optional="false">${escaped(identifier)}</usagereferences:objectIdentifier>`,
     )
     .join('');
-  return `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageSnippetRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:objectIdentifiers>${listed}</usagereferences:objectIdentifiers><usagereferences:affectedObjects/></usagereferences:usageSnippetRequest>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageSnippetRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:objectIdentifiers>${listed}</usagereferences:objectIdentifiers><usagereferences:affectedObjects/><usagereferences:grade definitions="true" elements="true" indirectReferences="true"/></usagereferences:usageSnippetRequest>`;
 }
 
 /**
  * The code lines of a `usageSnippets` answer, by identifier: every
  * `codeSnippetObject` at any depth, each `codeSnippet` of it with its `uri`
- * and `content`, `matches` where SAP sent it. An object without an
- * identifier, or a snippet without a `uri` or a `content`, is not read.
+ * and `content`, `matches` where SAP sent it. `undefined` for a document
+ * that is no such answer — not well-formed, without any
+ * `codeSnippetObject`, an object without its identifier, a snippet without
+ * its `uri` or its `content` —: a reading that cannot be told from SAP
+ * giving no code lines is not answered as one.
  */
-export function usageSnippetsReading(document: string): UsageSnippets {
+export function usageSnippetsReading(
+  document: string,
+): UsageSnippets | undefined {
+  if (!isWellFormed(document)) return undefined;
   const read = new Map<string, WhereUsedSnippet[]>();
+  let objects = 0;
   for (const visit of walk(parseXml(parser, document))) {
     if (visit.name !== 'codeSnippetObject') continue;
-    const identifier = text(child(visit.node, 'objectIdentifier'));
-    if (identifier === undefined) continue;
+    objects += 1;
+    const identifier = ownText(child(visit.node, 'objectIdentifier'));
+    if (identifier === undefined || identifier === '') return undefined;
     const snippets = read.get(identifier) ?? [];
     for (const snippet of listOf(
       child(child(visit.node, 'codeSnippets'), 'codeSnippet'),
     )) {
       const uri = attr(snippet, '@_uri');
-      const content = text(child(snippet, 'content'));
-      if (uri === undefined || content === undefined) continue;
+      const content = ownText(child(snippet, 'content'));
+      if (uri === undefined || content === undefined) return undefined;
       const matches = attr(snippet, '@_matches');
       snippets.push(
         matches === undefined ? { uri, content } : { uri, content, matches },
@@ -121,8 +230,12 @@ export function usageSnippetsReading(document: string): UsageSnippets {
     }
     read.set(identifier, snippets);
   }
-  return read;
+  return objects === 0 ? undefined : read;
 }
+
+/** The words of an answer {@link usageSnippetsReading} cannot read. */
+export const UNREADABLE_SNIPPETS =
+  'the usageSnippets answer is no usage snippet result: no code line could be read';
 
 /**
  * The element a snippet's position names: the `name=` part of its URI's
@@ -155,11 +268,13 @@ export function usageSnippetsOn(
   context: AdtHeadersContext,
   connection: IAbapConnection,
 ): UsageSnippetsSource {
+  const sent = { method: 'POST', url: USAGE_SNIPPETS_URL };
   return {
     read: (identifiers) =>
       withAdtHeaders(context, 'utils.getUsageSnippets', async (headers) => {
+        let answered: IAdtWireResponse;
         try {
-          const answered = await connection.makeAdtRequest({
+          answered = await connection.makeAdtRequest({
             url: USAGE_SNIPPETS_URL,
             method: 'POST',
             timeout: 0,
@@ -169,33 +284,32 @@ export function usageSnippetsOn(
               'Content-Type': headers.contentType,
             },
           });
-          // A connection that hands back a status other than a 2xx instead
-          // of throwing it (an embedder's own) is refused by it all the same.
-          if (answered.status < 200 || answered.status > 299) {
-            const refused: IAdtResponse<UsageSnippets, IAdtError> = failed(
-              requestErrorOf(
-                {
-                  message: `Request failed with status code ${answered.status}`,
-                  response: answered,
-                },
-                { method: 'POST', url: USAGE_SNIPPETS_URL },
-              ),
-            );
-            return refused;
-          }
-          const body = wireValueOf(answered.data);
-          return succeeded(
-            usageSnippetsReading(body.kind === 'text' ? body.text : ''),
-          );
         } catch (thrown) {
-          const error = requestFailureOf(thrown, {
-            method: 'POST',
-            url: USAGE_SNIPPETS_URL,
-          });
+          const error = requestFailureOf(thrown, sent);
           if (error === undefined) throw thrown;
           const failure: IAdtResponse<UsageSnippets, IAdtError> = failed(error);
           return failure;
         }
+        // A connection that hands back a status other than a 2xx instead of
+        // throwing it (an embedder's own) is refused by it all the same.
+        if (answered.status < 200 || answered.status > 299) {
+          const refused: IAdtResponse<UsageSnippets, IAdtError> = failed(
+            requestErrorOf(
+              {
+                message: `Request failed with status code ${answered.status}`,
+                response: answered,
+              },
+              sent,
+            ),
+          );
+          return refused;
+        }
+        const body = wireValueOf(answered.data);
+        const read =
+          body.kind === 'text' ? usageSnippetsReading(body.text) : undefined;
+        // Thrown, so the step names it (`atStep`): never read as no lines.
+        if (read === undefined) throw new Error(UNREADABLE_SNIPPETS);
+        return succeeded(read);
       }),
   };
 }

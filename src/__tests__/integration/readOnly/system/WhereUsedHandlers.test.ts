@@ -80,16 +80,19 @@ function fullReferences(full: McpResult): FullWhereUsedReference[] {
   return parsed.references ?? [];
 }
 
-function extractResultData(result: any): any {
-  const jsonContent = result.content.find((c: any) => c.type === 'json') as any;
-  if (jsonContent?.json) {
-    return jsonContent.json;
-  }
-  const textContent = result.content.find((c: any) => c.type === 'text') as any;
-  if (textContent?.text) {
-    return JSON.parse(textContent.text);
-  }
-  throw new Error('No response payload found');
+/** GetWhereUsed's `full` answer: the fields these cases read. */
+interface FullAnswer {
+  total_references: number;
+  enable_only_types?: string[];
+  references?: FullWhereUsedReference[];
+}
+
+/** A `full` answer's JSON, from its text. */
+function extractResultData(
+  result: Parameters<typeof terseText>[0],
+): FullAnswer {
+  const parsed: FullAnswer = JSON.parse(terseText(result));
+  return parsed;
 }
 
 /**
@@ -228,6 +231,19 @@ describe('WhereUsed Handler Integration', () => {
         rows.some((row) => (row.code ?? '') !== ''),
         shown,
       );
+      // Every row as the same call's full answer implies it: each usage
+      // with its element and each of its code lines.
+      const full = await handleGetWhereUsed(handlerContext, {
+        object_name: testClass,
+        object_type: 'class',
+        in_object: inObject,
+        detail: 'full',
+      });
+      assert.deepStrictEqual(
+        whereUsedTerseMismatches(answer, fullReferences(full)),
+        [],
+        shown,
+      );
       logger?.info(
         `✅ ${inObject.object_type} ${inObject.object_name}: ${rows.length} row(s) with code lines`,
       );
@@ -359,11 +375,7 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const textContent = result.content.find(
-        (c: any) => c.type === 'text',
-      ) as any;
-      assert.ok(textContent !== undefined);
-      assert.ok(textContent?.text.includes('Object name is required'));
+      assert.ok(terseText(result).includes('Object name is required'));
 
       logger?.info('✅ Error handling validated: missing object name');
     });
@@ -394,11 +406,7 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const textContent = result.content.find(
-        (c: any) => c.type === 'text',
-      ) as any;
-      assert.ok(textContent !== undefined);
-      assert.ok(textContent?.text.includes('Object type is required'));
+      assert.ok(terseText(result).includes('Object type is required'));
 
       logger?.info('✅ Error handling validated: missing object type');
     });
@@ -484,7 +492,12 @@ describe('WhereUsed Handler Integration', () => {
       );
       const testClass = params?.test_class || 'CL_ABAP_CHAR_UTILITIES';
 
-      const invoke = async (extra: Record<string, unknown>) =>
+      const invoke = async (
+        extra: Pick<
+          Parameters<typeof handleGetWhereUsed>[1],
+          'enable_all_types' | 'enable_only_types'
+        >,
+      ) =>
         tester.invokeToolOrHandler(
           'GetWhereUsed',
           // The references' types and the filter echoed: the full answer.
@@ -504,7 +517,7 @@ describe('WhereUsed Handler Integration', () => {
               object_type: 'class',
               detail: 'full',
               ...extra,
-            } as any);
+            });
           },
         );
 
@@ -513,9 +526,7 @@ describe('WhereUsed Handler Integration', () => {
       const allResult = await invoke({ enable_all_types: true });
       const allData = extractResultData(allResult);
       const allTypes: string[] = Array.from(
-        new Set<string>(
-          (allData.references || []).map((r: any) => String(r.type)),
-        ),
+        new Set<string>((allData.references ?? []).map((r) => String(r.type))),
       );
       logger?.info(
         `📊 ALL: ${allData.total_references} refs across [${allTypes.join(', ')}]`,
@@ -549,9 +560,7 @@ describe('WhereUsed Handler Integration', () => {
       // with an error — never silently fall back to the full default set.
       logger?.info('🔍 Type filtering: ONLY [BOGUS/XX] (must error)');
       const badResult = await invoke({ enable_only_types: ['BOGUS/XX'] });
-      const badText =
-        (badResult.content.find((c: any) => c.type === 'text') as any)?.text ||
-        '';
+      const badText = terseText(badResult);
       logger?.info(`📊 INVALID [BOGUS/XX]: isError=${badResult.isError}`);
       assert.equal(badResult.isError, true);
       assert.ok(badText.includes('BOGUS/XX'));

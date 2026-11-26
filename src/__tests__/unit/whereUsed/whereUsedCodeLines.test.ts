@@ -40,6 +40,7 @@ import {
 } from '../../../lib/batch/availability';
 import { writeListing } from '../../../lib/detail';
 import { USAGE_SNIPPETS_URL } from '../../../lib/strategies/usageSnippets';
+import { usageIn } from '../../../lib/strategies/whereUsedList';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { envelopeConnection, partByPart } from '../../helpers/batchEnvelope';
 import { recordingConnection } from '../../helpers/recordingConnection';
@@ -449,6 +450,215 @@ describe('GetWhereUsed with in_object: that object’s usages with their code li
     );
     assert.equal(result.isError, true);
     assert.equal(connection.requests.length, 0);
+  });
+});
+
+// One class used in four of its methods, beside another class: the four
+// identifiers go in one request; SAP answers them out of order, one with
+// two lines, one with none, one left out, and an object not asked for.
+describe('in_object over several usages of one class', () => {
+  const MULTI_URI = '/sap/bc/adt/oo/classes/zcl_multi';
+  const idOf = (method: string) =>
+    `ABAPFullName;ZCL_MULTI=====================CP;ZCL_MULTI=====================${method};\\TY:ZMCP_SHR_DTEL`;
+  const ELSE_ID =
+    'ABAPFullName;ZCL_ELSE======================CP;ZCL_ELSE======================CU;\\TY:ZMCP_SHR_DTEL';
+  const method = (name: string): Row => ({
+    uri: `${MULTI_URI}/source/main#type=CLAS%2FOM;name=${name}`,
+    parentUri: MULTI_URI,
+    usage: 'gradeElement,includeProductive',
+    name,
+    identifier: idOf(name),
+  });
+  const references = `<?xml version="1.0" encoding="utf-8"?><usagereferences:usageReferenceResult numberOfResults="6" xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:referencedObjects>${[
+    { uri: MULTI_URI, name: 'ZCL_MULTI', type: 'CLAS/OC' },
+    method('M1'),
+    method('M2'),
+    method('M3'),
+    method('M4'),
+    {
+      uri: '/sap/bc/adt/oo/classes/zcl_else',
+      usage: 'gradeDirect,includeTest',
+      name: 'ZCL_ELSE',
+      type: 'CLAS/OC',
+      identifier: ELSE_ID,
+    },
+  ]
+    .map(referenced)
+    .join(
+      '',
+    )}</usagereferences:referencedObjects></usagereferences:usageReferenceResult>`;
+  const at = (name: string, line: number) =>
+    `${MULTI_URI}/source/main#type=CLAS%2FOM;name=${name};start=${line},5;end=${line},12`;
+  const snippets = `<?xml version="1.0" encoding="utf-8"?><usageReferences:usageSnippetResult xmlns:usageReferences="http://www.sap.com/adt/ris/usageReferences"><usageReferences:codeSnippetObjects>${[
+    snippetObject(idOf('M3'), []),
+    snippetObject(ELSE_ID, [
+      snippet('/sap/bc/adt/oo/classes/zcl_else/source/main#start=1,1', 'X.'),
+    ]),
+    snippetObject(idOf('M2'), [snippet(at('M2', 4), '  DATA m2 TYPE z.')]),
+    snippetObject(idOf('M1'), [
+      snippet(at('M1', 2), '    DATA m1a TYPE z.'),
+      snippet(at('M1', 3), '    DATA m1b TYPE z.'),
+    ]),
+  ].join(
+    '',
+  )}</usageReferences:codeSnippetObjects></usageReferences:usageSnippetResult>`;
+  const multi = { object_type: 'CLAS/OC', object_name: 'ZCL_MULTI' };
+
+  it('one request with the four identifiers, in the order listed', async () => {
+    const { connection } = await whereUsed(
+      'terse',
+      multi,
+      { data: snippets },
+      references,
+    );
+    const sent = snippetRequests(connection);
+    assert.equal(sent.length, 1);
+    assert.equal(
+      sent[0]?.data,
+      eclipseBody([idOf('M1'), idOf('M2'), idOf('M3'), idOf('M4')]),
+    );
+  });
+
+  it('terse: every row joined by its identifier, the left-out one said', async () => {
+    const { result, text } = await whereUsed(
+      'terse',
+      multi,
+      { data: snippets },
+      references,
+    );
+    assert.equal(result.isError, false, text);
+    assert.equal(
+      text,
+      [
+        '# total 6',
+        '# in_object CLAS/OC ZCL_MULTI: 4 usage(s)',
+        '# no_snippet_sent 1 usage(s): SAP sent no code line for them',
+        'type\tname\telement\turi\tusage\tcode',
+        '# package ZMCP_SHR_PKG',
+        '# in CLAS/OC ZCL_MULTI',
+        '\t\tM1\t\tgradeElement,includeProductive\tDATA m1a TYPE z.',
+        '\t\tM1\t\tgradeElement,includeProductive\tDATA m1b TYPE z.',
+        '\t\tM2\t\tgradeElement,includeProductive\tDATA m2 TYPE z.',
+        '\t\tM3\t\tgradeElement,includeProductive\t',
+        '\t\tM4\t\tgradeElement,includeProductive\t',
+      ].join('\n'),
+    );
+  });
+
+  it('medium: the left-out identifier is marked, the line-less one not', async () => {
+    const { text } = await whereUsed(
+      'medium',
+      multi,
+      { data: snippets },
+      references,
+    );
+    const answer: {
+      references: Array<{
+        element?: string;
+        code?: string;
+        snippets_absent?: boolean;
+      }>;
+    } = JSON.parse(text);
+    assert.deepStrictEqual(
+      answer.references.map(({ element, code, snippets_absent }) => ({
+        element,
+        code,
+        snippets_absent,
+      })),
+      [
+        { element: 'M1', code: 'DATA m1a TYPE z.', snippets_absent: undefined },
+        { element: 'M1', code: 'DATA m1b TYPE z.', snippets_absent: undefined },
+        { element: 'M2', code: 'DATA m2 TYPE z.', snippets_absent: undefined },
+        { element: 'M3', code: undefined, snippets_absent: undefined },
+        { element: 'M4', code: undefined, snippets_absent: true },
+      ],
+    );
+  });
+});
+
+describe('the usageSnippets answer is read by its structure', () => {
+  it('a line holding text and CDATA keeps their order', async () => {
+    const snippets = SNIPPETS.replace(
+      '<content>    DATA: lv_test TYPE ZMCP_SHR_DTEL.</content>',
+      '<content>  A<![CDATA[B&#38;]]>C&#38;</content>',
+    );
+    const { text } = await whereUsed('terse', TESTER_CLASS, { data: snippets });
+    assert.ok(
+      text.includes(
+        '\t\tTESTER\t\tgradeElement,includeProductive\tAB&#38;C&\n',
+      ),
+      text,
+    );
+  });
+
+  for (const [name, data] of [
+    [
+      'another root',
+      '<unrelated><codeSnippetObject><objectIdentifier>ID</objectIdentifier><wrongCollection/></codeSnippetObject></unrelated>',
+    ],
+    [
+      'another root holding the collection',
+      '<usageReferences:other xmlns:usageReferences="http://www.sap.com/adt/ris/usageReferences"><usageReferences:codeSnippetObjects><usageReferences:codeSnippetObject><objectIdentifier>ID</objectIdentifier></usageReferences:codeSnippetObject></usageReferences:codeSnippetObjects></usageReferences:other>',
+    ],
+    [
+      'the root without its collection',
+      '<usageReferences:usageSnippetResult xmlns:usageReferences="http://www.sap.com/adt/ris/usageReferences"><usageReferences:codeSnippetObject><objectIdentifier>ID</objectIdentifier></usageReferences:codeSnippetObject></usageReferences:usageSnippetResult>',
+    ],
+    [
+      'an object without its identifier',
+      '<usageReferences:usageSnippetResult xmlns:usageReferences="http://www.sap.com/adt/ris/usageReferences"><usageReferences:codeSnippetObjects><usageReferences:codeSnippetObject/></usageReferences:codeSnippetObjects></usageReferences:usageSnippetResult>',
+    ],
+  ] as const) {
+    it(`${name} is a failed reading`, async () => {
+      const { result, text } = await whereUsed('terse', TESTER_CLASS, {
+        data,
+      });
+      assert.equal(result.isError, true, text);
+      assert.ok(text.includes('read where-used code lines'), text);
+    });
+  }
+
+  it('an object nested anywhere else is not read: its usage is said left out', async () => {
+    const nested = `<?xml version="1.0" encoding="utf-8"?><usageReferences:usageSnippetResult xmlns:usageReferences="http://www.sap.com/adt/ris/usageReferences"><usageReferences:codeSnippetObjects/><usageReferences:other>${snippetObject(
+      TESTER_ID,
+      [snippet(`${CLASS_URI}/source/main#start=2,1`, 'NESTED.')],
+    )}</usageReferences:other></usageReferences:usageSnippetResult>`;
+    const { result, text } = await whereUsed('terse', TESTER_CLASS, {
+      data: nested,
+    });
+    assert.equal(result.isError, false, text);
+    assert.equal(text.includes('NESTED.'), false, text);
+    assert.ok(text.includes('# no_snippet_sent 1 usage(s)'), text);
+  });
+});
+
+describe('a blank in_object field never matches', () => {
+  it('is refused before any request', async () => {
+    for (const blank of [
+      { object_type: ' ', object_name: 'RUN' },
+      { object_type: 'CLAS/OC', object_name: '' },
+    ]) {
+      const { result, connection } = await whereUsed('terse', blank);
+      assert.equal(result.isError, true);
+      assert.equal(connection.requests.length, 0);
+    }
+  });
+
+  it('matches no unresolved reference', () => {
+    assert.equal(
+      usageIn(
+        { name: 'RUN', type: '', usage_information: 'gradeElement' },
+        { object_type: ' ', object_name: 'RUN' },
+      ),
+      false,
+    );
+    assert.equal(
+      usageIn(
+        { name: '', type: 'CLAS/OC', usage_information: 'gradeElement' },
+        { object_type: 'CLAS/OC', object_name: '' },
+      ),
+      false,
+    );
   });
 });
 

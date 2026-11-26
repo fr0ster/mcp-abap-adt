@@ -36,7 +36,7 @@ import {
   TOOL_DEFINITION as GetPackageTree,
   handleGetPackageTree as handleGetPackageTreeOf,
 } from '../../../handlers/system/high/handleGetPackageTree';
-import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
+import { handleGetObjectInfo as handleGetObjectInfoOf } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { NODE_READ_CONCURRENCY } from '../../../lib/strategies/packageWalk';
@@ -64,6 +64,12 @@ const handleGetPackageTree = (
   context: Parameters<typeof handleGetPackageTreeOf>[0],
   args: Parameters<typeof handleGetPackageTreeOf>[1],
 ) => handleGetPackageTreeOf(context, { detail: 'full', ...args });
+
+/** handleGetObjectInfo at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, the remaining tools). */
+const handleGetObjectInfo = (
+  context: Parameters<typeof handleGetObjectInfoOf>[0],
+  args: Parameters<typeof handleGetObjectInfoOf>[1],
+) => handleGetObjectInfoOf(context, { detail: 'full', ...args });
 
 /** handleGetPackageContents at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
 const handleGetPackageContents = (

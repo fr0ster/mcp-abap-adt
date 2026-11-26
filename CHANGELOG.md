@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [24.2.1] - 2026-11-26
+
+### Fixed
+
+- **`GetWhereUsed` names the class a usage inside a method or section is in.** SAP lists such a usage with no `adtcore:type`: its name is the element (`IF_OO_ADT_CLASSRUN~MAIN`, `CONSTRUCTOR`, `Private Section`), and the class it belongs to is only its `parentUri`. At `terse` and `medium` the row had an empty type and the element's name alone, so nothing said which class used the object (seen on the cloud and on premise). The row is now resolved against the list's own node at its `parentUri`, by that node's type and name: `terse` and `medium` answer the class (`CLAS/OC` `ZMCP_SHR_DUMP_CLS`) with the method or section in a new `element` column, one row per element; `full` keeps SAP's fields and adds `parent_uri`, `parent_type`, `parent_name`, `parent_package` and `element`. A row with no type and no node at its `parentUri` is answered as SAP gave it, its URI shown.
+
 ## [24.2.0] - 2026-11-26
 
 ### Highlights

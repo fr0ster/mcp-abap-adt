@@ -11,7 +11,6 @@ import {
 import {
   about,
   type Column,
-  type DetailLevel,
   type Head,
   headShape,
   type ListAnswerTable,
@@ -112,7 +111,10 @@ export async function handleGetSqlQuery(
       logger?.debug(
         `Parsed SQL query data: rows=${reading.value.rows.length}/${reading.value.total_rows ?? 0}, columns=${reading.value.columns.length}`,
       );
-      return dataAnswerAt(levelOf(args))({
+      return listAnswerAt(
+        DATA_ANSWERS,
+        levelOf(args),
+      )({
         sqlQuery,
         rowNumber,
         reading,
@@ -181,7 +183,10 @@ function dataAnswerOf({ sqlQuery, rowNumber, reading }: DataRead) {
  * beside it (`keyAttribute`, `colType`, `isKeyFigure` and whatever SAP adds
  * next); raw the document as SAP sent it.
  */
-const DATA_ANSWERS: ListAnswerTable<DataRead, string | SqlQueryResponse> = {
+export const DATA_ANSWERS: ListAnswerTable<
+  DataRead,
+  string | SqlQueryResponse
+> = {
   terse: ({ reading }) => {
     const preview = reading.value;
     const heads: Head[] =
@@ -201,10 +206,3 @@ const DATA_ANSWERS: ListAnswerTable<DataRead, string | SqlQueryResponse> = {
   }),
   raw: ({ reading }) => reading.raw,
 };
-
-/** The data answer at `detail`. */
-export function dataAnswerAt(
-  detail: DetailLevel,
-): (read: DataRead) => string | SqlQueryResponse {
-  return listAnswerAt(DATA_ANSWERS, detail);
-}

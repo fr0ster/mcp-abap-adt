@@ -8,6 +8,7 @@ import {
   purpose,
   toolDescription,
 } from '../../../lib/description';
+import { listAnswerAt } from '../../../lib/detail';
 import { DETAIL_LEVELS } from '../../../lib/detail/levels';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -18,7 +19,7 @@ import {
   levelOf,
 } from '../../../lib/strategies/detail';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import { dataAnswerAt } from '../../system/readonly/handleGetSqlQuery';
+import { DATA_ANSWERS } from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
   name: 'GetTableContents',
@@ -91,8 +92,11 @@ export async function handleGetTableContents(
         `Parsed table data: rows=${reading.value.rows.length}/${reading.value.total_rows ?? 0}, columns=${reading.value.columns.length}`,
       );
       // The same document `GetSqlQuery` reads, answered the same way at
-      // every level (`dataAnswerAt`).
-      return dataAnswerAt(levelOf(args))({
+      // every level (`DATA_ANSWERS`).
+      return listAnswerAt(
+        DATA_ANSWERS,
+        levelOf(args),
+      )({
         sqlQuery,
         rowNumber: maxRows,
         reading,

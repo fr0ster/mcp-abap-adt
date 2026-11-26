@@ -6,13 +6,12 @@
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import {
-  boundedMessage,
-  STDIO_FRAME_CAP,
-} from '../../../../server-runtime/src/stdio/boundedStdioTransport';
 import { WHERE_USED_LISTS } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import { rows, writeListing } from '../../../lib/detail';
-import type { WhereUsedReference } from '../../../lib/strategies/whereUsedList';
+import {
+  usingObject,
+  type WhereUsedReference,
+} from '../../../lib/strategies/whereUsedList';
 
 interface Item {
   readonly type: string;
@@ -112,12 +111,11 @@ describe('a terse list of 200,000 items', () => {
 
   // The onprem case (CL_ABAP_UNIT_ASSERT): 107,174 usages, nearly all in
   // methods of test classes. Written with the class and its type on every
-  // row, the answer grew to 10,913,053 bytes, above the stdio message
-  // (24.2.1, measured on premise); each class is written once on its
-  // `# in` line, its elements under it, and the message keeps a tenth of
-  // the cap to spare (7,997,856 bytes here, every usage in a method and
-  // every name long: more than the real class's).
-  it("GetWhereUsed's terse answer of 107,174 element usages is one stdio message, a tenth under the cap", () => {
+  // row, the answer grew to 10,913,053 bytes (measured on premise); each
+  // class is now written once on its `# in` line, its elements under it.
+  // No bound is asserted: how long a message may be is the client's
+  // (`--stdio-message-limit`), and every usage is answered.
+  it("GetWhereUsed's terse answer of 107,174 element usages, the class once per # in line, is shorter than with the class on every row", () => {
     const USAGES = 107_174;
     const PER_CLASS = 10;
     const CLASSES_PER_PACKAGE = 30;
@@ -148,18 +146,57 @@ describe('a terse list of 200,000 items', () => {
     }).answer;
     // The header row and every usage, one `# in` line per class.
     assert.equal(rowCount(text), USAGES + 1);
-    const message = {
-      jsonrpc: '2.0' as const,
-      id: 1,
-      result: { content: [{ type: 'text', text }] },
-    };
-    const size = Buffer.byteLength(JSON.stringify(message), 'utf8');
-    assert.equal(
-      boundedMessage(message, Math.floor(STDIO_FRAME_CAP * 0.9)).kind ===
-        'send' && size <= STDIO_FRAME_CAP * 0.9,
-      true,
-      `${size} bytes, the cap ${STDIO_FRAME_CAP}`,
+    // The same usages with the class's type and name on every row and no
+    // `# in` line: the shape the grouping replaced.
+    const perRow = writeListing({
+      heads: [{ head: 'total', value: String(USAGES) }],
+      reading: { totalReferences: USAGES, references },
+      lists: {
+        references: rows('references', {
+          columns: [
+            {
+              name: 'type',
+              cell: (r: WhereUsedReference) => usingObject(r).type,
+            },
+            {
+              name: 'name',
+              cell: (r: WhereUsedReference) => usingObject(r).name,
+            },
+            {
+              name: 'element',
+              cell: (r: WhereUsedReference) => usingObject(r).element ?? '',
+            },
+            { name: 'uri', cell: () => '' },
+            {
+              name: 'usage',
+              cell: (r: WhereUsedReference) => r.usage_information ?? '',
+            },
+          ],
+          header: 'always',
+          groups: [
+            {
+              label: 'package',
+              of: (r: WhereUsedReference) => usingObject(r).package_name ?? '',
+              mode: 'gathered',
+            },
+          ],
+        }),
+      },
+    }).answer;
+    const bytes = (answer: string) =>
+      Buffer.byteLength(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          result: { content: [{ type: 'text', text: answer }] },
+        }),
+        'utf8',
+      );
+    const size = bytes(text);
+    const perRowSize = bytes(perRow);
+    assert.ok(size < perRowSize, `${size} bytes, per row ${perRowSize}`);
+    console.log(
+      `[largeListing] 107,174 element usages: ${size} bytes, ${perRowSize} with the class on every row`,
     );
-    console.log(`[largeListing] 107,174 element usages: ${size} bytes`);
   });
 });

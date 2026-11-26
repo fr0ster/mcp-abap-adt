@@ -325,6 +325,18 @@ server the registry is handed to: there the server's own `systemType`, resolver,
 rules, logger and `sapAnswerStrategy` / `lineMatchStrategy` options apply, never the
 exporter's.
 
+## Reads per batch envelope
+
+`readsPerEnvelope` (a whole number from 2, else the constructor throws) is
+the consumer's bound on the reads one ADT batch envelope of a call carries,
+where a tool reads several objects at once (`GetEnhancements`,
+`SearchSource`, the package listings and walks, the function module group
+checks): more go in consecutive envelopes of balanced size. Absent: no
+bound — a phase's independent reads go in one envelope, and SAP's answer to
+it is the answer. It applies as the strategies above do: the exporter's on
+`getHandlerEntries()` and `registerOnServer`, the hosting server's
+(`EmbeddableMcpServer`'s `readsPerEnvelope`) on `createRegistry()`.
+
 ## Logging
 
 Pass a logger (`Logger` from `@mcp-abap-adt/logger`):

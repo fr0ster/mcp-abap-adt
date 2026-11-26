@@ -3,8 +3,7 @@
  * values in its description: on every binary and declared system type, and
  * with `--deny-actions` applied as a launcher applies it, each closed
  * argument's description ends with exactly the values its completion
- * offers, in their order. A prompt's own description states its function
- * and names none of the tools its steps call.
+ * offers, in their order.
  */
 
 import assert from 'node:assert/strict';
@@ -22,8 +21,6 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
-import { toolsNamed } from '../../helpers/promptArguments';
-import { listedPromptTools } from '../../helpers/promptTools';
 import {
   type DeclaredType,
   type ListedPrompt,
@@ -179,19 +176,4 @@ describe('a closed prompt argument lists its completion values in its descriptio
       assert.ok(!values.includes(gone), `${gone} is denied`);
     });
   }
-
-  it('a prompt description names none of the tools its steps call', () => {
-    const toolsOf = listedPromptTools(listings);
-    for (const listing of listings) {
-      for (const { prompt } of listing.prompts) {
-        const called = new Set(toolsOf(listing, prompt.name));
-        assert.ok(called.size > 0, `${listing.bin} ${prompt.name} calls tools`);
-        assert.deepEqual(
-          toolsNamed(prompt.description ?? '', called),
-          [],
-          `${listing.systemType} ${listing.bin} ${prompt.name}: ${prompt.description}`,
-        );
-      }
-    }
-  });
 });

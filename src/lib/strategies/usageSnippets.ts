@@ -28,22 +28,28 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { XMLParser } from 'fast-xml-parser';
 import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
 import { requestErrorOf, requestFailureOf } from '../answer';
 import { wireValueOf } from '../wireValue';
-import { parseXml } from '../xml/node';
-import { isWellFormed } from '../xml/ordered';
+import {
+  isWellFormed,
+  ORDERED_ATTRIBUTES,
+  ORDERED_CDATA,
+  ORDERED_TEXT,
+  orderedText,
+  parseOrdered,
+} from '../xml/ordered';
 import {
   attr,
   child,
-  isElement,
+  entries,
   listOf,
+  localName,
   text,
-  walk,
+  type XmlList,
   type XmlRead,
 } from '../xml/tree';
 import { failed, succeeded } from './stepResponse';
@@ -128,45 +134,6 @@ export function decodeXmlReferences(value: string): string {
   return decoded + value.slice(at);
 }
 
-/**
- * The reader: the prefixes gone, values as text, each reference decoded
- * once by {@link decodeXmlReferences} (the parser's own entity handling
- * leaves character references as written), a CDATA section kept apart, as
- * written.
- */
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  parseAttributeValue: false,
-  parseTagValue: false,
-  trimValues: false,
-  removeNSPrefix: true,
-  processEntities: false,
-  cdataPropName: '#cdata',
-  tagValueProcessor: (_name: string, value: string) =>
-    decodeXmlReferences(value),
-  attributeValueProcessor: (_name: string, value: string) =>
-    decodeXmlReferences(value),
-});
-
-/** An element's own text: its text, then its CDATA sections as written. */
-function ownText(value: XmlRead): string | undefined {
-  if (typeof value === 'string') return value;
-  if (!isElement(value)) return undefined;
-  const written = text(value);
-  const sections = listOf(child(value, '#cdata')).flatMap((section) => {
-    const read = text(section);
-    return read === undefined ? [] : [read];
-  });
-  if (written === undefined && sections.length === 0) {
-    // An empty element: its text is empty.
-    return Object.keys(value).every((key) => key.startsWith('@_'))
-      ? ''
-      : undefined;
-  }
-  return (written ?? '') + sections.join('');
-}
-
 /** `value` escaped for an XML text node. */
 function escaped(value: string): string {
   return value
@@ -196,41 +163,120 @@ export function usageSnippetsRequest(identifiers: readonly string[]): string {
   return `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageSnippetRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:objectIdentifiers>${listed}</usagereferences:objectIdentifiers><usagereferences:affectedObjects/><usagereferences:grade definitions="true" elements="true" indirectReferences="true"/></usagereferences:usageSnippetRequest>`;
 }
 
+/** An element of the ordered form: its local name, its attributes, its content. */
+interface Ordered {
+  readonly name: string;
+  readonly attributes: XmlRead;
+  readonly content: XmlList;
+}
+
+/** The elements among `members`, in document order: no text, CDATA, comment or declaration. */
+function orderedChildren(members: XmlList): Ordered[] {
+  const found: Ordered[] = [];
+  for (const member of members) {
+    for (const [name, content] of entries(member)) {
+      if (
+        name === ORDERED_ATTRIBUTES ||
+        name.startsWith('#') ||
+        name.startsWith('?')
+      ) {
+        continue;
+      }
+      found.push({
+        name: localName(name),
+        attributes: child(member, ORDERED_ATTRIBUTES),
+        content: listOf(content),
+      });
+    }
+  }
+  return found;
+}
+
+/** The children of `parent` named `name` (its local name). */
+function named(parent: XmlList, name: string): Ordered[] {
+  return orderedChildren(parent).filter((element) => element.name === name);
+}
+
 /**
- * The code lines of a `usageSnippets` answer, by identifier: every
- * `codeSnippetObject` at any depth, each `codeSnippet` of it with its `uri`
- * and `content`, `matches` where SAP sent it. `undefined` for a document
- * that is no such answer — not well-formed, without any
- * `codeSnippetObject`, an object without its identifier, a snippet without
- * its `uri` or its `content` —: a reading that cannot be told from SAP
- * giving no code lines is not answered as one.
+ * An element's text in document order: each text member with its
+ * references decoded ({@link decodeXmlReferences}), each CDATA section as
+ * written — `A<![CDATA[B]]>C` is `ABC`. `undefined` when it holds an
+ * element: no text of ours.
+ */
+function textInOrder(content: XmlList): string | undefined {
+  let read = '';
+  for (const member of content) {
+    for (const [name, value] of entries(member)) {
+      if (name === ORDERED_TEXT) {
+        read += decodeXmlReferences(text(value) ?? '');
+      } else if (name === ORDERED_CDATA) {
+        read += orderedText(listOf(value));
+      } else if (!name.startsWith('#')) {
+        return undefined;
+      }
+    }
+  }
+  return read;
+}
+
+/** The attribute `name` of an element, its references decoded. */
+function attribute(element: Ordered, name: string): string | undefined {
+  const value = attr(element.attributes, name);
+  return value === undefined ? undefined : decodeXmlReferences(value);
+}
+
+/**
+ * The code lines of a `usageSnippets` answer, by identifier: the document's
+ * root must be `usageSnippetResult` and hold its `codeSnippetObjects`; each
+ * `codeSnippetObject` there — and only there — is read with its
+ * `objectIdentifier` and each `codeSnippet` of its `codeSnippets`, its
+ * `uri`, its `content` in document order and `matches` where SAP sent it.
+ * An object present with no snippet is an identifier with no line; an
+ * identifier the answer leaves out is absent from the map (the caller
+ * tells the two apart). `undefined` for any other document — not
+ * well-formed, another root, no collection, an object without its
+ * identifier, a snippet without its `uri` or `content` —: a reading that
+ * cannot be told from SAP giving no code lines is not answered as one.
  */
 export function usageSnippetsReading(
   document: string,
 ): UsageSnippets | undefined {
   if (!isWellFormed(document)) return undefined;
+  const parsed = parseOrdered(document);
+  if (parsed === null) return undefined;
+  const [root, ...others] = orderedChildren(listOf(parsed));
+  if (root === undefined || others.length > 0) return undefined;
+  if (root.name !== 'usageSnippetResult') return undefined;
+  const collections = named(root.content, 'codeSnippetObjects');
+  const [collection] = collections;
+  if (collection === undefined || collections.length > 1) return undefined;
   const read = new Map<string, WhereUsedSnippet[]>();
-  let objects = 0;
-  for (const visit of walk(parseXml(parser, document))) {
-    if (visit.name !== 'codeSnippetObject') continue;
-    objects += 1;
-    const identifier = ownText(child(visit.node, 'objectIdentifier'));
+  for (const object of named(collection.content, 'codeSnippetObject')) {
+    const [identifierElement] = named(object.content, 'objectIdentifier');
+    const identifier =
+      identifierElement === undefined
+        ? undefined
+        : textInOrder(identifierElement.content);
     if (identifier === undefined || identifier === '') return undefined;
     const snippets = read.get(identifier) ?? [];
-    for (const snippet of listOf(
-      child(child(visit.node, 'codeSnippets'), 'codeSnippet'),
-    )) {
-      const uri = attr(snippet, '@_uri');
-      const content = ownText(child(snippet, 'content'));
-      if (uri === undefined || content === undefined) return undefined;
-      const matches = attr(snippet, '@_matches');
-      snippets.push(
-        matches === undefined ? { uri, content } : { uri, content, matches },
-      );
+    for (const list of named(object.content, 'codeSnippets')) {
+      for (const snippet of named(list.content, 'codeSnippet')) {
+        const uri = attribute(snippet, 'uri');
+        const [contentElement] = named(snippet.content, 'content');
+        const content =
+          contentElement === undefined
+            ? undefined
+            : textInOrder(contentElement.content);
+        if (uri === undefined || content === undefined) return undefined;
+        const matches = attribute(snippet, 'matches');
+        snippets.push(
+          matches === undefined ? { uri, content } : { uri, content, matches },
+        );
+      }
     }
     read.set(identifier, snippets);
   }
-  return objects === 0 ? undefined : read;
+  return read;
 }
 
 /** The words of an answer {@link usageSnippetsReading} cannot read. */

@@ -110,7 +110,7 @@ export async function handleListATCResults(
   );
 }
 
-/** What a result's row is written with: what the next call needs of it. */
+/** What a result's row is written with: what tells it apart, and its counts. */
 const RESULT_COLUMNS: readonly Column<AtcResultEntry>[] = [
   {
     name: 'display_id',
@@ -128,7 +128,26 @@ const RESULT_COLUMNS: readonly Column<AtcResultEntry>[] = [
     means: 'when it was created',
     cell: (result) => result.created_at ?? '',
   },
+  // How many findings of each priority, and how many failures: which
+  // result to open.
+  ...(['1', '2', '3', '4'] as const).map(
+    (priority): Column<AtcResultEntry> => ({
+      name: `priority_${priority}`,
+      means: `how many findings of priority ${priority}`,
+      cell: (result) => countCell(result.by_priority?.[priority]),
+    }),
+  ),
+  {
+    name: 'failures',
+    means: 'how many failures',
+    cell: (result) => countCell(result.failures),
+  },
 ];
+
+/** A count as a cell: empty when SAP sent none. */
+function countCell(count: number | undefined): string {
+  return count === undefined ? '' : String(count);
+}
 
 /** The lists the result listing writes: a row per result. */
 export const ATC_RESULTS_LISTS: RowSchemas<AtcResultListReading> = {

@@ -42,26 +42,54 @@ describe('ListATCResults answers at each detail', () => {
     assert.equal(terse.isError, false, terse.text);
     const lines = terse.text.split('\n');
     assert.equal(lines[0], '# count 6');
-    assert.equal(lines[1], 'display_id\ttitle\tcheck_variant\tcreated_at');
+    assert.equal(
+      lines[1],
+      'display_id\ttitle\tcheck_variant\tcreated_at\tpriority_1\tpriority_2\tpriority_3\tpriority_4\tfailures',
+    );
     assert.equal(
       lines[2],
-      'E6AC99B2161F1FE1B5A1E9B68E5CD628\tZMCP_SHR_FGRP\tDEFAULT\t2026-10-31T09:41:53Z',
+      'E6AC99B2161F1FE1B5A1E9B68E5CD628\tZMCP_SHR_FGRP\tDEFAULT\t2026-10-31T09:41:53Z\t0\t2\t1\t0\t0',
     );
     assert.equal(lines.length, 2 + 6, terse.text);
   });
 
-  it('terse carries none of the counts per priority or the failures', async () => {
+  it("terse writes each result's counts per priority and its failures, no run series", async () => {
     const terse = await listed(LIST);
     assert.ok(!terse.text.includes('by_priority'), terse.text);
-    assert.ok(!terse.text.includes('failures'), terse.text);
+    assert.ok(!terse.text.includes('run_series'), terse.text);
     assert.ok(!terse.text.startsWith('{'), terse.text);
+    const [, header = '', ...rows] = terse.text.split('\n');
+    const columns = header.split('\t');
+    for (const row of rows) {
+      const cells = row.split('\t');
+      for (const counted of [
+        'priority_1',
+        'priority_2',
+        'priority_3',
+        'priority_4',
+        'failures',
+      ]) {
+        const cell = cells[columns.indexOf(counted)] ?? '';
+        assert.ok(
+          [...cell].every((c) => c >= '0' && c <= '9'),
+          `${counted}: ${row}`,
+        );
+      }
+    }
+  });
+
+  it('a count SAP did not send is an empty cell, never 0', async () => {
+    const terse = await listed(
+      '<atcresult:resultList xmlns:atcresult="http://www.sap.com/adt/atc/result"><atcresult:result><atcresult:displayId>D1</atcresult:displayId><atcresult:title>T</atcresult:title></atcresult:result></atcresult:resultList>',
+    );
+    assert.equal(terse.text.split('\n')[2], 'D1\tT\t\t\t\t\t\t\t');
   });
 
   it('terse of an empty list: the count 0 and the header alone', async () => {
     const terse = await listed(EMPTY);
     assert.equal(
       terse.text,
-      '# count 0\ndisplay_id\ttitle\tcheck_variant\tcreated_at',
+      '# count 0\ndisplay_id\ttitle\tcheck_variant\tcreated_at\tpriority_1\tpriority_2\tpriority_3\tpriority_4\tfailures',
     );
   });
 

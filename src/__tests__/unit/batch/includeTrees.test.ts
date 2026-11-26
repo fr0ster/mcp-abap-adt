@@ -535,6 +535,36 @@ describe('GetIncludesList', () => {
     });
   }
 
+  const fourObjects = {
+    objects: [
+      { object_name: 'ZPROG', object_type: 'PROG/P' },
+      { object_name: 'ZFG', object_type: 'FUGR/F' },
+      { object_name: 'ZCL', object_type: 'CLAS/OC' },
+      { object_name: 'ZNONE', object_type: 'PROG/P' },
+    ],
+  };
+
+  it('no bound given: a phase of four objects goes in one envelope of four', async () => {
+    const { a, b, batched } = await bothWays(
+      handleGetIncludesList,
+      fourObjects,
+    );
+    assert.equal(textOf(a), textOf(b));
+    assert.equal(batched.envelopes[0]?.parts.length, 4);
+  });
+
+  it("the consumer's bound of 2 (runPhase): every envelope carries at most two reads, the answer unchanged", async () => {
+    const { a, b, batched } = await bothWays(
+      handleGetIncludesList,
+      fourObjects,
+      {},
+      2,
+    );
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(batched.envelopes[0]?.parts.length, 2);
+    assert.ok(batched.envelopes.every((e) => e.parts.length <= 2));
+  });
+
   it('the tree is the depth-first walk: cycles and duplicates marked where the sequential walk marks them', async () => {
     const { a } = await bothWays(handleGetIncludesList, {
       object_name: 'ZPROG',

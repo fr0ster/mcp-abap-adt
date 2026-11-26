@@ -153,6 +153,83 @@ describe('createRegistry() hosted by an EmbeddableMcpServer', () => {
   });
 });
 
+describe("readsPerEnvelope, the consumer's envelope bound", () => {
+  it("HandlerExporter.registerOnServer: the exporter's bound reaches the call; absent, none", async () => {
+    for (const bound of [7, undefined]) {
+      seen.length = 0;
+      const exporter = new HandlerExporter({
+        systemType: 'onprem',
+        ...(bound !== undefined && { readsPerEnvelope: bound }),
+      });
+      const server = new McpServer({ name: 'routes', version: '1.0.0' });
+      exporter.registerOnServer(server, async () => built);
+      const client = await clientOf(server);
+      try {
+        await client.callTool({ name: 'SearchSource', arguments: ARGS });
+        assert.equal(seen[0]?.readsPerEnvelope, bound);
+      } finally {
+        await client.close();
+      }
+    }
+  });
+
+  it('two EmbeddableMcpServer instances keep their own bounds', async () => {
+    const serverOf = (readsPerEnvelope?: number) =>
+      new EmbeddableMcpServer({
+        connection: built,
+        handlersRegistry: new HandlerExporter({
+          systemType: 'onprem',
+        }).createRegistry(),
+        systemType: 'onprem',
+        logger: silent,
+        ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
+      });
+    const five = await clientOf(serverOf(5));
+    const nine = await clientOf(serverOf(9));
+    const none = await clientOf(serverOf());
+    try {
+      await five.callTool({ name: 'SearchSource', arguments: ARGS });
+      await nine.callTool({ name: 'SearchSource', arguments: ARGS });
+      await none.callTool({ name: 'SearchSource', arguments: ARGS });
+      assert.deepStrictEqual(
+        seen.map((context) => context.readsPerEnvelope),
+        [5, 9, undefined],
+      );
+    } finally {
+      await Promise.all([five.close(), nine.close(), none.close()]);
+    }
+  });
+
+  it('an option below 2 or not whole is refused at construction', () => {
+    for (const value of [1, 0, 2.5]) {
+      assert.throws(
+        () =>
+          new EmbeddableMcpServer({
+            connection: built,
+            systemType: 'onprem',
+            logger: silent,
+            readsPerEnvelope: value,
+          }),
+        (error: unknown) =>
+          error instanceof Error &&
+          error.message ===
+            'Invalid readsPerEnvelope: must be a whole number of reads from 2',
+      );
+      assert.throws(
+        () =>
+          new HandlerExporter({
+            systemType: 'onprem',
+            readsPerEnvelope: value,
+          }),
+        (error: unknown) =>
+          error instanceof Error &&
+          error.message ===
+            'Invalid readsPerEnvelope: must be a whole number of reads from 2',
+      );
+    }
+  });
+});
+
 describe('batch mode', () => {
   for (const [_name, strategies] of [
     ['the SAP-answer strategy given', { sapAnswerStrategy: serverSap }],

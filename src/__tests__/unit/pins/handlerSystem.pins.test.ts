@@ -10,7 +10,7 @@
  * - the other actions on `recordingConnection` with real adt-clients code,
  *   SAP's answers the corpus documents (in their envelope where the read is
  *   enveloped): `search_object` the quick search, `where_used` the usage
- *   references of a domain, `package_tree` the package's metadata and root
+ *   references of a domain (no code-line read: no in_object), `package_tree` the package's metadata and root
  *   node structure in one envelope, `transports` one GET of the listing
  *   by user, `atc_findings` the worklist,
  *   `atc_results` the result list, `atc_result` one result.

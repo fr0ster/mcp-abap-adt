@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [24.2.1] - 2026-11-26
+
+### Fixed
+
+- **`GetWhereUsed` names the class a usage inside a method or section is in.** SAP lists such a usage with no `adtcore:type`: its name is the element (`IF_OO_ADT_CLASSRUN~MAIN`, `CONSTRUCTOR`, `Private Section`), and the class it belongs to is only its `parentUri`. At `terse` and `medium` the row had an empty type and the element's name alone, so nothing said which class used the object (seen on the cloud and on premise). The row is now resolved against the list's own node at its `parentUri`, by that node's type and name: `terse` writes the class once on a `# in CLAS/OC ZMCP_SHR_DUMP_CLS` line after the plain rows of its package, each method or section under it in a new `element` column, one row per element, the class no longer repeated on every row (an answer as large as CL_ABAP_UNIT_ASSERT's 107,174 usages may still be above the client's stdio message limit, `--stdio-message-limit`: it is then answered the transport's error naming both sizes); `medium` gives each element usage the class's `type` and `name` with `element` beside them; columns are read by the header, a column was added; `full` keeps SAP's fields and adds `parent_uri`, `parent_type`, `parent_name`, `parent_package` and `element`. A row with no type and no node at its `parentUri` is answered as SAP gave it, its URI shown.
+- **`GetWhereUsed` gives the source lines of the usages inside one using object (`in_object`).** A new optional argument, `in_object` (type and name of one object the answer names), keeps the answer to that object's usages and reads their code lines with one `usageSnippets` request over exactly their `objectIdentifier`s (`POST /sap/bc/adt/repository/informationsystem/usageSnippets`, Eclipse's body: `optional="false"`, `affectedObjects`, the grade all true), as Eclipse reads them for the node opened: each usage with its method or section and the line, trimmed, in a `code` column, one row per line; an object with no usage answers `0 usage(s)`, no error. Without it the call reads the where-used list alone, as in 24.2.0, and stays recordable in batch mode; with it, it is not. The compact `HandlerSystem` `where_used` takes it too. Identifiers, lines and positions are decoded as the where-used answer is (named and numeric references); a refused or unreadable snippet read is the call's failure (step `read where-used code lines`). The request is made here: adt-strategies 0.28.3 reads no `usageSnippetResult`.
+
 ## [24.2.0] - 2026-11-26
 
 ### Highlights

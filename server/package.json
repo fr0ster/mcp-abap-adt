@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/core",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "24.2.0",
+  "version": "24.2.1",
   "description": "MCP server for SAP ABAP ADT over stdio, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: CRUD of ABAP, DDIC, CDS and RAP objects, where-used, ATC, unit tests, transports, the ABAP and AMDP debugger, the abapGit tools (link, pull, stage and push a package with any git host over HTTPS), MCP prompts and access restrictions (deny lists, allowed packages, requests and tables), the data tools off by default. One destination through the auth broker; connects over HTTP, RFC or SNC (RFC and SNC need the SAP NW RFC library at run time). Read-only: @mcp-abap-adt/core-ro; compact: @mcp-abap-adt/compact; Streamable HTTP: @mcp-abap-adt/http; SSE: @mcp-abap-adt/sse.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -86,10 +86,10 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^24.2.0",
-    "@mcp-abap-adt/lib": "^24.2.0",
-    "@mcp-abap-adt/responsible-rules": "^24.2.0",
-    "@mcp-abap-adt/server-runtime": "^24.2.0"
+    "@mcp-abap-adt/background-runs-memory": "^24.2.1",
+    "@mcp-abap-adt/lib": "^24.2.1",
+    "@mcp-abap-adt/responsible-rules": "^24.2.1",
+    "@mcp-abap-adt/server-runtime": "^24.2.1"
   },
   "devDependencies": {
     "@types/node": "*",

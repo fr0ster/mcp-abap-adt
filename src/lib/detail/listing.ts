@@ -956,18 +956,7 @@ function rowLines<I>(
   const groups = spec.groups ?? [];
   const first = groups[0];
   if (first !== undefined && first.mode === 'gathered') {
-    // Every item of a value under one line, in first-appearance order.
-    const gathered = new Map<string, I[]>();
-    for (const item of items) {
-      const value = first.of(item);
-      const members = gathered.get(value) ?? [];
-      members.push(item);
-      gathered.set(value, members);
-    }
-    for (const [value, members] of gathered) {
-      if (value !== first.unless) lines.push({ group: first.label, value });
-      for (const member of members) appendLines(lines, rowOf(member));
-    }
+    appendGathered(lines, items, groups, rowOf);
     return lines;
   }
   // Runs: a group line when its value changes; an inner group starts again
@@ -986,6 +975,44 @@ function rowLines<I>(
     appendLines(lines, rowOf(item));
   }
   return lines;
+}
+
+/**
+ * Items under gathered groups: every item of a value of the first group
+ * under one line, in the order the values first appear, and each value's
+ * items under the next group the same way, down the groups (an inner group
+ * of a gathered one gathers too). The items whose value is the group's
+ * `unless` are written first, with no line: a row after a group line is
+ * always one of that group.
+ */
+function appendGathered<I>(
+  lines: Line[],
+  items: readonly I[],
+  groups: readonly Group<I>[],
+  rowOf: (item: I) => Line[],
+): void {
+  const [group, ...inner] = groups;
+  if (group === undefined) {
+    for (const item of items) appendLines(lines, rowOf(item));
+    return;
+  }
+  const unlined: I[] = [];
+  const gathered = new Map<string, I[]>();
+  for (const item of items) {
+    const value = group.of(item);
+    if (value === group.unless) {
+      unlined.push(item);
+      continue;
+    }
+    const members = gathered.get(value) ?? [];
+    members.push(item);
+    gathered.set(value, members);
+  }
+  appendGathered(lines, unlined, inner, rowOf);
+  for (const [value, members] of gathered) {
+    lines.push({ group: group.label, value });
+    appendGathered(lines, members, inner, rowOf);
+  }
 }
 
 /** A tree's root row: the reading's own node, written by its columns as a row and no item. */

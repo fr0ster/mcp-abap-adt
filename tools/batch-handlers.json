@@ -725,7 +725,7 @@
     "tool": "HandlerSystem",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerSystem.ts#handleHandlerSystem",
-    "sends": "where_used of one object without a type filter: POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope",
+    "sends": "where_used of one object without a type filter and without in_object: POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope; with in_object its code lines are read with the identifiers that answer returns, so it is no entry",
     "when": [
       {
         "argument": "action",
@@ -745,6 +745,10 @@
       },
       {
         "argument": "disable_types",
+        "present": false
+      },
+      {
+        "argument": "in_object",
         "present": false
       },
       {

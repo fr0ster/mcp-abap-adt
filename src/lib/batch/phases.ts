@@ -59,6 +59,7 @@ import type {
 import type { HandlerContext } from '../../handlers/interfaces';
 import { adtCallScope, type HeaderInvocation } from '../adtHeaders/scope';
 import { correctedPair } from '../adtHeaders/withAdtHeaders';
+import { appendAll } from '../appendAll';
 import { failureOf, readOwn } from '../auth/failures';
 import {
   MIN_READS_PER_ENVELOPE,
@@ -370,8 +371,59 @@ export async function runPhase<I, R>(
   return results;
 }
 
-/** `runPhase`, its envelope's failure reported beside the settlements (`PhaseOutcome`). */
+/**
+ * `runPhase`, its envelope's failure reported beside the settlements
+ * (`PhaseOutcome`). The items go in the envelopes the call's context allows
+ * (`envelopesOf`): with no bound, one; with the consumer's bound, consecutive
+ * balanced envelopes, in item order. An envelope that failed, or that met a
+ * credential refusal, ends the phase: no later envelope is sent, and the
+ * items it would have carried settle with that failure, as one envelope
+ * holding them all would have answered — so the settlements stay one per
+ * item, in item order, whatever the bound. The outcome's `envelope` is the
+ * first failed envelope's.
+ */
 export async function runPhaseOutcome<I, R>(
+  context: HandlerContext,
+  items: readonly I[],
+  read: (item: I, batch: IAbapConnection) => Promise<R>,
+): Promise<PhaseOutcome<R>> {
+  const results: PhaseResult<R>[] = [];
+  let envelope: PhaseOutcome<R>['envelope'] = { failed: false };
+  for (const chunk of envelopesOf(context, items)) {
+    if (envelope.failed) {
+      const ended: unknown = envelope.error;
+      appendAll(
+        results,
+        chunk.map((): PhaseResult<R> => ({ ok: false, error: ended })),
+      );
+      continue;
+    }
+    const outcome = await runEnvelope(context, chunk, read);
+    appendAll(results, outcome.results);
+    if (outcome.envelope.failed) {
+      envelope = outcome.envelope;
+      continue;
+    }
+    const refusal = outcome.results.find(
+      (result) => !result.ok && failureOf(result.error) !== undefined,
+    );
+    if (refusal !== undefined && !refusal.ok) {
+      // The call ends with it: the later items are not sent.
+      const ended: unknown = refusal.error;
+      envelope = { failed: false };
+      const rest = items.slice(results.length);
+      appendAll(
+        results,
+        rest.map((): PhaseResult<R> => ({ ok: false, error: ended })),
+      );
+      break;
+    }
+  }
+  return { results, envelope };
+}
+
+/** One envelope of a phase: every item of `items` in it. */
+async function runEnvelope<I, R>(
   context: HandlerContext,
   items: readonly I[],
   read: (item: I, batch: IAbapConnection) => Promise<R>,

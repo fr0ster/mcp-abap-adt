@@ -14,6 +14,7 @@ import { updatePrompt } from '../../../lib/prompts/updatePrompt';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import { fullToolSet, type ToolSet } from '../../../lib/toolSet';
 import {
+  assertAsked,
   assertRefused,
   completionOf,
   promptOf,
@@ -155,12 +156,11 @@ describe('the read and the lock per type', () => {
 
 describe('the types one family serves stay out', () => {
   for (const type of ['table_settings', 'function_group_text_elements']) {
-    it(`${type} is refused on compact onprem`, () => {
-      assertRefused(
+    it(`${type} is answered with the served types on compact onprem`, async () => {
+      await assertAsked(
         promptOf(updatePrompt, compactOnprem),
         { object_type: type, name: 'SOME_OBJECT' },
-        `update: object_type "${type}" is not served by this server; it serves `,
-        true,
+        'object_type',
       );
     });
   }
@@ -225,12 +225,11 @@ describe('the deny list through the lock (test 4)', () => {
     assert.ok(values.includes('interface'));
   });
 
-  it('compact delete of local_types is refused', () => {
-    assertRefused(
+  it('compact delete of local_types is answered with the served types', async () => {
+    await assertAsked(
       promptOf(deletePrompt, denied),
       { object_type: 'local_types', name: 'SOME_CLASS' },
-      'delete: object_type "local_types" is not served by this server; it serves ',
-      true,
+      'object_type',
     );
   });
 });

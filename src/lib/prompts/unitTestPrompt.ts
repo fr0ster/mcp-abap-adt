@@ -4,8 +4,6 @@
  * one; on compact the run, its status until it is finished, and its result.
  */
 import type { AbapUnitRunObjectType } from '@mcp-abap-adt/interfaces-adt';
-import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
-import * as z from 'zod';
 import { TOOL_DEFINITION as RunAbapUnit } from '../../handlers/unit_test/high/handleRunAbapUnit.js';
 import { TOOL_DEFINITION as RunFunctionGroupUnitTest } from '../../handlers/unit_test/high/handleRunFunctionGroupUnitTest.js';
 import { TOOL_DEFINITION as RunFunctionModuleUnitTest } from '../../handlers/unit_test/high/handleRunFunctionModuleUnitTest.js';
@@ -13,11 +11,12 @@ import { TOOL_DEFINITION as RunProgramUnitTest } from '../../handlers/unit_test/
 import { TOOL_DEFINITION as RunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest.js';
 import type { RunTargetArgs } from '../../handlers/unit_test/shared/runTarget.js';
 import type { JsonValue } from '../json.js';
-import { completeFrom } from './completion.js';
+import { askValue } from './askValue.js';
+import { closedOptionalArgument } from './completion.js';
 import { jsonLiteral } from './instruction.js';
 import { objectArguments, stepValue, userValue } from './objectPrompts.js';
 import { type FullRow, fullRow } from './objectRows.js';
-import { notServedWords, promptRefusal, requiredWords } from './refusals.js';
+import { promptRefusal, requiredWords } from './refusals.js';
 import { matchServed, requiredArgument } from './served.js';
 import { toolStep } from './source.js';
 import type {
@@ -67,7 +66,14 @@ const PER_TYPE_RUNS: Partial<Record<RunType, FullRow>> = {
 };
 
 const INCLUDE_SUBPACKAGES_WORDS =
+  'For a package, whether the tests of its subpackages run too';
+
+/** What a package's run still to fill says of `include_subpackages`: the instruction's own words, kept apart from the argument's description. */
+const INCLUDE_SUBPACKAGES_TO_FILL =
   'For a package: true runs the tests of its subpackages too.';
+
+/** The values `include_subpackages` takes. */
+const INCLUDE_SUBPACKAGES_VALUES: readonly string[] = ['true', 'false'];
 
 /** The run target of `type` named `name`; a package's subpackages as given. */
 function targetOf(
@@ -112,7 +118,6 @@ function targetArguments(
 /** How a served type is run: the steps for its name and the subpackages flag. */
 interface RunRow {
   readonly type: RunType;
-  readonly tools: readonly string[];
   readonly steps: (
     name: string,
     includeSubpackages: boolean | undefined,
@@ -128,7 +133,6 @@ function fullRunRow(source: PromptSource, type: RunType): RunRow | undefined {
   const result = source.tools.get('GetUnitTestResult');
   return {
     type,
-    tools: result === undefined ? [runName] : [runName, 'GetUnitTestResult'],
     steps: (name, includeSubpackages) => [
       toolStep(
         run,
@@ -158,11 +162,6 @@ interface CompactRunTools {
 function compactRunRow(tools: CompactRunTools, type: RunType): RunRow {
   return {
     type,
-    tools: [
-      tools.run.definition.name,
-      tools.status.definition.name,
-      tools.result.definition.name,
-    ],
     steps: (name, includeSubpackages) => [
       toolStep(tools.run, targetArguments(type, name, includeSubpackages), {
         keeps: ['run_id'],
@@ -235,27 +234,26 @@ export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
   );
   return {
     name: 'unit_test',
-    description: `Runs the ABAP Unit tests of the object of object_type named name, or of a package: asks the model to call ${[
-      ...new Set(rows.flatMap(({ tools }) => tools)),
-    ].join(', ')} and read the result.`,
+    description:
+      'Runs the ABAP Unit tests of the object of object_type named name, or of a package, and reads the result.',
     argsSchema: {
       // A run names a function module by its own name: SAP finds its
       // function group and runs that group's tests, so no group is declared.
       ...objectArguments(served, []),
-      include_subpackages: completable(
-        z.string().optional().describe(INCLUDE_SUBPACKAGES_WORDS),
-        (typed) => completeFrom(['true', 'false'], typed ?? ''),
+      include_subpackages: closedOptionalArgument(
+        INCLUDE_SUBPACKAGES_WORDS,
+        INCLUDE_SUBPACKAGES_VALUES,
       ),
     },
     instruction: (args): PromptInstruction => {
       const objectType = requiredArgument(args, 'object_type');
-      if (objectType === undefined) {
-        throw promptRefusal(requiredWords('unit_test', 'object_type'));
-      }
-      const type = matchServed(objectType, byLowercase);
-      const row = rows.find((served) => served.type === type);
+      const type =
+        objectType === undefined
+          ? undefined
+          : matchServed(objectType, byLowercase);
+      const row = rows.find((each) => each.type === type);
       if (row === undefined) {
-        throw promptRefusal(notServedWords('unit_test', objectType, served));
+        return askValue('unit_test', 'object_type', objectType, served);
       }
       const name = requiredArgument(args, 'name');
       if (name === undefined) {
@@ -278,7 +276,7 @@ export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
                   ...first.stillToFill,
                   {
                     name: 'include_subpackages',
-                    description: INCLUDE_SUBPACKAGES_WORDS,
+                    description: INCLUDE_SUBPACKAGES_TO_FILL,
                   },
                 ],
               },

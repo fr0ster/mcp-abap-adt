@@ -76,7 +76,7 @@ export function updatePrompt(source: PromptSource): AbapPrompt | undefined {
   );
   return objectPrompt(
     'update',
-    'Changes an ABAP object of object_type named name as change says: asks the model to read it and write it with',
+    'Changes an ABAP object of object_type named name as change says: reads the object, then writes its new content.',
     rows,
     {
       change: z.string().optional().describe(CHANGE_WORDS),
@@ -117,11 +117,6 @@ export function updatePrompt(source: PromptSource): AbapPrompt | undefined {
           ...changeNotes(args),
         ],
       };
-    },
-    (row) => {
-      const read = readOf(row);
-      const readTool = read === undefined ? [] : [read.tool.definition.name];
-      return row.family === 'compact' ? [...readTool, 'HandlerLock'] : readTool;
     },
   );
 }

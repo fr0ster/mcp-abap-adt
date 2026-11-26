@@ -2,7 +2,7 @@
  * Test 4: the deny list reaches the prompts through the tools the server
  * lists. Each entry is applied as a launcher applies it (`restrictedStart`,
  * whose registry is `withoutDenied`'s), the server started as a launcher
- * starts it on `onprem`, and the listing, the completion and the refusal
+ * starts it on `onprem`, and the listing, the completion and the answer
  * read over a client. The prompt module reads no deny entry: nothing under
  * `src/lib/prompts/` imports from `src/lib/access/`.
  */
@@ -21,7 +21,6 @@ import { parseDeniedEntry } from '../../../lib/access/deniedActions';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { EMPTIED_INCLUDE_TYPES } from '../../../lib/compact/compactSchemas';
 import { LOCKED_AS } from '../../../lib/prompts/objectRows';
-import { notServedWords } from '../../../lib/prompts/refusals';
 import {
   fullToolSet,
   restrictedStart,
@@ -62,23 +61,25 @@ async function served(client: Client, prompt: string): Promise<string[]> {
   return completion.values;
 }
 
-/** `prompts/get` of `prompt` with `args` is refused as InvalidParams with `words`. */
-async function assertRefused(
+/**
+ * `prompts/get` of `prompt` with `args` answers no error but the line
+ * naming the object_type given as not served and listing `served`.
+ */
+async function assertAsked(
   client: Client,
   prompt: string,
   args: Record<string, string>,
-  words: string,
+  served: readonly string[],
 ): Promise<void> {
-  await assert.rejects(
-    client.getPrompt({ name: prompt, arguments: args }),
-    (error: Error) => {
-      assert.ok(error instanceof McpError);
-      assert.equal(error.code, ErrorCode.InvalidParams);
-      // The SDK prefixes the code once on the server's error and again on
-      // the client's, so the words end the message.
-      assert.ok(error.message.endsWith(`: ${words}`), error.message);
-      return true;
-    },
+  const { messages } = await client.getPrompt({
+    name: prompt,
+    arguments: args,
+  });
+  const content = messages[0]?.content;
+  assert.ok(content && 'text' in content);
+  assert.equal(
+    content.text,
+    `The object_type ${JSON.stringify(args.object_type)} is not served by this server. The ${prompt} prompt takes: ${served.join(', ')}. Ask the user which one they want, then call it again.`,
   );
 }
 
@@ -121,11 +122,11 @@ describe('test 4: the deny list, through the listed tools', () => {
         left,
         allowed.filter((type) => type !== 'class'),
       );
-      await assertRefused(
+      await assertAsked(
         denied,
         'create',
         { object_type: 'class', name: 'SOME_CLASS' },
-        notServedWords('create', 'class', left),
+        left,
       );
     });
   }
@@ -157,17 +158,17 @@ describe('test 4: the deny list, through the listed tools', () => {
       deletesLeft,
       deletes.filter((type) => !includes.has(type)),
     );
-    await assertRefused(
+    await assertAsked(
       denied,
       'update',
       { object_type: 'local_types', name: 'SOME_CLASS' },
-      notServedWords('update', 'local_types', updatesLeft),
+      updatesLeft,
     );
-    await assertRefused(
+    await assertAsked(
       denied,
       'delete',
       { object_type: 'local_types', name: 'SOME_CLASS' },
-      notServedWords('delete', 'local_types', deletesLeft),
+      deletesLeft,
     );
   });
 

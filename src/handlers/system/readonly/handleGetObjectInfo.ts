@@ -33,6 +33,7 @@ import {
 import {
   about,
   type Column,
+  cellsOf,
   type Head,
   type ListAnswerTable,
   listAnswerAt,
@@ -273,20 +274,70 @@ function enrichmentOf(
   if (!searchResult.isError && Array.isArray(searchResult.content)) {
     for (const entry of searchResult.content) {
       if (!('text' in entry) || typeof entry.text !== 'string') continue;
-      const [, ...rows] = entry.text.split('\n'); // drop the header row
-      for (const line of rows) {
-        const [name, hitType, hitDescription, hitPackage] = line.split('\t');
-        if (name && name.toUpperCase() === objectName.toUpperCase()) {
-          return {
-            packageName: hitPackage || undefined,
-            description: hitDescription || undefined,
-            type: hitType || objectType,
-          };
-        }
+      const hit = searchHitsOf(entry.text).find(
+        (row) => row.name.toUpperCase() === objectName.toUpperCase(),
+      );
+      if (hit !== undefined) {
+        return {
+          packageName: hit.packageName,
+          description: hit.description,
+          type: hit.type ?? objectType,
+        };
       }
     }
   }
   return none;
+}
+
+/** One object a search found, read from its row by the header's column names. */
+interface SearchHit {
+  readonly name: string;
+  readonly type: string | undefined;
+  readonly description: string | undefined;
+  readonly packageName: string | undefined;
+}
+
+/**
+ * The objects a `SearchObject` terse answer lists: its first line is the
+ * header, each later line a row; every line is read back into its cells
+ * (`cellsOf`, the inverse of the writer's escapes), and each cell is taken
+ * by its column's name, never by its position. A cell left empty reads as
+ * absent. An answer whose header names no `name` column lists nothing to
+ * match; a missing `type`, `description` or `package` column leaves that
+ * field absent.
+ */
+export function searchHitsOf(text: string): SearchHit[] {
+  const [header, ...lines] = text.split('\n');
+  if (header === undefined || header === '') return [];
+  const columns = cellsOf(header);
+  const at = (column: string): number | undefined => {
+    const index = columns.indexOf(column);
+    return index < 0 ? undefined : index;
+  };
+  const nameAt = at('name');
+  if (nameAt === undefined) return [];
+  const typeAt = at('type');
+  const descriptionAt = at('description');
+  const packageAt = at('package');
+  const cellAt = (cells: readonly string[], index: number | undefined) => {
+    if (index === undefined) return undefined;
+    const value = cells[index];
+    return value === undefined || value === '' ? undefined : value;
+  };
+  return lines.flatMap((line): SearchHit[] => {
+    if (line === '') return [];
+    const cells = cellsOf(line);
+    const name = cellAt(cells, nameAt);
+    if (name === undefined) return [];
+    return [
+      {
+        name,
+        type: cellAt(cells, typeAt),
+        description: cellAt(cells, descriptionAt),
+        packageName: cellAt(cells, packageAt),
+      },
+    ];
+  });
 }
 
 /** A node of a tree: an object read with its own type folders. */

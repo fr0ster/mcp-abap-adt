@@ -10,7 +10,10 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { handleGetObjectInfo } from '../../handlers/system/readonly/handleGetObjectInfo';
+import {
+  handleGetObjectInfo,
+  searchHitsOf,
+} from '../../handlers/system/readonly/handleGetObjectInfo';
 import {
   createBatchAvailability,
   NO_BATCH_ENDPOINT_STATUS,
@@ -221,5 +224,71 @@ describe('GetObjectInfo at medium, full and raw', () => {
       raw,
       CLASS_ANSWERS.map(({ data }) => ({ status: 200, body: data })),
     );
+  });
+});
+
+describe("the enrichment reads SearchObject's terse rows by column name", () => {
+  it('takes each cell by its header name, whatever the column order', () => {
+    assert.deepStrictEqual(
+      searchHitsOf(
+        'package\tdescription\tname\ttype\nZPARENT\tFound it\tZROOT\tDEVC/K',
+      ),
+      [
+        {
+          name: 'ZROOT',
+          type: 'DEVC/K',
+          description: 'Found it',
+          packageName: 'ZPARENT',
+        },
+      ],
+    );
+  });
+
+  it('decodes an escaped cell: a tab, a line break and a backslash in a description', () => {
+    assert.deepStrictEqual(
+      searchHitsOf(
+        'name\ttype\tdescription\tpackage\nZROOT\tDEVC/K\ta\\tb\\nc\\\\d\tZPARENT',
+      ),
+      [
+        {
+          name: 'ZROOT',
+          type: 'DEVC/K',
+          description: 'a\tb\nc\\d',
+          packageName: 'ZPARENT',
+        },
+      ],
+    );
+  });
+
+  it('a missing column leaves its field absent; no name column, nothing to match', () => {
+    assert.deepStrictEqual(searchHitsOf('name\ttype\nZROOT\tDEVC/K'), [
+      {
+        name: 'ZROOT',
+        type: 'DEVC/K',
+        description: undefined,
+        packageName: undefined,
+      },
+    ]);
+    assert.deepStrictEqual(searchHitsOf('type\tdescription\nDEVC/K\tx'), []);
+  });
+
+  // The batch path's case is in `unit/batch/packageWalks.test.ts`.
+  it('the sequential path: a description with a tab, a line break and a backslash reaches the tree as SAP sent it', async () => {
+    const answers = [
+      {
+        data: found('ZCL_X', 'CLAS/OC').replace(
+          'adtcore:description="Found ZCL_X"',
+          'adtcore:description="a&#9;b&#10;c\\d"',
+        ),
+      },
+      ...CLASS_ANSWERS,
+    ];
+    const result = await handleGetObjectInfo(contextOn(answers), {
+      ...CLASS,
+      enrich: true,
+      detail: 'full',
+    });
+    const text = result.content.map((part) => part.text ?? '').join('');
+    assert.equal(JSON.parse(text).OBJECT_DESCRIPTION, 'a\tb\nc\\d', text);
   });
 });

@@ -561,7 +561,9 @@ export interface SearchSourceStrategies {
  * node structures, then their type nodes), one envelope each; (3) the source
  * reads of every target — with the consumer's bound (`readsPerEnvelope`) in
  * chunks of that many targets, so a chunk's first round (one read per
- * target) fills one envelope; without it in one chunk —, each chunk's rounds
+ * target) fills one envelope; without it in one chunk; with `max_hits`, bound
+ * or not, one target per chunk, so the scan stops as soon as it is reached —,
+ * each chunk's rounds
  * (the objects' own sources and function group structures, then the function
  * groups' includes and function modules) in envelopes of at most the bound,
  * else one (`envelopesOf`), each source once. The answer is assembled by
@@ -650,11 +652,17 @@ async function runSearchSourceInPhases(
   // ones, so the reads sent here are the reads it answers from.
   const targets = enumerated.targets;
 
-  // (3) The source reads of the targets, in chunks of the consumer's bound
-  // (without one, a single chunk): a chunk is read through all its rounds,
-  // each round's reads not answered yet — every source once, whichever
-  // objects name it — in the envelopes `envelopesOf` allows.
-  const targetsPerChunk = ctx.readsPerEnvelope ?? targets.length;
+  // (3) The source reads of the targets, in chunks: a chunk is read through
+  // all its rounds, each round's reads not answered yet — every source once,
+  // whichever objects name it — in the envelopes `envelopesOf` allows. A
+  // chunk holds the consumer's bound of targets, without one every target;
+  // with `max_hits` one target, bound or not, so the scan stops at the first
+  // target that reaches it — that target's reads still go in envelopes (of
+  // at most the bound). No size is the server's own.
+  const perTarget = input.max_hits !== undefined;
+  const targetsPerChunk = perTarget
+    ? 1
+    : (ctx.readsPerEnvelope ?? targets.length);
   const sources = noAnsweredReads();
   // The scan over the answers read so far: `runSearchSource` over the
   // phases' answers, the sequential version's own.
@@ -689,19 +697,21 @@ async function runSearchSourceInPhases(
         ...new Map(asked.map((read) => [sourceReadKey(read), read])).values(),
       ];
       if (unique.length === 0) break;
-      // A chunk of one target reads as single requests; so does a round of
-      // one read.
+      // A chunk of one target reads as single requests — but for the
+      // one-target chunks of `max_hits`, whose reads stay in envelopes; a
+      // round of one read always does.
       for (const reads of envelopesOf(ctx, unique)) {
         await readSourcesInPhase(
           ctx,
           reads,
           sources,
-          chunk.length < 2 || reads.length < 2,
+          (chunk.length < 2 && !perTarget) || reads.length < 2,
         );
       }
     }
-    // `max_hits` (DO23): the scan stops at a chunk boundary — once the
-    // chunks read hold `max_hits` hits, no envelope of a later chunk is sent.
+    // `max_hits` (DO23): the scan stops at a chunk boundary, here after each
+    // target — once the targets read hold `max_hits` hits, nothing of a later
+    // target is sent.
     if (input.max_hits !== undefined) {
       const sofar = await scanAnswered({ ...input, answer: 'snippets' });
       if (sofar.results.length >= input.max_hits) break;

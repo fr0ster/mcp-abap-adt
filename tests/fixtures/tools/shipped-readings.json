@@ -789,7 +789,7 @@
   },
   "GetWhereUsed read-where-used-list-structure--01 @terse": {
     "isError": false,
-    "text": "# total 1\ntype\tname\turi\tusage\n# package ZMCP_SHR_PKG\nBDEF/BDO\tZMCP_SHR_I_ROOT\t\t",
+    "text": "# total 1\ntype\tname\telement\turi\tusage\n# package ZMCP_SHR_PKG\nBDEF/BDO\tZMCP_SHR_I_ROOT\t\t\t",
     "requests": [
       "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fddic%2Fstructures%2Fzmcp_shr_stru"
     ]
@@ -803,7 +803,7 @@
   },
   "GetWhereUsed read-where-used-list-structure--01 @full": {
     "isError": false,
-    "text": "{\"object_name\":\"ZMCP_SHR_STRU\",\"object_type\":\"TABL/DS\",\"enable_all_types\":false,\"total_references\":1,\"result_description\":\"[TRL] Where-Used List: ZBP_MCP_SHR_I_ROOT (Class)\",\"references\":[{\"name\":\"ZMCP_SHR_I_ROOT\",\"type\":\"BDEF/BDO\",\"uri\":\"/sap/bc/adt/bo/behaviordefinitions/zmcp_shr_i_root\",\"package_name\":\"ZMCP_SHR_PKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeProductive\"},{\"name\":\"ZADT_BLD_PKG03\",\"type\":\"DEVC/K\",\"uri\":\"/sap/bc/adt/packages/zadt_bld_pkg03\",\"package_name\":\"ZADT_BLD_PKG03\",\"responsible\":\"SAPUSER01\"},{\"name\":\"ZLOCAL\",\"type\":\"DEVC/K\",\"uri\":\"/sap/bc/adt/packages/zlocal\",\"package_name\":\"ZLOCAL\",\"responsible\":\"_SAPSUPPORT\"},{\"name\":\"ZMCP_SHR_PKG\",\"type\":\"DEVC/K\",\"uri\":\"/sap/bc/adt/packages/zmcp_shr_pkg\",\"package_name\":\"ZMCP_SHR_PKG\",\"responsible\":\"SAPUSER01\"}]}",
+    "text": "{\"object_name\":\"ZMCP_SHR_STRU\",\"object_type\":\"TABL/DS\",\"enable_all_types\":false,\"total_references\":1,\"result_description\":\"[TRL] Where-Used List: ZBP_MCP_SHR_I_ROOT (Class)\",\"references\":[{\"name\":\"ZMCP_SHR_I_ROOT\",\"type\":\"BDEF/BDO\",\"uri\":\"/sap/bc/adt/bo/behaviordefinitions/zmcp_shr_i_root\",\"parent_uri\":\"/sap/bc/adt/packages/zmcp_shr_pkg\",\"package_name\":\"ZMCP_SHR_PKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeProductive\"},{\"name\":\"ZADT_BLD_PKG03\",\"type\":\"DEVC/K\",\"uri\":\"/sap/bc/adt/packages/zadt_bld_pkg03\",\"parent_uri\":\"/sap/bc/adt/packages/zlocal\",\"package_name\":\"ZADT_BLD_PKG03\",\"responsible\":\"SAPUSER01\"},{\"name\":\"ZLOCAL\",\"type\":\"DEVC/K\",\"uri\":\"/sap/bc/adt/packages/zlocal\",\"package_name\":\"ZLOCAL\",\"responsible\":\"_SAPSUPPORT\"},{\"name\":\"ZMCP_SHR_PKG\",\"type\":\"DEVC/K\",\"uri\":\"/sap/bc/adt/packages/zmcp_shr_pkg\",\"parent_uri\":\"/sap/bc/adt/packages/zadt_bld_pkg03\",\"package_name\":\"ZMCP_SHR_PKG\",\"responsible\":\"SAPUSER01\"}]}",
     "requests": [
       "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fddic%2Fstructures%2Fzmcp_shr_stru"
     ]

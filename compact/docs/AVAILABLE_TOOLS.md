@@ -148,6 +148,7 @@ per request.
 - `enable_all_types` — where_used: true selects every object type of the where-used scope (default false, the SAP default scope).
 - `enable_only_types` — where_used: the only ADT object types searched, codes of the object's where-used scope (e.g. 'CLAS/OC', 'DDLS/DF').
 - `disable_types` — where_used: ADT object types removed from the scope (e.g. ['CLAS/OC']).
+- `in_object` — where_used: one object that uses it, as a where-used answer names it (type and name): the answer is then its usages only, each with its method or section and source line; once per using object whose code lines are wanted.
 - `package_name` — package_tree: package name (give this or package_names).
 - `package_names` — package_tree: several package names, read together (give this or package_name).
 - `max_depth` — package_tree: maximum depth of the walk (default 5).

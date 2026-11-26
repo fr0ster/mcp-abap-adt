@@ -8,7 +8,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { WHERE_USED_LISTS } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import { rows, writeListing } from '../../../lib/detail';
-import type { WhereUsedReference } from '../../../lib/strategies/whereUsedList';
+import {
+  type WhereUsedReference,
+  type WhereUsedRow,
+  whereUsedRows,
+} from '../../../lib/strategies/whereUsedList';
 
 interface Item {
   readonly type: string;
@@ -88,7 +92,7 @@ describe('a terse list of 200,000 items', () => {
   });
 
   it("GetWhereUsed's terse table of 200,000 references, every usage written", () => {
-    const references: WhereUsedReference[] = Array.from(
+    const references: WhereUsedRow[] = Array.from(
       { length: COUNT },
       (_, i) => ({
         name: `ZCL_${i}`,
@@ -104,5 +108,97 @@ describe('a terse list of 200,000 items', () => {
     }).answer;
     // The header row and every usage.
     assert.equal(rowCount(text), COUNT + 1);
+  });
+
+  // The onprem case (CL_ABAP_UNIT_ASSERT): 107,174 usages, nearly all in
+  // methods of test classes. Written with the class and its type on every
+  // row, the answer grew to 10,913,053 bytes (measured on premise); each
+  // class is now written once on its `# in` line, its elements under it.
+  // No bound is asserted: how long a message may be is the client's
+  // (`--stdio-message-limit`), and every usage is answered.
+  it("GetWhereUsed's terse answer of 107,174 element usages, the class once per # in line, is shorter than with the class on every row", () => {
+    const USAGES = 107_174;
+    const PER_CLASS = 10;
+    const CLASSES_PER_PACKAGE = 30;
+    const references: WhereUsedReference[] = Array.from(
+      { length: USAGES },
+      (_, i) => {
+        const owner = Math.floor(i / PER_CLASS);
+        const pkg = `ZABAPUNIT_USERS_PKG_${String(Math.floor(owner / CLASSES_PER_PACKAGE)).padStart(5, '0')}`;
+        const name = `ZCL_ABAPUNIT_ASSERT_USER_${String(owner).padStart(5, '0')}`;
+        const element = `LTCL_ASSERT_TESTS=>TEST_${String(i).padStart(6, '0')}`;
+        return {
+          name: element,
+          type: '',
+          uri: `/sap/bc/adt/oo/classes/${name.toLowerCase()}/includes/testclasses#type=CLAS%2FOLD;name=${element}`,
+          parent_uri: `/sap/bc/adt/oo/classes/${name.toLowerCase()}`,
+          usage_information: 'gradeElement,includeProductive',
+          parent_type: 'CLAS/OC',
+          parent_name: name,
+          parent_package: pkg,
+          element,
+        };
+      },
+    );
+    const shown = whereUsedRows({ totalReferences: USAGES, references });
+    const text = writeListing({
+      heads: [{ head: 'total', value: String(USAGES) }],
+      reading: shown,
+      lists: WHERE_USED_LISTS,
+    }).answer;
+    // The header row and every usage, one `# in` line per class.
+    assert.equal(rowCount(text), USAGES + 1);
+    // The same usages with the class's type and name on every row and no
+    // `# in` line: the shape the grouping replaced.
+    const perRow = writeListing({
+      heads: [{ head: 'total', value: String(USAGES) }],
+      reading: shown,
+      lists: {
+        references: rows('references', {
+          columns: [
+            {
+              name: 'type',
+              cell: (r: WhereUsedRow) => r.type,
+            },
+            {
+              name: 'name',
+              cell: (r: WhereUsedRow) => r.name,
+            },
+            {
+              name: 'element',
+              cell: (r: WhereUsedRow) => r.element ?? '',
+            },
+            { name: 'uri', cell: () => '' },
+            {
+              name: 'usage',
+              cell: (r: WhereUsedRow) => r.usage_information ?? '',
+            },
+          ],
+          header: 'always',
+          groups: [
+            {
+              label: 'package',
+              of: (r: WhereUsedRow) => r.package_name ?? '',
+              mode: 'gathered',
+            },
+          ],
+        }),
+      },
+    }).answer;
+    const bytes = (answer: string) =>
+      Buffer.byteLength(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          result: { content: [{ type: 'text', text: answer }] },
+        }),
+        'utf8',
+      );
+    const size = bytes(text);
+    const perRowSize = bytes(perRow);
+    assert.ok(size < perRowSize, `${size} bytes, per row ${perRowSize}`);
+    console.log(
+      `[largeListing] 107,174 element usages: ${size} bytes, ${perRowSize} with the class on every row`,
+    );
   });
 });

@@ -1,4 +1,8 @@
-import { rawOf, utilWhereUsedReferences } from '@mcp-abap-adt/adt-strategies';
+import {
+  type IWhereUsedReference,
+  rawOf,
+  utilWhereUsedReferences,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtError,
   IAdtHeaders,
@@ -14,6 +18,12 @@ import {
 import type { XmlRead } from '../xml/tree';
 import type { AdtReading } from './reading';
 import { atStep } from './step';
+import { succeeded } from './stepResponse';
+import {
+  snippetElement,
+  type UsageSnippetsSource,
+  type WhereUsedSnippet,
+} from './usageSnippets';
 
 /**
  * `getWhereUsedList`'s replacement, composed — the guide's "Sequences are
@@ -110,13 +120,73 @@ export function whereUsedOn(
 
 /** One reference of a where-used list: a JSON object, as the tool answers it. */
 export type WhereUsedReference = {
+  /** `adtcore:name` as SAP sent it — an element's name for an element usage. */
   name: string;
+  /** `adtcore:type` as SAP sent it; `''` when the row carries none. */
   type: string;
   uri?: string | undefined;
+  /** `parentUri` as SAP sent it: the node the row hangs under. */
+  parent_uri?: string | undefined;
   package_name?: string | undefined;
   responsible?: string | undefined;
   usage_information?: string | undefined;
+  /**
+   * A usage inside an element of another object (a method, a section of a
+   * class): SAP lists it with no `adtcore:type`, its `adtcore:name` the
+   * element, and the object it belongs to only as `parentUri`. The object is
+   * the list's own node at that URI: its type, name and package here, the
+   * element beside them. Absent on any other row, and on a row whose
+   * `parentUri` names no node of the list.
+   */
+  parent_type?: string | undefined;
+  parent_name?: string | undefined;
+  parent_package?: string | undefined;
+  element?: string | undefined;
+  /** `objectIdentifier` as SAP sent it: what the code lines are asked by. */
+  object_identifier?: string | undefined;
+  /**
+   * The source lines holding the usage (`usageSnippets`), as SAP sent them,
+   * each with its position; absent for a reference not asked for (no
+   * identifier, no usage) and for one SAP gave none (a usage not in code).
+   */
+  snippets?: WhereUsedSnippet[] | undefined;
+  /**
+   * `true` when the `usageSnippets` answer held no `codeSnippetObject` for
+   * the identifier asked: SAP sent no snippet for it — told apart from an
+   * object SAP answered with no line (a usage not in code), which has none
+   * of this. The handler's own contract for an identifier it leaves out is
+   * not read (`CL_RIS_ADT_RES_REF_SNIPPETS`): the answer says what SAP did.
+   */
+  snippets_absent?: true | undefined;
+  /** A row's code line: one snippet's content, trimmed (terse and medium only). */
+  code?: string | undefined;
 };
+
+/**
+ * The object a reference names, as terse and medium answer it: an element
+ * usage ({@link WhereUsedReference.element}) as the object it belongs to —
+ * its type, name and package — with the element beside them; any other
+ * reference as SAP sent it.
+ */
+export function usingObject(reference: WhereUsedReference): WhereUsedReference {
+  const {
+    parent_type: type,
+    parent_name: name,
+    parent_package: parentPackage,
+    element,
+    ...fields
+  } = reference;
+  if (type === undefined || name === undefined || element === undefined) {
+    return fields;
+  }
+  return {
+    ...fields,
+    type,
+    name,
+    package_name: fields.package_name ?? parentPackage,
+    element,
+  };
+}
 
 export interface WhereUsedListResult {
   totalReferences: number;
@@ -152,21 +222,48 @@ export const whereUsedListReading = (
   // and a usage attribute — an object that uses the one asked, its URI what
   // tells it apart (Codex round 7). The attribute's presence decides, never
   // its value: `usageInformation=""` is a usage too (Codex round 8).
-  const references: WhereUsedReference[] = read.references
-    .filter(
-      (reference) =>
-        reference.name !== '' ||
-        (reference.uri !== '' && reference.usageInformation !== undefined),
-    )
-    .map((reference) => ({
+  const listed = read.references.filter(
+    (reference) =>
+      reference.name !== '' ||
+      (reference.uri !== '' && reference.usageInformation !== undefined),
+  );
+  // The nodes by their URI: an element usage's object is the node at its
+  // `parentUri`, read off the list itself (the first one listed there).
+  const nodes = new Map<string, IWhereUsedReference>();
+  for (const reference of read.references) {
+    if (reference.uri !== '' && !nodes.has(reference.uri)) {
+      nodes.set(reference.uri, reference);
+    }
+  }
+  const references: WhereUsedReference[] = listed.map((reference) => {
+    const type = reference.type ?? reference.unknownType;
+    const fields: WhereUsedReference = {
       name: reference.name,
-      type: reference.type ?? reference.unknownType,
+      type,
       uri: reference.uri || undefined,
+      parent_uri: reference.parentUri || undefined,
       package_name: reference.packageName || undefined,
       responsible: reference.responsible || undefined,
       // As SAP sent it: an empty attribute stays a usage, `''`.
       usage_information: reference.usageInformation,
-    }));
+      object_identifier: reference.objectIdentifier || undefined,
+    };
+    const parent = elementParent(
+      type,
+      reference.name,
+      reference.parentUri,
+      nodes,
+    );
+    return parent === undefined
+      ? fields
+      : {
+          ...fields,
+          parent_type: parent.type,
+          parent_name: parent.name,
+          parent_package: parent.packageName || undefined,
+          element: reference.name,
+        };
+  });
   return {
     totalReferences: read.totalReferences,
     resultDescription: read.resultDescription || undefined,
@@ -174,6 +271,150 @@ export const whereUsedListReading = (
     document: rawOf(answer),
   };
 };
+
+/**
+ * The object an element usage belongs to: for a row SAP sent with no type
+ * but a name and a `parentUri`, the list's node at that URI, when it has a
+ * type and a name of its own; `undefined` for any other row. The node's type
+ * is taken as SAP listed it, never assumed.
+ */
+function elementParent(
+  type: string,
+  name: string,
+  parentUri: string | undefined,
+  nodes: ReadonlyMap<string, IWhereUsedReference>,
+):
+  | { type: string; name: string; packageName?: string | undefined }
+  | undefined {
+  if (type !== '' || name === '' || parentUri === undefined) return undefined;
+  const node = nodes.get(parentUri);
+  if (node === undefined) return undefined;
+  const nodeType = node.type ?? node.unknownType;
+  if (nodeType === '' || node.name === '') return undefined;
+  return { type: nodeType, name: node.name, packageName: node.packageName };
+}
+
+/** A row terse and medium answer: a reference as {@link usageRows} shows it. */
+export type WhereUsedRow = Omit<
+  WhereUsedReference,
+  'snippets' | 'object_identifier'
+>;
+
+/** What terse and medium list: the count SAP gave, and every row. */
+export interface WhereUsedRows {
+  totalReferences: number;
+  references: WhereUsedRow[];
+}
+
+/** The rows of `result`, in its order: {@link usageRows} of each reference. */
+export function whereUsedRows(result: WhereUsedListResult): WhereUsedRows {
+  return {
+    totalReferences: result.totalReferences,
+    references: result.references.flatMap(usageRows),
+  };
+}
+
+/**
+ * The rows terse and medium answer for `reference`, each naming the object
+ * it is in ({@link usingObject}): one per code line SAP gave for it, with
+ * the line (`code`, trimmed) and, where the reference names no element,
+ * the element its position names (`name=`); one row with no code line for
+ * a reference SAP gave none.
+ */
+export function usageRows(reference: WhereUsedReference): WhereUsedRow[] {
+  const { snippets, object_identifier, ...fields } = reference;
+  const shown = usingObject(fields);
+  if (snippets === undefined || snippets.length === 0) return [shown];
+  return snippets.map((snippet) => {
+    const element = shown.element ?? snippetElement(snippet.uri);
+    return {
+      ...shown,
+      ...(element === undefined ? {} : { element }),
+      code: snippet.content.trim(),
+    };
+  });
+}
+
+/** One object that uses the one asked for, named by its type and name. */
+export interface InObject {
+  object_type: string;
+  object_name: string;
+}
+
+/** `value` as compared: trimmed, upper case. */
+function comparable(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+/**
+ * Whether `reference` is a usage inside `inObject`: a usage (it carries
+ * `usage_information`) whose object — the one it is in where the list
+ * resolves it (`parent_type`, `parent_name`), else its own — has that type
+ * and name.
+ */
+export function usageIn(
+  reference: WhereUsedReference,
+  inObject: InObject,
+): boolean {
+  if (reference.usage_information === undefined) return false;
+  const type = comparable(reference.parent_type ?? reference.type);
+  const name = comparable(reference.parent_name ?? reference.name);
+  const wantedType = comparable(inObject.object_type);
+  const wantedName = comparable(inObject.object_name);
+  // A blank never matches: an unresolved reference names no object.
+  if (type === '' || name === '' || wantedType === '' || wantedName === '') {
+    return false;
+  }
+  return type === wantedType && name === wantedName;
+}
+
+/**
+ * The usages of a where-used list inside one using object, with their code
+ * lines: the list kept to the usages {@link usageIn} `inObject`, then ONE
+ * `usageSnippets` read over exactly their identifiers, each answer joined
+ * to its usage by its identifier. An object with no usage in the list
+ * answers none, with no request. A refused or unreadable read is the
+ * answer, with its step — never the usages without their lines.
+ */
+export async function withUsageSnippets(
+  listed: IAdtResponse<WhereUsedListRead, IAdtError>,
+  source: UsageSnippetsSource,
+  inObject: InObject,
+): Promise<IAdtResponse<WhereUsedListRead, IAdtError>> {
+  if (!listed.ok) return listed;
+  const read = listed.getResult().value;
+  const inside = read.references.filter((reference) =>
+    usageIn(reference, inObject),
+  );
+  const identifiers = [
+    ...new Set(
+      inside.flatMap((reference) =>
+        reference.object_identifier === undefined
+          ? []
+          : [reference.object_identifier],
+      ),
+    ),
+  ];
+  if (identifiers.length === 0) {
+    return succeeded({ ...read, references: inside });
+  }
+  const answered = await atStep('read where-used code lines', () =>
+    source.read(identifiers),
+  )();
+  if (!answered.ok) return answered;
+  const snippets = answered.getResult().value;
+  return succeeded({
+    ...read,
+    references: inside.map((reference) => {
+      if (reference.object_identifier === undefined) return reference;
+      const lines = snippets.get(reference.object_identifier);
+      if (lines === undefined) return { ...reference, snippets_absent: true };
+      return lines.length === 0
+        ? reference
+        : { ...reference, snippets: [...lines] };
+    }),
+  });
+}
 
 function needsScope(filter: WhereUsedFilter): boolean {
   return Boolean(

@@ -215,9 +215,11 @@ describe('the MCP tool surface', () => {
         },
         // `container` names whose text elements PROG/PX is (optional: required
         // with PROG/PX alone, the code it arrived with).
+        // 24.2.1: `in_object`, the code lines of one using object's
+        // usages (owner-approved): optional, nothing else changes.
         'system/GetWhereUsed': {
           relaxed: ['object_name', 'object_type'],
-          added: ['container', 'detail', 'objects'],
+          added: ['container', 'detail', 'in_object', 'objects'],
         },
       };
       const listed = LIST_ARGUMENTS[tool];

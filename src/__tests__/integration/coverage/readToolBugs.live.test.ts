@@ -20,7 +20,11 @@
  */
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
-import { ONE_MESSAGE_WORDS } from '../../../../server-runtime/src/stdio/boundedStdioTransport';
+import {
+  ONE_MESSAGE_WORDS,
+  oversizedAnswerWords,
+} from '../../../../server-runtime/src/stdio/boundedStdioTransport';
+import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import type { McpResult } from '../../../lib/answer';
 import {
   configuredSystemKind,
@@ -30,14 +34,21 @@ import {
 } from '../helpers/configHelpers';
 import type { LaunchedServer } from '../helpers/launchedServers';
 import { liveConnection, liveSuite } from '../helpers/live';
+import { createTestLogger } from '../helpers/loggerHelpers';
 import { skipRunningTest } from '../helpers/runningTest';
-import { headOf, terseOf } from '../helpers/terseAnswer';
+import {
+  type FullWhereUsedReference,
+  headOf,
+  terseOf,
+  whereUsedTerseMismatches,
+} from '../helpers/terseAnswer';
 import {
   destinationArgs,
   getHardModeConfig,
   launchStdio,
   testConnectionLogOn,
 } from '../helpers/testers/hardMode';
+import { createHandlerContext } from '../helpers/testHelpers';
 import { member } from './ownObjects';
 
 /** The class the config names for an answer above the stdio limit, or undefined. */
@@ -74,6 +85,34 @@ function textOf(tool: string, answer: McpResult): string {
   const text = answer.content.map((item) => item.text).join('\n');
   if (answer.isError) throw new Error(`${tool}: ${text.slice(0, 2000)}`);
   return text;
+}
+
+/**
+ * The sizes the stdio transport's refusal of an oversized answer names
+ * (`oversizedAnswerWords`), when `error` is exactly that refusal; else
+ * `undefined`. Plain string reading of our own words.
+ */
+function limitRefusal(
+  error: unknown,
+): { size: number; cap: number } | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const message = error.message;
+  const start = message.indexOf('The answer is ');
+  if (start < 0) return undefined;
+  const after = message.slice(start + 'The answer is '.length);
+  const sizeEnd = after.indexOf(' bytes, above the ');
+  if (sizeEnd < 0) return undefined;
+  const rest = after.slice(sizeEnd + ' bytes, above the '.length);
+  const capEnd = rest.indexOf(` ${ONE_MESSAGE_WORDS}`);
+  if (capEnd < 0) return undefined;
+  const size = Number(after.slice(0, sizeEnd));
+  const cap = Number(rest.slice(0, capEnd));
+  if (!Number.isSafeInteger(size) || !Number.isSafeInteger(cap)) {
+    return undefined;
+  }
+  return message.endsWith(oversizedAnswerWords(size, cap))
+    ? { size, cap }
+    : undefined;
 }
 
 /** The body of a raw read-only GET on the suite's connection. */
@@ -171,7 +210,11 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
     }
   });
 
-  it('terse, the default, answers every usage within the limit', async () => {
+  // How long one stdio message may be is the client's
+  // (`--stdio-message-limit`, `MCP_STDIO_MESSAGE_LIMIT`): terse answers
+  // every usage, and an answer above the limit is the transport's refusal
+  // naming both sizes — either outcome, nothing else.
+  it('terse, the default, answers every usage, or is refused naming both sizes above the limit', async () => {
     const name = oversizedClass();
     if (name === undefined) {
       skipRunningTest(
@@ -181,29 +224,55 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
     }
     const server = await launched();
     try {
-      const text = textOf(
-        'GetWhereUsed',
-        await server.call('GetWhereUsed', {
+      let called: McpResult;
+      try {
+        called = await server.call('GetWhereUsed', {
           object_name: name,
           object_type: 'CLAS/OC',
           background: false,
-        }),
-      );
+        });
+      } catch (error) {
+        const refused = limitRefusal(error);
+        assert.ok(refused !== undefined, String(error));
+        assert.ok(refused.size > refused.cap, String(error));
+        console.log(
+          `[readToolBugs] GetWhereUsed ${name} terse: ${refused.size} bytes, above the ${refused.cap}-byte stdio limit`,
+        );
+        return;
+      }
+      const text = textOf('GetWhereUsed', called);
       const answer = terseOf(text);
       const shown = text.slice(0, 2000);
       const total = `# total ${headOf(answer, 'total') ?? ''}`;
       assert.ok(Number.isFinite(Number(headOf(answer, 'total'))), shown);
       // The usages SAP answered, as rows under their package, each read by
-      // the header's column names; a usage names its object (a nameless one
-      // by its uri), its type SAP's, which a reference may lack (SAP lists
-      // local test classes without one, measured on premise).
-      for (const column of ['type', 'name', 'usage']) {
+      // the header's column names; every usage the same call's full answer
+      // resolves is a row by its real type and name — a usage inside a
+      // method or section by the object it is in, the element beside it —
+      // and one full leaves unresolved a row by its URI.
+      for (const column of ['type', 'name', 'element', 'usage']) {
         assert.ok(answer.columns.includes(column), shown);
       }
       assert.ok(answer.rows.length > 0, shown);
-      for (const row of answer.rows.slice(0, 50)) {
-        assert.ok(row.name || row.uri, JSON.stringify(row));
-      }
+      // The full answer is above the stdio limit (the case above): read it
+      // on the suite's connection, through the handler.
+      const full: { references: FullWhereUsedReference[] } = JSON.parse(
+        textOf(
+          'GetWhereUsed',
+          await handleGetWhereUsed(
+            createHandlerContext({
+              connection: liveConnection(),
+              logger: createTestLogger('readToolBugs'),
+            }),
+            { object_name: name, object_type: 'CLAS/OC', detail: 'full' },
+          ),
+        ),
+      );
+      assert.deepStrictEqual(
+        whereUsedTerseMismatches(answer, full.references),
+        [],
+        shown,
+      );
       console.log(
         `[readToolBugs] GetWhereUsed ${name} terse: ${text.length} characters, ${total}`,
       );

@@ -1,3 +1,5 @@
+import { cellsOf } from '../../../lib/detail/tsvCells';
+
 /**
  * A terse answer read back for a live case: its head lines (`# key value`)
  * and its table, each row read by the header's column names, never by
@@ -73,10 +75,11 @@ export function rowsWithoutTypeOrName(
 }
 
 /**
- * GetWhereUsed's terse rows, each naming its object: a row under an
- * `# in TYPE NAME` line (a usage in a method or section of that object)
- * read with that type and name; the line holds until the next `# in`,
- * `# package` or `# object` line. Every other row as it is.
+ * GetWhereUsed's terse rows, each naming its object, every cell decoded as
+ * the writer escaped it (`cellsOf`): a row under an `# in TYPE NAME` line
+ * (a usage in a method or section of that object) read with that type and
+ * name; the line holds until the next `# in`, `# package` or `# object`
+ * line. Every other row as it is.
  */
 export function whereUsedRows(
   answer: TerseAnswer,
@@ -84,10 +87,11 @@ export function whereUsedRows(
   const rows: Array<Readonly<Record<string, string>>> = [];
   let owner: { type: string; name: string } | undefined;
   let columns: string[] | undefined;
+  let header: string | undefined;
   for (const line of answer.text.split('\n')) {
     if (line === '') continue;
     if (line.startsWith('# in ')) {
-      const value = line.slice('# in '.length);
+      const value = cellsOf(line.slice('# in '.length))[0] ?? '';
       const space = value.indexOf(' ');
       owner =
         space < 0
@@ -101,14 +105,17 @@ export function whereUsedRows(
       }
       continue;
     }
-    const cells = line.split('\t');
-    if (columns === undefined) {
-      columns = cells;
+    if (header === undefined) {
+      header = line;
+      columns = cellsOf(line);
       continue;
     }
-    if (line === columns.join('\t')) continue;
+    if (line === header) continue;
+    const cells = cellsOf(line);
     const row: Record<string, string> = {};
-    for (const [at, column] of columns.entries()) row[column] = cells[at] ?? '';
+    for (const [at, column] of (columns ?? []).entries()) {
+      row[column] = cells[at] ?? '';
+    }
     rows.push(
       owner === undefined
         ? row
@@ -127,77 +134,103 @@ export interface FullWhereUsedReference {
   readonly parent_type?: string | undefined;
   readonly parent_name?: string | undefined;
   readonly element?: string | undefined;
-  readonly snippets?: ReadonlyArray<{ readonly content: string }> | undefined;
+  readonly snippets?:
+    | ReadonlyArray<{ readonly content: string; readonly uri?: string }>
+    | undefined;
+}
+
+/** The usage terse leaves empty, as the tool writes it. */
+const COMMON_USAGE = 'gradeDirect,includeProductive';
+
+/** The element a line's position names (`…;name=RUN;…`), decoded; `''` for none. */
+function positionElement(uri: string | undefined): string {
+  if (uri === undefined) return '';
+  const hash = uri.indexOf('#');
+  if (hash < 0) return '';
+  for (const part of uri.slice(hash + 1).split(';')) {
+    if (!part.startsWith('name=')) continue;
+    try {
+      return decodeURIComponent(part.slice('name='.length));
+    } catch {
+      return part.slice('name='.length);
+    }
+  }
+  return '';
+}
+
+/** A row's identity for the comparison: every column, in a fixed order. */
+function rowKey(row: Readonly<Record<string, string | undefined>>): string {
+  return JSON.stringify(
+    ['type', 'name', 'element', 'uri', 'usage', 'code'].map(
+      (column) => row[column] ?? '',
+    ),
+  );
+}
+
+/**
+ * The terse rows `full` implies, one per code line of each usage (a
+ * reference with `usage_information`), one with no line for a usage SAP
+ * gave none: its object (the parent's type and name where full names one),
+ * its element (full's, else the line's position's), its URI where the
+ * object is untold (no type or no name), its usage as terse writes it, the
+ * line trimmed.
+ */
+function expectedRows(
+  references: readonly FullWhereUsedReference[],
+): Array<Record<string, string>> {
+  return references.flatMap((reference) => {
+    if (reference.usage_information === undefined) return [];
+    const type = reference.parent_type ?? reference.type ?? '';
+    const name = reference.parent_name ?? reference.name ?? '';
+    const base = {
+      type,
+      name,
+      uri: type === '' || name === '' ? (reference.uri ?? '') : '',
+      usage:
+        reference.usage_information === COMMON_USAGE
+          ? ''
+          : reference.usage_information,
+    };
+    const lines = reference.snippets ?? [];
+    if (lines.length === 0) {
+      return [{ ...base, element: reference.element ?? '', code: '' }];
+    }
+    return lines.map((line) => ({
+      ...base,
+      element: reference.element ?? positionElement(line.uri),
+      code: line.content.trim(),
+    }));
+  });
 }
 
 /**
  * What GetWhereUsed's terse answer gets wrong against the `full` answer of
  * the same call, one line each; empty when it gets nothing wrong.
  *
- * Every usage `full` lists (a reference with `usage_information`) must be a
- * terse row, each code line `full` holds for it a row with that line
- * (`code`, trimmed): one `full` resolves — a type and a name of its own, or its
- * parent's — by that type, name and element; one it leaves unresolved by
- * its URI, as SAP gave it. A terse row without a type or a name must be one
- * of those unresolved references, by its URI. A row under an `# in` line
- * names its object by that line ({@link whereUsedRows}).
+ * Whole rows are compared, each as many times as it occurs: every row full
+ * implies ({@link expectedRows}: the object, the element, the URI of an
+ * unresolved reference, the usage, the code line) must be a terse row
+ * ({@link whereUsedRows}, its cells decoded), and terse must hold no row
+ * more. A line under the wrong element, a usage missing or doubled, an
+ * unresolved reference's line: each is a mismatch.
  */
 export function whereUsedTerseMismatches(
   answer: TerseAnswer,
   references: readonly FullWhereUsedReference[],
 ): string[] {
-  const rows = whereUsedRows(answer);
-  const named = new Set(
-    rows
-      .filter((row) => row.type && row.name)
-      .map((row) => `${row.type}\t${row.name}\t${row.element ?? ''}`),
-  );
-  const objects = new Set(
-    rows
-      .filter((row) => row.type && row.name)
-      .map((row) => `${row.type}\t${row.name}`),
-  );
-  // An object's code lines, whatever element a row names.
-  const lines = new Set(
-    rows
-      .filter((row) => row.type && row.name && row.code)
-      .map((row) => `${row.type}\t${row.name}\t${row.code}`),
-  );
-  const byUri = new Set(rows.map((row) => row.uri ?? ''));
-  const unresolved = new Set<string>();
-  const wrong: string[] = [];
-  for (const reference of references) {
-    if (reference.usage_information === undefined) continue;
-    const type = reference.parent_type ?? reference.type ?? '';
-    const name = reference.parent_name ?? reference.name ?? '';
-    if (type !== '' && name !== '') {
-      if (reference.element !== undefined) {
-        const key = `${type}\t${name}\t${reference.element}`;
-        if (!named.has(key)) wrong.push(`no terse row ${key}`);
-      } else if (!objects.has(`${type}\t${name}`)) {
-        wrong.push(`no terse row ${type}\t${name}`);
-      }
-      // Every code line full holds is a terse row of that object.
-      for (const snippet of reference.snippets ?? []) {
-        const key = `${type}\t${name}\t${snippet.content.trim()}`;
-        if (!lines.has(key)) wrong.push(`no terse code line ${key}`);
-      }
-      continue;
-    }
-    const uri = reference.uri ?? '';
-    unresolved.add(uri);
-    if (uri === '' || !byUri.has(uri)) {
-      wrong.push(
-        `no terse row for the unresolved ${JSON.stringify(reference)}`,
-      );
-    }
+  const counts = new Map<string, number>();
+  for (const row of expectedRows(references)) {
+    const key = rowKey(row);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  for (const row of rows.filter((row) => !row.type || !row.name)) {
-    if (!unresolved.has(row.uri ?? '') || (row.uri ?? '') === '') {
-      wrong.push(
-        `a terse row without a type or a name: ${JSON.stringify(row)}`,
-      );
-    }
+  for (const row of whereUsedRows(answer)) {
+    const key = rowKey(row);
+    counts.set(key, (counts.get(key) ?? 0) - 1);
+  }
+  const wrong: string[] = [];
+  for (const [key, count] of counts) {
+    if (count > 0) wrong.push(`${count} terse row(s) missing: ${key}`);
+    if (count < 0) wrong.push(`${-count} terse row(s) full has not: ${key}`);
   }
   return wrong;
 }

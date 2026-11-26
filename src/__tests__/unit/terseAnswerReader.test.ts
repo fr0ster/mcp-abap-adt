@@ -99,7 +99,7 @@ describe('the live terse reader', () => {
 
   it('where-used: terse matches full — the resolved by type, name and element, the unresolved by its URI', () => {
     const terse = terseOf(
-      `${HEADER}\n# package ZPKG\n\tRUN\t\t/absent#run\tg\nPROG/P\tZPROG\t\t\tg\n# in CLAS/OC ZCL\n\t\tMAIN\t\t`,
+      `${HEADER}\n# package ZPKG\n\tRUN\t\t/absent#run\tg\nPROG/P\tZPROG\t\t\tg\n# in CLAS/OC ZCL\n\t\tMAIN\t\tgradeElement`,
     );
     assert.deepEqual(whereUsedTerseMismatches(terse, FULL), []);
   });
@@ -108,14 +108,19 @@ describe('the live terse reader', () => {
     const terse = terseOf(
       `${HEADER}\n\tMAIN\t\t/c#main\t\n\tRUN\t\t/absent#run\tg\nPROG/P\tZPROG\t\t\tg`,
     );
-    assert.equal(whereUsedTerseMismatches(terse, FULL).length, 2);
+    assert.deepEqual(whereUsedTerseMismatches(terse, FULL), [
+      '1 terse row(s) missing: ["CLAS/OC","ZCL","MAIN","","gradeElement",""]',
+      '1 terse row(s) full has not: ["","MAIN","","/c#main","",""]',
+    ]);
   });
 
   it('where-used: a row without a type and no URI full leaves unresolved is a mismatch', () => {
     const terse = terseOf(
-      `${HEADER}\n\tRUN\t\t/absent#run\tg\nPROG/P\tZPROG\t\t\tg\n\tZX\t\t\tg\n# in CLAS/OC ZCL\n\t\tMAIN\t\t`,
+      `${HEADER}\n\tRUN\t\t/absent#run\tg\nPROG/P\tZPROG\t\t\tg\n\tZX\t\t\tg\n# in CLAS/OC ZCL\n\t\tMAIN\t\tgradeElement`,
     );
-    assert.equal(whereUsedTerseMismatches(terse, FULL).length, 1);
+    assert.deepEqual(whereUsedTerseMismatches(terse, FULL), [
+      '1 terse row(s) full has not: ["","ZX","","","g",""]',
+    ]);
   });
 
   it('where-used: a row under an # in line is read with its type and name, until the next package', () => {
@@ -153,7 +158,64 @@ describe('the live terse reader', () => {
         terseOf(`${header}\nPROG/P\tZPROG\t\t\tg\t`),
         withLine,
       ).length,
-      1,
+      2,
+    );
+  });
+
+  // Codex's case: terse gives method A's line to method B and drops one of
+  // two identical usages — the comparison must see both.
+  it('where-used: a line under the wrong element, or a usage missing, is a mismatch', () => {
+    const full: FullWhereUsedReference[] = [
+      {
+        name: 'A',
+        type: '',
+        uri: '/c#a',
+        usage_information: 'gradeElement',
+        parent_type: 'CLAS/OC',
+        parent_name: 'ZCL',
+        element: 'A',
+        snippets: [{ content: 'DATA a TYPE zd.', uri: '/c#a;start=1,1' }],
+      },
+      {
+        name: 'B',
+        type: '',
+        uri: '/c#b',
+        usage_information: 'gradeElement',
+        parent_type: 'CLAS/OC',
+        parent_name: 'ZCL',
+        element: 'B',
+        snippets: [
+          { content: 'DATA b TYPE zd.', uri: '/c#b;start=1,1' },
+          { content: 'DATA b TYPE zd.', uri: '/c#b;start=2,1' },
+        ],
+      },
+    ];
+    const header = 'type\tname\telement\turi\tusage\tcode';
+    const right = `${header}\n# in CLAS/OC ZCL\n\t\tA\t\tgradeElement\tDATA a TYPE zd.\n\t\tB\t\tgradeElement\tDATA b TYPE zd.\n\t\tB\t\tgradeElement\tDATA b TYPE zd.`;
+    assert.deepEqual(whereUsedTerseMismatches(terseOf(right), full), []);
+    const wrong = `${header}\n# in CLAS/OC ZCL\n\t\tA\t\tgradeElement\tDATA a TYPE zd.\n\t\tB\t\tgradeElement\tDATA a TYPE zd.\n\t\tB\t\tgradeElement\tDATA b TYPE zd.`;
+    assert.notDeepEqual(whereUsedTerseMismatches(terseOf(wrong), full), []);
+  });
+
+  // A cell the writer escaped (a backslash, a tab in the line) is compared
+  // decoded, as the writer wrote it from full's text.
+  it('where-used: escaped cells are compared decoded', () => {
+    const full: FullWhereUsedReference[] = [
+      {
+        name: 'ZPROG',
+        type: 'PROG/P',
+        uri: '/prog',
+        usage_information: 'g',
+        snippets: [{ content: "  x = 'a\\b\tc'.", uri: '/prog#start=1,1' }],
+      },
+    ];
+    const header = 'type\tname\telement\turi\tusage\tcode';
+    assert.deepEqual(
+      whereUsedTerseMismatches(
+        terseOf(`${header}\nPROG/P\tZPROG\t\t\tg\tx = 'a\\\\b\\tc'.`),
+        full,
+      ),
+      [],
     );
   });
 });

@@ -17,13 +17,16 @@ import assert from 'node:assert/strict';
 import { after, before, it } from 'node:test';
 import * as z from 'zod';
 import { handleGetWhereUsed } from '../../../../handlers/system/readonly/handleGetWhereUsed';
+import type { McpResult } from '../../../../lib/answer';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { servedSuite } from '../../helpers/servedHere';
 import {
+  type FullWhereUsedReference,
   headOf,
   terseOf,
   terseText,
+  whereUsedRows,
   whereUsedTerseMismatches,
 } from '../../helpers/terseAnswer';
 import { readCaseParams } from '../../helpers/testConfigSchema';
@@ -42,7 +45,10 @@ const WhereUsedParams = z.looseObject({
  * `# total N` head; its rows read by the header's column names, and, with
  * `full` (the same call at `detail: 'full'`), compared with it.
  */
-function terseTotal(result: any, full?: any): number {
+function terseTotal(
+  result: Parameters<typeof terseText>[0],
+  full?: McpResult,
+): number {
   const answer = terseOf(terseText(result));
   const shown = answer.text.slice(0, 2000);
   const total = Number(headOf(answer, 'total'));
@@ -58,12 +64,20 @@ function terseTotal(result: any, full?: any): number {
   // beside it; one full leaves unresolved is a row by its URI.
   if (full !== undefined) {
     assert.deepStrictEqual(
-      whereUsedTerseMismatches(answer, extractResultData(full).references),
+      whereUsedTerseMismatches(answer, fullReferences(full)),
       [],
       shown,
     );
   }
   return total;
+}
+
+/** The references of GetWhereUsed's `full` answer: its text, parsed. */
+function fullReferences(full: McpResult): FullWhereUsedReference[] {
+  const parsed: { references?: FullWhereUsedReference[] } = JSON.parse(
+    terseText(full),
+  );
+  return parsed.references ?? [];
 }
 
 function extractResultData(result: any): any {
@@ -160,6 +174,63 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(total >= 0);
 
       logger?.info(`✅ Found ${total} references with default scope`);
+    });
+  });
+
+  // The code lines of one using object: the first object the plain answer
+  // names on an `# in` line (a class with usages in its methods), read with
+  // in_object — its usages only, each with its method and source line.
+  it('in_object answers one using class its usages, each with its code line', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection } = context;
+      const params = readCaseParams(
+        context.params,
+        WhereUsedParams,
+        'whereused_readonly',
+      );
+      const testClass = params?.test_class || 'CL_ABAP_CHAR_UTILITIES';
+      const handlerContext = createHandlerContext({ connection, logger });
+      const plain = await handleGetWhereUsed(handlerContext, {
+        object_name: testClass,
+        object_type: 'class',
+      });
+      assert.equal(plain.isError, false, terseText(plain).slice(0, 2000));
+      const owner = whereUsedRows(terseOf(terseText(plain))).find(
+        (row) => row.element !== '' && row.type !== '' && row.name !== '',
+      );
+      assert.ok(owner, terseText(plain).slice(0, 2000));
+      const inObject = {
+        object_type: owner.type ?? '',
+        object_name: owner.name ?? '',
+      };
+      const result = await handleGetWhereUsed(handlerContext, {
+        object_name: testClass,
+        object_type: 'class',
+        in_object: inObject,
+      });
+      const text = terseText(result);
+      const shown = text.slice(0, 2000);
+      assert.equal(result.isError, false, shown);
+      const answer = terseOf(text);
+      assert.ok(answer.columns.includes('code'), shown);
+      const rows = whereUsedRows(answer);
+      assert.ok(rows.length > 0, shown);
+      // Every row is a usage inside that object, at its method or section.
+      for (const row of rows) {
+        assert.deepStrictEqual(
+          { type: row.type, name: row.name },
+          { type: inObject.object_type, name: inObject.object_name },
+          shown,
+        );
+      }
+      // The usages in its code come with the line they are on.
+      assert.ok(
+        rows.some((row) => (row.code ?? '') !== ''),
+        shown,
+      );
+      logger?.info(
+        `✅ ${inObject.object_type} ${inObject.object_name}: ${rows.length} row(s) with code lines`,
+      );
     });
   });
 

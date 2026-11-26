@@ -563,7 +563,7 @@ function expectFinished(answer: LiveAnswer, handle: string, tool: string) {
   expectRows(itemOf(answer, 1));
 }
 
-/** The rows of the shared table, as the read answers them. */
+/** The rows of the shared table, as the read answers them at detail medium (every read here asks it). */
 function expectRows(payload: unknown): void {
   assert.equal(member(payload, 'sql_query'), query());
   assert.equal(Array.isArray(member(payload, 'columns')), true);
@@ -597,6 +597,7 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
     it('a long read called without background answers a run_handle, read finished once', async () => {
       const started = await liveCall('GetSqlQuery', {
         sql_query: query(),
+        detail: 'medium',
         row_number: 5,
       });
       const handle = startedHandle('GetSqlQuery', started);
@@ -616,6 +617,7 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
       const before = current().own.length;
       const answered = await liveCall('GetSqlQuery', {
         sql_query: query(),
+        detail: 'medium',
         row_number: 5,
         background: false,
       });
@@ -632,7 +634,11 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
       const held = current().holdNext();
       const handle = startedHandle(
         'GetSqlQuery',
-        await livePrepare('GetSqlQuery', { sql_query: query(), row_number: 5 }),
+        await livePrepare('GetSqlQuery', {
+          sql_query: query(),
+          detail: 'medium',
+          row_number: 5,
+        }),
       );
       const own = current().own.at(-1);
       if (own === undefined) throw new Error('the run opened no connection');
@@ -699,6 +705,7 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
     it('a long read called without background answers a run_handle, read finished once', async () => {
       const started = await liveCall('GetSqlQuery', {
         sql_query: query(),
+        detail: 'medium',
         row_number: 5,
       });
       const handle = startedHandle('GetSqlQuery', started);
@@ -729,6 +736,7 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
     it('a long read called without background answers a run_handle, read finished once', async () => {
       const started = await liveCall('HandlerGetData', {
         sql_query: query(),
+        detail: 'medium',
         max_rows: 5,
       });
       const handle = startedHandle('HandlerGetData', started);
@@ -749,6 +757,7 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
         'HandlerGetData',
         await livePrepare('HandlerGetData', {
           sql_query: query(),
+          detail: 'medium',
           max_rows: 5,
         }),
       );

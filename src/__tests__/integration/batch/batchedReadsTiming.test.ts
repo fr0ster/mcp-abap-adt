@@ -218,6 +218,7 @@ const CASES: Case[] = [
         parent_type: 'DEVC/K',
         parent_name: name,
         maxDepth: 5,
+        detail: 'full',
       }),
   },
   {

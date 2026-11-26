@@ -23,6 +23,7 @@ import { pollUntilFinished } from '../../helpers/atcRun';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { servedSuite } from '../../helpers/servedHere';
+import { headOf, terseOf, terseText } from '../../helpers/terseAnswer';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
@@ -239,19 +240,18 @@ describe('ATC Handlers Integration', () => {
           `ListATCResults failed: ${extractErrorMessage(listed)}`,
         );
       }
-      const list = payload(listed);
-      assert.equal(list.result_count, list.results.length);
-      const ours = list.results.filter(
-        (r: any) => r.title === params.object_name,
-      );
-      assert.ok(ours.length >= 1);
-      const newest = ours.reduce((a: any, b: any) =>
+      // The terse list: its count, a row per result.
+      const list = terseOf(terseText(listed));
+      assert.equal(Number(headOf(list, 'count')), list.rows.length, list.text);
+      const ours = list.rows.filter((r) => r.title === params.object_name);
+      assert.ok(ours.length >= 1, list.text);
+      const newest = ours.reduce((a, b) =>
         String(b.created_at) > String(a.created_at) ? b : a,
       );
 
       // The fields read below: the JSON of detail medium, on both paths.
       const readArgs = {
-        display_id: newest.display_id,
+        display_id: newest.display_id ?? '',
         detail: 'medium' as const,
       };
       const read = await tester.invokeToolOrHandler(
@@ -274,7 +274,7 @@ describe('ATC Handlers Integration', () => {
         findings.map((f) => `${f.object}|${f.line}|${f.check}`).sort();
       assertEquals(checks(result.findings), checks(fromWorklist.findings));
       logger?.info(
-        `ATC result ${newest.display_id} of ${list.result_count} listed: ${result.finding_count} finding(s)`,
+        `ATC result ${newest.display_id} of ${list.rows.length} listed: ${result.finding_count} finding(s)`,
       );
     });
   });

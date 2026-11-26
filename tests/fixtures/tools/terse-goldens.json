@@ -348,7 +348,7 @@
   "GetWhereUsed one object @terse": {
     "isError": false,
     "parts": [
-      "# total 4\ntype\tname\telement\turi\tusage\n# package ZPKG\nCLAS/OC\tZCL_USER\t\t\t\nPROG/P\tZPROG\t\t\tgradeDirect,includeTest\n# package ZOTHER\nINTF/OI\tZIF_X\t\t\t\nCLAS/OC\t\t\t/sap/bc/adt/oo/classes/nameless\tgradeDirect"
+      "# total 4\ntype\tname\telement\turi\tusage\tcode\n# package ZPKG\nCLAS/OC\tZCL_USER\t\t\t\t\nPROG/P\tZPROG\t\t\tgradeDirect,includeTest\t\n# package ZOTHER\nINTF/OI\tZIF_X\t\t\t\t\nCLAS/OC\t\t\t/sap/bc/adt/oo/classes/nameless\tgradeDirect\t"
     ]
   },
   "GetWhereUsed one object @medium": {
@@ -366,7 +366,7 @@
   "GetWhereUsed two objects, one refused @terse": {
     "isError": false,
     "parts": [
-      "# object CLAS/OC ZCL_X\n# total 4\ntype\tname\telement\turi\tusage\n# package ZPKG\nCLAS/OC\tZCL_USER\t\t\t\nPROG/P\tZPROG\t\t\tgradeDirect,includeTest\n# package ZOTHER\nINTF/OI\tZIF_X\t\t\t\nCLAS/OC\t\t\t/sap/bc/adt/oo/classes/nameless\tgradeDirect\n# object CLAS/OC ZCL_GONE\n# error {\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read where-used\",\"status\":403,\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}"
+      "# object CLAS/OC ZCL_X\n# total 4\ntype\tname\telement\turi\tusage\tcode\n# package ZPKG\nCLAS/OC\tZCL_USER\t\t\t\t\nPROG/P\tZPROG\t\t\tgradeDirect,includeTest\t\n# package ZOTHER\nINTF/OI\tZIF_X\t\t\t\t\nCLAS/OC\t\t\t/sap/bc/adt/oo/classes/nameless\tgradeDirect\t\n# object CLAS/OC ZCL_GONE\n# error {\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read where-used\",\"status\":403,\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}"
     ]
   },
   "GetWhereUsed two objects, one refused @medium": {

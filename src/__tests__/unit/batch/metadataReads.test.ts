@@ -47,6 +47,7 @@ import { metadataDescriptions } from '../../../lib/strategies/packageWalk';
 import {
   envelopeConnection,
   envelopeResponse,
+  statusError,
 } from '../../helpers/batchEnvelope';
 import { repositoryRoot } from '../../helpers/repoRoot';
 import { withinTurns } from '../../helpers/withinTurns';
@@ -483,13 +484,12 @@ describe('the metadata phase is bounded (GetObjectInfo include_descriptions)', (
   const contextOn = (
     fake: ReturnType<typeof envelopeConnection>,
     readsPerEnvelope?: number,
-  ) =>
-    ({
-      connection: fake.connection,
-      logger: undefined,
-      batchAvailability: createBatchAvailability(),
-      ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
-    }) as unknown as HandlerContext;
+  ): HandlerContext => ({
+    connection: fake.connection,
+    logger: undefined,
+    batchAvailability: createBatchAvailability(),
+    ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
+  });
 
   /** Each class's own metadata document: its description names it. */
   const ownDocument = (url: string) => {
@@ -547,6 +547,32 @@ describe('the metadata phase is bounded (GetObjectInfo include_descriptions)', (
         target.name,
       );
     }
+  });
+
+  it('a whole metadata envelope that fails: its objects have no description, the next envelope is still sent (the metadata exception)', async () => {
+    let count = 0;
+    const fake = envelopeConnection((parts) => {
+      count += 1;
+      if (count === 1) throw statusError(500, 'Internal Server Error');
+      return envelopeResponse(
+        parts.map((p) => ({
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'application/xml' },
+          body: ownDocument(p.url),
+        })),
+      );
+    });
+    const targets = classes(BOUND + 2);
+    const { descriptions } = await withinTurns(
+      metadataDescriptions(contextOn(fake, BOUND), targets),
+      2000,
+    );
+    assert.equal(fake.envelopes.length, 2);
+    const described = targets.filter(
+      (t) => descriptions.get(metadataKeyOf(t) ?? '') !== undefined,
+    );
+    assert.equal(described.length, 151);
   });
 
   it('a 401 on one object’s metadata: that object has no description, every other its own, every envelope sent', async () => {

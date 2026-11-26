@@ -332,12 +332,13 @@ export function contextOn(
 ) {
   const port = createBatchAvailability();
   if (batch === 'absent') port.noteOuterStatus(404);
-  return {
+  const context: HandlerContext = {
     connection: fake.connection,
     logger: undefined,
     batchAvailability: port,
     ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
-  } as unknown as HandlerContext;
+  };
+  return context;
 }
 
 export const textOf = (result: unknown): string =>

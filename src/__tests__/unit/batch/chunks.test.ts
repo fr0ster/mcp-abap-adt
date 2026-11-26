@@ -332,6 +332,40 @@ describe('runPhaseOutcome: the bound is applied to every phase', () => {
     assert.ok(last !== undefined && !last.ok && last.error === refusal);
   });
 
+  it('bound 2: a part SAP answered 401 ends the phase — no later envelope', async () => {
+    const fake = envelopeConnection((parts) =>
+      envelopeResponse(
+        parts.map((p) =>
+          p.url.endsWith('/x/1')
+            ? { status: 401, statusText: 'Unauthorized', body: '' }
+            : { status: 200, statusText: 'OK', body: p.url },
+        ),
+      ),
+    );
+    const context: HandlerContext = {
+      connection: fake.connection,
+      logger: undefined,
+      batchAvailability: createBatchAvailability(),
+      readsPerEnvelope: 2,
+    };
+    const outcome = await withinTurns(
+      runPhaseOutcome(context, numbers(5), async (item, c) => {
+        const answer = await c.makeAdtRequest({
+          url: `/sap/bc/adt/x/${item}`,
+          method: 'GET',
+          timeout: 0,
+        });
+        return String(answer.data);
+      }),
+      2000,
+    );
+    assert.equal(fake.envelopes.length, 1);
+    assert.deepStrictEqual(
+      outcome.results.map((r) => r.ok),
+      [true, false, false, false, false],
+    );
+  });
+
   it('bound 2: a failure in a later envelope keeps the earlier answers', async () => {
     const { fake, outcome } = await phaseOn(5, 2, {
       envelope: 2,

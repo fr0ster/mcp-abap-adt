@@ -25,7 +25,7 @@ import {
 } from '../../../lib/adtHeaders/AdtHeaderPairs';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { runPhase } from '../../../lib/batch/phases';
+import { runPhase, runPhaseOutcome } from '../../../lib/batch/phases';
 import { assertMatchObject } from '../../helpers/assertions';
 import {
   envelopeConnection,
@@ -159,6 +159,45 @@ const phase = (fake: Fake, port: AdtHeaderPort) => {
   const context = contextOn(fake, port);
   return withinTurns(runPhase(context, ITEMS, whereUsed(context)));
 };
+
+describe("the consumer's bound and a failed correction envelope", () => {
+  it('bound 2: the correction envelope of the first envelope fails — the phase ends, no later envelope is sent', async () => {
+    let envelopes = 0;
+    const fake = envelopeConnection((parts, seen) => {
+      envelopes += 1;
+      // The correction envelope (the second request) fails as a whole.
+      if (envelopes === 2) throw statusError(500, 'Internal Server Error');
+      return partByPart((inner) =>
+        acceptsNewer(
+          itemOf(inner.url),
+          inner.headers.accept,
+          inner.headers['content-type'],
+        ),
+      )(parts, seen);
+    });
+    const port = new AdtHeaderPairs().forSystem('S1');
+    const context: HandlerContext = {
+      connection: fake.connection,
+      logger: undefined,
+      adtHeaders: port,
+      readsPerEnvelope: 2,
+    };
+    const items = ['ITEM_A', 'ITEM_B', 'ITEM_C', 'ITEM_A'];
+    const results = await withinTurns(
+      runPhaseOutcome(context, items, whereUsed(context)),
+    );
+    // The first envelope (A, B), B's correction — and nothing after it.
+    assert.deepStrictEqual(
+      fake.envelopes.map((e) => e.parts.length),
+      [2, 1],
+    );
+    assert.equal(results.results.length, 4);
+    assert.deepStrictEqual(
+      results.results.map((r) => r.ok),
+      [true, true, false, false],
+    );
+  });
+});
 
 describe('the format correction of an internal batch phase', () => {
   it('only the 406 part is recorded again, by its member with the corrected Accept, in one envelope', async () => {

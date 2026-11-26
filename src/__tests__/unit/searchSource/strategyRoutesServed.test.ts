@@ -173,6 +173,41 @@ describe("readsPerEnvelope, the consumer's envelope bound", () => {
     }
   });
 
+  it("getHandlerEntries(): the exporter's bound reaches the call", async () => {
+    const exporter = new HandlerExporter({
+      systemType: 'onprem',
+      readsPerEnvelope: 4,
+    });
+    const entry = exporter
+      .getHandlerEntries()
+      .find((e) => e.toolDefinition.name === 'SearchSource');
+    assert.ok(entry !== undefined);
+    await entry.call({ connection: built, readsPerEnvelope: 99 }, ARGS);
+    // The exporter's option, never the embedder's context.
+    assert.equal(seen[0]?.readsPerEnvelope, 4);
+  });
+
+  it("createRegistry() hosted by a server with its own bound: the server's applies, the exporter's never", async () => {
+    const exporter = new HandlerExporter({
+      systemType: 'onprem',
+      readsPerEnvelope: 7,
+    });
+    const server = new EmbeddableMcpServer({
+      connection: built,
+      handlersRegistry: exporter.createRegistry(),
+      systemType: 'onprem',
+      logger: silent,
+      readsPerEnvelope: 5,
+    });
+    const client = await clientOf(server);
+    try {
+      await client.callTool({ name: 'SearchSource', arguments: ARGS });
+      assert.equal(seen[0]?.readsPerEnvelope, 5);
+    } finally {
+      await client.close();
+    }
+  });
+
   it('two EmbeddableMcpServer instances keep their own bounds', async () => {
     const serverOf = (readsPerEnvelope?: number) =>
       new EmbeddableMcpServer({

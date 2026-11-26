@@ -13,7 +13,10 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { handleSearchSource } from '../../../handlers/system/readonly/handleSearchSource';
+import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 import {
+  contextOn,
   type Fake,
   hitNames,
   keyOf,
@@ -27,6 +30,7 @@ import {
   standOn,
   textOf,
 } from '../../helpers/searchSourceStand';
+import { withinTurns } from '../../helpers/withinTurns';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -188,7 +192,7 @@ describe('SearchSource: source reads in envelopes', () => {
     assert.deepStrictEqual(sourceSizes(fake, 0), [650]);
   });
 
-  it('650 one-read targets go as 300 + 300 + 50 reads, in target order', async () => {
+  it('650 one-read targets at 300 go as balanced envelopes of 217 + 217 + 216 reads, in target order', async () => {
     const fake = on(programs(650));
     const result = await search(fake, ['ZBIG']);
     // The walk of one package: the root node, then its type node — one
@@ -197,7 +201,7 @@ describe('SearchSource: source reads in envelopes', () => {
       fake.directs.map((r) => keyOf(r.url, r.params)),
       [nodeKey('ZBIG'), nodeKey('ZBIG', '20')],
     );
-    assert.deepStrictEqual(sourceSizes(fake, 0), [300, 300, 50]);
+    assert.deepStrictEqual(sourceSizes(fake, 0), [217, 217, 216]);
     assert.deepStrictEqual(
       fake.envelopes.flatMap(partKeys).map((k) => k.slice('PROGRAM '.length)),
       Array.from({ length: 650 }, (_, i) => `ZP${pad(i)}`),
@@ -220,6 +224,110 @@ describe('SearchSource: source reads in envelopes', () => {
     // The structures (3 reads), then the includes (6 reads) in two.
     assert.deepStrictEqual(sourceSizes(fake, 0), [3, 3, 3]);
     assert.equal(payloadOf(result).results.length, 6);
+  });
+
+  it("bound 2: a 401 on a group's include ends the reads — no later envelope", async () => {
+    // Two groups of four includes; ZG0's first include is 401.
+    const fake = on(
+      groups(2, 4),
+      {},
+      {
+        refuse: { 'FINCLUDE ZG0/LZG0000': 401 },
+      },
+    );
+    await searchOn(
+      fake,
+      { query: 'marker', packages: ['ZGS'], background: false },
+      false,
+      TURNS,
+      2,
+    ).catch(() => undefined);
+    const includeEnvelopes = fake.envelopes.filter((e) =>
+      partKeys(e).some((k) => k.startsWith('FINCLUDE ')),
+    );
+    assert.equal(includeEnvelopes.length, 1);
+  });
+
+  it('max_hits given, bound 2: a 401 on an include ends the reads — no later envelope', async () => {
+    const fake = on(
+      groups(1, 4),
+      {},
+      { refuse: { 'FINCLUDE ZG0/LZG0000': 401 } },
+    );
+    await searchOn(
+      fake,
+      // A query no source holds: the hits never decide the stop.
+      { query: 'nothing-here', packages: ['ZGS'], max_hits: 1 },
+      false,
+      TURNS,
+      2,
+    ).catch(() => undefined);
+    const includeEnvelopes = fake.envelopes.filter((e) =>
+      partKeys(e).some((k) => k.startsWith('FINCLUDE ')),
+    );
+    assert.equal(includeEnvelopes.length, 1);
+  });
+
+  it("max_hits 1, bound 2: a group's first envelope of includes holds the hit — the second is not sent", async () => {
+    const fake = on(groups(1, 4));
+    const result = await searchOn(
+      fake,
+      { query: 'marker', packages: ['ZGS'], max_hits: 1 },
+      false,
+      TURNS,
+      2,
+    );
+    const includeEnvelopes = fake.envelopes.filter((e) =>
+      partKeys(e).some((k) => k.startsWith('FINCLUDE ')),
+    );
+    assert.equal(includeEnvelopes.length, 1);
+    assert.equal(payloadOf(result).results.length, 1);
+  });
+
+  it('max_hits with a line match whose hits hold the query: a step without the query is not scanned again', async () => {
+    let calls = 0;
+    const counting = {
+      match: (
+        lines: readonly string[],
+        input: Parameters<typeof substringLineMatch.match>[1],
+      ) => {
+        calls += 1;
+        return substringLineMatch.match(lines, input);
+      },
+      hitsHoldQuery: true,
+    };
+    const fake = on(programs(60));
+    await withinTurns(
+      handleSearchSource(
+        { ...contextOn(fake, 'served'), lineMatchStrategy: counting },
+        {
+          query: 'nothing-here',
+          packages: ['ZBIG'],
+          max_hits: 1,
+          background: false,
+        },
+      ),
+      TURNS,
+    );
+    // The final scan's one match per source, and no rescan per target
+    // (which would be 60 · 61 / 2 more).
+    assert.ok(calls <= 60, `${calls} matches`);
+  });
+
+  it('exclude takes more than three substrings', async () => {
+    const fake = on(programs(2));
+    const result = await searchOn(
+      fake,
+      {
+        query: 'marker',
+        packages: ['ZBIG'],
+        exclude: ['a1', 'a2', 'a3', 'MARKER'],
+      },
+      false,
+      TURNS,
+    );
+    // Four entries are taken; the fourth drops every line.
+    assert.equal(payloadOf(result).results.length, 0);
   });
 
   it("no bound given: 3 groups' 6 includes go in one envelope", async () => {

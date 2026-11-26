@@ -18,6 +18,12 @@ import {
 import type { XmlRead } from '../xml/tree';
 import type { AdtReading } from './reading';
 import { atStep } from './step';
+import { succeeded } from './stepResponse';
+import {
+  snippetElement,
+  type UsageSnippetsSource,
+  type WhereUsedSnippet,
+} from './usageSnippets';
 
 /**
  * `getWhereUsedList`'s replacement, composed — the guide's "Sequences are
@@ -136,6 +142,16 @@ export type WhereUsedReference = {
   parent_name?: string | undefined;
   parent_package?: string | undefined;
   element?: string | undefined;
+  /** `objectIdentifier` as SAP sent it: what the code lines are asked by. */
+  object_identifier?: string | undefined;
+  /**
+   * The source lines holding the usage (`usageSnippets`), as SAP sent them,
+   * each with its position; absent for a reference not asked for (no
+   * identifier, no usage) and for one SAP gave none (a usage not in code).
+   */
+  snippets?: WhereUsedSnippet[] | undefined;
+  /** A row's code line: one snippet's content, trimmed (terse and medium only). */
+  code?: string | undefined;
 };
 
 /**
@@ -222,6 +238,7 @@ export const whereUsedListReading = (
       responsible: reference.responsible || undefined,
       // As SAP sent it: an empty attribute stays a usage, `''`.
       usage_information: reference.usageInformation,
+      object_identifier: reference.objectIdentifier || undefined,
     };
     const parent = elementParent(
       type,
@@ -267,6 +284,91 @@ function elementParent(
   const nodeType = node.type ?? node.unknownType;
   if (nodeType === '' || node.name === '') return undefined;
   return { type: nodeType, name: node.name, packageName: node.packageName };
+}
+
+/** A row terse and medium answer: a reference as {@link usageRows} shows it. */
+export type WhereUsedRow = Omit<
+  WhereUsedReference,
+  'snippets' | 'object_identifier'
+>;
+
+/** What terse and medium list: the count SAP gave, and every row. */
+export interface WhereUsedRows {
+  totalReferences: number;
+  references: WhereUsedRow[];
+}
+
+/** The rows of `result`, in its order: {@link usageRows} of each reference. */
+export function whereUsedRows(result: WhereUsedListResult): WhereUsedRows {
+  return {
+    totalReferences: result.totalReferences,
+    references: result.references.flatMap(usageRows),
+  };
+}
+
+/**
+ * The rows terse and medium answer for `reference`, each naming the object
+ * it is in ({@link usingObject}): one per code line SAP gave for it, with
+ * the line (`code`, trimmed) and, where the reference names no element,
+ * the element its position names (`name=`); one row with no code line for
+ * a reference SAP gave none.
+ */
+export function usageRows(reference: WhereUsedReference): WhereUsedRow[] {
+  const { snippets, object_identifier, ...fields } = reference;
+  const shown = usingObject(fields);
+  if (snippets === undefined || snippets.length === 0) return [shown];
+  return snippets.map((snippet) => {
+    const element = shown.element ?? snippetElement(snippet.uri);
+    return {
+      ...shown,
+      ...(element === undefined ? {} : { element }),
+      code: snippet.content.trim(),
+    };
+  });
+}
+
+/**
+ * A where-used list with its code lines: ONE `usageSnippets` read over the
+ * identifiers of every usage the list holds (a reference with
+ * `usage_information`), each answer joined to its reference by its
+ * identifier. A list with no such identifier is answered as read, with no
+ * request. A refused read is the answer, with its step — never the list
+ * without its code lines.
+ */
+export async function withUsageSnippets(
+  listed: IAdtResponse<WhereUsedListRead, IAdtError>,
+  source: UsageSnippetsSource,
+): Promise<IAdtResponse<WhereUsedListRead, IAdtError>> {
+  if (!listed.ok) return listed;
+  const read = listed.getResult().value;
+  const identifiers = [
+    ...new Set(
+      read.references.flatMap((reference) =>
+        reference.usage_information !== undefined &&
+        reference.object_identifier !== undefined
+          ? [reference.object_identifier]
+          : [],
+      ),
+    ),
+  ];
+  if (identifiers.length === 0) return listed;
+  const answered = await atStep('read where-used code lines', () =>
+    source.read(identifiers),
+  )();
+  if (!answered.ok) return answered;
+  const snippets = answered.getResult().value;
+  return succeeded({
+    ...read,
+    references: read.references.map((reference) => {
+      const lines =
+        reference.object_identifier === undefined
+          ? undefined
+          : snippets.get(reference.object_identifier);
+      return lines === undefined || lines.length === 0
+        ? reference
+        : { ...reference, snippets: [...lines] };
+    }),
+  });
 }
 
 function needsScope(filter: WhereUsedFilter): boolean {

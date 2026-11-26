@@ -9,8 +9,9 @@ import { describe, it } from 'node:test';
 import { WHERE_USED_LISTS } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import { rows, writeListing } from '../../../lib/detail';
 import {
-  usingObject,
   type WhereUsedReference,
+  type WhereUsedRow,
+  whereUsedRows,
 } from '../../../lib/strategies/whereUsedList';
 
 interface Item {
@@ -91,7 +92,7 @@ describe('a terse list of 200,000 items', () => {
   });
 
   it("GetWhereUsed's terse table of 200,000 references, every usage written", () => {
-    const references: WhereUsedReference[] = Array.from(
+    const references: WhereUsedRow[] = Array.from(
       { length: COUNT },
       (_, i) => ({
         name: `ZCL_${i}`,
@@ -139,9 +140,10 @@ describe('a terse list of 200,000 items', () => {
         };
       },
     );
+    const shown = whereUsedRows({ totalReferences: USAGES, references });
     const text = writeListing({
       heads: [{ head: 'total', value: String(USAGES) }],
-      reading: { totalReferences: USAGES, references },
+      reading: shown,
       lists: WHERE_USED_LISTS,
     }).answer;
     // The header row and every usage, one `# in` line per class.
@@ -150,33 +152,34 @@ describe('a terse list of 200,000 items', () => {
     // `# in` line: the shape the grouping replaced.
     const perRow = writeListing({
       heads: [{ head: 'total', value: String(USAGES) }],
-      reading: { totalReferences: USAGES, references },
+      reading: shown,
       lists: {
         references: rows('references', {
           columns: [
             {
               name: 'type',
-              cell: (r: WhereUsedReference) => usingObject(r).type,
+              cell: (r: WhereUsedRow) => r.type,
             },
             {
               name: 'name',
-              cell: (r: WhereUsedReference) => usingObject(r).name,
+              cell: (r: WhereUsedRow) => r.name,
             },
             {
               name: 'element',
-              cell: (r: WhereUsedReference) => usingObject(r).element ?? '',
+              cell: (r: WhereUsedRow) => r.element ?? '',
             },
             { name: 'uri', cell: () => '' },
             {
               name: 'usage',
-              cell: (r: WhereUsedReference) => r.usage_information ?? '',
+              cell: (r: WhereUsedRow) => r.usage_information ?? '',
             },
+            { name: 'code', cell: (r: WhereUsedRow) => r.code ?? '' },
           ],
           header: 'always',
           groups: [
             {
               label: 'package',
-              of: (r: WhereUsedReference) => usingObject(r).package_name ?? '',
+              of: (r: WhereUsedRow) => r.package_name ?? '',
               mode: 'gathered',
             },
           ],

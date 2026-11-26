@@ -195,12 +195,12 @@ describe('GetWhereUsed: a usage inside an element of another object', () => {
       await whereUsed('terse'),
       [
         '# total 5',
-        'type\tname\telement\turi\tusage',
+        'type\tname\telement\turi\tusage\tcode',
         '# package ZMCP_SHR_PKG',
-        'PROG/P\tZMCP_SHR_PROG\t\t\tgradeDirect,includeTest',
+        'PROG/P\tZMCP_SHR_PROG\t\t\tgradeDirect,includeTest\t',
         '# in CLAS/OC ZMCP_SHR_DUMP_CLS',
-        '\t\tIF_OO_ADT_CLASSRUN~MAIN\t\tgradeElement,includeProductive',
-        '\t\tCONSTRUCTOR\t\tgradeElement,includeProductive',
+        '\t\tIF_OO_ADT_CLASSRUN~MAIN\t\tgradeElement,includeProductive\t',
+        '\t\tCONSTRUCTOR\t\tgradeElement,includeProductive\t',
       ].join('\n'),
     );
   });

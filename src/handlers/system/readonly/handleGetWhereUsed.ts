@@ -101,15 +101,18 @@ import { whereUsedScopeTypesOf } from '../../../lib/strategies/metadataFields';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
+import { usageSnippetsOn } from '../../../lib/strategies/usageSnippets';
 import {
   fetchWhereUsedReferences,
   presentScopeOptions,
-  usingObject,
   type WhereUsedListRead,
   type WhereUsedListResult,
-  type WhereUsedReference,
+  type WhereUsedRow,
+  type WhereUsedRows,
   type WhereUsedSource,
   whereUsedOn,
+  whereUsedRows,
+  withUsageSnippets,
 } from '../../../lib/strategies/whereUsedList';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
@@ -191,27 +194,24 @@ export function whereUsedTargetOf(
 }
 
 /**
- * The URI of a reference whose name and type do not tell where it is — one
- * SAP listed without a name, or without a type and with no node of the list
- * at its `parentUri` — as SAP sent it; `''` for any other.
+ * The URI of a row whose name and type do not tell where it is — one SAP
+ * listed without a name, or without a type and with no node of the list at
+ * its `parentUri` — as SAP sent it; `''` for any other.
  */
-function untoldUri(reference: WhereUsedReference) {
-  return reference.name === '' || reference.type === ''
-    ? (reference.uri ?? '')
-    : '';
+function untoldUri(row: WhereUsedRow) {
+  return row.name === '' || row.type === '' ? (row.uri ?? '') : '';
 }
 
 /**
  * The object a usage in a method or section belongs to, as its `# in`
- * line names it — `TYPE NAME` —; `''` for any other reference.
+ * line names it — `TYPE NAME` —; `''` for a row that names no element.
  */
-function ownerOf(reference: WhereUsedReference): string {
-  const shown = usingObject(reference);
-  return shown.element === undefined ? '' : `${shown.type} ${shown.name}`;
+function ownerOf(row: WhereUsedRow): string {
+  return row.element === undefined ? '' : `${row.type} ${row.name}`;
 }
 
-/** The lists a WhereUsedListResult listing writes: what its description states. */
-export const WHERE_USED_LISTS: RowSchemas<WhereUsedListResult> = {
+/** The lists a WhereUsedRows listing writes: what its description states. */
+export const WHERE_USED_LISTS: RowSchemas<WhereUsedRows> = {
   references: about(
     'for each object that uses it, under its package',
     rows('references', {
@@ -219,43 +219,43 @@ export const WHERE_USED_LISTS: RowSchemas<WhereUsedListResult> = {
         {
           name: 'type',
           means: 'its type (a usage in a method or section: on its # in line)',
-          cell: (reference: WhereUsedReference) =>
-            ownerOf(reference) === '' ? reference.type : '',
+          cell: (row: WhereUsedRow) => (ownerOf(row) === '' ? row.type : ''),
         },
         {
           name: 'name',
           means: 'its name (a usage in a method or section: on its # in line)',
-          cell: (reference: WhereUsedReference) =>
-            ownerOf(reference) === '' ? reference.name : '',
+          cell: (row: WhereUsedRow) => (ownerOf(row) === '' ? row.name : ''),
         },
         {
           name: 'element',
           means:
             'the method or section the use is in, under the # in line of the object it belongs to',
-          cell: (reference: WhereUsedReference) =>
-            usingObject(reference).element ?? '',
+          cell: (row: WhereUsedRow) => row.element ?? '',
         },
         {
           name: 'uri',
           means: 'its URI when SAP lists it without a name or a type',
-          cell: (reference: WhereUsedReference) =>
-            untoldUri(usingObject(reference)),
+          cell: untoldUri,
         },
         {
           name: 'usage',
           means: 'how it uses the object, where SAP tells it',
-          cell: (reference: WhereUsedReference) =>
-            reference.usage_information === COMMON_USAGE
+          cell: (row: WhereUsedRow) =>
+            row.usage_information === COMMON_USAGE
               ? ''
-              : (reference.usage_information ?? ''),
+              : (row.usage_information ?? ''),
+        },
+        {
+          name: 'code',
+          means: 'the source line the use is on, where it is in code',
+          cell: (row: WhereUsedRow) => row.code ?? '',
         },
       ],
       header: 'always',
       groups: [
         {
           label: 'package',
-          of: (reference: WhereUsedReference) =>
-            usingObject(reference).package_name ?? '',
+          of: (row: WhereUsedRow) => row.package_name ?? '',
           mode: 'gathered',
         },
         // A usage in a method or section under one line naming the object
@@ -271,8 +271,8 @@ export const WHERE_USED_LISTS: RowSchemas<WhereUsedListResult> = {
       // The terse shape (approved): usages only — the package and
       // container nodes of SAP's tree carry no usage, and leave.
       omit: omitting(
-        (reference: WhereUsedReference) =>
-          reference.usage_information === undefined ? 'node' : 'usage',
+        (row: WhereUsedRow) =>
+          row.usage_information === undefined ? 'node' : 'usage',
         {
           node: 'the packages and containers SAP groups the usages under are left out',
         },
@@ -502,9 +502,7 @@ function fullWhereUsed(result: WhereUsedListResult, args: WhereUsedArgs) {
  * tree carry none, and leave — each usage names its package on the group
  * line. Every usage is answered: nothing is cut.
  */
-function whereUsedListing(
-  result: WhereUsedListResult,
-): Listing<WhereUsedListResult> {
+function whereUsedListing(result: WhereUsedRows): Listing<WhereUsedRows> {
   return {
     heads: [{ head: 'total', value: String(result.totalReferences) }],
     reading: result,
@@ -523,22 +521,21 @@ function whereUsedListing(
 const WHERE_USED_ANSWERS: ListAnswerTable<WhereUsedRead, string | object> = {
   // Every usage (terse) or reference (medium, full), written from the
   // list's own references by the listing writers.
-  terse: ({ result }) => writeListing(whereUsedListing(result)),
+  terse: ({ result }) => writeListing(whereUsedListing(whereUsedRows(result))),
   medium: ({ result }) =>
     writeJson(
       {
         total_references: result.totalReferences,
         result_description: result.resultDescription,
       },
-      result,
+      whereUsedRows(result),
       {
-        // Every field but the URIs, an element usage as the object it is
-        // in (`usingObject`) — the URI kept for a reference SAP listed
-        // without a name or a type, what tells it apart.
-        references: entries('references', (reference: WhereUsedReference) => {
-          const shown = usingObject(reference);
-          const { uri, parent_uri, ...fields } = shown;
-          return untoldUri(shown) === '' || uri === undefined
+        // Every row (`usageRows`: one per code line) with every field but
+        // the URIs — the URI kept for a row SAP listed without a name or a
+        // type, what tells it apart.
+        references: entries('references', (row: WhereUsedRow) => {
+          const { uri, parent_uri, ...fields } = row;
+          return untoldUri(row) === '' || uri === undefined
             ? fields
             : { ...fields, uri };
         }),
@@ -625,13 +622,17 @@ async function whereUsedOf(
   const shown = listAnswerAt(WHERE_USED_ANSWERS, levelOf(args));
   return answer(
     { tool: 'GetWhereUsed', detail: detailOf(args) },
-    () =>
-      fetchWhereUsedReferences(whereUsedOn(context, utils), {
-        ...target,
-        enableAllTypes: typedArgs.enable_all_types,
-        enableOnlyTypes: typedArgs.enable_only_types,
-        disableTypes: typedArgs.disable_types,
-      }),
+    // The usages, then ONE read of their code lines (`withUsageSnippets`).
+    async () =>
+      withUsageSnippets(
+        await fetchWhereUsedReferences(whereUsedOn(context, utils), {
+          ...target,
+          enableAllTypes: typedArgs.enable_all_types,
+          enableOnlyTypes: typedArgs.enable_only_types,
+          disableTypes: typedArgs.disable_types,
+        }),
+        usageSnippetsOn(context, connection),
+      ),
     (result: WhereUsedListRead) => {
       // The cache keeps the full answer, whatever the level answered.
       objectsListCache.setCache({
@@ -735,20 +736,27 @@ async function whereUsedFromAnswers(
   const shown = listAnswerAt(WHERE_USED_ANSWERS, levelOf(given));
   return answer(
     { tool: 'GetWhereUsed', detail: detailOf(given) },
-    () =>
-      fetchWhereUsedReferences(
-        {
-          getWhereUsedScope: () => answered(scope),
-          modifyWhereUsedScope: (scopeXml, options) =>
-            utils.modifyWhereUsedScope(scopeXml, presentScopeOptions(options)),
-          getWhereUsed: () => answered(references),
-        },
-        {
-          ...target,
-          enableAllTypes: typedArgs.enable_all_types,
-          enableOnlyTypes: typedArgs.enable_only_types,
-          disableTypes: typedArgs.disable_types,
-        },
+    // The usages, then ONE read of their code lines (`withUsageSnippets`).
+    async () =>
+      withUsageSnippets(
+        await fetchWhereUsedReferences(
+          {
+            getWhereUsedScope: () => answered(scope),
+            modifyWhereUsedScope: (scopeXml, options) =>
+              utils.modifyWhereUsedScope(
+                scopeXml,
+                presentScopeOptions(options),
+              ),
+            getWhereUsed: () => answered(references),
+          },
+          {
+            ...target,
+            enableAllTypes: typedArgs.enable_all_types,
+            enableOnlyTypes: typedArgs.enable_only_types,
+            disableTypes: typedArgs.disable_types,
+          },
+        ),
+        usageSnippetsOn(context, connection),
       ),
     (result: WhereUsedListRead) => {
       // The cache keeps the full answer, whatever the level answered.
@@ -999,6 +1007,13 @@ function listAnswer(
   return listAnswerAt(LIST_ANSWERS, level)({ objects, targets, results });
 }
 
+/** The rows of a list read, when there is one. */
+function rowsOf(
+  read: WhereUsedListResult | undefined,
+): WhereUsedRows | undefined {
+  return read === undefined ? undefined : whereUsedRows(read);
+}
+
 /** A list call's terse text. */
 function terseList({ objects, targets, results }: ListOf): Written<TextResult> {
   // Every object's text written by the listing writer: its name escaped in
@@ -1010,9 +1025,9 @@ function terseList({ objects, targets, results }: ListOf): Written<TextResult> {
       answered: results.map((result, i) => ({
         asked: objects[i],
         answer: answerPayload(result),
-        read: result.isError
-          ? undefined
-          : readsOf.get(targets[i] ?? {})?.result,
+        read: rowsOf(
+          result.isError ? undefined : readsOf.get(targets[i] ?? {})?.result,
+        ),
       })),
     },
     lists: {
@@ -1044,7 +1059,7 @@ function terseList({ objects, targets, results }: ListOf): Written<TextResult> {
 interface AnsweredObject {
   readonly asked: ListOf['objects'][number] | undefined;
   readonly answer: JsonValue;
-  readonly read: WhereUsedListResult | undefined;
+  readonly read: WhereUsedRows | undefined;
 }
 
 /** A list call's entries as a JSON array. */

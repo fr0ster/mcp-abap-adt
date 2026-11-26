@@ -526,6 +526,12 @@ describe('eligible', () => {
           object_type: 'class',
           disable_types: ['CLAS/OC'],
         }),
+        'where_used in_object': system({
+          action: 'where_used',
+          object_name: 'CLAS_A',
+          object_type: 'class',
+          in_object: { object_type: 'CLAS/OC', object_name: 'ZCL_B' },
+        }),
       },
       {
         search_object: { ok: true },
@@ -542,6 +548,8 @@ describe('eligible', () => {
         'where_used enable_all_types': no,
         'where_used enable_only_types': no,
         'where_used disable_types': no,
+        // Its code lines are read with the identifiers of its first answer.
+        'where_used in_object': no,
       },
     );
   });

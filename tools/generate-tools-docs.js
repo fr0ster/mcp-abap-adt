@@ -463,6 +463,26 @@ function promptsOfTools(listed) {
   return byTool;
 }
 
+/**
+ * What a tool's answer holds, for the tools whose answer a consumer reads
+ * by its columns: written on the tool's entry, after its source.
+ */
+const ANSWER_NOTES = {
+  GetWhereUsed: [
+    '**Answer:** `terse` (default) is TSV: a `# total N` line, then the tab-separated header `type name element uri usage` and one row per usage, grouped under `# package P` lines. Read the columns by the header, never by position: `element` (and, with `in_object`, `code`) were added in 24.2.1, and a column may be added again.',
+    "- A usage inside a method or a section of a class (SAP lists it with no type, the class only as its `parentUri`) is written under a `# in TYPE NAME` line that names the class by its type (`CLAS/OC`) and name, once per class, after the plain rows of its package; each row under it carries the method or section in `element` and its `usage`. The line holds until the next `# in` or `# package` line. The class is the node of the same answer at that `parentUri`, by the type SAP lists it with; a reference SAP leaves unresolved keeps its plain row. A program's usage names the program: SAP names no FORM.",
+    '- `uri` is filled only for a reference SAP lists without a name, or without a type and with no node of the answer at its `parentUri`: such a row is answered as SAP gave it, its type empty, its URI telling where it is.',
+    "- **`in_object`** (type and name of one using object, as the answer names it) answers that object's usages only, each with the source line it is on in a `code` column, trimmed (`DATA: lv_test TYPE ZMCP_SHR_DTEL.`), one row per line, after a `# in_object TYPE NAME: N usage(s)` line (`0 usage(s)` when it uses nothing, no error). The lines are read with one `usageSnippets` request over exactly that object's usages, as Eclipse reads them for the node opened; where a line's position names a method and the usage names none, that method is its `element`; a usage not in code has no line; a usage SAP's answer leaves out is counted on a `# no_snippet_sent N usage(s)` line (`snippets_absent: true` at medium and full). The type and the name may not be blank. Call it once per using object whose code is wanted; it is taken with one object, not with `objects`, and is not recorded in batch mode. A refused or unreadable `usageSnippets` read is the call's failure (step `read where-used code lines`).",
+    "- `medium` is JSON, one object per row: an element usage carries the class's `type` and `name` with `element` beside them, every row `package_name`, `responsible`, `usage_information` (and with `in_object` its `code`), and `uri` only where terse shows it. `full` keeps SAP's fields as they came (`name`, `type`, `uri`, …) and adds `parent_uri`, `object_identifier`, for an element usage `parent_type`, `parent_name`, `parent_package` and `element`, and with `in_object` SAP's `snippets` (each line's `uri` with its position, `content` as SAP sent it, `matches`).",
+  ].join('\n'),
+};
+
+/** The answer note of `tool`'s entry, or nothing. */
+function answerNote(tool) {
+  const note = ANSWER_NOTES[tool.name];
+  return note === undefined ? '' : `${note}\n\n`;
+}
+
 /** The line a tool's entry carries when a prompt asks the model to call it. */
 function promptPointer(tool, byTool) {
   const names = byTool.get(tool.name);
@@ -752,6 +772,7 @@ function generateMarkdown(tools, surface, listedPrompts) {
         md += `**Description:** ${tool.description || 'No description'}\n\n`;
         md += `**Source:** \`${tool.filePath}\`\n\n`;
         md += promptPointer(tool, byTool);
+        md += answerNote(tool);
         md += optIn(tool);
         md += `**Parameters:**\n`;
         md += renderParams(tool);
@@ -817,6 +838,7 @@ function generateLevelMarkdown(
       md += `**Description:** ${tool.description || 'No description'}\n\n`;
       md += `**Source:** \`${tool.filePath}\`\n\n`;
       md += promptPointer(tool, byTool);
+      md += answerNote(tool);
       md += optIn(tool);
       md += `**Parameters:**\n`;
       md += renderParams(tool);
@@ -890,6 +912,7 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
         md += `**Description:** ${tool.description || 'No description'}\n\n`;
         md += `**Source:** \`${tool.filePath}\`\n\n`;
         md += `**Available in:** \`${tool.availableIn.join('`, `')}\`\n\n`;
+        md += answerNote(tool);
         md += optIn(tool);
         md += `**Parameters:**\n`;
         md += renderParams(tool);

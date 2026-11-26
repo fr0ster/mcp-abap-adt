@@ -465,6 +465,9 @@ const COMPACT: BatchEntryCase[] = [
   {
     tool: 'HandlerSystem',
     args: { action: 'where_used', object_name: 'CLAS_A', object_type: 'class' },
+    // An answer naming a usage by its identifier: without in_object no
+    // code-line read follows it, so the call stays one request.
+    body: '<?xml version="1.0" encoding="utf-8"?><usagereferences:usageReferenceResult numberOfResults="1" xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:referencedObjects><usagereferences:referencedObject uri="/sap/bc/adt/programs/programs/prog_a" usageInformation="gradeDirect"><usagereferences:adtObject adtcore:name="PROG_A" adtcore:type="PROG/P" xmlns:adtcore="http://www.sap.com/adt/core"/><usagereferences:objectIdentifier>ABAPFullName;PROG_A;PROG_A;\\TY:CLAS_A</usagereferences:objectIdentifier></usagereferences:referencedObject></usagereferences:referencedObjects></usagereferences:usageReferenceResult>',
   },
   {
     tool: 'HandlerSystem',

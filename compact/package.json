@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/compact",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-compact",
-  "version": "24.2.0",
+  "version": "24.2.1",
   "description": "The compact MCP server for SAP ABAP ADT over stdio, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: one tool per operation with the object type in the arguments: CRUD, where-used, ATC, unit tests, transports, the debugger, abapGit, batch mode, MCP prompts and access restrictions. Configured as @mcp-abap-adt/core; connects over HTTP, RFC or SNC (RFC and SNC need the SAP NW RFC library at run time).",
   "license": "AGPL-3.0-only",
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
@@ -72,12 +72,12 @@
     "docs:tools": "node ./tools/generate-docs.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^24.2.0",
-    "@mcp-abap-adt/compact-modify": "^24.2.0",
-    "@mcp-abap-adt/compact-readonly-entries": "^24.2.0",
-    "@mcp-abap-adt/lib": "^24.2.0",
-    "@mcp-abap-adt/responsible-rules": "^24.2.0",
-    "@mcp-abap-adt/server-runtime": "^24.2.0"
+    "@mcp-abap-adt/background-runs-memory": "^24.2.1",
+    "@mcp-abap-adt/compact-modify": "^24.2.1",
+    "@mcp-abap-adt/compact-readonly-entries": "^24.2.1",
+    "@mcp-abap-adt/lib": "^24.2.1",
+    "@mcp-abap-adt/responsible-rules": "^24.2.1",
+    "@mcp-abap-adt/server-runtime": "^24.2.1"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

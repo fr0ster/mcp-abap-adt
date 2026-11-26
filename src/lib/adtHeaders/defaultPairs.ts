@@ -793,6 +793,11 @@ export const DEFAULT_ADT_HEADERS = Object.freeze({
     'application/vnd.sap.adt.repository.virtualfolders.result.v1+xml',
     'application/vnd.sap.adt.repository.virtualfolders.request.v1+xml',
   ),
+  // A direct request (`usageSnippets.ts`): no adt-clients member sends it.
+  'utils.getUsageSnippets': pair(
+    'application/vnd.sap.adt.repository.usagesnippets.result.v1+xml',
+    'application/vnd.sap.adt.repository.usagesnippets.request.v1+xml',
+  ),
   'utils.getWhereUsed': pair(
     'application/vnd.sap.adt.repository.usagereferences.result.v1+xml',
     'application/vnd.sap.adt.repository.usagereferences.request.v1+xml',

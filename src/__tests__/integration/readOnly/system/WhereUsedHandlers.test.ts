@@ -17,10 +17,18 @@ import assert from 'node:assert/strict';
 import { after, before, it } from 'node:test';
 import * as z from 'zod';
 import { handleGetWhereUsed } from '../../../../handlers/system/readonly/handleGetWhereUsed';
+import type { McpResult } from '../../../../lib/answer';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { servedSuite } from '../../helpers/servedHere';
-import { headOf, terseOf, terseText } from '../../helpers/terseAnswer';
+import {
+  type FullWhereUsedReference,
+  headOf,
+  terseOf,
+  terseText,
+  whereUsedRows,
+  whereUsedTerseMismatches,
+} from '../../helpers/terseAnswer';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -34,38 +42,57 @@ const WhereUsedParams = z.looseObject({
 
 /**
  * The reference total of GetWhereUsed's terse answer (the default): its
- * `# total N` head; its rows read by the header's column names.
+ * `# total N` head; its rows read by the header's column names, and, with
+ * `full` (the same call at `detail: 'full'`), compared with it.
  */
-function terseTotal(result: any): number {
+function terseTotal(
+  result: Parameters<typeof terseText>[0],
+  full?: McpResult,
+): number {
   const answer = terseOf(terseText(result));
   const shown = answer.text.slice(0, 2000);
   const total = Number(headOf(answer, 'total'));
   assert.ok(Number.isFinite(total), shown);
   // The usages SAP answered, as rows under their package: each a type, a
-  // name and a usage, wherever the header puts them.
-  for (const column of ['type', 'name', 'usage']) {
+  // name, the element it is in and a usage, wherever the header puts them.
+  for (const column of ['type', 'name', 'element', 'usage']) {
     assert.ok(answer.columns.includes(column), shown);
   }
   if (total > 0) assert.ok(answer.rows.length > 0, shown);
-  // Each usage names its object (a nameless one by its uri); its type is
-  // SAP's, which a reference may carry none of (CONVERT_FILE_TO_STRING
-  // came without adtcore:type on premise).
-  for (const row of answer.rows.slice(0, 50)) {
-    assert.ok(row.name || row.uri, JSON.stringify(row));
+  // Every usage full resolves is a terse row by its real type and name — a
+  // usage inside a method or section by the object it is in, the element
+  // beside it; one full leaves unresolved is a row by its URI.
+  if (full !== undefined) {
+    assert.deepStrictEqual(
+      whereUsedTerseMismatches(answer, fullReferences(full)),
+      [],
+      shown,
+    );
   }
   return total;
 }
 
-function extractResultData(result: any): any {
-  const jsonContent = result.content.find((c: any) => c.type === 'json') as any;
-  if (jsonContent?.json) {
-    return jsonContent.json;
-  }
-  const textContent = result.content.find((c: any) => c.type === 'text') as any;
-  if (textContent?.text) {
-    return JSON.parse(textContent.text);
-  }
-  throw new Error('No response payload found');
+/** The references of GetWhereUsed's `full` answer: its text, parsed. */
+function fullReferences(full: McpResult): FullWhereUsedReference[] {
+  const parsed: { references?: FullWhereUsedReference[] } = JSON.parse(
+    terseText(full),
+  );
+  return parsed.references ?? [];
+}
+
+/** GetWhereUsed's `full` answer: the fields these cases read. */
+interface FullAnswer {
+  total_references: number;
+  enable_only_types?: string[];
+  references?: FullWhereUsedReference[];
+}
+
+/** A `full` answer's JSON, from its text. */
+function extractResultData(
+  result: Parameters<typeof terseText>[0],
+): FullAnswer {
+  const parsed: FullAnswer = JSON.parse(terseText(result));
+  return parsed;
 }
 
 /**
@@ -137,10 +164,89 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const total = terseTotal(result);
+      const full = await handleGetWhereUsed(
+        createHandlerContext({ connection, logger }),
+        {
+          object_name: testClass,
+          object_type: 'class',
+          enable_all_types: false,
+          detail: 'full',
+        },
+      );
+      const total = terseTotal(result, full);
       assert.ok(total >= 0);
 
       logger?.info(`✅ Found ${total} references with default scope`);
+    });
+  });
+
+  // The code lines of one using object: the first object the plain answer
+  // names on an `# in` line (a class with usages in its methods), read with
+  // in_object — its usages only, each with its method and source line.
+  it('in_object answers one using class its usages, each with its code line', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection } = context;
+      const params = readCaseParams(
+        context.params,
+        WhereUsedParams,
+        'whereused_readonly',
+      );
+      const testClass = params?.test_class || 'CL_ABAP_CHAR_UTILITIES';
+      const handlerContext = createHandlerContext({ connection, logger });
+      const plain = await handleGetWhereUsed(handlerContext, {
+        object_name: testClass,
+        object_type: 'class',
+      });
+      assert.equal(plain.isError, false, terseText(plain).slice(0, 2000));
+      const owner = whereUsedRows(terseOf(terseText(plain))).find(
+        (row) => row.element !== '' && row.type !== '' && row.name !== '',
+      );
+      assert.ok(owner, terseText(plain).slice(0, 2000));
+      const inObject = {
+        object_type: owner.type ?? '',
+        object_name: owner.name ?? '',
+      };
+      const result = await handleGetWhereUsed(handlerContext, {
+        object_name: testClass,
+        object_type: 'class',
+        in_object: inObject,
+      });
+      const text = terseText(result);
+      const shown = text.slice(0, 2000);
+      assert.equal(result.isError, false, shown);
+      const answer = terseOf(text);
+      assert.ok(answer.columns.includes('code'), shown);
+      const rows = whereUsedRows(answer);
+      assert.ok(rows.length > 0, shown);
+      // Every row is a usage inside that object, at its method or section.
+      for (const row of rows) {
+        assert.deepStrictEqual(
+          { type: row.type, name: row.name },
+          { type: inObject.object_type, name: inObject.object_name },
+          shown,
+        );
+      }
+      // The usages in its code come with the line they are on.
+      assert.ok(
+        rows.some((row) => (row.code ?? '') !== ''),
+        shown,
+      );
+      // Every row as the same call's full answer implies it: each usage
+      // with its element and each of its code lines.
+      const full = await handleGetWhereUsed(handlerContext, {
+        object_name: testClass,
+        object_type: 'class',
+        in_object: inObject,
+        detail: 'full',
+      });
+      assert.deepStrictEqual(
+        whereUsedTerseMismatches(answer, fullReferences(full)),
+        [],
+        shown,
+      );
+      logger?.info(
+        `✅ ${inObject.object_type} ${inObject.object_name}: ${rows.length} row(s) with code lines`,
+      );
     });
   });
 
@@ -178,7 +284,16 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const total = terseTotal(result);
+      const full = await handleGetWhereUsed(
+        createHandlerContext({ connection, logger }),
+        {
+          object_name: testClass,
+          object_type: 'class',
+          enable_all_types: true,
+          detail: 'full',
+        },
+      );
+      const total = terseTotal(result, full);
       assert.ok(total >= 0);
 
       logger?.info(`✅ Found ${total} references with all types enabled`);
@@ -219,7 +334,16 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const total = terseTotal(result);
+      const full = await handleGetWhereUsed(
+        createHandlerContext({ connection, logger }),
+        {
+          object_name: testTable,
+          object_type: 'table',
+          enable_all_types: false,
+          detail: 'full',
+        },
+      );
+      const total = terseTotal(result, full);
       assert.ok(total >= 0);
 
       logger?.info(`✅ Found ${total} references for table`);
@@ -251,11 +375,7 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const textContent = result.content.find(
-        (c: any) => c.type === 'text',
-      ) as any;
-      assert.ok(textContent !== undefined);
-      assert.ok(textContent?.text.includes('Object name is required'));
+      assert.ok(terseText(result).includes('Object name is required'));
 
       logger?.info('✅ Error handling validated: missing object name');
     });
@@ -286,11 +406,7 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const textContent = result.content.find(
-        (c: any) => c.type === 'text',
-      ) as any;
-      assert.ok(textContent !== undefined);
-      assert.ok(textContent?.text.includes('Object type is required'));
+      assert.ok(terseText(result).includes('Object type is required'));
 
       logger?.info('✅ Error handling validated: missing object type');
     });
@@ -376,7 +492,12 @@ describe('WhereUsed Handler Integration', () => {
       );
       const testClass = params?.test_class || 'CL_ABAP_CHAR_UTILITIES';
 
-      const invoke = async (extra: Record<string, unknown>) =>
+      const invoke = async (
+        extra: Pick<
+          Parameters<typeof handleGetWhereUsed>[1],
+          'enable_all_types' | 'enable_only_types'
+        >,
+      ) =>
         tester.invokeToolOrHandler(
           'GetWhereUsed',
           // The references' types and the filter echoed: the full answer.
@@ -396,7 +517,7 @@ describe('WhereUsed Handler Integration', () => {
               object_type: 'class',
               detail: 'full',
               ...extra,
-            } as any);
+            });
           },
         );
 
@@ -405,9 +526,7 @@ describe('WhereUsed Handler Integration', () => {
       const allResult = await invoke({ enable_all_types: true });
       const allData = extractResultData(allResult);
       const allTypes: string[] = Array.from(
-        new Set<string>(
-          (allData.references || []).map((r: any) => String(r.type)),
-        ),
+        new Set<string>((allData.references ?? []).map((r) => String(r.type))),
       );
       logger?.info(
         `📊 ALL: ${allData.total_references} refs across [${allTypes.join(', ')}]`,
@@ -441,9 +560,7 @@ describe('WhereUsed Handler Integration', () => {
       // with an error — never silently fall back to the full default set.
       logger?.info('🔍 Type filtering: ONLY [BOGUS/XX] (must error)');
       const badResult = await invoke({ enable_only_types: ['BOGUS/XX'] });
-      const badText =
-        (badResult.content.find((c: any) => c.type === 'text') as any)?.text ||
-        '';
+      const badText = terseText(badResult);
       logger?.info(`📊 INVALID [BOGUS/XX]: isError=${badResult.isError}`);
       assert.equal(badResult.isError, true);
       assert.ok(badText.includes('BOGUS/XX'));

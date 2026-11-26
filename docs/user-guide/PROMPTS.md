@@ -24,7 +24,9 @@ The lists per binary and kind below are these completions.
 
 ## Refusal
 
-A `prompts/get` with an `object_type` the binary does not serve (unknown, not served on the system kind, or denied) is refused with the protocol's invalid-params error and no instruction: `<prompt>: object_type "<value>" is not served by this server; it serves <list>.` A required argument that is absent or blank is refused the same way: `<prompt>: <argument> is required.` So is a `function_group` given for an `object_type` whose steps read none: `<prompt>: function_group is read with object_type function_module only.`.
+`object_type` (every object prompt, `unit_test`, `where_used`) and the `transport` `action` are optional, so a client that checks required arguments itself (Claude Code's slash command, whose hint shows argument names only) still sends the call. A `prompts/get` without one, or with a value the binary does not serve (unknown, not served on the system kind, or denied), is answered with no error and no call: one line naming the argument and listing the values it takes — the same list as its completion and its description — and telling the model to ask the user, e.g. `No action was given. The transport prompt takes: create, create_task, list, get, objects, log, add_object, remove_object, move_objects, sort_compress. Ask the user which one they want, then call it again.` or `The object_type "<value>" is not served by this server. The <prompt> prompt takes: <list>. Ask the user which one they want, then call it again.`
+
+Every other refusal is the protocol's invalid-params error, with no instruction. A required argument that is absent or blank: `<prompt>: <argument> is required.` A `transport` `object_type` the transport object types do not hold: `transport: object_type "<value>" is not served by this server; it serves <list>.` A `function_group` given for an `object_type` whose steps read none: `<prompt>: function_group is read with object_type function_module only.`.
 
 A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCESS_RESTRICTIONS.md)) loses those `object_type` values; a prompt with none left is not listed.
 

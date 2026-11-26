@@ -493,7 +493,11 @@ describe('the YAML template and validation come from the table', () => {
         'system-type',
       ].sort(),
     );
-    assert.deepStrictEqual(parsed.batch, { keepRawParts: false });
+    // No bound is the server's own: the template states none.
+    assert.deepStrictEqual(parsed.batch, {
+      keepRawParts: false,
+      readsPerEnvelope: null,
+    });
     assert.deepStrictEqual(
       Object.keys(parsed.sse as object).sort(),
       [

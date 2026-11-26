@@ -38,7 +38,6 @@ import { handleGetServiceDefinition } from '../../../handlers/service_definition
 import { handleGetStructure } from '../../../handlers/structure/high/handleGetStructure';
 import { handleGetTable } from '../../../handlers/table/high/handleGetTable';
 import { createBatchAvailability } from '../../../lib/batch/availability';
-import { READS_PER_ENVELOPE } from '../../../lib/batch/phases';
 import {
   METADATA_READ_TYPES,
   type MetadataTarget,
@@ -479,11 +478,17 @@ describe('the metadata phase is bounded (GetObjectInfo include_descriptions)', (
       type: 'CLAS/OC',
       name: `ZCL_${i}`,
     }));
-  const contextOn = (fake: ReturnType<typeof envelopeConnection>) =>
+  /** The consumer's bound the tests below set. */
+  const BOUND = 300;
+  const contextOn = (
+    fake: ReturnType<typeof envelopeConnection>,
+    readsPerEnvelope?: number,
+  ) =>
     ({
       connection: fake.connection,
       logger: undefined,
       batchAvailability: createBatchAvailability(),
+      ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
     }) as unknown as HandlerContext;
 
   /** Each class's own metadata document: its description names it. */
@@ -492,7 +497,7 @@ describe('the metadata phase is bounded (GetObjectInfo include_descriptions)', (
     return `<?xml version="1.0" encoding="utf-8"?><adtcore:mainObject xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${name}" adtcore:description="Own ${name}"/>`;
   };
 
-  it(`more than ${READS_PER_ENVELOPE} objects: balanced envelopes, each object its own description`, async () => {
+  it('no bound given: 302 objects in one envelope', async () => {
     const fake = envelopeConnection((parts) =>
       envelopeResponse(
         parts.map((p) => ({
@@ -503,9 +508,30 @@ describe('the metadata phase is bounded (GetObjectInfo include_descriptions)', (
         })),
       ),
     );
-    const targets = classes(READS_PER_ENVELOPE + 2);
+    await withinTurns(
+      metadataDescriptions(contextOn(fake), classes(BOUND + 2)),
+      2000,
+    );
+    assert.deepStrictEqual(
+      fake.envelopes.map((e) => e.parts.length),
+      [302],
+    );
+  });
+
+  it(`the consumer's bound of ${BOUND}: balanced envelopes, each object its own description`, async () => {
+    const fake = envelopeConnection((parts) =>
+      envelopeResponse(
+        parts.map((p) => ({
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'application/xml' },
+          body: ownDocument(p.url),
+        })),
+      ),
+    );
+    const targets = classes(BOUND + 2);
     const { descriptions } = await withinTurns(
-      metadataDescriptions(contextOn(fake), targets),
+      metadataDescriptions(contextOn(fake, BOUND), targets),
       2000,
     );
     assert.deepStrictEqual(
@@ -538,9 +564,9 @@ describe('the metadata phase is bounded (GetObjectInfo include_descriptions)', (
         ),
       ),
     );
-    const targets = classes(READS_PER_ENVELOPE + 2);
+    const targets = classes(BOUND + 2);
     const { descriptions } = await withinTurns(
-      metadataDescriptions(contextOn(fake), targets),
+      metadataDescriptions(contextOn(fake, BOUND), targets),
       2000,
     );
     assert.equal(fake.envelopes.length, 2);

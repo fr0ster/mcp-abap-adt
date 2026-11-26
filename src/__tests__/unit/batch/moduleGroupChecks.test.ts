@@ -3,8 +3,9 @@
  * envelopes (#2, `checkModuleReferences`): a group activation and a
  * `GetWhereUsed` of several `GROUP|FM` targets check each module's group
  * against its metadata. The metadata reads of two or more modules are
- * independent: they go in one envelope (consecutive envelopes of at most
- * `READS_PER_ENVELOPE` reads), and the answer is the sequential version's —
+ * independent: they go in one envelope (with the consumer's
+ * `readsPerEnvelope`, consecutive balanced envelopes of at most that many
+ * reads), and the answer is the sequential version's —
  * the first failure in the references' order, a `404` part (a module that
  * does not exist) beside `200` parts included. One module is its one read,
  * sent as itself.
@@ -22,7 +23,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createBatchAvailability } from '../../../lib/batch/availability';
-import { READS_PER_ENVELOPE } from '../../../lib/batch/phases';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   checkModuleReferences,
@@ -120,16 +120,27 @@ function system(
 
 type Fake = ReturnType<typeof system>;
 
-/** A context on the fake: batch served (default) or known to be absent. */
-function contextOn(fake: Fake, batch: 'served' | 'absent' = 'served') {
+/**
+ * A context on the fake: batch served (default) or known to be absent; the
+ * consumer's `readsPerEnvelope` when given.
+ */
+function contextOn(
+  fake: Fake,
+  batch: 'served' | 'absent' = 'served',
+  readsPerEnvelope?: number,
+) {
   const port = createBatchAvailability();
   if (batch === 'absent') port.noteOuterStatus(404);
   return {
     connection: fake.connection,
     logger: undefined,
     batchAvailability: port,
+    ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
   } as unknown as HandlerContext;
 }
+
+/** The consumer's bound the tests below set. */
+const BOUND = 300;
 
 const moduleRef = (name: string, group = 'ZFG'): ModuleReference => ({
   type: 'FUGR/FF',
@@ -291,8 +302,8 @@ describe('function module group checks of several references (checkModuleReferen
     assert.equal(fake.envelopes.length, 1);
   });
 
-  it(`more than ${READS_PER_ENVELOPE} modules: consecutive balanced envelopes of at most ${READS_PER_ENVELOPE} reads`, async () => {
-    const many = Array.from({ length: READS_PER_ENVELOPE + 1 }, (_, i) =>
+  it('no bound given: 302 modules in one envelope', async () => {
+    const many = Array.from({ length: BOUND + 2 }, (_, i) =>
       moduleRef(`ZFM_${i}`),
     );
     const fake = system();
@@ -303,8 +314,24 @@ describe('function module group checks of several references (checkModuleReferen
     assert.equal(checked, undefined);
     assert.deepStrictEqual(
       fake.envelopes.map((e) => e.parts.length),
+      [302],
+    );
+  });
+
+  it(`the consumer's bound of ${BOUND}: 302 modules in balanced envelopes of 151 and 151`, async () => {
+    const many = Array.from({ length: BOUND + 2 }, (_, i) =>
+      moduleRef(`ZFM_${i}`),
+    );
+    const fake = system();
+    const checked = await withinTurns(
+      checkModuleReferences(contextOn(fake, 'served', BOUND), many),
+      2000,
+    );
+    assert.equal(checked, undefined);
+    assert.deepStrictEqual(
+      fake.envelopes.map((e) => e.parts.length),
       // Balanced: never a one-read envelope beside a full one.
-      [151, 150],
+      [151, 151],
     );
     assert.deepStrictEqual(
       phasesOf(fake).flat(),
@@ -313,12 +340,12 @@ describe('function module group checks of several references (checkModuleReferen
   });
 
   it('a failure in an envelope: the later envelopes are not sent', async () => {
-    const many = Array.from({ length: READS_PER_ENVELOPE + 2 }, (_, i) =>
+    const many = Array.from({ length: BOUND + 2 }, (_, i) =>
       moduleRef(`ZFM_${i}`),
     );
     const fake = system({ ZFM_3: 'ZOTHER' });
     const checked = await withinTurns(
-      checkModuleReferences(contextOn(fake), many),
+      checkModuleReferences(contextOn(fake, 'served', BOUND), many),
       2000,
     );
     assert.equal(Object(verdictOf(checked)).code, 'FUNCTION_GROUP_MISMATCH');

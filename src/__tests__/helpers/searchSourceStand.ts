@@ -325,13 +325,18 @@ export function standOn(
 export type Fake = ReturnType<typeof standOn>;
 
 /** A context on the fake: batch served (default) or known to be absent. */
-export function contextOn(fake: Fake, batch: 'served' | 'absent' = 'served') {
+export function contextOn(
+  fake: Fake,
+  batch: 'served' | 'absent' = 'served',
+  readsPerEnvelope?: number,
+) {
   const port = createBatchAvailability();
   if (batch === 'absent') port.noteOuterStatus(404);
   return {
     connection: fake.connection,
     logger: undefined,
     batchAvailability: port,
+    ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
   } as unknown as HandlerContext;
 }
 
@@ -369,12 +374,16 @@ export const searchOn = (
   args: Record<string, unknown>,
   absent = false,
   turns = 400,
+  readsPerEnvelope?: number,
 ) =>
   withinTurns(
-    handleSearchSource(contextOn(fake, absent ? 'absent' : 'served'), {
-      detail: 'full',
-      ...args,
-    } as never),
+    handleSearchSource(
+      contextOn(fake, absent ? 'absent' : 'served', readsPerEnvelope),
+      {
+        detail: 'full',
+        ...args,
+      } as never,
+    ),
     turns,
   );
 

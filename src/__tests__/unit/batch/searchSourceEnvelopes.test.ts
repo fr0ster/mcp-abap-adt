@@ -1,9 +1,11 @@
 /**
- * `SearchSource`'s source reads in envelopes of at most 300 reads (#89):
- * every target, in chunks of 300, each chunk read through all its rounds
- * (main sources and function group structures, then the function groups'
- * includes and function modules), each round's unique reads in envelopes of
- * at most 300; the call ends on its result, every target read in one run.
+ * `SearchSource`'s source reads in ADT batch envelopes (#89). With no bound
+ * given, every target is one chunk and each round's reads one envelope. With
+ * the consumer's `readsPerEnvelope` (300 below): every target, in chunks of
+ * 300, each chunk read through all its rounds (main sources and function
+ * group structures, then the function groups' includes and function
+ * modules), each round's unique reads in envelopes of at most 300; the call
+ * ends on its result, every target read in one run.
  *
  * On the batch stand-in (`helpers/searchSourceStand.ts`): real handler, real
  * clients, real `AdtBatchConnection`; only the connection is a fake.
@@ -11,7 +13,6 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { READS_PER_ENVELOPE } from '../../../lib/search-source/orchestrator';
 import {
   type Fake,
   hitNames,
@@ -77,6 +78,36 @@ function bigGroup(): Repository {
   };
 }
 
+/** `ZGS`: `count` function groups, ZG0 …, each with `includes` includes. */
+function groups(count: number, includes: number): Repository {
+  const names = Array.from({ length: count }, (_, i) => `ZG${i}`);
+  const includesOf = (group: string) =>
+    Array.from({ length: includes }, (_, i) => `L${group}${pad(i)}`);
+  return {
+    nodes: {
+      [nodeKey('ZGS')]: { types: [{ type: 'FUGR/F', nodeId: '000030' }] },
+      [nodeKey('ZGS', '30')]: {
+        objects: names.map((name) => ({ type: 'FUGR/F', name })),
+      },
+    },
+    sources: Object.fromEntries(
+      names.flatMap((group) =>
+        includesOf(group).map((name) => [
+          `FINCLUDE ${group}/${name}`,
+          `* ${name}\nDATA marker.`,
+        ]),
+      ),
+    ),
+    fugrChildren: Object.fromEntries(
+      names.map((group) => [
+        group,
+        includesOf(group).map((name): [string, string] => ['FUGR/I', name]),
+      ]),
+    ),
+    masks: {},
+  };
+}
+
 /**
  * `ZA`: 300 programs (the first chunk); `ZB`: a function group and two
  * programs (the second chunk, targets 300 … 302).
@@ -115,12 +146,21 @@ function twoChunks(): Repository {
 const on = (repo: Repository, options: SystemOptions = {}, model: Model = {}) =>
   standOn(repo, model, options);
 
+/** The consumer's bound the tests below set, unless they say none. */
+const BOUND = 300;
+
+/** The search with the consumer's bound of `BOUND`. */
 const search = (
   fake: Fake,
   packages: string[],
   args: Record<string, unknown> = {},
   absent = false,
-) => searchOn(fake, { query: 'marker', packages, ...args }, absent, TURNS);
+) =>
+  searchOn(fake, { query: 'marker', packages, ...args }, absent, TURNS, BOUND);
+
+/** The search with no bound given. */
+const unbounded = (fake: Fake, packages: string[]) =>
+  searchOn(fake, { query: 'marker', packages }, false, TURNS);
 
 /** The envelopes after the walk's `walkEnvelopes`: their sizes. */
 const sourceSizes = (fake: Fake, walkEnvelopes: number) =>
@@ -134,9 +174,18 @@ const answeredNames = (result: unknown) => [
   ),
 ];
 
-describe('SearchSource: source reads in envelopes of at most 300', () => {
-  it('the envelope bound is 300', () => {
-    assert.equal(READS_PER_ENVELOPE, 300);
+describe('SearchSource: source reads in envelopes', () => {
+  it('no bound given: 302 one-read targets go in one envelope', async () => {
+    const fake = on(programs(302));
+    const result = await unbounded(fake, ['ZBIG']);
+    assert.deepStrictEqual(sourceSizes(fake, 0), [302]);
+    assert.equal(payloadOf(result).results.length, 302);
+  });
+
+  it('no bound given: 650 one-read targets go in one envelope', async () => {
+    const fake = on(programs(650));
+    await unbounded(fake, ['ZBIG']);
+    assert.deepStrictEqual(sourceSizes(fake, 0), [650]);
   });
 
   it('650 one-read targets go as 300 + 300 + 50 reads, in target order', async () => {
@@ -157,6 +206,26 @@ describe('SearchSource: source reads in envelopes of at most 300', () => {
     assert.equal(p.results.length, 650);
     assert.equal(p.scanned.objects, 650);
     assert.deepStrictEqual(p.truncated, { by_object_cap: false });
+  });
+
+  it("the consumer's bound reaches a round's envelopes: 3 groups' 6 includes at 3 go as 3 + 3", async () => {
+    const fake = on(groups(3, 2));
+    const result = await searchOn(
+      fake,
+      { query: 'marker', packages: ['ZGS'] },
+      false,
+      TURNS,
+      3,
+    );
+    // The structures (3 reads), then the includes (6 reads) in two.
+    assert.deepStrictEqual(sourceSizes(fake, 0), [3, 3, 3]);
+    assert.equal(payloadOf(result).results.length, 6);
+  });
+
+  it("no bound given: 3 groups' 6 includes go in one envelope", async () => {
+    const fake = on(groups(3, 2));
+    await unbounded(fake, ['ZGS']);
+    assert.deepStrictEqual(sourceSizes(fake, 0), [3, 6]);
   });
 
   it('a single target — one function group, 400 includes — is read as single requests, no envelope; nothing dropped', async () => {

@@ -27,12 +27,7 @@ import { tableCodeOf } from '../adtTypeCode';
 import { isCredentialFailure } from '../answer';
 import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
-import {
-  chunksOf,
-  type PhaseResult,
-  READS_PER_ENVELOPE,
-  runPhase,
-} from '../batch/phases';
+import { envelopesOf, type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import { readsInFlight } from '../connectionKind';
 import { parseXml, type XmlNode } from '../xml/node';
@@ -133,7 +128,8 @@ export type LevelReader<I, R> = ((
 /**
  * One level's reads in ADT batch envelopes (spec §11): `read(item,
  * connection)` for every item, on the phase's batch connection (`runPhase`),
- * in consecutive envelopes of at most `READS_PER_ENVELOPE` (`chunksOf`);
+ * in consecutive envelopes of at most the consumer's bound, else one
+ * (`envelopesOf`);
  * each item's settlement, in item order. A failure that ends the call is
  * thrown at its envelope, and no later envelope is sent.
  */
@@ -143,7 +139,7 @@ export function batchReader<I, R>(
 ): LevelReader<I, R> {
   return async (items) => {
     const results: PhaseResult<R>[] = [];
-    for (const chunk of chunksOf(items, READS_PER_ENVELOPE)) {
+    for (const chunk of envelopesOf(context, items)) {
       results.push(...(await runPhase(context, chunk, read)));
     }
     return results;
@@ -1063,7 +1059,8 @@ export interface MetadataDescriptions {
  * distinct object, the one its type's `Get<Type>` handler sends
  * (`metadataReadOf`), keyed by `metadataKeyOf`. Metadata reads do not
  * cross-talk inside an envelope, so two or more go in ADT batch envelopes
- * (`runPhase`) of at most `READS_PER_ENVELOPE`, balanced (`chunksOf`); one
+ * (`runPhase`) of at most the consumer's bound, balanced, else one
+ * (`envelopesOf`); one
  * read, or `alone` (the sequential version), goes as single requests, one
  * after another. A read SAP refused — any status, a `401` included — is
  * that object's: it has no entry, the others theirs, on both paths alike.
@@ -1116,7 +1113,7 @@ export async function metadataDescriptions(
     }
     return { descriptions };
   }
-  for (const keyed of chunksOf([...reads], READS_PER_ENVELOPE)) {
+  for (const keyed of envelopesOf(context, [...reads])) {
     const results = await runPhase(context, keyed, ([, read], connection) =>
       atStep(METADATA_STEP, read)(createAdtClient(connection, context.logger)),
     );

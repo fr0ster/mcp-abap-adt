@@ -1,9 +1,8 @@
 import type { AdtCodes } from '../adtProjections';
 import { appendAll } from '../appendAll';
 import {
-  chunksOf,
+  envelopesOf,
   type PhaseResult,
-  READS_PER_ENVELOPE,
   runPhaseOrAlone,
   withSequentialFallback,
 } from '../batch/phases';
@@ -549,15 +548,6 @@ export async function runSearchSource(
   return result;
 }
 
-/** The most reads one envelope of the source-read phase carries (`phases.ts`). */
-export { READS_PER_ENVELOPE };
-
-/**
- * The targets read together through their rounds: a chunk's first round (one
- * read per target) fills one envelope.
- */
-const TARGETS_PER_CHUNK = READS_PER_ENVELOPE;
-
 /** The strategies a `SearchSource` call runs with: the line match and the SAP-answer one. */
 export interface SearchSourceStrategies {
   lineMatch: LineMatchStrategy;
@@ -569,10 +559,12 @@ export interface SearchSourceStrategies {
  * ADT batch envelopes — (1) the quickSearch of every package mask, one
  * envelope per round of the masks not resolved yet; (2) the package walk's levels (`walkPackages`: per level the root
  * node structures, then their type nodes), one envelope each; (3) the source
- * reads of every target, in chunks of 300 targets, each chunk's rounds
+ * reads of every target — with the consumer's bound (`readsPerEnvelope`) in
+ * chunks of that many targets, so a chunk's first round (one read per
+ * target) fills one envelope; without it in one chunk —, each chunk's rounds
  * (the objects' own sources and function group structures, then the function
- * groups' includes and function modules) in envelopes of at most
- * `READS_PER_ENVELOPE`, each source once. The answer is assembled by
+ * groups' includes and function modules) in envelopes of at most the bound,
+ * else one (`envelopesOf`), each source once. The answer is assembled by
  * `runSearchSource` over the phases' answers, so the hits, the counters and
  * the limits are the sequential version's.
  */
@@ -658,10 +650,11 @@ async function runSearchSourceInPhases(
   // ones, so the reads sent here are the reads it answers from.
   const targets = enumerated.targets;
 
-  // (3) The source reads of the targets, in chunks of TARGETS_PER_CHUNK: a
-  // chunk is read through all its rounds, each round's reads not answered
-  // yet — every source once, whichever objects name it — in envelopes of at
-  // most READS_PER_ENVELOPE.
+  // (3) The source reads of the targets, in chunks of the consumer's bound
+  // (without one, a single chunk): a chunk is read through all its rounds,
+  // each round's reads not answered yet — every source once, whichever
+  // objects name it — in the envelopes `envelopesOf` allows.
+  const targetsPerChunk = ctx.readsPerEnvelope ?? targets.length;
   const sources = noAnsweredReads();
   // The scan over the answers read so far: `runSearchSource` over the
   // phases' answers, the sequential version's own.
@@ -676,8 +669,8 @@ async function runSearchSourceInPhases(
       },
       { ...asked, concurrency: 1 },
     );
-  for (let at = 0; at < targets.length; at += TARGETS_PER_CHUNK) {
-    const chunk = targets.slice(at, at + TARGETS_PER_CHUNK);
+  for (let at = 0; at < targets.length; at += targetsPerChunk) {
+    const chunk = targets.slice(at, at + targetsPerChunk);
     for (;;) {
       const asked: Read[] = [];
       const naming = answeredReaderDeps(sources, asked);
@@ -698,7 +691,7 @@ async function runSearchSourceInPhases(
       if (unique.length === 0) break;
       // A chunk of one target reads as single requests; so does a round of
       // one read.
-      for (const reads of chunksOf(unique, READS_PER_ENVELOPE)) {
+      for (const reads of envelopesOf(ctx, unique)) {
         await readSourcesInPhase(
           ctx,
           reads,

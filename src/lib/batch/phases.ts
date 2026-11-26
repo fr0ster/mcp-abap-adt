@@ -60,25 +60,40 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import { adtCallScope, type HeaderInvocation } from '../adtHeaders/scope';
 import { correctedPair } from '../adtHeaders/withAdtHeaders';
 import { failureOf, readOwn } from '../auth/failures';
+import {
+  MIN_READS_PER_ENVELOPE,
+  readsPerEnvelopeRefusal,
+} from '../config/authParameters';
 import { withSystemKindOf } from '../connectionFactory';
 import { NO_BATCH_ENDPOINT_STATUS } from './availability';
 
 /**
- * The most reads one envelope carries where a call's independent reads may
- * outnumber it: past it, they go in consecutive envelopes of at most this
- * many (`SearchSource`'s source reads, the function module group checks,
- * `GetEnhancements`' phases). SAP's own limit is not measured.
+ * `value` when it is a bound the envelopes can keep — a whole number from
+ * `MIN_READS_PER_ENVELOPE` —, else a throw naming `name`. For a bound an
+ * embedder states in its options (`readsPerEnvelope`); the configured one
+ * is read by `BATCH_READS_PER_ENVELOPE_ROW`.
  */
-export const READS_PER_ENVELOPE = 300;
+export function readsPerEnvelopeOf(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < MIN_READS_PER_ENVELOPE) {
+    throw new Error(readsPerEnvelopeRefusal(name));
+  }
+  return value;
+}
 
 /**
- * The consecutive slices of `items`, in order: as few as hold at most
- * `size` each, balanced — their lengths differ by one at most, so past the
- * bound no slice is a single read beside a full one (301 reads at 300 are
- * 151 and 150, never 300 and 1).
+ * The consecutive slices of `items`, in order. `size` absent: no bound,
+ * every item in one slice (none for no item) — whatever SAP answers to it
+ * is SAP's. `size` given (the consumer's bound): as few slices as hold at
+ * most `size` each, balanced — their lengths differ by one at most, so past
+ * the bound no slice is a single read beside a full one (301 reads at 300
+ * are 151 and 150, never 300 and 1).
  */
-export function chunksOf<I>(items: readonly I[], size: number): I[][] {
-  const count = Math.ceil(items.length / size);
+export function chunksOf<I>(
+  items: readonly I[],
+  size: number | undefined,
+): I[][] {
+  if (items.length === 0) return [];
+  const count = size === undefined ? 1 : Math.ceil(items.length / size);
   const chunks: I[][] = [];
   let at = 0;
   for (let i = 0; i < count; i++) {
@@ -89,6 +104,18 @@ export function chunksOf<I>(items: readonly I[], size: number): I[][] {
     at += length;
   }
   return chunks;
+}
+
+/**
+ * A phase's independent reads in the envelopes the call's context allows:
+ * `chunksOf` by `context.readsPerEnvelope`, the consumer's bound — absent,
+ * all of them in one envelope.
+ */
+export function envelopesOf<I>(
+  context: HandlerContext,
+  items: readonly I[],
+): I[][] {
+  return chunksOf(items, context.readsPerEnvelope);
 }
 
 /** One item's settlement in a phase. */

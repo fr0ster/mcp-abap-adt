@@ -32,9 +32,8 @@ import {
 } from '../../../lib/answer';
 import { failureOf } from '../../../lib/auth/failures';
 import {
-  chunksOf,
+  envelopesOf,
   type PhaseResult,
-  READS_PER_ENVELOPE,
   runPhaseOutcome,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
@@ -1419,7 +1418,7 @@ function enhancementAnswers(context: HandlerContext) {
     },
     /**
      * The reads not answered yet. Reads of two or more objects go in ADT
-     * batch envelopes of at most `READS_PER_ENVELOPE`, each judged as it
+     * batch envelopes (`envelopesOf`: the consumer's bound, else one), each judged as it
      * answered, so a credential failure sends no later one; an envelope
      * whose own request answered `404` (the endpoint once served) is every
      * read's failure, never each read's "not found". Reads of one object
@@ -1451,7 +1450,7 @@ function enhancementAnswers(context: HandlerContext) {
         }
         return;
       }
-      for (const chunk of chunksOf(pending, READS_PER_ENVELOPE)) {
+      for (const chunk of envelopesOf(context, pending)) {
         const { results, envelope } = await runPhaseOutcome(
           context,
           chunk,

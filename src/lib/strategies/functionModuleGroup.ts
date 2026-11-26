@@ -46,12 +46,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../adtClientContract';
 import type { AdtCodes } from '../adtProjections';
-import {
-  chunksOf,
-  READS_PER_ENVELOPE,
-  runPhase,
-  withSequentialFallback,
-} from '../batch/phases';
+import { envelopesOf, runPhase, withSequentialFallback } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import type { ReadVersion } from '../handlers/readVersion';
@@ -248,7 +243,7 @@ async function checkOneByOne(
 /**
  * The group checks of `modules` in ADT batch envelopes: every metadata read
  * is independent of the others, so they go together, in consecutive
- * envelopes of at most `READS_PER_ENVELOPE`. Each envelope's answers are
+ * envelopes (`envelopesOf`: the consumer's bound, else one). Each envelope's answers are
  * judged in the references' order, as the sequential version judges them:
  * the first failure is the answer (a module that does not exist is its
  * `404` part, beside the others' `200`s), and no later envelope is sent; a
@@ -258,7 +253,7 @@ async function checkInEnvelopes(
   context: HandlerContext,
   modules: readonly ModuleInGroup[],
 ): Promise<IAdtFailure<StepError> | undefined> {
-  for (const chunk of chunksOf(modules, READS_PER_ENVELOPE)) {
+  for (const chunk of envelopesOf(context, modules)) {
     const results = await runPhase(context, chunk, (reference, connection) =>
       checkFunctionModuleGroupOn(
         createAdtClient(connection, context.logger),

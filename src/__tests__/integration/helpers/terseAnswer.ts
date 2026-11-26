@@ -72,6 +72,52 @@ export function rowsWithoutTypeOrName(
   return answer.rows.filter((row) => !row.type || !row.name);
 }
 
+/**
+ * GetWhereUsed's terse rows, each naming its object: a row under an
+ * `# in TYPE NAME` line (a usage in a method or section of that object)
+ * read with that type and name; the line holds until the next `# in`,
+ * `# package` or `# object` line. Every other row as it is.
+ */
+export function whereUsedRows(
+  answer: TerseAnswer,
+): ReadonlyArray<Readonly<Record<string, string>>> {
+  const rows: Array<Readonly<Record<string, string>>> = [];
+  let owner: { type: string; name: string } | undefined;
+  let columns: string[] | undefined;
+  for (const line of answer.text.split('\n')) {
+    if (line === '') continue;
+    if (line.startsWith('# in ')) {
+      const value = line.slice('# in '.length);
+      const space = value.indexOf(' ');
+      owner =
+        space < 0
+          ? { type: value, name: '' }
+          : { type: value.slice(0, space), name: value.slice(space + 1) };
+      continue;
+    }
+    if (line.startsWith('# ')) {
+      if (line.startsWith('# package') || line.startsWith('# object')) {
+        owner = undefined;
+      }
+      continue;
+    }
+    const cells = line.split('\t');
+    if (columns === undefined) {
+      columns = cells;
+      continue;
+    }
+    if (line === columns.join('\t')) continue;
+    const row: Record<string, string> = {};
+    for (const [at, column] of columns.entries()) row[column] = cells[at] ?? '';
+    rows.push(
+      owner === undefined
+        ? row
+        : { ...row, type: owner.type, name: owner.name },
+    );
+  }
+  return rows;
+}
+
 /** One reference of GetWhereUsed's `full` answer: the fields compared. */
 export interface FullWhereUsedReference {
   readonly name?: string | undefined;
@@ -91,18 +137,20 @@ export interface FullWhereUsedReference {
  * terse row: one `full` resolves — a type and a name of its own, or its
  * parent's — by that type, name and element; one it leaves unresolved by
  * its URI, as SAP gave it. A terse row without a type or a name must be one
- * of those unresolved references, by its URI.
+ * of those unresolved references, by its URI. A row under an `# in` line
+ * names its object by that line ({@link whereUsedRows}).
  */
 export function whereUsedTerseMismatches(
   answer: TerseAnswer,
   references: readonly FullWhereUsedReference[],
 ): string[] {
+  const rows = whereUsedRows(answer);
   const named = new Set(
-    answer.rows
+    rows
       .filter((row) => row.type && row.name)
       .map((row) => `${row.type}\t${row.name}\t${row.element ?? ''}`),
   );
-  const byUri = new Set(answer.rows.map((row) => row.uri ?? ''));
+  const byUri = new Set(rows.map((row) => row.uri ?? ''));
   const unresolved = new Set<string>();
   const wrong: string[] = [];
   for (const reference of references) {
@@ -122,7 +170,7 @@ export function whereUsedTerseMismatches(
       );
     }
   }
-  for (const row of rowsWithoutTypeOrName(answer)) {
+  for (const row of rows.filter((row) => !row.type || !row.name)) {
     if (!unresolved.has(row.uri ?? '') || (row.uri ?? '') === '') {
       wrong.push(
         `a terse row without a type or a name: ${JSON.stringify(row)}`,

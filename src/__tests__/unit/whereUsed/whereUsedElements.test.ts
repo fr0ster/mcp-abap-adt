@@ -33,6 +33,7 @@ import {
 } from '../../../lib/batch/availability';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { recordingConnection } from '../../helpers/recordingConnection';
+import { terseOf, whereUsedRows } from '../../integration/helpers/terseAnswer';
 
 const CLASS_URI = '/sap/bc/adt/oo/classes/zmcp_shr_dump_cls';
 const MAIN_URI = `${CLASS_URI}/source/main#type=CLAS%2FOM;name=IF_OO_ADT_CLASSRUN%7eMAIN`;
@@ -130,19 +131,12 @@ async function whereUsed(
   return result.content[0]?.text ?? '';
 }
 
-/** The terse rows after the header, each by the header's column names. */
-function terseRows(text: string): Array<Record<string, string>> {
-  const lines = text
-    .split('\n')
-    .filter((line) => line !== '' && !line.startsWith('#'));
-  const [header, ...rows] = lines;
-  const columns = (header ?? '').split('\t');
-  return rows.map((row) => {
-    const cells = row.split('\t');
-    return Object.fromEntries(
-      columns.map((column, at) => [column, cells[at] ?? '']),
-    );
-  });
+/**
+ * The terse rows, each by the header's column names, a row under an
+ * `# in TYPE NAME` line read with that type and name (`whereUsedRows`).
+ */
+function terseRows(text: string): Array<Readonly<Record<string, string>>> {
+  return [...whereUsedRows(terseOf(text))];
 }
 
 interface MediumReference {
@@ -172,13 +166,13 @@ describe('GetWhereUsed: a usage inside an element of another object', () => {
         element,
       })),
       [
+        { type: 'PROG/P', name: 'ZMCP_SHR_PROG', element: '' },
         {
           type: 'CLAS/OC',
           name: 'ZMCP_SHR_DUMP_CLS',
           element: 'IF_OO_ADT_CLASSRUN~MAIN',
         },
         { type: 'CLAS/OC', name: 'ZMCP_SHR_DUMP_CLS', element: 'CONSTRUCTOR' },
-        { type: 'PROG/P', name: 'ZMCP_SHR_PROG', element: '' },
       ],
       text,
     );
@@ -194,7 +188,24 @@ describe('GetWhereUsed: a usage inside an element of another object', () => {
     );
   });
 
-  it('terse: no row has an empty type or name', async () => {
+  // The class written once, its elements under it: the answer of 107k
+  // usages stays one stdio message (largeListing.test.ts).
+  it('terse: the plain usages first, then the class once on its # in line, each element under it', async () => {
+    assert.equal(
+      await whereUsed('terse'),
+      [
+        '# total 5',
+        'type\tname\telement\turi\tusage',
+        '# package ZMCP_SHR_PKG',
+        'PROG/P\tZMCP_SHR_PROG\t\t\tgradeDirect,includeTest',
+        '# in CLAS/OC ZMCP_SHR_DUMP_CLS',
+        '\t\tIF_OO_ADT_CLASSRUN~MAIN\t\tgradeElement,includeProductive',
+        '\t\tCONSTRUCTOR\t\tgradeElement,includeProductive',
+      ].join('\n'),
+    );
+  });
+
+  it('terse: every row names its object, on the row or on its # in line', async () => {
     const text = await whereUsed('terse');
     for (const row of terseRows(text)) {
       assert.notEqual(row.type, '', text);
@@ -269,7 +280,15 @@ describe('GetWhereUsed: a usage inside an element of another object', () => {
     const atTerse = terseRows(await whereUsed('terse')).map(
       ({ type, name, element }) => ({ type, name, element }),
     );
-    assert.deepStrictEqual(atTerse, atFull);
+    const key = (row: {
+      type?: string | undefined;
+      name?: string | undefined;
+      element?: string | undefined;
+    }) => `${row.type ?? ''}\t${row.name ?? ''}\t${row.element ?? ''}`;
+    assert.deepStrictEqual(
+      atTerse.map(key).sort(),
+      atFull.map((row) => key(row)).sort(),
+    );
     for (const row of atTerse) {
       assert.ok(row.type !== '' && row.name !== '', JSON.stringify(row));
     }
@@ -411,13 +430,13 @@ describe('GetWhereUsed: a usage inside an element of another object', () => {
         element,
       })),
       [
+        { type: 'PROG/P', name: 'ZMCP_SHR_PROG', element: '' },
         {
           type: 'CLAS/OC',
           name: 'ZMCP_SHR_DUMP_CLS',
           element: 'IF_OO_ADT_CLASSRUN~MAIN',
         },
         { type: 'CLAS/OC', name: 'ZMCP_SHR_DUMP_CLS', element: 'CONSTRUCTOR' },
-        { type: 'PROG/P', name: 'ZMCP_SHR_PROG', element: '' },
       ],
       text,
     );

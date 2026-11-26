@@ -14,6 +14,7 @@ import {
   headOf,
   rowsWithoutTypeOrName,
   terseOf,
+  whereUsedRows,
   whereUsedTerseMismatches,
 } from '../integration/helpers/terseAnswer';
 
@@ -98,7 +99,7 @@ describe('the live terse reader', () => {
 
   it('where-used: terse matches full — the resolved by type, name and element, the unresolved by its URI', () => {
     const terse = terseOf(
-      `${HEADER}\nCLAS/OC\tZCL\tMAIN\t\t\n\tRUN\t\t/absent#run\tg\nPROG/P\tZPROG\t\t\tg`,
+      `${HEADER}\n# package ZPKG\n\tRUN\t\t/absent#run\tg\nPROG/P\tZPROG\t\t\tg\n# in CLAS/OC ZCL\n\t\tMAIN\t\t`,
     );
     assert.deepEqual(whereUsedTerseMismatches(terse, FULL), []);
   });
@@ -112,8 +113,20 @@ describe('the live terse reader', () => {
 
   it('where-used: a row without a type and no URI full leaves unresolved is a mismatch', () => {
     const terse = terseOf(
-      `${HEADER}\nCLAS/OC\tZCL\tMAIN\t\t\n\tRUN\t\t/absent#run\tg\nPROG/P\tZPROG\t\t\tg\n\tZX\t\t\tg`,
+      `${HEADER}\n\tRUN\t\t/absent#run\tg\nPROG/P\tZPROG\t\t\tg\n\tZX\t\t\tg\n# in CLAS/OC ZCL\n\t\tMAIN\t\t`,
     );
     assert.equal(whereUsedTerseMismatches(terse, FULL).length, 1);
+  });
+
+  it('where-used: a row under an # in line is read with its type and name, until the next package', () => {
+    const terse = terseOf(
+      `${HEADER}\n# package ZA\n# in CLAS/OC ZCL\n\t\tMAIN\t\t\n# package ZB\n\tRUN\t\t/r\tg`,
+    );
+    assert.deepEqual(
+      whereUsedRows(terse).map(
+        (row) => `${row.type}|${row.name}|${row.element}`,
+      ),
+      ['CLAS/OC|ZCL|MAIN', '|RUN|'],
+    );
   });
 });

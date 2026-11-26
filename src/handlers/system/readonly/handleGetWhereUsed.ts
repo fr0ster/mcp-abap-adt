@@ -201,6 +201,15 @@ function untoldUri(reference: WhereUsedReference) {
     : '';
 }
 
+/**
+ * The object a usage in a method or section belongs to, as its `# in`
+ * line names it — `TYPE NAME` —; `''` for any other reference.
+ */
+function ownerOf(reference: WhereUsedReference): string {
+  const shown = usingObject(reference);
+  return shown.element === undefined ? '' : `${shown.type} ${shown.name}`;
+}
+
 /** The lists a WhereUsedListResult listing writes: what its description states. */
 export const WHERE_USED_LISTS: RowSchemas<WhereUsedListResult> = {
   references: about(
@@ -209,18 +218,20 @@ export const WHERE_USED_LISTS: RowSchemas<WhereUsedListResult> = {
       columns: [
         {
           name: 'type',
-          means: 'its type',
-          cell: (reference: WhereUsedReference) => usingObject(reference).type,
+          means: 'its type (a usage in a method or section: on its # in line)',
+          cell: (reference: WhereUsedReference) =>
+            ownerOf(reference) === '' ? reference.type : '',
         },
         {
           name: 'name',
-          means: 'its name',
-          cell: (reference: WhereUsedReference) => usingObject(reference).name,
+          means: 'its name (a usage in a method or section: on its # in line)',
+          cell: (reference: WhereUsedReference) =>
+            ownerOf(reference) === '' ? reference.name : '',
         },
         {
           name: 'element',
           means:
-            'the method or section of it the use is in, where SAP tells it',
+            'the method or section the use is in, under the # in line of the object it belongs to',
           cell: (reference: WhereUsedReference) =>
             usingObject(reference).element ?? '',
         },
@@ -246,6 +257,15 @@ export const WHERE_USED_LISTS: RowSchemas<WhereUsedListResult> = {
           of: (reference: WhereUsedReference) =>
             usingObject(reference).package_name ?? '',
           mode: 'gathered',
+        },
+        // A usage in a method or section under one line naming the object
+        // it belongs to by its type and name, written once; every other
+        // usage a plain row, before those lines.
+        {
+          label: 'in',
+          of: ownerOf,
+          mode: 'gathered',
+          unless: '',
         },
       ],
       // The terse shape (approved): usages only — the package and

@@ -350,7 +350,8 @@ describe('the MCP tool surface', () => {
         // 19.1.0 (#300): reading each leaf's metadata for its description is
         // the caller's choice, `include_descriptions` (default false), as in
         // GetPackageContents and GetPackageTree.
-        'system/GetObjectInfo': ['include_descriptions'],
+        // The terse answers' follow-up: `detail` (default terse) beside it.
+        'system/GetObjectInfo': ['detail', 'include_descriptions'],
         // 24.0.0 (DO23): SearchSource's answer level and its hit limit,
         // both optional — without them the answer is as before.
         'search/SearchSource': ['answer', 'detail', 'max_hits'],

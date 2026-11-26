@@ -404,6 +404,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `central_only` (boolean, optional) - true lists central results only; absent lists every kind.
 - `created_by` (string, required) - Whose results: a user name, or * for every user.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 
@@ -3462,4 +3463,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 On `mcp-abap-adt-http` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 
-*Last updated: 2026-11-25*
+*Last updated: 2026-11-26*

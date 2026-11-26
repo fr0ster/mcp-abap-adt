@@ -8,13 +8,18 @@ import {
   purpose,
   toolDescription,
 } from '../../../lib/description';
+import { listAnswerAt } from '../../../lib/detail';
 import { DETAIL_LEVELS } from '../../../lib/detail/levels';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
-import { DETAIL_WORDS, detailOf } from '../../../lib/strategies/detail';
+import {
+  DETAIL_WORDS,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import type { SqlQueryResponse } from '../../system/readonly/handleGetSqlQuery';
+import { DATA_ANSWERS } from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
   name: 'GetTableContents',
@@ -83,29 +88,19 @@ export async function handleGetTableContents(
           ),
       ),
     (reading) => {
-      if (detail === 'raw') return reading.raw;
-      const preview = reading.value;
       logger?.debug(
-        `Parsed table data: rows=${preview.rows.length}/${preview.total_rows ?? 0}, columns=${preview.columns.length}`,
+        `Parsed table data: rows=${reading.value.rows.length}/${reading.value.total_rows ?? 0}, columns=${reading.value.columns.length}`,
       );
-      const answered: SqlQueryResponse = {
-        sql_query: sqlQuery,
-        row_number: maxRows,
-        execution_time: preview.execution_time,
-        total_rows: preview.total_rows,
-        columns: preview.columns,
-        rows: preview.rows,
-      };
-      // **`full` is the whole parse, and `terse` the fields you act on.**
-      // These two were identical for a moment, which took away everything the
-      // generic parse used to carry here — and naming two of the missing
-      // fields, as the next attempt did, still left `keyAttribute`,
-      // `colType`, `isKeyFigure` and whatever SAP adds next outside an answer
-      // that called itself full. So `full` is the document's own parse,
-      // beside the rows this reading exists to get right.
-      return detail === 'full'
-        ? { ...answered, document: preview.document }
-        : answered;
+      // The same document `GetSqlQuery` reads, answered the same way at
+      // every level (`DATA_ANSWERS`).
+      return listAnswerAt(
+        DATA_ANSWERS,
+        levelOf(args),
+      )({
+        sqlQuery,
+        rowNumber: maxRows,
+        reading,
+      });
     },
   );
 }

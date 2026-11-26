@@ -295,7 +295,8 @@ row SAP answered is answered. `detail` has four levels:
 - `full`: the whole parse, the answer as it was before `detail` where a tool did not take it.
 - `raw`: what ADT sent. The shape is the tool's, not the call's, and each tool's `detail`
   description names it. A tool that reads one document answers that document as is. A tool that
-  assembles reads — package contents and tree, the other repository walks, `SearchSource`,
+  assembles reads — package contents and tree, the other repository walks (`GetObjectInfo`,
+  `GetNodeStructureLow` included), `SearchSource`,
   `DescribeByList`, the include, structure and function group lists, `GetEnhancements`,
   `GetWhereUsed`, `GetUnitTest`, `GetCdsUnitTest`, `GetUnitTestResult`, `GetCdsUnitTestResult`, the
   unit-test runs, `RuntimeListFeeds`, `CreateTransport`, `CreateTransportTask`, `CreateTableType`,
@@ -334,6 +335,9 @@ level.
 **Migration (24.2.0):** a caller that parsed a tool's default JSON asks for `detail: 'full'`,
 which gives the former shape where the tool had no `detail` before; where it had one, the former
 terse JSON is `detail: 'medium'`. See the [CHANGELOG](CHANGELOG.md).
+The same holds for the tools that moved after it (`GetObjectInfo`, `GetNodeStructureLow`,
+`ListATCResults`; `GetSqlQuery`, `GetTableContents` and `HandlerGetData`, whose former terse JSON
+is `detail: 'medium'`).
 
 ### Batch mode
 

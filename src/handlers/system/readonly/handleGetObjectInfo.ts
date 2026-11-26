@@ -31,6 +31,20 @@ import {
   toolDescription,
 } from '../../../lib/description';
 import {
+  about,
+  type Column,
+  cellsOf,
+  type Head,
+  type ListAnswerTable,
+  listAnswerAt,
+  partsOf,
+  type RowSchemas,
+  rows,
+  wireAnswer,
+  writeListing,
+  writeWhole,
+} from '../../../lib/detail';
+import {
   onEveryVariant,
   type RuleVariant,
   stated,
@@ -38,6 +52,11 @@ import {
 } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import {
   type MetadataTarget,
   metadataKeyOf,
@@ -105,6 +124,7 @@ const FIELDS = {
     .describe(
       "[read-only] Include each leaf's description, read from the leaf's metadata once the structure is read: one more read per leaf (in ADT batch envelopes where the system serves them), which on a large tree takes most of the call (default false)",
     ),
+  ...ASSEMBLED_DETAIL_SHAPE,
 };
 
 type ObjectInfoFields = z.output<z.ZodObject<typeof FIELDS>>;
@@ -254,20 +274,70 @@ function enrichmentOf(
   if (!searchResult.isError && Array.isArray(searchResult.content)) {
     for (const entry of searchResult.content) {
       if (!('text' in entry) || typeof entry.text !== 'string') continue;
-      const [, ...rows] = entry.text.split('\n'); // drop the header row
-      for (const line of rows) {
-        const [name, hitType, hitDescription, hitPackage] = line.split('\t');
-        if (name && name.toUpperCase() === objectName.toUpperCase()) {
-          return {
-            packageName: hitPackage || undefined,
-            description: hitDescription || undefined,
-            type: hitType || objectType,
-          };
-        }
+      const hit = searchHitsOf(entry.text).find(
+        (row) => row.name.toUpperCase() === objectName.toUpperCase(),
+      );
+      if (hit !== undefined) {
+        return {
+          packageName: hit.packageName,
+          description: hit.description,
+          type: hit.type ?? objectType,
+        };
       }
     }
   }
   return none;
+}
+
+/** One object a search found, read from its row by the header's column names. */
+interface SearchHit {
+  readonly name: string;
+  readonly type: string | undefined;
+  readonly description: string | undefined;
+  readonly packageName: string | undefined;
+}
+
+/**
+ * The objects a `SearchObject` terse answer lists: its first line is the
+ * header, each later line a row; every line is read back into its cells
+ * (`cellsOf`, the inverse of the writer's escapes), and each cell is taken
+ * by its column's name, never by its position. A cell left empty reads as
+ * absent. An answer whose header names no `name` column lists nothing to
+ * match; a missing `type`, `description` or `package` column leaves that
+ * field absent.
+ */
+export function searchHitsOf(text: string): SearchHit[] {
+  const [header, ...lines] = text.split('\n');
+  if (header === undefined || header === '') return [];
+  const columns = cellsOf(header);
+  const at = (column: string): number | undefined => {
+    const index = columns.indexOf(column);
+    return index < 0 ? undefined : index;
+  };
+  const nameAt = at('name');
+  if (nameAt === undefined) return [];
+  const typeAt = at('type');
+  const descriptionAt = at('description');
+  const packageAt = at('package');
+  const cellAt = (cells: readonly string[], index: number | undefined) => {
+    if (index === undefined) return undefined;
+    const value = cells[index];
+    return value === undefined || value === '' ? undefined : value;
+  };
+  return lines.flatMap((line): SearchHit[] => {
+    if (line === '') return [];
+    const cells = cellsOf(line);
+    const name = cellAt(cells, nameAt);
+    if (name === undefined) return [];
+    return [
+      {
+        name,
+        type: cellAt(cells, typeAt),
+        description: cellAt(cells, descriptionAt),
+        packageName: cellAt(cells, packageAt),
+      },
+    ];
+  });
 }
 
 /** A node of a tree: an object read with its own type folders. */
@@ -797,7 +867,153 @@ async function buildTreesSequential(
   return { trees };
 }
 
+/** A tree row's columns: the type and the name, its description and package where read. */
+const INFO_COLUMNS: readonly Column<TreeNode>[] = [
+  { name: 'type', means: 'its type', cell: (node) => node.OBJECT_TYPE },
+  { name: 'name', means: 'its name', cell: (node) => node.OBJECT_NAME },
+  {
+    name: 'description',
+    means: 'its description, where read',
+    cell: (node) => node.OBJECT_DESCRIPTION ?? '',
+  },
+  {
+    name: 'package',
+    means: 'its package, where read',
+    cell: (node) => node.OBJECT_PACKAGE ?? '',
+  },
+];
+
+/** The rows below a node, every node at its depth (terse). */
+function infoTreeSchemas(): RowSchemas<TreeNode> {
+  const schemas: RowSchemas<TreeNode> = {
+    CHILDREN: about(
+      'for each object below it, at its depth',
+      rows('CHILDREN', {
+        columns: INFO_COLUMNS,
+        header: 'none',
+        get lists() {
+          return schemas;
+        },
+      }),
+    ),
+  };
+  return schemas;
+}
+
+/** The lists below a tree's own row. */
+export const OBJECT_INFO_LISTS = infoTreeSchemas();
+
+/** One object asked by a list call, as its terse part reads it: what was asked, its tree or its failure. */
+interface AskedInfo {
+  readonly asked: string;
+  readonly tree: TreeNode | undefined;
+  readonly failed: FailedTree | undefined;
+}
+
+/** What a call answers from: whether a list was asked, the objects asked, and each one's entry. */
+interface InfoRead {
+  readonly listed: boolean;
+  readonly asked: ReadonlyArray<{
+    readonly type: string;
+    readonly name: string;
+  }>;
+  readonly entries: readonly InfoEntry[];
+}
+
+/** Whether an entry is a root whose tree could not be read. */
+function isFailedTree(entry: InfoEntry): entry is FailedTree {
+  return 'error' in entry;
+}
+
+/** The answer before `detail`: the one tree, or the list of entries. */
+function wholeAnswer({ listed, entries }: InfoRead): InfoEntry | InfoEntry[] {
+  const [first] = entries;
+  return listed || first === undefined ? [...entries] : first;
+}
+
+/**
+ * What GetObjectInfo answers at each `detail`, selected before the reads
+ * (`src/lib/detail`): terse the tree written by the listing writer — the
+ * object's own row, then every node at its depth (type, name, description,
+ * package); a list call each object under its `# asked` line, a failed one
+ * with its `# error`. Medium and full the tree as JSON, as before. Raw never
+ * reaches this table: the handler answers it as the documents read
+ * (`wireAnswer`).
+ */
+const INFO_ANSWERS: ListAnswerTable<InfoRead, string | object> = {
+  terse: (read) => {
+    const [first] = read.entries;
+    if (!read.listed && first !== undefined && !isFailedTree(first)) {
+      return writeListing({
+        heads: [],
+        reading: first,
+        root: { columns: INFO_COLUMNS },
+        lists: OBJECT_INFO_LISTS,
+      });
+    }
+    return writeListing({
+      heads: [],
+      reading: {
+        asked: read.entries.map(
+          (entry, i): AskedInfo => ({
+            asked: `${read.asked[i]?.type ?? entry.OBJECT_TYPE} ${read.asked[i]?.name ?? entry.OBJECT_NAME}`,
+            tree: isFailedTree(entry) ? undefined : entry,
+            failed: isFailedTree(entry) ? entry : undefined,
+          }),
+        ),
+      },
+      lists: {
+        asked: partsOf(
+          'asked',
+          ({ asked, failed }: AskedInfo): Head[] => [
+            { head: 'asked', value: asked },
+            ...(failed === undefined
+              ? []
+              : [{ head: 'error', value: JSON.stringify(failed.error) }]),
+          ],
+          'tree',
+          {
+            variants: {
+              only: {
+                lists: OBJECT_INFO_LISTS,
+                root: { columns: INFO_COLUMNS },
+              },
+            },
+            frame: () => ({ variant: 'only' }),
+          },
+        ),
+      },
+    });
+  },
+  // The answer whole, as full gives it: complete by construction.
+  medium: (read) => writeWhole(wholeAnswer(read)),
+  full: wholeAnswer,
+  raw: wholeAnswer,
+};
+
+/**
+ * GetObjectInfo at the level asked: at `raw` what ADT sent — the documents
+ * the call's reads answered, the searches and metadata reads included, read
+ * with the tool at full (`wireAnswer`, `src/lib/detail/wire.ts`).
+ */
 export async function handleGetObjectInfo(
+  context: HandlerContext,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetObjectInfo',
+        shape: 'assembled',
+      },
+      () => objectInfo(context, { ...args, detail: 'full' }),
+    );
+  }
+  return objectInfo(context, args);
+}
+
+async function objectInfo(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
@@ -840,11 +1056,7 @@ export async function handleGetObjectInfo(
   const describe = args.include_descriptions === true;
   const asked = objects.map((o) => ({ ...o, maxDepth: depthOf(o.type) }));
 
-  // Task 28: why this tool carries no `detail`. The node-level family's
-  // shape (`ourUtils.node`, adt-strategies' `utilNodeContents`): the
-  // reading keeps no wire text beside the level — there is no `.raw` for
-  // `detail: 'raw'` to answer. This tool's own answer besides is a composite tree assembled
-  // from several such calls (`buildTrees`), not one reading.
+  const shown = listAnswerAt(INFO_ANSWERS, levelOf(args));
   let ended: Ended = {};
   const entryOf = (
     o: { type: string; name: string },
@@ -858,7 +1070,7 @@ export async function handleGetObjectInfo(
         : failureEntry(failed.getError(), 'read node structure'),
   });
   const answered = await answer(
-    { tool: 'GetObjectInfo', detail: 'terse' },
+    { tool: 'GetObjectInfo', detail: detailOf(args) },
     () =>
       withSequentialFallback<IAdtResponse<InfoEntry[], IAdtError>>(
         context,
@@ -924,7 +1136,8 @@ export async function handleGetObjectInfo(
           );
         },
       ),
-    (trees: InfoEntry[]) => (listed === undefined ? trees[0] : trees),
+    (trees: InfoEntry[]) =>
+      shown({ listed: listed !== undefined, asked, entries: trees }),
   );
   // A credential failure the enrichment search answered ends the call as it came.
   return ended.answer ?? answered;

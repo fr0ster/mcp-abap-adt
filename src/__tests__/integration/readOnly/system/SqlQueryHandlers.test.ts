@@ -17,6 +17,7 @@ import * as z from 'zod';
 import { handleGetSqlQuery } from '../../../../handlers/system/readonly/handleGetSqlQuery';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { servedSuite } from '../../helpers/servedHere';
+import { headOf, terseOf, terseText } from '../../helpers/terseAnswer';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -27,14 +28,6 @@ const SqlQueryParams = z.looseObject({
   test_row_number: z.number().optional(),
   test_sql_query: z.string().optional(),
 });
-
-function extractResultData(result: any): any {
-  const textContent = result.content.find((c: any) => c.type === 'text') as any;
-  if (textContent?.text) {
-    return JSON.parse(textContent.text);
-  }
-  throw new Error('No response payload found');
-}
 
 /**
  * This file's `describe`: the suite runs where the configured system serves
@@ -98,13 +91,12 @@ describe('GetSqlQuery Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const data = extractResultData(result);
-      assert.equal(data.sql_query, sqlQuery);
-      assert.ok(data.columns !== undefined);
-      assert.equal(Array.isArray(data.columns), true);
-      assert.ok(data.columns.length > 0);
-      assert.ok(data.rows !== undefined);
-      assert.equal(Array.isArray(data.rows), true);
+      // The terse answer: the total, the column names, a row per record.
+      const data = terseOf(terseText(result));
+      assert.ok(data.columns.length > 0, data.text);
+      assert.ok(data.rows.length <= rowNumber, data.text);
+      const total = headOf(data, 'total_rows');
+      if (total !== undefined) assert.ok(Number(total) >= data.rows.length);
 
       logger?.info(
         `Query returned ${data.rows.length} rows, ${data.columns.length} columns`,

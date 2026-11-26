@@ -512,6 +512,7 @@ describe('HandlerSystem', () => {
     'package_tree',
     'transports',
     'atc_findings',
+    'atc_results',
     'atc_result',
   ];
 

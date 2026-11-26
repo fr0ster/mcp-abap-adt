@@ -178,7 +178,7 @@ describe('detail over a data preview', () => {
   mock.method(clients, 'createAdtClient', () => fakeClient);
 
   const context = { connection: {} as any, logger: undefined };
-  const answerOf = async (detail?: 'terse' | 'full' | 'raw') => {
+  const answerOf = async (detail?: 'terse' | 'medium' | 'full' | 'raw') => {
     fakeClient = {
       getUtils: () => ({
         getSqlQuery: async () =>
@@ -200,10 +200,10 @@ describe('detail over a data preview', () => {
     }
   };
 
-  it('answers the acting fields on terse', async () => {
-    const terse = await answerOf();
-    assert.equal(terse.rows.length, 5);
-    assert.equal(terse.document, undefined);
+  it('answers the rows with their columns on medium, the document left out', async () => {
+    const medium = await answerOf('medium');
+    assert.equal(medium.rows.length, 5);
+    assert.equal(medium.document, undefined);
   });
 
   it('answers the whole parse on full', async () => {
@@ -241,15 +241,16 @@ describe('detail over a data preview', () => {
       {
         table_name: 'I_Country',
         max_rows: 5,
+        detail: 'medium',
       } as never,
     );
-    const terse = JSON.parse(String(result.content[0].text));
-    assertMatchObject(terse, {
+    const medium = JSON.parse(String(result.content[0].text));
+    assertMatchObject(medium, {
       sql_query: 'SELECT * FROM I_Country',
       row_number: 5,
       total_rows: 249,
     });
-    assert.equal(terse.rows.length, 5);
-    assert.equal(terse.columns.length, 13);
+    assert.equal(medium.rows.length, 5);
+    assert.equal(medium.columns.length, 13);
   });
 });

@@ -8,11 +8,29 @@ import {
   purpose,
   toolDescription,
 } from '../../../lib/description';
+import {
+  about,
+  type Column,
+  type Head,
+  headShape,
+  type ListAnswerTable,
+  listAnswerAt,
+  type RowSchemas,
+  rows,
+  writeListing,
+  writeWhole,
+} from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import type { SqlPreview } from '../../../lib/strategies/sqlPreview';
 import type { XmlRead } from '../../../lib/xml/tree';
 
 /**
@@ -90,29 +108,105 @@ export async function handleGetSqlQuery(
           ),
       ),
     (reading) => {
-      if (detail === 'raw') return reading.raw;
-      const preview = reading.value;
       logger?.debug(
-        `Parsed SQL query data: rows=${preview.rows.length}/${preview.total_rows ?? 0}, columns=${preview.columns.length}`,
+        `Parsed SQL query data: rows=${reading.value.rows.length}/${reading.value.total_rows ?? 0}, columns=${reading.value.columns.length}`,
       );
-      const answered: SqlQueryResponse = {
-        sql_query: sqlQuery,
-        row_number: rowNumber,
-        execution_time: preview.execution_time,
-        total_rows: preview.total_rows,
-        columns: preview.columns,
-        rows: preview.rows,
-      };
-      // **`full` is the whole parse, and `terse` the fields you act on.**
-      // These two were identical for a moment, which took away everything the
-      // generic parse used to carry here — and naming two of the missing
-      // fields, as the next attempt did, still left `keyAttribute`,
-      // `colType`, `isKeyFigure` and whatever SAP adds next outside an answer
-      // that called itself full. So `full` is the document's own parse,
-      // beside the rows this reading exists to get right.
-      return detail === 'full'
-        ? { ...answered, document: preview.document }
-        : answered;
+      return listAnswerAt(
+        DATA_ANSWERS,
+        levelOf(args),
+      )({
+        sqlQuery,
+        rowNumber,
+        reading,
+      });
     },
   );
 }
+
+/** What a data read answers from: the statement sent, the rows asked, and the reading. */
+export interface DataRead {
+  readonly sqlQuery: string;
+  readonly rowNumber: number;
+  readonly reading: AdtReading<SqlPreview>;
+}
+
+/** One record of the selection: its value per column name, a blank cell `null`. */
+type DataRecord = Readonly<Record<string, string | null>>;
+
+/** What the data listing writes: a row per record. */
+interface DataListing {
+  readonly records: readonly DataRecord[];
+}
+
+/** A column of the selection as a terse column: its name, the record's value (a blank cell empty). */
+function dataColumnOf(name: string): Column<DataRecord> {
+  return { name, cell: (record) => record[name] ?? '' };
+}
+
+/** The lists the data listing writes: a row per record, under the column names. */
+function dataLists(columns: readonly string[]): RowSchemas<DataListing> {
+  return {
+    records: about(
+      'for each record, its value in each column',
+      rows('records', {
+        columns: columns.map(dataColumnOf),
+        header: 'always',
+      }),
+    ),
+  };
+}
+
+/** The head the data listing opens with. */
+export const DATA_HEADS = [
+  headShape(
+    'total_rows',
+    'how many records the selection holds, when SAP reports it',
+  ),
+];
+
+/** The answer of a data read before `detail` shaped it: the rows, and each column's type and description. */
+function dataAnswerOf({ sqlQuery, rowNumber, reading }: DataRead) {
+  const preview = reading.value;
+  return {
+    sql_query: sqlQuery,
+    row_number: rowNumber,
+    execution_time: preview.execution_time,
+    total_rows: preview.total_rows,
+    columns: preview.columns,
+    rows: preview.rows,
+  } satisfies SqlQueryResponse;
+}
+
+/**
+ * What a data read answers at each `detail` (`src/lib/detail`), shared by
+ * `GetSqlQuery` and `GetTableContents`, which read the same document: terse
+ * a row per record under the column names, after how many records the
+ * selection holds when SAP reports it (`# total_rows`, absent when it does
+ * not — the record count never stands in), written by the listing writer; medium the rows with each
+ * column's type and description; full that with the whole document parsed
+ * beside it (`keyAttribute`, `colType`, `isKeyFigure` and whatever SAP adds
+ * next); raw the document as SAP sent it.
+ */
+export const DATA_ANSWERS: ListAnswerTable<
+  DataRead,
+  string | SqlQueryResponse
+> = {
+  terse: ({ reading }) => {
+    const preview = reading.value;
+    const heads: Head[] =
+      preview.total_rows === undefined
+        ? []
+        : [{ head: 'total_rows', value: String(preview.total_rows) }];
+    return writeListing({
+      heads,
+      reading: { records: preview.rows },
+      lists: dataLists(preview.columns.map((column) => column.name)),
+    });
+  },
+  medium: (read) => writeWhole(dataAnswerOf(read)),
+  full: (read) => ({
+    ...dataAnswerOf(read),
+    document: read.reading.value.document,
+  }),
+  raw: ({ reading }) => reading.raw,
+};

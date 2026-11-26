@@ -21,17 +21,10 @@ import {
 import { schemaWords } from '../../../helpers/schemaWords';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { servedSuite } from '../../helpers/servedHere';
+import { terseOf, terseText } from '../../helpers/terseAnswer';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
-
-function extractResultData(result: any): any {
-  const textContent = result.content.find((c: any) => c.type === 'text') as any;
-  if (textContent?.text) {
-    return JSON.parse(textContent.text);
-  }
-  throw new Error('No response payload found');
-}
 
 /**
  * This file's `describe`: the suite runs where the configured system serves
@@ -95,14 +88,11 @@ describe('GetTableContents Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const data = extractResultData(result);
-      assert.ok(data.columns !== undefined);
-      assert.equal(Array.isArray(data.columns), true);
-      assert.ok(data.columns.length > 0);
-      assert.ok(data.rows !== undefined);
-      assert.equal(Array.isArray(data.rows), true);
-      assert.ok(data.rows.length > 0);
-      assert.ok(data.rows.length <= maxRows);
+      // The terse answer: the total, the column names, a row per record.
+      const data = terseOf(terseText(result));
+      assert.ok(data.columns.length > 0, data.text);
+      assert.ok(data.rows.length > 0, data.text);
+      assert.ok(data.rows.length <= Number(maxRows), data.text);
 
       logger?.info(
         `Table ${tableName}: ${data.rows.length} rows, ${data.columns.length} columns`,

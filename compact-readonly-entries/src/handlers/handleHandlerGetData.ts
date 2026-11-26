@@ -30,22 +30,26 @@ const tableContents = defineTool(
 type HandlerGetDataArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
- * `sql_query` when stated, else the table `object_name` names. The schema
- * holds the rule: one of them is stated.
+ * `sql_query` when stated, else the table `object_name` names, at the
+ * `detail` asked. The schema holds the rule: one of them is stated.
  */
 export async function handleHandlerGetData(
   context: HandlerContext,
   args: HandlerGetDataArgs,
 ) {
   const maxRows = args.max_rows ?? 100;
+  // The level asked, forwarded: each read answers it as its own tool does.
+  const detail = args.detail === undefined ? {} : { detail: args.detail };
   if (stated(args.sql_query)) {
     return sqlQuery(context, {
       sql_query: args.sql_query,
       row_number: maxRows,
+      ...detail,
     });
   }
   return tableContents(context, {
     table_name: args.object_name,
     max_rows: maxRows,
+    ...detail,
   });
 }

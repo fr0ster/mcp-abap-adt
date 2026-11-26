@@ -320,10 +320,12 @@ export const IN_OBJECT_FIELD = z
   .object({
     object_type: z
       .string()
+      .trim()
+      .min(1)
       .describe(
         'Its type as the where-used answer names it, e.g. CLAS/OC, PROG/P, FUGR/F',
       ),
-    object_name: z.string().describe('Its name'),
+    object_name: z.string().trim().min(1).describe('Its name'),
   })
   .optional()
   .describe(
@@ -571,6 +573,7 @@ function whereUsedListing(result: WhereUsedRows): Listing<WhereUsedRows> {
 function inObjectListing(
   result: WhereUsedRows,
   usages: number,
+  absent: number,
   inObject: { object_type: string; object_name: string },
 ): Listing<WhereUsedRows> {
   return {
@@ -580,6 +583,16 @@ function inObjectListing(
         head: 'in_object',
         value: `${inObject.object_type} ${inObject.object_name}: ${usages} usage(s)`,
       },
+      // An identifier SAP's usageSnippets answer left out: said, never
+      // read as a usage with no line.
+      ...(absent === 0
+        ? []
+        : [
+            {
+              head: 'no_snippet_sent',
+              value: `${absent} usage(s): SAP sent no code line for them`,
+            },
+          ]),
     ],
     reading: result,
     lists: WHERE_USED_CODE_LISTS,
@@ -604,6 +617,9 @@ const WHERE_USED_ANSWERS: ListAnswerTable<WhereUsedRead, string | object> = {
         : inObjectListing(
             whereUsedRows(result),
             result.references.length,
+            result.references.filter(
+              (reference) => reference.snippets_absent === true,
+            ).length,
             args.in_object,
           ),
     ),
@@ -704,6 +720,15 @@ async function whereUsedOf(
     }
   }
 
+  const blank = typedArgs.in_object;
+  if (
+    blank !== undefined &&
+    (blank.object_type.trim() === '' || blank.object_name.trim() === '')
+  ) {
+    return return_error(
+      'in_object needs a type and a name, neither blank; nothing was sent',
+    );
+  }
   const shown = listAnswerAt(WHERE_USED_ANSWERS, levelOf(args));
   return answer(
     { tool: 'GetWhereUsed', detail: detailOf(args) },

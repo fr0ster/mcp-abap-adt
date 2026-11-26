@@ -2458,10 +2458,12 @@ function systemProperties(
       .object({
         object_type: z
           .string()
+          .trim()
+          .min(1)
           .describe(
             'Its type as the where-used answer names it, e.g. CLAS/OC, PROG/P, FUGR/F',
           ),
-        object_name: z.string().describe('Its name'),
+        object_name: z.string().trim().min(1).describe('Its name'),
       })
       .optional()
       .describe(

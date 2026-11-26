@@ -150,6 +150,14 @@ export type WhereUsedReference = {
    * identifier, no usage) and for one SAP gave none (a usage not in code).
    */
   snippets?: WhereUsedSnippet[] | undefined;
+  /**
+   * `true` when the `usageSnippets` answer held no `codeSnippetObject` for
+   * the identifier asked: SAP sent no snippet for it — told apart from an
+   * object SAP answered with no line (a usage not in code), which has none
+   * of this. The handler's own contract for an identifier it leaves out is
+   * not read (`CL_RIS_ADT_RES_REF_SNIPPETS`): the answer says what SAP did.
+   */
+  snippets_absent?: true | undefined;
   /** A row's code line: one snippet's content, trimmed (terse and medium only). */
   code?: string | undefined;
 };
@@ -349,12 +357,15 @@ export function usageIn(
   inObject: InObject,
 ): boolean {
   if (reference.usage_information === undefined) return false;
-  const type = reference.parent_type ?? reference.type;
-  const name = reference.parent_name ?? reference.name;
-  return (
-    comparable(type) === comparable(inObject.object_type) &&
-    comparable(name) === comparable(inObject.object_name)
-  );
+  const type = comparable(reference.parent_type ?? reference.type);
+  const name = comparable(reference.parent_name ?? reference.name);
+  const wantedType = comparable(inObject.object_type);
+  const wantedName = comparable(inObject.object_name);
+  // A blank never matches: an unresolved reference names no object.
+  if (type === '' || name === '' || wantedType === '' || wantedName === '') {
+    return false;
+  }
+  return type === wantedType && name === wantedName;
 }
 
 /**
@@ -395,11 +406,10 @@ export async function withUsageSnippets(
   return succeeded({
     ...read,
     references: inside.map((reference) => {
-      const lines =
-        reference.object_identifier === undefined
-          ? undefined
-          : snippets.get(reference.object_identifier);
-      return lines === undefined || lines.length === 0
+      if (reference.object_identifier === undefined) return reference;
+      const lines = snippets.get(reference.object_identifier);
+      if (lines === undefined) return { ...reference, snippets_absent: true };
+      return lines.length === 0
         ? reference
         : { ...reference, snippets: [...lines] };
     }),

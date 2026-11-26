@@ -127,6 +127,7 @@ export interface FullWhereUsedReference {
   readonly parent_type?: string | undefined;
   readonly parent_name?: string | undefined;
   readonly element?: string | undefined;
+  readonly snippets?: ReadonlyArray<{ readonly content: string }> | undefined;
 }
 
 /**
@@ -134,7 +135,8 @@ export interface FullWhereUsedReference {
  * the same call, one line each; empty when it gets nothing wrong.
  *
  * Every usage `full` lists (a reference with `usage_information`) must be a
- * terse row: one `full` resolves — a type and a name of its own, or its
+ * terse row, each code line `full` holds for it a row with that line
+ * (`code`, trimmed): one `full` resolves — a type and a name of its own, or its
  * parent's — by that type, name and element; one it leaves unresolved by
  * its URI, as SAP gave it. A terse row without a type or a name must be one
  * of those unresolved references, by its URI. A row under an `# in` line
@@ -150,6 +152,17 @@ export function whereUsedTerseMismatches(
       .filter((row) => row.type && row.name)
       .map((row) => `${row.type}\t${row.name}\t${row.element ?? ''}`),
   );
+  const objects = new Set(
+    rows
+      .filter((row) => row.type && row.name)
+      .map((row) => `${row.type}\t${row.name}`),
+  );
+  // An object's code lines, whatever element a row names.
+  const lines = new Set(
+    rows
+      .filter((row) => row.type && row.name && row.code)
+      .map((row) => `${row.type}\t${row.name}\t${row.code}`),
+  );
   const byUri = new Set(rows.map((row) => row.uri ?? ''));
   const unresolved = new Set<string>();
   const wrong: string[] = [];
@@ -158,8 +171,17 @@ export function whereUsedTerseMismatches(
     const type = reference.parent_type ?? reference.type ?? '';
     const name = reference.parent_name ?? reference.name ?? '';
     if (type !== '' && name !== '') {
-      const key = `${type}\t${name}\t${reference.element ?? ''}`;
-      if (!named.has(key)) wrong.push(`no terse row ${key}`);
+      if (reference.element !== undefined) {
+        const key = `${type}\t${name}\t${reference.element}`;
+        if (!named.has(key)) wrong.push(`no terse row ${key}`);
+      } else if (!objects.has(`${type}\t${name}`)) {
+        wrong.push(`no terse row ${type}\t${name}`);
+      }
+      // Every code line full holds is a terse row of that object.
+      for (const snippet of reference.snippets ?? []) {
+        const key = `${type}\t${name}\t${snippet.content.trim()}`;
+        if (!lines.has(key)) wrong.push(`no terse code line ${key}`);
+      }
       continue;
     }
     const uri = reference.uri ?? '';

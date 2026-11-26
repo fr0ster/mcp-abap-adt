@@ -129,4 +129,31 @@ describe('the live terse reader', () => {
       ['CLAS/OC|ZCL|MAIN', '|RUN|'],
     );
   });
+
+  it('where-used: a code line full holds that no terse row carries is a mismatch', () => {
+    const withLine: FullWhereUsedReference[] = [
+      {
+        name: 'ZPROG',
+        type: 'PROG/P',
+        uri: '/prog',
+        usage_information: 'g',
+        snippets: [{ content: '  DATA x TYPE zdtel.' }],
+      },
+    ];
+    const header = 'type\tname\telement\turi\tusage\tcode';
+    assert.deepEqual(
+      whereUsedTerseMismatches(
+        terseOf(`${header}\nPROG/P\tZPROG\t\t\tg\tDATA x TYPE zdtel.`),
+        withLine,
+      ),
+      [],
+    );
+    assert.equal(
+      whereUsedTerseMismatches(
+        terseOf(`${header}\nPROG/P\tZPROG\t\t\tg\t`),
+        withLine,
+      ).length,
+      1,
+    );
+  });
 });

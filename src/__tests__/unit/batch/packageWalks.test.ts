@@ -36,7 +36,7 @@ import {
   TOOL_DEFINITION as GetPackageTree,
   handleGetPackageTree as handleGetPackageTreeOf,
 } from '../../../handlers/system/high/handleGetPackageTree';
-import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
+import { handleGetObjectInfo as handleGetObjectInfoOf } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { NODE_READ_CONCURRENCY } from '../../../lib/strategies/packageWalk';
@@ -64,6 +64,12 @@ const handleGetPackageTree = (
   context: Parameters<typeof handleGetPackageTreeOf>[0],
   args: Parameters<typeof handleGetPackageTreeOf>[1],
 ) => handleGetPackageTreeOf(context, { detail: 'full', ...args });
+
+/** handleGetObjectInfo at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, the remaining tools). */
+const handleGetObjectInfo = (
+  context: Parameters<typeof handleGetObjectInfoOf>[0],
+  args: Parameters<typeof handleGetObjectInfoOf>[1],
+) => handleGetObjectInfoOf(context, { detail: 'full', ...args });
 
 /** handleGetPackageContents at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
 const handleGetPackageContents = (
@@ -246,14 +252,20 @@ const OBJECT_XML = (path: string, name: string) =>
 const nameAt = (path: string) =>
   decodeURIComponent(path.split('/').pop() ?? '').toUpperCase();
 
-const SEARCH_XML = (name: string, type: string) =>
-  `<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/x/${name.toLowerCase()}" adtcore:type="${type}" adtcore:name="${name}" adtcore:packageName="ZPARENT" adtcore:description="Found ${name}"/></adtcore:objectReferences>`;
+const SEARCH_XML = (
+  name: string,
+  type: string,
+  description = `Found ${name}`,
+) =>
+  `<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/x/${name.toLowerCase()}" adtcore:type="${type}" adtcore:name="${name}" adtcore:packageName="ZPARENT" adtcore:description="${description}"/></adtcore:objectReferences>`;
 
 interface Model {
   /** Requests answered with this status instead (a key of `keyOf`). */
   refuse?: Record<string, number>;
   /** The body a refused request is answered with (default: none). */
   refuseBody?: Record<string, string>;
+  /** A search's description by the object's name, as written in the XML (default: `Found <name>`). */
+  searchDescription?: Record<string, string>;
 }
 
 /** The key of any request: a node structure's, else `METHOD path`. */
@@ -300,7 +312,7 @@ function answerOf(
       status: 200,
       statusText: 'OK',
       headers: xml,
-      body: SEARCH_XML(name, 'DEVC/K'),
+      body: SEARCH_XML(name, 'DEVC/K', model.searchDescription?.[name]),
     };
   }
   if (key.startsWith('GET /sap/bc/adt/packages/')) {
@@ -1310,6 +1322,26 @@ describe('GetObjectInfo', () => {
       error: { status: 500, step: 'read node structure' },
     });
   });
+
+  for (const [path, batch] of [
+    ['the batch path', undefined],
+    ['the sequential path', 'absent'],
+  ] as const) {
+    it(`${path}: an enriched description with a tab, a line break and a backslash reaches the tree as SAP sent it`, async () => {
+      const fake = system({
+        searchDescription: { ZROOT_A: 'a&#9;b&#10;c\\d' },
+      });
+      const result = await withinTurns(
+        handleGetObjectInfo(
+          batch === undefined ? contextOn(fake) : contextOn(fake, batch),
+          single,
+        ),
+      );
+      assert.equal(payloadOf(result).OBJECT_DESCRIPTION, 'a\tb\nc\\d');
+      if (batch === undefined) assert.ok(fake.envelopes.length > 0);
+      else assert.equal(fake.envelopes.length, 0);
+    });
+  }
 
   it('credential refusal ends the call as it came', async () => {
     const fake = system({}, () => {

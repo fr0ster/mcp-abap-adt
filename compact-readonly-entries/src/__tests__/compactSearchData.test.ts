@@ -91,6 +91,27 @@ describe('HandlerGetData', () => {
     ]);
   });
 
+  // The level asked reaches the read it routes to, as that tool takes it.
+  for (const detail of ['medium', 'full', 'raw'] as const) {
+    it(`forwards detail ${detail} to the read it routes to`, async () => {
+      await defineTool(GetData_Tool, handleHandlerGetData).call(context, {
+        object_name: 'ZT',
+        detail,
+      });
+      await defineTool(GetData_Tool, handleHandlerGetData).call(context, {
+        sql_query: 'SELECT * FROM ZT',
+        detail,
+      });
+      assert.deepStrictEqual(
+        calls.map((call) => [call.tool, call.args.detail]),
+        [
+          ['GetTableContents', detail],
+          ['GetSqlQuery', detail],
+        ],
+      );
+    });
+  }
+
   it('refuses with neither, asking nothing: its schema holds the rule', async () => {
     await assertRejects(
       defineTool(GetData_Tool, handleHandlerGetData).call(context, {}),

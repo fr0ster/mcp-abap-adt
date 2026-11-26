@@ -24,6 +24,7 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 import {
+  assertAsked,
   assertRefused,
   completionOf,
   promptOf,
@@ -117,13 +118,19 @@ describe('action is accepted in any case (M9)', () => {
     });
   }
 
-  it('an unknown action is refused naming the served ones in lower case', () => {
-    assertRefused(
-      prompt,
-      { action: 'RELEASE' },
-      'transport: action "RELEASE" is not served by this server; it serves create, create_task, list, get, objects, log, add_object, remove_object, move_objects, sort_compress.',
+  it('an unknown action is answered with the served ones, in lower case, to ask the user', async () => {
+    await assertAsked(prompt, { action: 'RELEASE' }, 'action');
+    assert.equal(
+      textOf(prompt, { action: 'RELEASE' }),
+      'The action "RELEASE" is not served by this server. The transport prompt takes: create, create_task, list, get, objects, log, add_object, remove_object, move_objects, sort_compress. Ask the user which one they want, then call it again.',
     );
   });
+
+  for (const missing of [{}, { action: '' }, { action: '  ' }]) {
+    it(`action ${JSON.stringify(missing)} is answered with the served ones, to ask the user`, async () => {
+      await assertAsked(prompt, missing, 'action');
+    });
+  }
 
   it('object_type is completed for an action given in upper case', async () => {
     assert.equal(
@@ -220,11 +227,17 @@ describe('each action refuses its missing argument', () => {
     }
   }
 
-  it('an action the binary serves none of is refused', () => {
-    assertRefused(
-      promptOf(transportPrompt, sourceOf(fullReadOnlyToolSet)),
+  it('an action the binary serves none of is answered with the ones it serves', async () => {
+    const readOnly = promptOf(transportPrompt, sourceOf(fullReadOnlyToolSet));
+    await assertAsked(
+      readOnly,
       { action: 'create', description: 'some words' },
-      'transport: action "create" is not served by this server; it serves list, get, objects, log.',
+      'action',
+    );
+    assert.ok(
+      textOf(readOnly, { action: 'create' }).includes(
+        'The transport prompt takes: list, get, objects, log.',
+      ),
     );
   });
 

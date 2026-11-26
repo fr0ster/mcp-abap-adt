@@ -2397,6 +2397,7 @@ function systemProperties(
           package_tree: DETAIL_WORDS,
           transports: DETAIL_WORDS,
           atc_findings: DETAIL_WORDS,
+          atc_results: DETAIL_WORDS,
           atc_result: DETAIL_WORDS,
         }),
       ),
@@ -2625,7 +2626,7 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
     ],
     transports: ['user', 'modifiable_only', 'detail'],
     atc_findings: ['worklist_id', 'detail'],
-    atc_results: ['created_by', 'central_only', 'age_min', 'age_max'],
+    atc_results: ['created_by', 'central_only', 'age_min', 'age_max', 'detail'],
     atc_result: ['display_id', 'detail'],
   },
 });
@@ -2769,6 +2770,9 @@ const MAX_ROWS = {
     .describe('Maximum number of rows returned.'),
 };
 
+/** `detail`, the data tools' own: how much of the rows' answer to return. */
+const DATA_DETAIL = { detail: DETAIL_SHAPE.detail };
+
 /** Rows of a table or CDS view, or of an SQL SELECT. */
 /** What `HandlerGetData` reads: `sql_query` when stated, else `object_name`; one of them. */
 function oneDataRead(
@@ -2794,6 +2798,7 @@ const GET_DATA_FIELDS = {
       'ABAP SQL SELECT naming the columns, conditions and order to read.',
     ),
   ...MAX_ROWS,
+  ...DATA_DETAIL,
 };
 
 export const compactGetDataSchema = withInCallSchema(
@@ -2804,7 +2809,11 @@ export const compactGetDataSchema = withInCallSchema(
 );
 
 /** The table read alone: the fields but `background`. */
-const GET_TABLE_DATA_FIELDS = { ...getDataProperties(false), ...MAX_ROWS };
+const GET_TABLE_DATA_FIELDS = {
+  ...getDataProperties(false),
+  ...MAX_ROWS,
+  ...DATA_DETAIL,
+};
 
 /**
  * `HandlerGetData`'s description and schema: with `sql`, the table read and

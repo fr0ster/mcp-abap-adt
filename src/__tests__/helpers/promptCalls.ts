@@ -51,6 +51,32 @@ export function assertRefused(
   );
 }
 
+/**
+ * `prompt` answers `args` with no call: one line naming `argument` — absent,
+ * or the value given that this binary does not serve — and listing exactly
+ * the values its completion offers, the model told to ask the user and call
+ * the prompt again. The words are written here, not taken from the source.
+ */
+export async function assertAsked(
+  prompt: AbapPrompt,
+  args: Record<string, string | undefined>,
+  argument: 'object_type' | 'action',
+): Promise<void> {
+  const values = await completionOf(prompt, argument);
+  assert.ok(values.length > 0, `${prompt.name} completes ${argument}`);
+  const given = args[argument]?.trim();
+  const what =
+    given === undefined || given === ''
+      ? `No ${argument} was given.`
+      : `The ${argument} ${JSON.stringify(given)} is not served by this server.`;
+  const instruction = prompt.instruction(args);
+  assert.deepEqual(instruction.steps, []);
+  assert.equal(
+    renderInstruction(instruction),
+    `${what} The ${prompt.name} prompt takes: ${values.join(', ')}. Ask the user which one they want, then call it again.`,
+  );
+}
+
 /** The values `prompt` completes argument `name` with, for `typed`. */
 export async function completionOf(
   prompt: AbapPrompt,

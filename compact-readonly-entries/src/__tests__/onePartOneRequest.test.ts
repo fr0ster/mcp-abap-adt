@@ -537,8 +537,17 @@ describe('compact HandlerGet: one part, one request', () => {
       assert.deepStrictEqual(refused.sent, held.sent);
     });
 
-    it('a blank body answers an empty listing with both readings stated', async () => {
+    it('a blank body answers an empty listing with both readings stated (terse)', async () => {
       const { answer } = await run('document', args, '');
+      assert.notEqual(answer?.isError, true);
+      assert.equal(
+        textOf(answer).split('\n')[1],
+        '# blank SAP answered a blank body: the package holds no objects, or no package of this name exists.',
+      );
+    });
+
+    it('a blank body answers an empty listing with both readings stated (full)', async () => {
+      const { answer } = await run('document', { ...args, detail: 'full' }, '');
       assert.notEqual(answer?.isError, true);
       assert.deepStrictEqual(jsonOf(answer), {
         objects: [],
@@ -552,7 +561,11 @@ describe('compact HandlerGet: one part, one request', () => {
       const listing = corpusBody(
         'read-package-contents-structure--01-nodestructure',
       );
-      const { sent, answer } = await run('document', args, listing);
+      const { sent, answer } = await run(
+        'document',
+        { ...args, detail: 'full' },
+        listing,
+      );
       assert.equal(sent.length, 1);
       const body = jsonOf(answer);
       assertNoProperty(body, 'blank');

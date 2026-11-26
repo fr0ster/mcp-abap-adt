@@ -3,11 +3,10 @@
  * code of its type — `GetWhereUsed` on the full set, `HandlerSystem`'s
  * `where_used` on compact — answered in the call.
  */
-import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
-import * as z from 'zod';
 import type { TextElementsContainer } from '../../handlers/system/readonly/handleGetWhereUsed.js';
 import { WHERE_USED_CODES, type WhereUsedCode } from '../adtProjections.js';
-import { completeFrom } from './completion.js';
+import { askValue } from './askValue.js';
+import { closedOptionalArgument } from './completion.js';
 import {
   functionGroupTakers,
   nameArguments,
@@ -21,7 +20,7 @@ import {
   userValue,
 } from './objectPrompts.js';
 import type { PromptObjectType } from './objectRows.js';
-import { notServedWords, promptRefusal, requiredWords } from './refusals.js';
+import { promptRefusal, requiredWords } from './refusals.js';
 import { lowercaseKeyed, matchServed, requiredArgument } from './served.js';
 import { listedProperty, longToolStep } from './source.js';
 import type {
@@ -125,7 +124,7 @@ const CONTAINERS: readonly TextElementsContainer[] = [
 ];
 
 const CONTAINER_WORDS =
-  'For text_elements: whose text elements they are, program or function_group.';
+  'For object_type text_elements, whose text elements they are';
 
 /** `container` as given: required with text elements, read with them alone, one of the listed values in any case. */
 function containerOf(
@@ -177,25 +176,22 @@ export function whereUsedPrompt(source: PromptSource): AbapPrompt | undefined {
   };
   return {
     name: 'where_used',
-    description: `Lists the objects that use the object of object_type named name: asks the model to call ${row.tool.definition.name}.`,
+    description:
+      'Lists the objects that use the object of object_type named name.',
     argsSchema: {
       ...objectArguments(served),
-      container: completable(
-        z.string().optional().describe(CONTAINER_WORDS),
-        (typed, context) =>
-          readsContainer(context?.arguments?.object_type)
-            ? completeFrom(containers, typed ?? '')
-            : [],
+      container: closedOptionalArgument(CONTAINER_WORDS, containers, (given) =>
+        readsContainer(given.object_type),
       ),
     },
     instruction: (args): PromptInstruction => {
       const objectType = requiredArgument(args, 'object_type');
-      if (objectType === undefined) {
-        throw promptRefusal(requiredWords('where_used', 'object_type'));
-      }
-      const type = matchServed(objectType, byLowercase);
+      const type =
+        objectType === undefined
+          ? undefined
+          : matchServed(objectType, byLowercase);
       if (type === undefined) {
-        throw promptRefusal(notServedWords('where_used', objectType, served));
+        return askValue('where_used', 'object_type', objectType, served);
       }
       const name = requiredArgument(args, 'name');
       if (name === undefined) {

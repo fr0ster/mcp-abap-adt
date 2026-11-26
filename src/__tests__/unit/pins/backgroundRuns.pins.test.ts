@@ -49,7 +49,7 @@ function member(value: unknown, key: string): unknown {
     : undefined;
 }
 
-/** A finished read run, as Get answers it: its header, then the rows. */
+/** A finished read run, as Get answers it: its header, then the rows (each read asks detail medium, which echoes the statement). */
 function expectFinished(answer: McpResult, tool: string): void {
   assert.equal(member(itemOf(answer, 0), 'state'), 'finished');
   assert.equal(member(itemOf(answer, 0), 'tool'), tool);
@@ -225,7 +225,10 @@ describe('onprem', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'GetSqlQuery', args: { sql_query: QUERY, row_number: 5 } },
+        {
+          tool: 'GetSqlQuery',
+          args: { sql_query: QUERY, row_number: 5, detail: 'medium' },
+        },
       ],
       bind: { run_handle: { from: 0, field: 'run_handle' } },
       args: {},
@@ -238,7 +241,10 @@ describe('onprem', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'GetSqlQuery', args: { sql_query: QUERY, row_number: 5 } },
+        {
+          tool: 'GetSqlQuery',
+          args: { sql_query: QUERY, row_number: 5, detail: 'medium' },
+        },
       ],
       args: {},
       expected: 'none',
@@ -256,7 +262,10 @@ describe('onprem', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'GetSqlQuery', args: { sql_query: QUERY, row_number: 5 } },
+        {
+          tool: 'GetSqlQuery',
+          args: { sql_query: QUERY, row_number: 5, detail: 'medium' },
+        },
       ],
       bind: { run_handle: { from: 0, field: 'run_handle' } },
       args: {},
@@ -270,7 +279,10 @@ describe('onprem', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'HandlerGetData', args: { sql_query: QUERY, max_rows: 5 } },
+        {
+          tool: 'HandlerGetData',
+          args: { sql_query: QUERY, max_rows: 5, detail: 'medium' },
+        },
       ],
       bind: { run_handle: { from: 0, field: 'run_handle' } },
       args: {},
@@ -283,7 +295,10 @@ describe('onprem', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'HandlerGetData', args: { sql_query: QUERY, max_rows: 5 } },
+        {
+          tool: 'HandlerGetData',
+          args: { sql_query: QUERY, max_rows: 5, detail: 'medium' },
+        },
       ],
       args: {},
       expected: 'none',
@@ -301,7 +316,10 @@ describe('onprem', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'HandlerGetData', args: { sql_query: QUERY, max_rows: 5 } },
+        {
+          tool: 'HandlerGetData',
+          args: { sql_query: QUERY, max_rows: 5, detail: 'medium' },
+        },
       ],
       bind: { run_handle: { from: 0, field: 'run_handle' } },
       args: {},
@@ -511,7 +529,10 @@ describe('cloud', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'GetSqlQuery', args: { sql_query: QUERY, row_number: 5 } },
+        {
+          tool: 'GetSqlQuery',
+          args: { sql_query: QUERY, row_number: 5, detail: 'medium' },
+        },
       ],
       bind: { run_handle: { from: 0, field: 'run_handle' } },
       args: {},
@@ -524,7 +545,10 @@ describe('cloud', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'GetSqlQuery', args: { sql_query: QUERY, row_number: 5 } },
+        {
+          tool: 'GetSqlQuery',
+          args: { sql_query: QUERY, row_number: 5, detail: 'medium' },
+        },
       ],
       args: {},
       expected: 'none',
@@ -542,7 +566,10 @@ describe('cloud', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'GetSqlQuery', args: { sql_query: QUERY, row_number: 5 } },
+        {
+          tool: 'GetSqlQuery',
+          args: { sql_query: QUERY, row_number: 5, detail: 'medium' },
+        },
       ],
       bind: { run_handle: { from: 0, field: 'run_handle' } },
       args: {},
@@ -556,7 +583,10 @@ describe('cloud', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'HandlerGetData', args: { sql_query: QUERY, max_rows: 5 } },
+        {
+          tool: 'HandlerGetData',
+          args: { sql_query: QUERY, max_rows: 5, detail: 'medium' },
+        },
       ],
       bind: { run_handle: { from: 0, field: 'run_handle' } },
       args: {},
@@ -569,7 +599,10 @@ describe('cloud', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'HandlerGetData', args: { sql_query: QUERY, max_rows: 5 } },
+        {
+          tool: 'HandlerGetData',
+          args: { sql_query: QUERY, max_rows: 5, detail: 'medium' },
+        },
       ],
       args: {},
       expected: 'none',
@@ -587,7 +620,10 @@ describe('cloud', () => {
       stand: 'server',
       settle: 'background-runs',
       before: [
-        { tool: 'HandlerGetData', args: { sql_query: QUERY, max_rows: 5 } },
+        {
+          tool: 'HandlerGetData',
+          args: { sql_query: QUERY, max_rows: 5, detail: 'medium' },
+        },
       ],
       bind: { run_handle: { from: 0, field: 'run_handle' } },
       args: {},

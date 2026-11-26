@@ -1194,6 +1194,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
   // three tests are.
   it('GetNodeStructureLow reaches getUtils, carrying analyseException', async () => {
     await handleGetNodeStructure(context as any, {
+      detail: 'full',
       parent_type: 'DEVC/K',
       parent_name: 'ZP_X',
     });
@@ -1229,6 +1230,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
     }));
 
     const result: any = await handleGetNodeStructure(context as any, {
+      detail: 'full',
       parent_type: 'DEVC/K',
       parent_name: 'ZMCP_SHR_PKG',
       node_id: '28',
@@ -1294,6 +1296,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
     }));
 
     const result: any = await handleGetNodeStructure(context as any, {
+      detail: 'full',
       parent_type: 'DEVC/K',
       parent_name: 'ZMCP_BLD_PKG01',
     });
@@ -1327,6 +1330,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
     }));
 
     const result: any = await handleGetNodeStructure(context as any, {
+      detail: 'full',
       parent_type: 'DEVC/K',
       parent_name: 'ZMCP_BLD_NOPKG9X',
     });
@@ -1364,6 +1368,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
     }));
 
     const result: any = await handleGetNodeStructure(context as any, {
+      detail: 'full',
       parent_type: 'CLAS/OC',
       parent_name: 'CL_ABAP_CHAR_UTILITIES',
     });

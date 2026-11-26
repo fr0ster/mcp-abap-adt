@@ -100,6 +100,8 @@ function storedResult(): Promise<string> {
   stored ??= (async () => {
     await worklist();
     const listed = await livePrepare('ListATCResults', {
+      // The fields read below: the JSON of detail medium.
+      detail: 'medium',
       created_by: '*',
       age_min: 0,
       age_max: 1,

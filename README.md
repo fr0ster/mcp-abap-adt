@@ -295,7 +295,8 @@ row SAP answered is answered. `detail` has four levels:
 - `full`: the whole parse, the answer as it was before `detail` where a tool did not take it.
 - `raw`: what ADT sent. The shape is the tool's, not the call's, and each tool's `detail`
   description names it. A tool that reads one document answers that document as is. A tool that
-  assembles reads — package contents and tree, the other repository walks, `SearchSource`,
+  assembles reads — package contents and tree, the other repository walks (`GetObjectInfo`,
+  `GetNodeStructureLow` included), `SearchSource`,
   `DescribeByList`, the include, structure and function group lists, `GetEnhancements`,
   `GetWhereUsed`, `GetUnitTest`, `GetCdsUnitTest`, `GetUnitTestResult`, `GetCdsUnitTestResult`, the
   unit-test runs, `RuntimeListFeeds`, `CreateTransport`, `CreateTransportTask`, `CreateTableType`,
@@ -334,6 +335,9 @@ level.
 **Migration (24.2.0):** a caller that parsed a tool's default JSON asks for `detail: 'full'`,
 which gives the former shape where the tool had no `detail` before; where it had one, the former
 terse JSON is `detail: 'medium'`. See the [CHANGELOG](CHANGELOG.md).
+The same holds for the tools that moved after it (`GetObjectInfo`, `GetNodeStructureLow`,
+`ListATCResults`; `GetSqlQuery`, `GetTableContents` and `HandlerGetData`, whose former terse JSON
+is `detail: 'medium'`).
 
 ### Batch mode
 
@@ -427,8 +431,11 @@ answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`
 `HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerLock` `action: unlock`. A value the user did
 not give is listed in the instruction as still to fill.
 
-A `prompts/get` with an `object_type` the binary does not serve is refused with the protocol's
-invalid-params error and names the types it serves. `BaseMcpServer` and `EmbeddableMcpServer`
+`object_type` and `transport`'s `action` are optional. With the other required arguments given
+(`name`; an absent one is refused invalid-params by the SDK's argument check), a `prompts/get`
+without one, or with a value the binary does not serve, answers no error but one line naming the values it takes and
+telling the model to ask the user, e.g. `No action was given. The transport prompt takes: create,
+create_task, list, …. Ask the user which one they want, then call it again.` `BaseMcpServer` and `EmbeddableMcpServer`
 register the prompts after the tools; the option `prompts: false` registers none. A plain
 registration on an SDK `McpServer` registers none of its own accord;
 `registerAbapPrompts(server, registry)` adds them

@@ -404,6 +404,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `central_only` (boolean, optional) - true lists central results only; absent lists every kind.
 - `created_by` (string, required) - Whose results: a user name, or * for every user.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 

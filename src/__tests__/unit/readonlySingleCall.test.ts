@@ -835,6 +835,7 @@ describe('GetObjectInfo, mapped from a real matched pair of captured node-struct
       const result: any = await handleGetObjectInfo(
         { ...context, batchAvailability: notServed } as any,
         {
+          detail: 'full',
           parent_type: 'DEVC/K',
           parent_name: 'ZMCP_SHR_PKG',
           enrich: false, // isolate the tree walk from SearchObject enrichment

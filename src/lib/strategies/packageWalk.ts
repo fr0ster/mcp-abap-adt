@@ -1215,7 +1215,10 @@ export function assembleTree(
   const attach = (owner: string, owned: WalkedItem[]) => {
     if (placed.has(owner)) return;
     placed.add(owner);
-    children.push(...owned.map((o) => nodeOf(o)));
+    appendAll(
+      children,
+      owned.map((o) => nodeOf(o)),
+    );
   };
   for (const [owner, owned] of byOwner) {
     if (!listedPackages.has(owner)) attach(owner, owned);

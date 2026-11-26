@@ -83,6 +83,13 @@ export interface IServerConfig {
   batchKeepRawParts?: boolean | undefined;
 
   /**
+   * The consumer's bound on the reads one ADT batch envelope of a call
+   * carries (`--batch-reads-per-envelope`, `MCP_BATCH_READS_PER_ENVELOPE`,
+   * `batch.readsPerEnvelope`): a whole number from 2. Absent: no bound.
+   */
+  batchReadsPerEnvelope?: number | undefined;
+
+  /**
    * Whether the binary serves the data tools (`--enable-data-tools`,
    * `MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`). Default `false`.
    */

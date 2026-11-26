@@ -993,6 +993,56 @@ export const BATCH_KEEP_RAW_PARTS_ROW: Parameter = {
   help: "Each answer of a batch (HandlerBatch answers, DebugBatchAnswers) also carries the raw part it came in: SAP's status, status text, headers and body, as they came. Default: false.",
 };
 
+export const BATCH_READS_PER_ENVELOPE_CLI = '--batch-reads-per-envelope';
+export const BATCH_READS_PER_ENVELOPE_ENV = 'MCP_BATCH_READS_PER_ENVELOPE';
+export const BATCH_READS_PER_ENVELOPE_YAML = 'batch.readsPerEnvelope';
+
+/** The fewest reads a consumer's bound on an envelope may set. */
+export const MIN_READS_PER_ENVELOPE = 2;
+
+/** The refusal of a reads-per-envelope bound, in fixed words: the value is never echoed. */
+export function readsPerEnvelopeRefusal(name: string): string {
+  return `Invalid ${name}: must be a whole number of reads from ${MIN_READS_PER_ENVELOPE}`;
+}
+
+/**
+ * `--batch-reads-per-envelope`'s value: a whole number from
+ * `MIN_READS_PER_ENVELOPE`, read by plain code — ASCII digits as a string,
+ * or a YAML integer; a list, a mapping, a boolean or a fraction is refused.
+ */
+export function parseReadsPerEnvelope(raw: JsonValue, name: string): number {
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  const value =
+    typeof raw === 'number'
+      ? raw
+      : isDigits(text)
+        ? Number.parseInt(text, 10)
+        : Number.NaN;
+  if (!Number.isSafeInteger(value) || value < MIN_READS_PER_ENVELOPE) {
+    throw new ParameterRefusal(readsPerEnvelopeRefusal(name));
+  }
+  return value;
+}
+
+/**
+ * `--batch-reads-per-envelope` / `MCP_BATCH_READS_PER_ENVELOPE` / YAML
+ * `batch.readsPerEnvelope`: the consumer's bound on the reads one ADT batch
+ * envelope of a call carries (`chunksOf`). No default: not given (or
+ * blank), the server sets no bound — a phase's independent reads go in one
+ * envelope, and what SAP answers to it is SAP's. In every binary's table.
+ */
+export const BATCH_READS_PER_ENVELOPE_ROW: Parameter = {
+  key: 'batchReadsPerEnvelope',
+  cli: BATCH_READS_PER_ENVELOPE_CLI,
+  env: BATCH_READS_PER_ENVELOPE_ENV,
+  yaml: BATCH_READS_PER_ENVELOPE_YAML,
+  kind: 'custom',
+  parse: parseReadsPerEnvelope,
+  valueHint: '=<reads>',
+  section: 'BATCH MODE',
+  help: `The most reads one ADT batch envelope carries when a single tool call reads several objects at once (GetEnhancements, SearchSource, package listings and walks, function module group checks): more go in consecutive envelopes of balanced size. A whole number from ${MIN_READS_PER_ENVELOPE}. Default (not given or blank): no bound — all independent reads of a step go in one envelope, and an envelope SAP refuses or fails is answered as SAP answered it.`,
+};
+
 export const ENABLE_DATA_TOOLS_CLI = '--enable-data-tools';
 export const ENABLE_DATA_TOOLS_ENV = 'MCP_ENABLE_DATA_TOOLS';
 export const ENABLE_DATA_TOOLS_YAML = 'enable-data-tools';

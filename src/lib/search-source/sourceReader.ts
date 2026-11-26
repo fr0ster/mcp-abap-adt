@@ -27,6 +27,7 @@ import { ourUtils } from '../strategies/resultSets';
 import { carryingFailure } from '../strategies/step';
 import type { EnumeratedObject } from './packageEnumerator';
 import {
+  endsTheSearch,
   envelopeFailure,
   failedRead,
   type SapAnswerPlace,
@@ -223,6 +224,30 @@ export function sourceReadKey(read: Read): string {
   return read.reader === 'functionGroupStructure'
     ? `structure|${read.name.toUpperCase()}`
     : `${sourceUriOf(read)}|${read.version}`;
+}
+
+/**
+ * Whether any read of `reads` was answered with what ends the call — a
+ * credential refusal, thrown or SAP's answered `401` — so no later envelope
+ * of the call is sent.
+ */
+export function answeredAnEnd(
+  answers: AnsweredReads,
+  reads: readonly Read[],
+): boolean {
+  return reads.some((read) => {
+    const key = sourceReadKey(read);
+    const result =
+      read.reader === 'functionGroupStructure'
+        ? answers.structures.get(key)
+        : answers.sources.get(key);
+    if (result === undefined) return false;
+    if (!result.ok) return endsTheSearch(result.error);
+    return (
+      !result.value.ok &&
+      endsTheSearch(thrownOf(result.value.error, STEP[read.reader]))
+    );
+  });
 }
 
 /** A failed answer as a thrown failure, with its step. */

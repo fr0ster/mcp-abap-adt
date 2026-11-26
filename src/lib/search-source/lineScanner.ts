@@ -7,8 +7,6 @@ import type {
 
 export type { ScanHit, ScanInput, ScanResult } from './lineMatch';
 
-const SNIPPET_MAX = 255;
-
 function isCommentLine(line: string): boolean {
   if (line.length === 0) return false;
   if (line[0] === '*') return true;
@@ -56,7 +54,7 @@ export function scanLines(
     }
     hits.push({
       line: i + 1,
-      snippet: raw.length > SNIPPET_MAX ? raw.slice(0, SNIPPET_MAX) : raw,
+      snippet: raw,
     });
   }
 
@@ -67,6 +65,9 @@ export function scanLines(
  * The shipped line match: a case-insensitive substring per line — `query`,
  * and `query2` on the same line when given; a line holding an `exclude`
  * entry is dropped; with `exclude_comments`, col-1 `*` and full-line `"`
- * comment lines are skipped; a snippet is cut at 255 characters.
+ * comment lines are skipped; a snippet is the whole line, uncut.
  */
-export const substringLineMatch: LineMatchStrategy = { match: scanLines };
+export const substringLineMatch: LineMatchStrategy = {
+  match: scanLines,
+  hitsHoldQuery: true,
+};

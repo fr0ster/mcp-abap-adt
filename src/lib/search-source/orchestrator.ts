@@ -48,6 +48,8 @@ import {
   type SapAnswerStrategy,
 } from './readFailure';
 import {
+  type AnsweredReads,
+  answeredAnEnd,
   answeredReaderDeps,
   createSourceReaderDeps,
   type GroupMember,
@@ -290,9 +292,6 @@ function checkInput(input: OrchestratorInput): void {
   }
   if (!input.packages || input.packages.length === 0) {
     throw new Error('packages must contain at least one entry');
-  }
-  if (input.exclude && input.exclude.length > 3) {
-    throw new Error('exclude may not contain more than 3 entries');
   }
 }
 
@@ -548,6 +547,25 @@ export async function runSearchSource(
   return result;
 }
 
+/**
+ * Whether `read`'s answered source holds `query`, in either case: what the
+ * shipped line match needs before a line can be a hit.
+ */
+function holdsQuery(
+  answers: AnsweredReads,
+  read: Read,
+  query: string,
+): boolean {
+  if (read.reader === 'functionGroupStructure') return false;
+  const answer = answers.sources.get(sourceReadKey(read));
+  if (answer === undefined || !answer.ok || !answer.value.ok) return false;
+  const text = answer.value.value;
+  return (
+    text.toUpperCase().includes(query.toUpperCase()) ||
+    text.toLowerCase().includes(query.toLowerCase())
+  );
+}
+
 /** The strategies a `SearchSource` call runs with: the line match and the SAP-answer one. */
 export interface SearchSourceStrategies {
   lineMatch: LineMatchStrategy;
@@ -652,17 +670,17 @@ async function runSearchSourceInPhases(
   // ones, so the reads sent here are the reads it answers from.
   const targets = enumerated.targets;
 
-  // (3) The source reads of the targets, in chunks: a chunk is read through
-  // all its rounds, each round's reads not answered yet — every source once,
-  // whichever objects name it — in the envelopes `envelopesOf` allows. A
-  // chunk holds the consumer's bound of targets, without one every target;
-  // with `max_hits` one target, bound or not, so the scan stops at the first
-  // target that reaches it — that target's reads still go in envelopes (of
-  // at most the bound). No size is the server's own.
+  // (3) The source reads of the targets, round by round: each round's reads
+  // not answered yet — every source once, whichever objects name it. Without
+  // `max_hits` every target is read together, each round's reads one phase
+  // (`readSourcesInPhase`: one envelope, or the consumer's bound of reads per
+  // envelope). With `max_hits` the targets are read one at a time, each
+  // round's reads in the envelopes `envelopesOf` allows, and the hits are
+  // counted after each envelope: once they reach `max_hits` nothing more is
+  // sent. Either way an envelope that answered what ends the call (a
+  // credential refusal) is the last one sent. No size is the server's own.
   const perTarget = input.max_hits !== undefined;
-  const targetsPerChunk = perTarget
-    ? 1
-    : (ctx.readsPerEnvelope ?? targets.length);
+  const targetsPerChunk = perTarget ? 1 : targets.length;
   const sources = noAnsweredReads();
   // The scan over the answers read so far: `runSearchSource` over the
   // phases' answers, the sequential version's own.
@@ -677,7 +695,23 @@ async function runSearchSourceInPhases(
       },
       { ...asked, concurrency: 1 },
     );
-  for (let at = 0; at < targets.length; at += targetsPerChunk) {
+  // Whether the answers now hold `max_hits` hits. A line match whose hits
+  // hold the query (`hitsHoldQuery`, the shipped one) finds none in a step
+  // whose sources hold no query text, so that step is not scanned again;
+  // any other line match is always asked.
+  const reachedMaxHits = async (reads: readonly Read[]): Promise<boolean> => {
+    const maxHits = input.max_hits;
+    if (maxHits === undefined) return false;
+    if (
+      lineMatch.hitsHoldQuery === true &&
+      !reads.some((read) => holdsQuery(sources, read, input.query))
+    ) {
+      return false;
+    }
+    const sofar = await scanAnswered({ ...input, answer: 'snippets' });
+    return sofar.results.length >= maxHits;
+  };
+  reading: for (let at = 0; at < targets.length; at += targetsPerChunk) {
     const chunk = targets.slice(at, at + targetsPerChunk);
     for (;;) {
       const asked: Read[] = [];
@@ -697,24 +731,21 @@ async function runSearchSourceInPhases(
         ...new Map(asked.map((read) => [sourceReadKey(read), read])).values(),
       ];
       if (unique.length === 0) break;
-      // A chunk of one target reads as single requests — but for the
-      // one-target chunks of `max_hits`, whose reads stay in envelopes; a
+      // A round of one target reads as single requests — but for the
+      // one-target rounds of `max_hits`, whose reads stay in envelopes; a
       // round of one read always does.
-      for (const reads of envelopesOf(ctx, unique)) {
+      const steps = perTarget ? envelopesOf(ctx, unique) : [unique];
+      for (const reads of steps) {
         await readSourcesInPhase(
           ctx,
           reads,
           sources,
           (chunk.length < 2 && !perTarget) || reads.length < 2,
         );
+        if (answeredAnEnd(sources, reads)) break reading;
+        // `max_hits` (DO23): reached, no read of a later object is sent.
+        if (await reachedMaxHits(reads)) break reading;
       }
-    }
-    // `max_hits` (DO23): the scan stops at a chunk boundary, here after each
-    // target — once the targets read hold `max_hits` hits, nothing of a later
-    // target is sent.
-    if (input.max_hits !== undefined) {
-      const sofar = await scanAnswered({ ...input, answer: 'snippets' });
-      if (sofar.results.length >= input.max_hits) break;
     }
   }
 

@@ -4,9 +4,8 @@
  * rows its binary lists. The entries a read answers are sent on through
  * `ENTRY_ARGUMENT`, their `pgmid` carried.
  */
-import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
 import * as z from 'zod';
-import { completeFrom } from './completion.js';
+import { closedArgument, closedOptionalArgument } from './completion.js';
 import { jsonLiteral } from './instruction.js';
 import {
   offers,
@@ -55,9 +54,8 @@ interface Given {
   readonly target: string;
 }
 
-/** An action as one row serves it: the tools it calls and its instruction. */
+/** An action as one row serves it: its instruction. */
 interface ServedAction {
-  readonly tools: readonly string[];
   readonly instruction: (given: Given) => PromptInstruction;
 }
 
@@ -90,7 +88,6 @@ function oneCall(
     const tool = source.tools.get(name);
     if (tool === undefined) return undefined;
     return {
-      tools: [name],
       instruction: (given) => ({
         headline: headline(given),
         steps: [
@@ -115,7 +112,6 @@ function memberCall(
     const tool = source.tools.get(name);
     if (!offers(source, tool, member)) return undefined;
     return {
-      tools: [name],
       instruction: (given) => ({
         headline: headline(given),
         steps: [
@@ -131,7 +127,6 @@ function memberCall(
 
 /** How the read of a task's entries is made on a binary. */
 interface EntryRead {
-  readonly tools: readonly string[];
   readonly step: (number: string, note: string | undefined) => PromptStep;
 }
 
@@ -140,7 +135,6 @@ function fullEntryRead(source: PromptSource): EntryRead | undefined {
   const tool = source.tools.get('ReadTransportObjects');
   if (tool === undefined) return undefined;
   return {
-    tools: [tool.definition.name],
     step: (number, note) =>
       toolStep(tool, [['transport_number', userValue(number)]], {
         lead: "Read the task's entries",
@@ -154,7 +148,6 @@ function compactEntryRead(source: PromptSource): EntryRead | undefined {
   const tool = source.tools.get('HandlerGet');
   if (!offers(source, tool, 'TRANSPORT')) return undefined;
   return {
-    tools: [tool.definition.name],
     step: (number, note) =>
       longToolStep(
         tool,
@@ -191,7 +184,6 @@ function removeRow(source: PromptSource): ServedAction | undefined {
   const remove = source.tools.get('RemoveTransportObject');
   if (read === undefined || remove === undefined) return undefined;
   return {
-    tools: [...read.tools, remove.definition.name],
     instruction: (given) => ({
       headline: `Remove ${objectWords(given)} from the task ${jsonLiteral(given.number)}.`,
       steps: [
@@ -227,7 +219,6 @@ function moveRow(
     const move = source.tools.get(moveName);
     if (read === undefined || move === undefined) return undefined;
     return {
-      tools: [...read.tools, moveName],
       instruction: (given) => {
         const picked = given.object !== undefined;
         return {
@@ -483,20 +474,19 @@ const ARGUMENTS: readonly TransportArgument[] = [
   'target_number',
 ];
 
-/** The words of the arguments whose words name no action. */
+/** The words of the arguments whose words name no action; `action`'s before its values. */
 const WORDS: {
   readonly [A in
-    | Exclude<TransportArgument, 'number' | 'user'>
+    | Exclude<TransportArgument, 'number' | 'user' | 'object_type'>
     | 'action']: string;
 } = {
-  action: 'What to do with transport requests.',
+  action: 'What to do with transport requests',
   description: "The new request's description.",
-  object_type: "The object's type.",
   name: "The object's name.",
   target_number: 'The task the entries move to.',
 };
 
-/** `argument`'s words, naming only the served `actions`. */
+/** `argument`'s words, naming only the served `actions`; `object_type`'s before its values. */
 function wordsOf(
   argument: TransportArgument,
   actions: readonly ActionName[],
@@ -517,6 +507,10 @@ function wordsOf(
           return whose === undefined ? [] : [`${whose} (${action})`];
         })
         .join(', or ')}.`;
+    case 'object_type':
+      return `The object's type (read by ${actions
+        .filter((action) => readsOf(action).includes('object_type'))
+        .join(', ')})`;
     default:
       return WORDS[argument];
   }
@@ -611,26 +605,20 @@ export function transportPrompt(source: PromptSource): AbapPrompt | undefined {
       ? true
       : named !== undefined && readsOf(named).includes('object_type');
   };
-  const tools = [
-    ...new Set(actions.flatMap((action) => served.get(action)?.tools ?? [])),
-  ];
-  const optional = (argument: TransportArgument) =>
-    z.string().optional().describe(wordsOf(argument, actions));
   const schemaOf = (argument: TransportArgument) =>
     argument === 'object_type'
-      ? completable(optional('object_type'), (typed, context) =>
-          readsObjectType(context?.arguments?.action)
-            ? completeFrom(objectTypeValues, typed ?? '')
-            : [],
+      ? closedOptionalArgument(
+          wordsOf('object_type', actions),
+          objectTypeValues,
+          (given) => readsObjectType(given.action),
         )
-      : optional(argument);
+      : z.string().optional().describe(wordsOf(argument, actions));
   return {
     name: 'transport',
-    description: `Works with transport requests by action: asks the model to call ${tools.join(', ')}.`,
+    description:
+      'Works with transport requests and their entries, by the action given.',
     argsSchema: {
-      action: completable(z.string().describe(WORDS.action), (typed) =>
-        completeFrom(actions, typed),
-      ),
+      action: closedArgument(WORDS.action, actions),
       ...Object.fromEntries(
         declared.map((argument) => [argument, schemaOf(argument)]),
       ),

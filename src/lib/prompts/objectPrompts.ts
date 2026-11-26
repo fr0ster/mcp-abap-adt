@@ -3,11 +3,10 @@
  * serves the types its rows' tools are listed for, on the server's kind and
  * after its deny list, and answers the calls of the row it serves the type by.
  */
-import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
 import * as z from 'zod';
 import { EMPTIED_INCLUDE_TYPES } from '../compact/compactSchemas.js';
 import type { JsonValue } from '../json.js';
-import { completeFrom } from './completion.js';
+import { closedArgument } from './completion.js';
 import {
   functionGroupArgument,
   functionGroupTakers,
@@ -168,18 +167,6 @@ export function familyRows<M extends PromptObjectType>(
       );
 }
 
-/** The tools of `rows`, with those `alsoCalls` names per row, each once, in row order. */
-export function toolsOf(
-  rows: readonly ServedRow[],
-  alsoCalls: (row: ServedRow) => readonly string[] = () => [],
-): string {
-  return [
-    ...new Set(
-      rows.flatMap((row) => [row.tool.definition.name, ...alsoCalls(row)]),
-    ),
-  ].join(', ');
-}
-
 /** The served types by their name in lowercase. */
 function byLowercase(
   rows: readonly ServedRow[],
@@ -187,21 +174,18 @@ function byLowercase(
   return new Map(rows.map(({ type }) => [type.toLowerCase(), type]));
 }
 
-const OBJECT_TYPE_WORDS =
-  "The object's type; the values are the types this server serves for the operation.";
+const OBJECT_TYPE_WORDS = "The object's type";
 const NAME_WORDS = "The object's name.";
 const FUNCTION_MODULE_NAME_WORDS =
   "The object's name; for a function module, its own name, with its function group in function_group.";
 
-/** The prompt arguments every object prompt takes: `object_type`, completed from `served` (lowercase), and `name`. */
+/** The prompt arguments every object prompt takes: `object_type`, listed and completed from `served` (lowercase), and `name`. */
 export function objectArguments(
   served: readonly string[],
   takers: readonly string[] = functionGroupTakers(served),
 ): PromptArgumentsSchema {
   return {
-    object_type: completable(z.string().describe(OBJECT_TYPE_WORDS), (typed) =>
-      completeFrom(served, typed),
-    ),
+    object_type: closedArgument(OBJECT_TYPE_WORDS, served),
     name: z
       .string()
       .describe(takers.length === 0 ? NAME_WORDS : FUNCTION_MODULE_NAME_WORDS),
@@ -389,16 +373,7 @@ export function underLock(
   ];
 }
 
-/** The description of an object prompt: its sentence and the tools it asks for. */
-function described(
-  sentence: string,
-  rows: readonly ServedRow[],
-  alsoCalls?: (row: ServedRow) => readonly string[],
-): string {
-  return `${sentence} ${toolsOf(rows, alsoCalls)}.`;
-}
-
-/** One object prompt: its served rows, its arguments and its instruction per row. */
+/** One object prompt: its function in words, its served rows, its arguments and its instruction per row. */
 export function objectPrompt(
   operation: ObjectOperation,
   sentence: string,
@@ -409,12 +384,11 @@ export function objectPrompt(
     named: ObjectName,
     args: PromptArguments,
   ) => PromptInstruction,
-  alsoCalls?: (row: ServedRow) => readonly string[],
 ): AbapPrompt | undefined {
   if (rows.length === 0) return undefined;
   return {
     name: operation,
-    description: described(sentence, rows, alsoCalls),
+    description: sentence,
     argsSchema: {
       ...objectArguments(rows.map(({ type }) => type.toLowerCase())),
       ...extra,
@@ -461,7 +435,7 @@ export function createPrompt(source: PromptSource): AbapPrompt | undefined {
   const rows = servedRows(source, FULL_ROWS.create, COMPACT_ROWS.create);
   return objectPrompt(
     'create',
-    'Creates an ABAP object of object_type named name in package_name: asks the model to call',
+    'Creates an ABAP object of object_type named name in package_name.',
     rows,
     {
       package_name: z.string().optional().describe(PACKAGE_WORDS),
@@ -512,7 +486,7 @@ export function getPrompt(source: PromptSource): AbapPrompt | undefined {
   const rows = servedRows(source, FULL_ROWS.get, COMPACT_ROWS.get);
   return objectPrompt(
     'get',
-    'Reads an ABAP object of object_type named name: asks the model to call',
+    'Reads an ABAP object of object_type named name.',
     rows,
     {},
     (row, named) =>
@@ -539,7 +513,7 @@ export function deletePrompt(source: PromptSource): AbapPrompt | undefined {
   );
   return objectPrompt(
     'delete',
-    'Deletes an ABAP object of object_type named name: asks the model to call',
+    'Deletes an ABAP object of object_type named name.',
     rows,
     {
       transport_request: z
@@ -580,10 +554,6 @@ export function deletePrompt(source: PromptSource): AbapPrompt | undefined {
         toolStep(row.tool, [...compactNamed(row, named), ...optional]),
       );
     },
-    (row) =>
-      row.family === 'compact' && deletedUnderLock(row.type)
-        ? ['HandlerLock']
-        : [],
   );
 }
 
@@ -602,7 +572,7 @@ export function activatePrompt(source: PromptSource): AbapPrompt | undefined {
   const rows = servedRows(source, FULL_ROWS.activate, COMPACT_ROWS.activate);
   return objectPrompt(
     'activate',
-    'Activates an ABAP object of object_type named name: asks the model to call',
+    'Activates an ABAP object of object_type named name.',
     rows,
     {},
     (row, named) => ({
@@ -619,7 +589,7 @@ export function checkPrompt(source: PromptSource): AbapPrompt | undefined {
   const rows = servedRows(source, FULL_ROWS.check, COMPACT_ROWS.check);
   return objectPrompt(
     'check',
-    'Runs a syntax check of an ABAP object of object_type named name: asks the model to call',
+    'Runs a syntax check of an ABAP object of object_type named name.',
     rows,
     {},
     (row, named) =>

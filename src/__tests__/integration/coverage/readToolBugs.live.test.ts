@@ -31,7 +31,7 @@ import {
 import type { LaunchedServer } from '../helpers/launchedServers';
 import { liveConnection, liveSuite } from '../helpers/live';
 import { skipRunningTest } from '../helpers/runningTest';
-import { headOf, terseOf } from '../helpers/terseAnswer';
+import { headOf, rowsWithoutTypeOrName, terseOf } from '../helpers/terseAnswer';
 import {
   destinationArgs,
   getHardModeConfig,
@@ -194,16 +194,14 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
       const total = `# total ${headOf(answer, 'total') ?? ''}`;
       assert.ok(Number.isFinite(Number(headOf(answer, 'total'))), shown);
       // The usages SAP answered, as rows under their package, each read by
-      // the header's column names; a usage names its object (a nameless one
-      // by its uri), its type SAP's, which a reference may lack (SAP lists
-      // local test classes without one, measured on premise).
-      for (const column of ['type', 'name', 'usage']) {
+      // the header's column names; every usage names its object by a real
+      // type and name — a usage inside a method or section by the object
+      // it is in, the element beside it.
+      for (const column of ['type', 'name', 'element', 'usage']) {
         assert.ok(answer.columns.includes(column), shown);
       }
       assert.ok(answer.rows.length > 0, shown);
-      for (const row of answer.rows.slice(0, 50)) {
-        assert.ok(row.name || row.uri, JSON.stringify(row));
-      }
+      assert.deepStrictEqual(rowsWithoutTypeOrName(answer), [], shown);
       console.log(
         `[readToolBugs] GetWhereUsed ${name} terse: ${text.length} characters, ${total}`,
       );

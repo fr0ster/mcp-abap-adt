@@ -9,7 +9,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { repositoryRoot } from '../helpers/repoRoot';
-import { headOf, terseOf } from '../integration/helpers/terseAnswer';
+import {
+  headOf,
+  rowsWithoutTypeOrName,
+  terseOf,
+} from '../integration/helpers/terseAnswer';
 
 const GOLDENS: Record<string, { parts: string[] }> = JSON.parse(
   readFileSync(
@@ -60,6 +64,16 @@ describe('the live terse reader', () => {
     assert.deepEqual(
       answer.rows.map((row) => row.name),
       ['ZA', 'ZB'],
+    );
+  });
+
+  it('names the rows without a type or a name, by the header', () => {
+    const answer = terseOf(
+      'element\ttype\tname\n\tCLAS/OC\tZA\nRUN\tPROG/P\t\n\tINTF/OI\t',
+    );
+    assert.deepEqual(
+      rowsWithoutTypeOrName(answer).map((row) => row.element),
+      ['RUN', ''],
     );
   });
 });

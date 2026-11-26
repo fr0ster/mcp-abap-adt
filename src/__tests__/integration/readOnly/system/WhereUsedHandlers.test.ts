@@ -20,7 +20,12 @@ import { handleGetWhereUsed } from '../../../../handlers/system/readonly/handleG
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { servedSuite } from '../../helpers/servedHere';
-import { headOf, terseOf, terseText } from '../../helpers/terseAnswer';
+import {
+  headOf,
+  rowsWithoutTypeOrName,
+  terseOf,
+  terseText,
+} from '../../helpers/terseAnswer';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -42,17 +47,14 @@ function terseTotal(result: any): number {
   const total = Number(headOf(answer, 'total'));
   assert.ok(Number.isFinite(total), shown);
   // The usages SAP answered, as rows under their package: each a type, a
-  // name and a usage, wherever the header puts them.
-  for (const column of ['type', 'name', 'usage']) {
+  // name, the element it is in and a usage, wherever the header puts them.
+  for (const column of ['type', 'name', 'element', 'usage']) {
     assert.ok(answer.columns.includes(column), shown);
   }
   if (total > 0) assert.ok(answer.rows.length > 0, shown);
-  // Each usage names its object (a nameless one by its uri); its type is
-  // SAP's, which a reference may carry none of (CONVERT_FILE_TO_STRING
-  // came without adtcore:type on premise).
-  for (const row of answer.rows.slice(0, 50)) {
-    assert.ok(row.name || row.uri, JSON.stringify(row));
-  }
+  // Every usage names its object by a real type and name — a usage inside
+  // a method or section by the object it is in, the element beside it.
+  assert.deepStrictEqual(rowsWithoutTypeOrName(answer), [], shown);
   return total;
 }
 

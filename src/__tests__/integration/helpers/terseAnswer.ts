@@ -61,3 +61,14 @@ export function terseOf(text: string): TerseAnswer {
 export function headOf(answer: TerseAnswer, key: string): string | undefined {
   return answer.heads.find(([name]) => name === key)?.[1];
 }
+
+/**
+ * The rows of `answer` that do not name their object by a type and a name:
+ * every row of a listing of objects must, or it cannot be told where it
+ * is. Empty when every row names both.
+ */
+export function rowsWithoutTypeOrName(
+  answer: TerseAnswer,
+): ReadonlyArray<Readonly<Record<string, string>>> {
+  return answer.rows.filter((row) => !row.type || !row.name);
+}

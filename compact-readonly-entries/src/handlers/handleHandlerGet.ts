@@ -134,6 +134,8 @@ function addressReadOf(part: string, args: ToolArgs): AddressRead {
         parent_name: args.object_name,
         node_id: args.node_id,
         with_short_descriptions: args.with_short_descriptions,
+        // The part answers as GetNodeStructureLow answers, at the level asked.
+        detail: args.detail,
       },
     };
   }

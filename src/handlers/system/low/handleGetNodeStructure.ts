@@ -1,6 +1,19 @@
 import * as z from 'zod';
 import { purpose, toolDescription } from '../../../lib/description';
+import {
+  type Head,
+  type ListAnswerTable,
+  listAnswerAt,
+  wireAnswer,
+  writeListing,
+  writeWhole,
+} from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { succeeded } from '../../../lib/strategies/stepResponse';
 /**
  * GetNodeStructure Handler - Low-level handler for node structure
@@ -83,6 +96,7 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { bodyTextOf } from '../../../lib/wireValue';
+import { OBJECTS_BY_TYPE_LISTS } from '../../search/readonly/handleGetObjectsByType';
 
 export const TOOL_DEFINITION = {
   name: 'GetNodeStructureLow',
@@ -112,6 +126,7 @@ export const TOOL_DEFINITION = {
       .default(true)
       .optional()
       .describe('Include short descriptions in response'),
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -138,8 +153,24 @@ interface LevelAnswer {
   blank?: string;
 }
 
-/** The level answered: every object listed, complete or not. */
-function levelAnswer(level: NodeLevel): LevelAnswer {
+/** What a call read: the level, and for a package's blank body read once, `blank`. */
+interface NodeRead {
+  readonly level: NodeLevel;
+  readonly blank?: string | undefined;
+}
+
+/** The level of a blank body: nothing listed. */
+const EMPTY_LEVEL: NodeLevel = { objects: [], childNodes: [] };
+
+/** The level answered as JSON: every object listed, complete or not. */
+function levelAnswer({ level, blank }: NodeRead): LevelAnswer {
+  if (blank !== undefined) {
+    return {
+      objects: nodeItemsOf(level),
+      childNodes: childNodesOf(level),
+      blank,
+    };
+  }
   return {
     ...(isNotLoaded(level) ? { notLoaded: true as const } : {}),
     objects: nodeItemsOf(level),
@@ -148,13 +179,44 @@ function levelAnswer(level: NodeLevel): LevelAnswer {
 }
 
 /**
- * A success carrying a level answer — the shape `sequence()`'s steps answer
- * with — and, for a package's blank body read once, `blank`.
+ * A success carrying what the call read — the shape `sequence()`'s steps
+ * answer with.
  */
-function succeededLevel(
-  level: LevelAnswer,
-): IAdtResponse<LevelAnswer, IAdtError> {
-  return succeeded(level);
+function succeededRead(read: NodeRead): IAdtResponse<NodeRead, IAdtError> {
+  return succeeded(read);
+}
+
+/**
+ * What the level answers at each `detail` (`src/lib/detail`): terse the
+ * objects as rows, each child node and each node SAP could not load as a
+ * mark line, written by the listing writer over the level's own lists (as
+ * `GetObjectsByType` writes a level), the description column where asked;
+ * medium and full the level as JSON. Raw never reaches this table: the
+ * handler answers it as the documents read (`wireAnswer`).
+ */
+function nodeAnswers(
+  descriptions: boolean,
+): ListAnswerTable<NodeRead, string | LevelAnswer> {
+  return {
+    terse: (read) => {
+      const count =
+        nodeItemsOf(read.level).length + (read.level.notLoaded ?? []).length;
+      const heads: Head[] = [
+        { head: 'count', value: String(count) },
+        ...(read.blank === undefined
+          ? []
+          : [{ head: 'blank', value: read.blank }]),
+      ];
+      return writeListing({
+        heads,
+        reading: read.level,
+        lists: OBJECTS_BY_TYPE_LISTS[descriptions ? 'described' : 'bare'],
+      });
+    },
+    medium: (read) => writeWhole(levelAnswer(read)),
+    full: levelAnswer,
+    raw: levelAnswer,
+  };
 }
 
 /**
@@ -176,7 +238,7 @@ export async function handleGetNodeStructure(
   context: HandlerContext,
   args: GetNodeStructureArgs,
 ) {
-  return nodeStructure(context, args, 'read-package');
+  return nodeStructureAt(context, args, 'read-package');
 }
 
 /**
@@ -187,7 +249,31 @@ export async function handleGetNodeStructureOnce(
   context: HandlerContext,
   args: GetNodeStructureArgs,
 ) {
-  return nodeStructure(context, args, 'state');
+  return nodeStructureAt(context, args, 'state');
+}
+
+/**
+ * The node structure at the level asked: at `raw` what ADT sent — the
+ * documents the call's reads answered (one, or two where a package's blank
+ * body is checked against its metadata), read with the tool at full
+ * (`wireAnswer`, `src/lib/detail/wire.ts`).
+ */
+async function nodeStructureAt(
+  context: HandlerContext,
+  args: GetNodeStructureArgs,
+  blankPackage: BlankPackage,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetNodeStructureLow',
+        shape: 'assembled',
+      },
+      () => nodeStructure(context, { ...args, detail: 'full' }, blankPackage),
+    );
+  }
+  return nodeStructure(context, args, blankPackage);
 }
 
 async function nodeStructure(
@@ -206,10 +292,12 @@ async function nodeStructure(
     );
   }
 
-  // Task 28: why this tool carries no `detail`: it answers the level as
-  // read, one shape; the projection below is the identity.
+  const shown = listAnswerAt(
+    nodeAnswers(with_short_descriptions !== false),
+    levelOf(args),
+  );
   return answer(
-    { tool: 'GetNodeStructureLow', detail: 'terse' },
+    { tool: 'GetNodeStructureLow', detail: detailOf(args) },
     () => {
       const client = createAdtClient(connection, logger);
       return sequence(
@@ -227,19 +315,18 @@ async function nodeStructure(
         ),
         async (read) => {
           if (!isIndeterminateWalkAnswer(read.raw)) {
-            return succeededLevel(levelAnswer(read.level));
+            return succeededRead({ level: read.level });
           }
 
           if (parentType !== 'DEVC/K') {
             // Nothing below this node. See the header: measured on a class
             // that exists, so the blank body is the answer, not a refusal.
-            return succeededLevel({ objects: [], childNodes: [] });
+            return succeededRead({ level: EMPTY_LEVEL });
           }
 
           if (blankPackage === 'state') {
-            return succeededLevel({
-              objects: [],
-              childNodes: [],
+            return succeededRead({
+              level: EMPTY_LEVEL,
               blank: BLANK_PACKAGE_LISTING,
             });
           }
@@ -263,10 +350,10 @@ async function nodeStructure(
 
           // The package exists; the blank body was the genuinely-empty
           // answer, not the not-found one.
-          return succeededLevel({ objects: [], childNodes: [] });
+          return succeededRead({ level: EMPTY_LEVEL });
         },
       );
     },
-    (value) => value,
+    shown,
   );
 }

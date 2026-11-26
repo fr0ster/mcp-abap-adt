@@ -20,28 +20,33 @@ export function valuesWords(words: string, values: readonly string[]): string {
   return values.length === 0 ? `${words}.` : `${words}: ${values.join(', ')}.`;
 }
 
-/** A required argument whose description lists `values` and whose completion offers them. */
-export function closedArgument(words: string, values: readonly string[]) {
-  return completable(z.string().describe(valuesWords(words, values)), (typed) =>
-    completeFrom(values, typed),
-  );
-}
-
 /**
  * An optional argument whose description lists `values` and whose
  * completion offers them while `completes` holds for the arguments given so
  * far, and nothing otherwise.
+ *
+ * The completer is set on the optional schema and on the string inside it:
+ * the SDK answers `completion/complete` from the schema registered, but
+ * enables the completions capability only when the type inside an optional
+ * is completable — a prompt whose closed arguments are all optional would
+ * otherwise answer `completion/complete` "Method not found".
  */
 export function closedOptionalArgument(
   words: string,
   values: readonly string[],
   completes: (given: Readonly<Record<string, string>>) => boolean = () => true,
 ) {
+  const complete = (
+    typed: string | undefined,
+    context?: { arguments?: Record<string, string> },
+  ): string[] =>
+    completes(context?.arguments ?? {})
+      ? completeFrom(values, typed ?? '')
+      : [];
   return completable(
-    z.string().optional().describe(valuesWords(words, values)),
-    (typed, context) =>
-      completes(context?.arguments ?? {})
-        ? completeFrom(values, typed ?? '')
-        : [],
+    completable(z.string(), complete)
+      .optional()
+      .describe(valuesWords(words, values)),
+    complete,
   );
 }

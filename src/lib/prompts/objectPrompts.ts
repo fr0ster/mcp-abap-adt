@@ -6,7 +6,8 @@
 import * as z from 'zod';
 import { EMPTIED_INCLUDE_TYPES } from '../compact/compactSchemas.js';
 import type { JsonValue } from '../json.js';
-import { closedArgument } from './completion.js';
+import { askValue } from './askValue.js';
+import { closedOptionalArgument } from './completion.js';
 import {
   functionGroupArgument,
   functionGroupTakers,
@@ -25,7 +26,7 @@ import {
   type PromptObjectType,
   READ_PART,
 } from './objectRows.js';
-import { notServedWords, promptRefusal, requiredWords } from './refusals.js';
+import { promptRefusal, requiredWords } from './refusals.js';
 import { matchServed, requiredArgument } from './served.js';
 import { hasProperty, longToolStep, membersOn, toolStep } from './source.js';
 import type {
@@ -185,7 +186,7 @@ export function objectArguments(
   takers: readonly string[] = functionGroupTakers(served),
 ): PromptArgumentsSchema {
   return {
-    object_type: closedArgument(OBJECT_TYPE_WORDS, served),
+    object_type: closedOptionalArgument(OBJECT_TYPE_WORDS, served),
     name: z
       .string()
       .describe(takers.length === 0 ? NAME_WORDS : FUNCTION_MODULE_NAME_WORDS),
@@ -193,30 +194,30 @@ export function objectArguments(
   };
 }
 
-/** The served row and the name `args` give, or the refusal of either. */
+/**
+ * The served row and the name `args` give; the instruction asking for the
+ * type when `object_type` is absent or names none served; or the refusal of
+ * the name.
+ */
 export function objectOf(
   operation: ObjectOperation,
   rows: readonly ServedRow[],
   args: PromptArguments,
-): { readonly row: ServedRow; readonly named: ObjectName } {
+):
+  | { readonly row: ServedRow; readonly named: ObjectName }
+  | { readonly ask: PromptInstruction } {
+  const served = rows.map(({ type }) => type.toLowerCase());
   const objectType = requiredArgument(args, 'object_type');
-  if (objectType === undefined) {
-    throw promptRefusal(requiredWords(operation, 'object_type'));
-  }
-  const type = matchServed(objectType, byLowercase(rows));
-  const row = rows.find((served) => served.type === type);
+  const type =
+    objectType === undefined
+      ? undefined
+      : matchServed(objectType, byLowercase(rows));
+  const row = rows.find((each) => each.type === type);
   if (row === undefined) {
-    throw promptRefusal(
-      notServedWords(
-        operation,
-        objectType,
-        rows.map(({ type }) => type.toLowerCase()),
-      ),
-    );
+    return { ask: askValue(operation, 'object_type', objectType, served) };
   }
   const name = requiredArgument(args, 'name');
   if (name === undefined) throw promptRefusal(requiredWords(operation, 'name'));
-  const served = rows.map(({ type }) => type.toLowerCase());
   return {
     row,
     named: objectNameOf(
@@ -394,8 +395,10 @@ export function objectPrompt(
       ...extra,
     },
     instruction: (args) => {
-      const { row, named } = objectOf(operation, rows, args);
-      return instruction(row, named, args);
+      const found = objectOf(operation, rows, args);
+      return 'ask' in found
+        ? found.ask
+        : instruction(found.row, found.named, args);
     },
   };
 }

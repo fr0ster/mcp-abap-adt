@@ -5,6 +5,7 @@
  */
 import type { TextElementsContainer } from '../../handlers/system/readonly/handleGetWhereUsed.js';
 import { WHERE_USED_CODES, type WhereUsedCode } from '../adtProjections.js';
+import { askValue } from './askValue.js';
 import { closedOptionalArgument } from './completion.js';
 import {
   functionGroupTakers,
@@ -19,7 +20,7 @@ import {
   userValue,
 } from './objectPrompts.js';
 import type { PromptObjectType } from './objectRows.js';
-import { notServedWords, promptRefusal, requiredWords } from './refusals.js';
+import { promptRefusal, requiredWords } from './refusals.js';
 import { lowercaseKeyed, matchServed, requiredArgument } from './served.js';
 import { listedProperty, longToolStep } from './source.js';
 import type {
@@ -185,12 +186,12 @@ export function whereUsedPrompt(source: PromptSource): AbapPrompt | undefined {
     },
     instruction: (args): PromptInstruction => {
       const objectType = requiredArgument(args, 'object_type');
-      if (objectType === undefined) {
-        throw promptRefusal(requiredWords('where_used', 'object_type'));
-      }
-      const type = matchServed(objectType, byLowercase);
+      const type =
+        objectType === undefined
+          ? undefined
+          : matchServed(objectType, byLowercase);
       if (type === undefined) {
-        throw promptRefusal(notServedWords('where_used', objectType, served));
+        return askValue('where_used', 'object_type', objectType, served);
       }
       const name = requiredArgument(args, 'name');
       if (name === undefined) {

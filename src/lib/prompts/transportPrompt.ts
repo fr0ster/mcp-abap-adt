@@ -5,7 +5,8 @@
  * `ENTRY_ARGUMENT`, their `pgmid` carried.
  */
 import * as z from 'zod';
-import { closedArgument, closedOptionalArgument } from './completion.js';
+import { askValue } from './askValue.js';
+import { closedOptionalArgument } from './completion.js';
 import { jsonLiteral } from './instruction.js';
 import {
   offers,
@@ -16,7 +17,6 @@ import {
 import {
   notServedWords,
   promptRefusal,
-  requiredWords,
   transportTakesWords,
 } from './refusals.js';
 import { lowercaseKeyed, matchServed, requiredArgument } from './served.js';
@@ -618,22 +618,18 @@ export function transportPrompt(source: PromptSource): AbapPrompt | undefined {
     description:
       'Works with transport requests and their entries, by the action given.',
     argsSchema: {
-      action: closedArgument(WORDS.action, actions),
+      action: closedOptionalArgument(WORDS.action, actions),
       ...Object.fromEntries(
         declared.map((argument) => [argument, schemaOf(argument)]),
       ),
     },
     instruction: (args): PromptInstruction => {
       const given = requiredArgument(args, 'action');
-      if (given === undefined) {
-        throw promptRefusal(requiredWords('transport', 'action'));
-      }
-      const action = matchServed(given, actionByName);
+      const action =
+        given === undefined ? undefined : matchServed(given, actionByName);
       const row = action === undefined ? undefined : served.get(action);
       if (action === undefined || row === undefined) {
-        throw promptRefusal(
-          `transport: action ${jsonLiteral(given)} is not served by this server; it serves ${actions.join(', ')}.`,
-        );
+        return askValue('transport', 'action', given, actions);
       }
       return row.instruction(givenFor(action, args, objectTypes));
     },

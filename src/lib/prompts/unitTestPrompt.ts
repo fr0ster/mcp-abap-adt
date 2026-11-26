@@ -11,11 +11,12 @@ import { TOOL_DEFINITION as RunProgramUnitTest } from '../../handlers/unit_test/
 import { TOOL_DEFINITION as RunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest.js';
 import type { RunTargetArgs } from '../../handlers/unit_test/shared/runTarget.js';
 import type { JsonValue } from '../json.js';
+import { askValue } from './askValue.js';
 import { closedOptionalArgument, valuesWords } from './completion.js';
 import { jsonLiteral } from './instruction.js';
 import { objectArguments, stepValue, userValue } from './objectPrompts.js';
 import { type FullRow, fullRow } from './objectRows.js';
-import { notServedWords, promptRefusal, requiredWords } from './refusals.js';
+import { promptRefusal, requiredWords } from './refusals.js';
 import { matchServed, requiredArgument } from './served.js';
 import { toolStep } from './source.js';
 import type {
@@ -242,13 +243,13 @@ export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
     },
     instruction: (args): PromptInstruction => {
       const objectType = requiredArgument(args, 'object_type');
-      if (objectType === undefined) {
-        throw promptRefusal(requiredWords('unit_test', 'object_type'));
-      }
-      const type = matchServed(objectType, byLowercase);
-      const row = rows.find((served) => served.type === type);
+      const type =
+        objectType === undefined
+          ? undefined
+          : matchServed(objectType, byLowercase);
+      const row = rows.find((each) => each.type === type);
       if (row === undefined) {
-        throw promptRefusal(notServedWords('unit_test', objectType, served));
+        return askValue('unit_test', 'object_type', objectType, served);
       }
       const name = requiredArgument(args, 'name');
       if (name === undefined) {

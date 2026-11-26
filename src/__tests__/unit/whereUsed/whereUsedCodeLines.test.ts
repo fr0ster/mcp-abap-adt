@@ -650,6 +650,23 @@ describe('a blank in_object field never matches', () => {
     assert.equal(connection.requests.length, 0);
   });
 
+  // A function module's group is read first (its module check): the
+  // refusal comes before that read too.
+  it('is refused before the group read a function module target sends', async () => {
+    const connection = recordingConnection([]);
+    declareSystemKind(connection, 'onprem');
+    const result = await handleGetWhereUsed(
+      { connection, logger: undefined, batchAvailability: noBatch() },
+      {
+        object_name: 'ZMCP_SHR_FUGR|Z_SHR_MODULE',
+        object_type: 'FUGR/FF',
+        in_object: { object_type: 'CLAS/OC', object_name: '  ' },
+      },
+    );
+    assert.equal(result.isError, true);
+    assert.equal(connection.requests.length, 0);
+  });
+
   it('is refused before any request', async () => {
     for (const blank of [
       { object_type: ' ', object_name: 'RUN' },

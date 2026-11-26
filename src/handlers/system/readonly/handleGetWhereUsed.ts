@@ -207,84 +207,128 @@ function untoldUri(row: WhereUsedRow) {
  * line names it — `TYPE NAME` —; `''` for a row that names no element.
  */
 function ownerOf(row: WhereUsedRow): string {
-  return row.element === undefined ? '' : `${row.type} ${row.name}`;
+  // Only an object of a known type and name: a reference SAP left
+  // unresolved keeps its plain row, its URI what tells where it is.
+  return row.element === undefined || row.type === '' || row.name === ''
+    ? ''
+    : `${row.type} ${row.name}`;
 }
 
-/** The lists a WhereUsedRows listing writes: what its description states. */
-export const WHERE_USED_LISTS: RowSchemas<WhereUsedRows> = {
-  references: about(
-    'for each object that uses it, under its package',
-    rows('references', {
-      columns: [
-        {
-          name: 'type',
-          means: 'its type (a usage in a method or section: on its # in line)',
-          cell: (row: WhereUsedRow) => (ownerOf(row) === '' ? row.type : ''),
-        },
-        {
-          name: 'name',
-          means: 'its name (a usage in a method or section: on its # in line)',
-          cell: (row: WhereUsedRow) => (ownerOf(row) === '' ? row.name : ''),
-        },
-        {
-          name: 'element',
-          means:
-            'the method or section the use is in, under the # in line of the object it belongs to',
-          cell: (row: WhereUsedRow) => row.element ?? '',
-        },
-        {
-          name: 'uri',
-          means: 'its URI when SAP lists it without a name or a type',
-          cell: untoldUri,
-        },
-        {
-          name: 'usage',
-          means: 'how it uses the object, where SAP tells it',
-          cell: (row: WhereUsedRow) =>
-            row.usage_information === COMMON_USAGE
-              ? ''
-              : (row.usage_information ?? ''),
-        },
-        {
-          name: 'code',
-          means: 'the source line the use is on, where it is in code',
-          cell: (row: WhereUsedRow) => row.code ?? '',
-        },
-      ],
-      header: 'always',
-      groups: [
-        {
-          label: 'package',
-          of: (row: WhereUsedRow) => row.package_name ?? '',
-          mode: 'gathered',
-        },
-        // A usage in a method or section under one line naming the object
-        // it belongs to by its type and name, written once; every other
-        // usage a plain row, before those lines.
-        {
-          label: 'in',
-          of: ownerOf,
-          mode: 'gathered',
-          unless: '',
-        },
-      ],
-      // The terse shape (approved): usages only — the package and
-      // container nodes of SAP's tree carry no usage, and leave.
-      omit: omitting(
-        (row: WhereUsedRow) =>
-          row.usage_information === undefined ? 'node' : 'usage',
-        {
-          node: 'the packages and containers SAP groups the usages under are left out',
-        },
-      ),
-    }),
-  ),
-};
+/**
+ * The lists a WhereUsedRows listing writes: what its description states —
+ * with `code`, each row's source line (an `in_object` answer).
+ */
+function whereUsedLists(withCode: boolean): RowSchemas<WhereUsedRows> {
+  return {
+    references: about(
+      withCode
+        ? 'for each usage inside the object named, its method or section and its source line'
+        : 'for each object that uses it, under its package',
+      rows('references', {
+        columns: [
+          {
+            name: 'type',
+            means:
+              'its type (a usage in a method or section: on its # in line)',
+            cell: (row: WhereUsedRow) => (ownerOf(row) === '' ? row.type : ''),
+          },
+          {
+            name: 'name',
+            means:
+              'its name (a usage in a method or section: on its # in line)',
+            cell: (row: WhereUsedRow) => (ownerOf(row) === '' ? row.name : ''),
+          },
+          {
+            name: 'element',
+            means:
+              'the method or section the use is in, under the # in line of the object it belongs to',
+            cell: (row: WhereUsedRow) => row.element ?? '',
+          },
+          {
+            name: 'uri',
+            means: 'its URI when SAP lists it without a name or a type',
+            cell: untoldUri,
+          },
+          {
+            name: 'usage',
+            means: 'how it uses the object, where SAP tells it',
+            cell: (row: WhereUsedRow) =>
+              row.usage_information === COMMON_USAGE
+                ? ''
+                : (row.usage_information ?? ''),
+          },
+          ...(withCode
+            ? [
+                {
+                  name: 'code',
+                  means: 'the source line the use is on, where it is in code',
+                  cell: (row: WhereUsedRow) => row.code ?? '',
+                },
+              ]
+            : []),
+        ],
+        header: 'always',
+        groups: [
+          {
+            label: 'package',
+            of: (row: WhereUsedRow) => row.package_name ?? '',
+            mode: 'gathered',
+          },
+          // A usage in a method or section under one line naming the object
+          // it belongs to by its type and name, written once; every other
+          // usage a plain row, before those lines.
+          {
+            label: 'in',
+            of: ownerOf,
+            mode: 'gathered',
+            unless: '',
+          },
+        ],
+        // The terse shape (approved): usages only — the package and
+        // container nodes of SAP's tree carry no usage, and leave.
+        omit: omitting(
+          (row: WhereUsedRow) =>
+            row.usage_information === undefined ? 'node' : 'usage',
+          {
+            node: 'the packages and containers SAP groups the usages under are left out',
+          },
+        ),
+      }),
+    ),
+  };
+}
+
+/** The lists of a where-used answer: where each usage is. */
+export const WHERE_USED_LISTS: RowSchemas<WhereUsedRows> =
+  whereUsedLists(false);
+
+/** The lists of an `in_object` answer: each usage with its source line. */
+export const WHERE_USED_CODE_LISTS: RowSchemas<WhereUsedRows> =
+  whereUsedLists(true);
 
 /** The head every where-used listing opens with. */
 export const WHERE_USED_HEADS = [
   headShape('total', 'how many references SAP counts'),
 ];
+
+/**
+ * `in_object`: one object that uses the one asked for. With it the answer
+ * is that object's usages only, each with the source line it is on (one
+ * `usageSnippets` read over their identifiers).
+ */
+export const IN_OBJECT_FIELD = z
+  .object({
+    object_type: z
+      .string()
+      .describe(
+        'Its type as the where-used answer names it, e.g. CLAS/OC, PROG/P, FUGR/F',
+      ),
+    object_name: z.string().describe('Its name'),
+  })
+  .optional()
+  .describe(
+    "One object that uses it, as a where-used answer names it (type and name): the answer is then that object's usages only, each with its method or section and the source line it is on. Call once for each using object whose code lines are wanted; without it the answer is where each usage is, with no code lines.",
+  );
 
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
@@ -329,6 +373,7 @@ function oneWhereUsedForm(variant: RuleVariant) {
       object_type?: string | undefined;
       container?: TextElementsContainer | undefined;
       objects?: readonly object[] | undefined;
+      in_object?: object | undefined;
     },
     ctx: z.RefinementCtx,
   ): void => {
@@ -354,6 +399,12 @@ function oneWhereUsedForm(variant: RuleVariant) {
       refuse(
         'container goes in each objects entry beside its object_type',
         'container',
+      );
+    }
+    if (args.in_object !== undefined) {
+      refuse(
+        'in_object is taken with one object (object_name and object_type), not with objects',
+        'in_object',
       );
     }
     if (
@@ -422,6 +473,7 @@ function whereUsedFields(variant: ProjectionVariant) {
       .describe(
         "Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.",
       ),
+    in_object: IN_OBJECT_FIELD,
     ...ASSEMBLED_DETAIL_SHAPE,
   };
 }
@@ -490,6 +542,7 @@ function fullWhereUsed(result: WhereUsedListResult, args: WhereUsedArgs) {
     enable_all_types: args.enable_all_types || false,
     enable_only_types: args.enable_only_types,
     disable_types: args.disable_types,
+    in_object: args.in_object,
     total_references: result.totalReferences,
     result_description: result.resultDescription,
     references: result.references,
@@ -511,6 +564,29 @@ function whereUsedListing(result: WhereUsedRows): Listing<WhereUsedRows> {
 }
 
 /**
+ * The usages inside one object (`in_object`) as TSV: the count SAP gave,
+ * then how many are inside it — `0` said plainly, not an error —, each
+ * with its source line.
+ */
+function inObjectListing(
+  result: WhereUsedRows,
+  usages: number,
+  inObject: { object_type: string; object_name: string },
+): Listing<WhereUsedRows> {
+  return {
+    heads: [
+      { head: 'total', value: String(result.totalReferences) },
+      {
+        head: 'in_object',
+        value: `${inObject.object_type} ${inObject.object_name}: ${usages} usage(s)`,
+      },
+    ],
+    reading: result,
+    lists: WHERE_USED_CODE_LISTS,
+  };
+}
+
+/**
  * What GetWhereUsed answers at each `detail`, selected before the requests
  * (`src/lib/detail`): terse the usages ({@link whereUsedListing}, its nodes an `omit` kind); medium every
  * reference with every field read, without its uri; full the answer before
@@ -521,7 +597,16 @@ function whereUsedListing(result: WhereUsedRows): Listing<WhereUsedRows> {
 const WHERE_USED_ANSWERS: ListAnswerTable<WhereUsedRead, string | object> = {
   // Every usage (terse) or reference (medium, full), written from the
   // list's own references by the listing writers.
-  terse: ({ result }) => writeListing(whereUsedListing(whereUsedRows(result))),
+  terse: ({ result, args }) =>
+    writeListing(
+      args.in_object === undefined
+        ? whereUsedListing(whereUsedRows(result))
+        : inObjectListing(
+            whereUsedRows(result),
+            result.references.length,
+            args.in_object,
+          ),
+    ),
   medium: ({ result }) =>
     writeJson(
       {
@@ -622,17 +707,27 @@ async function whereUsedOf(
   const shown = listAnswerAt(WHERE_USED_ANSWERS, levelOf(args));
   return answer(
     { tool: 'GetWhereUsed', detail: detailOf(args) },
-    // The usages, then ONE read of their code lines (`withUsageSnippets`).
-    async () =>
-      withUsageSnippets(
-        await fetchWhereUsedReferences(whereUsedOn(context, utils), {
+    // The usages; with `in_object`, those inside it and ONE read of their
+    // code lines (`withUsageSnippets`).
+    async () => {
+      const listed = await fetchWhereUsedReferences(
+        whereUsedOn(context, utils),
+        {
           ...target,
           enableAllTypes: typedArgs.enable_all_types,
           enableOnlyTypes: typedArgs.enable_only_types,
           disableTypes: typedArgs.disable_types,
-        }),
-        usageSnippetsOn(context, connection),
-      ),
+        },
+      );
+      const inObject = typedArgs.in_object;
+      return inObject === undefined
+        ? listed
+        : withUsageSnippets(
+            listed,
+            usageSnippetsOn(context, connection),
+            inObject,
+          );
+    },
     (result: WhereUsedListRead) => {
       // The cache keeps the full answer, whatever the level answered.
       objectsListCache.setCache({
@@ -736,27 +831,22 @@ async function whereUsedFromAnswers(
   const shown = listAnswerAt(WHERE_USED_ANSWERS, levelOf(given));
   return answer(
     { tool: 'GetWhereUsed', detail: detailOf(given) },
-    // The usages, then ONE read of their code lines (`withUsageSnippets`).
-    async () =>
-      withUsageSnippets(
-        await fetchWhereUsedReferences(
-          {
-            getWhereUsedScope: () => answered(scope),
-            modifyWhereUsedScope: (scopeXml, options) =>
-              utils.modifyWhereUsedScope(
-                scopeXml,
-                presentScopeOptions(options),
-              ),
-            getWhereUsed: () => answered(references),
-          },
-          {
-            ...target,
-            enableAllTypes: typedArgs.enable_all_types,
-            enableOnlyTypes: typedArgs.enable_only_types,
-            disableTypes: typedArgs.disable_types,
-          },
-        ),
-        usageSnippetsOn(context, connection),
+    // The usages read in envelopes: with no code lines (`in_object` is read
+    // by the single call, `whereUsedOf`).
+    () =>
+      fetchWhereUsedReferences(
+        {
+          getWhereUsedScope: () => answered(scope),
+          modifyWhereUsedScope: (scopeXml, options) =>
+            utils.modifyWhereUsedScope(scopeXml, presentScopeOptions(options)),
+          getWhereUsed: () => answered(references),
+        },
+        {
+          ...target,
+          enableAllTypes: typedArgs.enable_all_types,
+          enableOnlyTypes: typedArgs.enable_only_types,
+          disableTypes: typedArgs.disable_types,
+        },
       ),
     (result: WhereUsedListRead) => {
       // The cache keeps the full answer, whatever the level answered.
@@ -945,14 +1035,16 @@ async function whereUsedInEnvelopes(
 
   const answers: McpResult[] = [];
   for (const [i, target] of targets.entries()) {
-    answers.push(
-      await whereUsedFromAnswers(
-        context,
-        target,
-        scopes.get(i),
-        references.get(i),
-      ),
+    const result = await whereUsedFromAnswers(
+      context,
+      target,
+      scopes.get(i),
+      references.get(i),
     );
+    // A credential failure of an object's code-line read ends the call, as
+    // the sequential version ends it: nothing after it is read.
+    if (endsList(result)) return { ended: result };
+    answers.push(result);
   }
   return { answers };
 }
@@ -1151,13 +1243,24 @@ async function answeredGetWhereUsed(
   if (listed === undefined) {
     const refused = await refusedModule(context, [args]);
     if (refused !== undefined) return refused;
-    if (!args?.object_name || !args?.object_type || !readsScope(args)) {
+    // `in_object` reads its code lines after the usages: the single call.
+    if (
+      !args?.object_name ||
+      !args?.object_type ||
+      !readsScope(args) ||
+      args.in_object !== undefined
+    ) {
       return whereUsedOf(context, args);
     }
     return withSequentialFallback<McpResult>(
       context,
       async () => onlyAnswer(await whereUsedInEnvelopes(context, [args], args)),
       () => whereUsedOf(context, args),
+    );
+  }
+  if (args.in_object !== undefined) {
+    return return_error(
+      'in_object is taken with one object (object_name and object_type), not with objects; nothing was sent',
     );
   }
   const objects = listed.map((o) => ({

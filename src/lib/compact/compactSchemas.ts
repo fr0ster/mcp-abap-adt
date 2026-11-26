@@ -2454,6 +2454,22 @@ function systemProperties(
             "ADT object types removed from the scope (e.g. ['CLAS/OC']).",
         }),
       ),
+    in_object: z
+      .object({
+        object_type: z
+          .string()
+          .describe(
+            'Its type as the where-used answer names it, e.g. CLAS/OC, PROG/P, FUGR/F',
+          ),
+        object_name: z.string().describe('Its name'),
+      })
+      .optional()
+      .describe(
+        said(actions, {
+          where_used:
+            'one object that uses it, as a where-used answer names it (type and name): the answer is then its usages only, each with its method or section and source line; once per using object whose code lines are wanted.',
+        }),
+      ),
     package_name: z
       .string()
       .optional()
@@ -2594,6 +2610,7 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
       'enable_all_types',
       'enable_only_types',
       'disable_types',
+      'in_object',
       'detail',
     ],
     package_tree: [

@@ -327,31 +327,66 @@ export function usageRows(reference: WhereUsedReference): WhereUsedRow[] {
   });
 }
 
+/** One object that uses the one asked for, named by its type and name. */
+export interface InObject {
+  object_type: string;
+  object_name: string;
+}
+
+/** `value` as compared: trimmed, upper case. */
+function comparable(value: string): string {
+  return value.trim().toUpperCase();
+}
+
 /**
- * A where-used list with its code lines: ONE `usageSnippets` read over the
- * identifiers of every usage the list holds (a reference with
- * `usage_information`), each answer joined to its reference by its
- * identifier. A list with no such identifier is answered as read, with no
- * request. A refused read is the answer, with its step — never the list
- * without its code lines.
+ * Whether `reference` is a usage inside `inObject`: a usage (it carries
+ * `usage_information`) whose object — the one it is in where the list
+ * resolves it (`parent_type`, `parent_name`), else its own — has that type
+ * and name.
+ */
+export function usageIn(
+  reference: WhereUsedReference,
+  inObject: InObject,
+): boolean {
+  if (reference.usage_information === undefined) return false;
+  const type = reference.parent_type ?? reference.type;
+  const name = reference.parent_name ?? reference.name;
+  return (
+    comparable(type) === comparable(inObject.object_type) &&
+    comparable(name) === comparable(inObject.object_name)
+  );
+}
+
+/**
+ * The usages of a where-used list inside one using object, with their code
+ * lines: the list kept to the usages {@link usageIn} `inObject`, then ONE
+ * `usageSnippets` read over exactly their identifiers, each answer joined
+ * to its usage by its identifier. An object with no usage in the list
+ * answers none, with no request. A refused or unreadable read is the
+ * answer, with its step — never the usages without their lines.
  */
 export async function withUsageSnippets(
   listed: IAdtResponse<WhereUsedListRead, IAdtError>,
   source: UsageSnippetsSource,
+  inObject: InObject,
 ): Promise<IAdtResponse<WhereUsedListRead, IAdtError>> {
   if (!listed.ok) return listed;
   const read = listed.getResult().value;
+  const inside = read.references.filter((reference) =>
+    usageIn(reference, inObject),
+  );
   const identifiers = [
     ...new Set(
-      read.references.flatMap((reference) =>
-        reference.usage_information !== undefined &&
-        reference.object_identifier !== undefined
-          ? [reference.object_identifier]
-          : [],
+      inside.flatMap((reference) =>
+        reference.object_identifier === undefined
+          ? []
+          : [reference.object_identifier],
       ),
     ),
   ];
-  if (identifiers.length === 0) return listed;
+  if (identifiers.length === 0) {
+    return succeeded({ ...read, references: inside });
+  }
   const answered = await atStep('read where-used code lines', () =>
     source.read(identifiers),
   )();
@@ -359,7 +394,7 @@ export async function withUsageSnippets(
   const snippets = answered.getResult().value;
   return succeeded({
     ...read,
-    references: read.references.map((reference) => {
+    references: inside.map((reference) => {
       const lines =
         reference.object_identifier === undefined
           ? undefined

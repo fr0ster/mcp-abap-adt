@@ -633,6 +633,23 @@ describe('the usageSnippets answer is read by its structure', () => {
 });
 
 describe('a blank in_object field never matches', () => {
+  // With a scope filter the scope is read first: the refusal comes before it.
+  it('is refused before the scope request a type filter sends', async () => {
+    const connection = recordingConnection([]);
+    declareSystemKind(connection, 'onprem');
+    const result = await handleGetWhereUsed(
+      { connection, logger: undefined, batchAvailability: noBatch() },
+      {
+        object_name: 'ZMCP_SHR_DTEL',
+        object_type: 'DTEL/DE',
+        enable_only_types: ['CLAS/OC'],
+        in_object: { object_type: ' ', object_name: 'ZCL_OK_TEST' },
+      },
+    );
+    assert.equal(result.isError, true);
+    assert.equal(connection.requests.length, 0);
+  });
+
   it('is refused before any request', async () => {
     for (const blank of [
       { object_type: ' ', object_name: 'RUN' },

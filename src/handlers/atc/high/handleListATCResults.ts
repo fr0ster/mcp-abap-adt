@@ -8,10 +8,30 @@ import {
   toolDescription,
 } from '../../../lib/description';
 import { runParts } from '../../../lib/description/runs';
+import {
+  about,
+  type Column,
+  headShape,
+  type ListAnswerTable,
+  listAnswerAt,
+  type RowSchemas,
+  rows,
+  writeListing,
+  writeWhole,
+} from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
-import { parseAtcResultList } from '../../../lib/strategies/atcResults';
+import {
+  type AtcResultEntry,
+  type AtcResultListReading,
+  parseAtcResultList,
+} from '../../../lib/strategies/atcResults';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 
 /**
@@ -59,6 +79,7 @@ export const TOOL_DEFINITION = {
       .min(0, { error: AGE_MAX_WORDS })
       .optional()
       .describe('Oldest age to list, in days.'),
+    ...DETAIL_SHAPE,
   }),
 } as const;
 
@@ -75,7 +96,7 @@ export async function handleListATCResults(
   const atc = new AdtRuntimeClient(connection, logger).getAtc(ourAtc);
 
   return answer(
-    { tool: 'ListATCResults', detail: 'terse' },
+    { tool: 'ListATCResults', detail: detailOf(args) },
     () =>
       atc.listResults({
         createdBy,
@@ -84,9 +105,61 @@ export async function handleListATCResults(
         ...(args.age_max !== undefined && { ageMax: args.age_max }),
         analyse: analyseException,
       }),
-    (document) => atcResultListAnswer(String(document ?? '')),
+    (document) =>
+      listAnswerAt(RESULTS_ANSWERS, levelOf(args))(String(document ?? '')),
   );
 }
+
+/** What a result's row is written with: what the next call needs of it. */
+const RESULT_COLUMNS: readonly Column<AtcResultEntry>[] = [
+  {
+    name: 'display_id',
+    means: 'its display ID',
+    cell: (result) => result.display_id,
+  },
+  { name: 'title', means: 'its title', cell: (result) => result.title ?? '' },
+  {
+    name: 'check_variant',
+    means: 'its check variant',
+    cell: (result) => result.check_variant ?? '',
+  },
+  {
+    name: 'created_at',
+    means: 'when it was created',
+    cell: (result) => result.created_at ?? '',
+  },
+];
+
+/** The lists the result listing writes: a row per result. */
+export const ATC_RESULTS_LISTS: RowSchemas<AtcResultListReading> = {
+  results: about(
+    'for each result',
+    rows('results', { columns: RESULT_COLUMNS, header: 'always' }),
+  ),
+};
+
+/** The head the result listing opens with. */
+export const ATC_RESULTS_HEADS = [headShape('count', 'how many there are')];
+
+/**
+ * What the list answers at each `detail` (`src/lib/detail`): terse a row
+ * per result, written by the listing writer; medium and full every field
+ * read, as JSON; raw the document as SAP sent it.
+ */
+const RESULTS_ANSWERS: ListAnswerTable<string, string | object> = {
+  terse: (document) => {
+    const reading = parseAtcResultList(document);
+    return writeListing({
+      heads: [{ head: 'count', value: String(reading.results.length) }],
+      reading,
+      lists: ATC_RESULTS_LISTS,
+    });
+  },
+  // The reading whole, as full gives it: complete by construction.
+  medium: (document) => writeWhole(atcResultListAnswer(document)),
+  full: atcResultListAnswer,
+  raw: (document) => document,
+};
 
 /** What the list answers: how many results, and each result. */
 export function atcResultListAnswer(document: string) {

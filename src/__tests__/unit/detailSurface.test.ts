@@ -247,6 +247,7 @@ const JSON_ANSWERING: readonly string[] = [
   'GetTransport',
   'GetUnitTestResult',
   'GetWhereUsed',
+  'ListATCResults',
   'ListAbapGitRepos',
   'ListFunctionGroupIncludes',
   'ListFunctionModules',

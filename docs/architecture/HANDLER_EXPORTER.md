@@ -314,7 +314,10 @@ only as options — `HandlerExporter`'s, or the hosting server's:
   refusal. A credential refusal always ends the call; a failed batch envelope
   and anything else are always thrown. Absent: `skipSapAnswers`.
 - **`lineMatchStrategy`** (`LineMatchStrategy`): which lines of a source are
-  hits (`ScanInput` in, `ScanResult` out). Absent: `substringLineMatch`.
+  hits (`ScanInput` in, `ScanResult` out). Absent: `substringLineMatch`. A
+  strategy whose hits are only lines holding `query` may say so
+  (`hitsHoldQuery: true`, as the shipped one does): with `max_hits`, a step
+  whose sources hold no query is then not scanned again.
 
 Both contracts and both shipped strategies are exported from
 `@mcp-abap-adt/lib/embeddable`. On `getHandlerEntries()` and

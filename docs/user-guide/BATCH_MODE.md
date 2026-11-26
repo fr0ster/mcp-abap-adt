@@ -337,20 +337,24 @@ choice, not a rule: an envelope of one part would be as correct.
   description is its metadata's. The sequential version reads the same metadata, one request
   each, so both paths answer from one source. A leaf whose metadata read SAP refused — a `401`
   included — has no description, and the call answers, on both paths.
-- **`SearchSource`.** Several targets' rounds go in envelopes; a single target, and any phase of
-  one read (one mask's quickSearch, a walk level of one node structure, a round of one source
-  read), goes as single requests (an implementation choice).
+- **`SearchSource`.** Several targets' rounds go in envelopes; without `max_hits` a single target,
+  and any phase of one read (one mask's quickSearch, a walk level of one node structure, a round of
+  one source read), goes as single requests (an implementation choice). With `max_hits` a target's
+  rounds of two or more reads go in envelopes (below).
 - **No bound of the server's own on the reads of an envelope.** By default all independent reads of
   a phase go in one envelope. The consumer may set a bound: `--batch-reads-per-envelope=<reads>`
   (`MCP_BATCH_READS_PER_ENVELOPE`, YAML `batch.readsPerEnvelope`; a whole number from 2; an
   embedder's `readsPerEnvelope` option). It applies to every phase, in one place
   (`runPhaseOutcome` / `runPhase`, `src/lib/batch/phases.ts`): more independent reads go in
   consecutive envelopes of balanced size (`chunksOf`: 302 reads at 300 are 151 and 151, never 300
-  and 2), in order, each answer still its own read's.
+  and 2), in order, each answer still its own read's. The bound counts a phase's reads — one per
+  object or source read; a read whose ADT call sends several independent requests at once carries
+  them all in its envelope, so an envelope's parts can exceed the bound by those extra requests.
 - **A failed envelope is answered as SAP answered it.** An envelope SAP refuses or fails is every
   part's failure, as it came, and the call answers that; with a bound, an envelope that failed or
   met a credential refusal ends the phase: no later envelope is sent, and the reads it would have
-  carried answer that same failure, as one envelope holding them all would have. Where a step
+  carried answer that same failure, as one envelope holding them all would have. A part SAP
+  answered `401`, and a format-correction envelope that failed, end the phase the same way. Where a step
   judges each envelope itself — the group checks (the first failure is the answer), `GetEnhancements`
   — no envelope is sent after the one whose answer ends the call. **The exception is
   `GetObjectInfo`'s metadata phase** (`include_descriptions: true`): a failed metadata read — a part

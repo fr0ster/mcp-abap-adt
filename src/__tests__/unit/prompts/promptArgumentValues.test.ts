@@ -267,6 +267,26 @@ describe('a closed prompt argument lists its completion values in its descriptio
     });
   }
 
+  it('with --deny-actions AddTransportObject on core: the transport object_type names only the actions left that read it', async () => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    const client = await deniedClient(fullToolSet, ['AddTransportObject']);
+    opened.push(client);
+    const listed = (await promptsOf(client)).find(
+      (each) => each.prompt.name === 'transport',
+    );
+    assert.ok(listed, 'core lists transport');
+    assert.ok(!(listed.completions.action ?? []).includes('add_object'));
+    const values = listed.completions.object_type ?? [];
+    assert.ok(values.length > 0, 'transport object_type completes');
+    const objectType = listed.prompt.arguments?.find(
+      ({ name }) => name === 'object_type',
+    );
+    assert.equal(
+      objectType?.description,
+      `The object's type (read by remove_object, move_objects): ${values.join(', ')}.`,
+    );
+  });
+
   it('a picked argument absent, blank or not served asks the user, on every stdio binary and kind', async () => {
     let answers = 0;
     for (const systemType of LISTED_TYPES) {

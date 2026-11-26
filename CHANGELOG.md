@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Terse answers, the remaining tools** (the follow-up named in 24.2.0): `GetObjectInfo`, `GetNodeStructureLow`, `ListATCResults` and the data tools (`GetSqlQuery`, `GetTableContents`, compact `HandlerGetData`) answer terse by default, written by the shared listing writer, and take `detail` (`terse`, `medium`, `full`, `raw`).
+  - `GetObjectInfo`: terse the tree as indented rows, the object asked first, each node with its type, name, description and package; several objects each under its `# asked` line, a failed one with its `# error`. Medium and full the tree as JSON, as before; raw the documents read.
+  - `GetNodeStructureLow`: terse a row per object (type, name, technical name where it differs, URI when SAP lists it nameless, description), a `# child_node` line per child node with its type and node ID, a `# not loaded by SAP` line per node SAP could not load, and the `# blank` line for a package's blank body. Medium and full the level as JSON, as before; raw the documents read.
+  - `ListATCResults`: terse a row per result (display ID, title, check variant, created at) under its `# count`. Medium and full the results as JSON, as before; raw the document.
+  - `GetSqlQuery`, `GetTableContents`, `HandlerGetData`: terse a row per record under a header of the column names, a blank cell empty, after `# total_rows`. Medium the rows with each column's type and description (the former terse answer); full that with the whole parse, as before; raw the document. The data tools stay off by default.
+
 ## [24.2.0] - 2026-11-26
 
 ### Highlights

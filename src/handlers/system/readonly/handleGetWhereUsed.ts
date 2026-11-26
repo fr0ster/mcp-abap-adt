@@ -104,6 +104,7 @@ import { withStep } from '../../../lib/strategies/step';
 import {
   fetchWhereUsedReferences,
   presentScopeOptions,
+  usingObject,
   type WhereUsedListRead,
   type WhereUsedListResult,
   type WhereUsedReference,
@@ -189,9 +190,15 @@ export function whereUsedTargetOf(
   return { object_name: name, object_type: code };
 }
 
-/** A reference SAP listed without a name: its URI, what tells it apart; `''` for a named one. */
-function namelessUri(reference: { name: string; uri?: string | undefined }) {
-  return reference.name === '' ? (reference.uri ?? '') : '';
+/**
+ * The URI of a reference whose name and type do not tell where it is — one
+ * SAP listed without a name, or without a type and with no node of the list
+ * at its `parentUri` — as SAP sent it; `''` for any other.
+ */
+function untoldUri(reference: WhereUsedReference) {
+  return reference.name === '' || reference.type === ''
+    ? (reference.uri ?? '')
+    : '';
 }
 
 /** The lists a WhereUsedListResult listing writes: what its description states. */
@@ -203,17 +210,25 @@ export const WHERE_USED_LISTS: RowSchemas<WhereUsedListResult> = {
         {
           name: 'type',
           means: 'its type',
-          cell: (reference: WhereUsedReference) => reference.type,
+          cell: (reference: WhereUsedReference) => usingObject(reference).type,
         },
         {
           name: 'name',
           means: 'its name',
-          cell: (reference: WhereUsedReference) => reference.name,
+          cell: (reference: WhereUsedReference) => usingObject(reference).name,
+        },
+        {
+          name: 'element',
+          means:
+            'the method or section of it the use is in, where SAP tells it',
+          cell: (reference: WhereUsedReference) =>
+            usingObject(reference).element ?? '',
         },
         {
           name: 'uri',
-          means: 'its URI when SAP lists it nameless',
-          cell: namelessUri,
+          means: 'its URI when SAP lists it without a name or a type',
+          cell: (reference: WhereUsedReference) =>
+            untoldUri(usingObject(reference)),
         },
         {
           name: 'usage',
@@ -228,7 +243,8 @@ export const WHERE_USED_LISTS: RowSchemas<WhereUsedListResult> = {
       groups: [
         {
           label: 'package',
-          of: (reference: WhereUsedReference) => reference.package_name ?? '',
+          of: (reference: WhereUsedReference) =>
+            usingObject(reference).package_name ?? '',
           mode: 'gathered',
         },
       ],
@@ -496,15 +512,16 @@ const WHERE_USED_ANSWERS: ListAnswerTable<WhereUsedRead, string | object> = {
       },
       result,
       {
-        // Every field but the URI — kept for a reference SAP listed without
-        // a name, what tells it apart.
-        references: entries(
-          'references',
-          ({ uri, ...fields }: WhereUsedReference): WhereUsedReference =>
-            fields.name === '' && uri !== undefined
-              ? { ...fields, uri }
-              : fields,
-        ),
+        // Every field but the URIs, an element usage as the object it is
+        // in (`usingObject`) — the URI kept for a reference SAP listed
+        // without a name or a type, what tells it apart.
+        references: entries('references', (reference: WhereUsedReference) => {
+          const shown = usingObject(reference);
+          const { uri, parent_uri, ...fields } = shown;
+          return untoldUri(shown) === '' || uri === undefined
+            ? fields
+            : { ...fields, uri };
+        }),
       },
     ),
   // The answer before `detail`, as it is.

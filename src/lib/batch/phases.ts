@@ -391,7 +391,7 @@ export async function runPhaseOutcome<I, R>(
   let envelope: PhaseOutcome<R>['envelope'] = { failed: false };
   for (const chunk of envelopesOf(context, items)) {
     if (envelope.failed) {
-      const ended: unknown = envelope.error;
+      const ended = envelope.error;
       appendAll(
         results,
         chunk.map((): PhaseResult<R> => ({ ok: false, error: ended })),
@@ -409,7 +409,7 @@ export async function runPhaseOutcome<I, R>(
     );
     if (refusal !== undefined && !refusal.ok) {
       // The call ends with it: the later items are not sent.
-      const ended: unknown = refusal.error;
+      const ended = refusal.error;
       envelope = { failed: false };
       const rest = items.slice(results.length);
       appendAll(

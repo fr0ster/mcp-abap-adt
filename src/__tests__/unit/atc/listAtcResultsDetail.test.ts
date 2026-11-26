@@ -93,6 +93,31 @@ describe('ListATCResults answers at each detail', () => {
     );
   });
 
+  it('a result with every count non-zero and a run series: the exact row, the series kept for medium and full', async () => {
+    const document =
+      '<?xml version="1.0" encoding="utf-8"?><atcresult:resultList xmlns:atcresult="http://www.sap.com/adt/atc/result"><atcresult:result><atcresult:displayId>D7</atcresult:displayId><atcresult:title>ZOBJ</atcresult:title><atcresult:checkVariant>VAR</atcresult:checkVariant><atcresult:runSeries>SERIES_A</atcresult:runSeries><atcresult:createdAt>2026-11-01T10:00:00Z</atcresult:createdAt><atcresult:aggregates><atcresult:numPrio1>1</atcresult:numPrio1><atcresult:numPrio2>2</atcresult:numPrio2><atcresult:numPrio3>3</atcresult:numPrio3><atcresult:numPrio4>4</atcresult:numPrio4><atcresult:numFailure>5</atcresult:numFailure></atcresult:aggregates></atcresult:result></atcresult:resultList>';
+    const terse = await listed(document);
+    assert.equal(
+      terse.text,
+      [
+        '# count 1',
+        'display_id\ttitle\tcheck_variant\tcreated_at\tpriority_1\tpriority_2\tpriority_3\tpriority_4\tfailures',
+        'D7\tZOBJ\tVAR\t2026-11-01T10:00:00Z\t1\t2\t3\t4\t5',
+      ].join('\n'),
+    );
+    for (const detail of ['medium', 'full'] as const) {
+      const json = JSON.parse((await listed(document, detail)).text);
+      assert.equal(json.results[0].run_series, 'SERIES_A', detail);
+      assert.deepStrictEqual(json.results[0].by_priority, {
+        '1': 1,
+        '2': 2,
+        '3': 3,
+        '4': 4,
+      });
+      assert.equal(json.results[0].failures, 5);
+    }
+  });
+
   for (const detail of ['medium', 'full'] as const) {
     it(`${detail}: every field read, as JSON`, async () => {
       const answered = await listed(LIST, detail);

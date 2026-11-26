@@ -21,6 +21,7 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { ONE_MESSAGE_WORDS } from '../../../../server-runtime/src/stdio/boundedStdioTransport';
+import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import type { McpResult } from '../../../lib/answer';
 import {
   configuredSystemKind,
@@ -30,14 +31,21 @@ import {
 } from '../helpers/configHelpers';
 import type { LaunchedServer } from '../helpers/launchedServers';
 import { liveConnection, liveSuite } from '../helpers/live';
+import { createTestLogger } from '../helpers/loggerHelpers';
 import { skipRunningTest } from '../helpers/runningTest';
-import { headOf, rowsWithoutTypeOrName, terseOf } from '../helpers/terseAnswer';
+import {
+  type FullWhereUsedReference,
+  headOf,
+  terseOf,
+  whereUsedTerseMismatches,
+} from '../helpers/terseAnswer';
 import {
   destinationArgs,
   getHardModeConfig,
   launchStdio,
   testConnectionLogOn,
 } from '../helpers/testers/hardMode';
+import { createHandlerContext } from '../helpers/testHelpers';
 import { member } from './ownObjects';
 
 /** The class the config names for an answer above the stdio limit, or undefined. */
@@ -194,14 +202,33 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
       const total = `# total ${headOf(answer, 'total') ?? ''}`;
       assert.ok(Number.isFinite(Number(headOf(answer, 'total'))), shown);
       // The usages SAP answered, as rows under their package, each read by
-      // the header's column names; every usage names its object by a real
-      // type and name — a usage inside a method or section by the object
-      // it is in, the element beside it.
+      // the header's column names; every usage the same call's full answer
+      // resolves is a row by its real type and name — a usage inside a
+      // method or section by the object it is in, the element beside it —
+      // and one full leaves unresolved a row by its URI.
       for (const column of ['type', 'name', 'element', 'usage']) {
         assert.ok(answer.columns.includes(column), shown);
       }
       assert.ok(answer.rows.length > 0, shown);
-      assert.deepStrictEqual(rowsWithoutTypeOrName(answer), [], shown);
+      // The full answer is above the stdio limit (the case above): read it
+      // on the suite's connection, through the handler.
+      const full: { references: FullWhereUsedReference[] } = JSON.parse(
+        textOf(
+          'GetWhereUsed',
+          await handleGetWhereUsed(
+            createHandlerContext({
+              connection: liveConnection(),
+              logger: createTestLogger('readToolBugs'),
+            }),
+            { object_name: name, object_type: 'CLAS/OC', detail: 'full' },
+          ),
+        ),
+      );
+      assert.deepStrictEqual(
+        whereUsedTerseMismatches(answer, full.references),
+        [],
+        shown,
+      );
       console.log(
         `[readToolBugs] GetWhereUsed ${name} terse: ${text.length} characters, ${total}`,
       );

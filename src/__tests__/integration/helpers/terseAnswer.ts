@@ -63,12 +63,71 @@ export function headOf(answer: TerseAnswer, key: string): string | undefined {
 }
 
 /**
- * The rows of `answer` that do not name their object by a type and a name:
- * every row of a listing of objects must, or it cannot be told where it
- * is. Empty when every row names both.
+ * The rows of `answer` that do not name their object by a type and a name.
+ * Empty when every row names both.
  */
 export function rowsWithoutTypeOrName(
   answer: TerseAnswer,
 ): ReadonlyArray<Readonly<Record<string, string>>> {
   return answer.rows.filter((row) => !row.type || !row.name);
+}
+
+/** One reference of GetWhereUsed's `full` answer: the fields compared. */
+export interface FullWhereUsedReference {
+  readonly name?: string | undefined;
+  readonly type?: string | undefined;
+  readonly uri?: string | undefined;
+  readonly usage_information?: string | undefined;
+  readonly parent_type?: string | undefined;
+  readonly parent_name?: string | undefined;
+  readonly element?: string | undefined;
+}
+
+/**
+ * What GetWhereUsed's terse answer gets wrong against the `full` answer of
+ * the same call, one line each; empty when it gets nothing wrong.
+ *
+ * Every usage `full` lists (a reference with `usage_information`) must be a
+ * terse row: one `full` resolves — a type and a name of its own, or its
+ * parent's — by that type, name and element; one it leaves unresolved by
+ * its URI, as SAP gave it. A terse row without a type or a name must be one
+ * of those unresolved references, by its URI.
+ */
+export function whereUsedTerseMismatches(
+  answer: TerseAnswer,
+  references: readonly FullWhereUsedReference[],
+): string[] {
+  const named = new Set(
+    answer.rows
+      .filter((row) => row.type && row.name)
+      .map((row) => `${row.type}\t${row.name}\t${row.element ?? ''}`),
+  );
+  const byUri = new Set(answer.rows.map((row) => row.uri ?? ''));
+  const unresolved = new Set<string>();
+  const wrong: string[] = [];
+  for (const reference of references) {
+    if (reference.usage_information === undefined) continue;
+    const type = reference.parent_type ?? reference.type ?? '';
+    const name = reference.parent_name ?? reference.name ?? '';
+    if (type !== '' && name !== '') {
+      const key = `${type}\t${name}\t${reference.element ?? ''}`;
+      if (!named.has(key)) wrong.push(`no terse row ${key}`);
+      continue;
+    }
+    const uri = reference.uri ?? '';
+    unresolved.add(uri);
+    if (uri === '' || !byUri.has(uri)) {
+      wrong.push(
+        `no terse row for the unresolved ${JSON.stringify(reference)}`,
+      );
+    }
+  }
+  for (const row of rowsWithoutTypeOrName(answer)) {
+    if (!unresolved.has(row.uri ?? '') || (row.uri ?? '') === '') {
+      wrong.push(
+        `a terse row without a type or a name: ${JSON.stringify(row)}`,
+      );
+    }
+  }
+  return wrong;
 }

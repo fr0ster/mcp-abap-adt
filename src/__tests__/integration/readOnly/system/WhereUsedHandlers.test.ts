@@ -22,9 +22,9 @@ import { createTestLogger } from '../../helpers/loggerHelpers';
 import { servedSuite } from '../../helpers/servedHere';
 import {
   headOf,
-  rowsWithoutTypeOrName,
   terseOf,
   terseText,
+  whereUsedTerseMismatches,
 } from '../../helpers/terseAnswer';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -39,9 +39,10 @@ const WhereUsedParams = z.looseObject({
 
 /**
  * The reference total of GetWhereUsed's terse answer (the default): its
- * `# total N` head; its rows read by the header's column names.
+ * `# total N` head; its rows read by the header's column names, and, with
+ * `full` (the same call at `detail: 'full'`), compared with it.
  */
-function terseTotal(result: any): number {
+function terseTotal(result: any, full?: any): number {
   const answer = terseOf(terseText(result));
   const shown = answer.text.slice(0, 2000);
   const total = Number(headOf(answer, 'total'));
@@ -52,9 +53,16 @@ function terseTotal(result: any): number {
     assert.ok(answer.columns.includes(column), shown);
   }
   if (total > 0) assert.ok(answer.rows.length > 0, shown);
-  // Every usage names its object by a real type and name — a usage inside
-  // a method or section by the object it is in, the element beside it.
-  assert.deepStrictEqual(rowsWithoutTypeOrName(answer), [], shown);
+  // Every usage full resolves is a terse row by its real type and name — a
+  // usage inside a method or section by the object it is in, the element
+  // beside it; one full leaves unresolved is a row by its URI.
+  if (full !== undefined) {
+    assert.deepStrictEqual(
+      whereUsedTerseMismatches(answer, extractResultData(full).references),
+      [],
+      shown,
+    );
+  }
   return total;
 }
 
@@ -139,7 +147,16 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const total = terseTotal(result);
+      const full = await handleGetWhereUsed(
+        createHandlerContext({ connection, logger }),
+        {
+          object_name: testClass,
+          object_type: 'class',
+          enable_all_types: false,
+          detail: 'full',
+        },
+      );
+      const total = terseTotal(result, full);
       assert.ok(total >= 0);
 
       logger?.info(`✅ Found ${total} references with default scope`);
@@ -180,7 +197,16 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const total = terseTotal(result);
+      const full = await handleGetWhereUsed(
+        createHandlerContext({ connection, logger }),
+        {
+          object_name: testClass,
+          object_type: 'class',
+          enable_all_types: true,
+          detail: 'full',
+        },
+      );
+      const total = terseTotal(result, full);
       assert.ok(total >= 0);
 
       logger?.info(`✅ Found ${total} references with all types enabled`);
@@ -221,7 +247,16 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const total = terseTotal(result);
+      const full = await handleGetWhereUsed(
+        createHandlerContext({ connection, logger }),
+        {
+          object_name: testTable,
+          object_type: 'table',
+          enable_all_types: false,
+          detail: 'full',
+        },
+      );
+      const total = terseTotal(result, full);
       assert.ok(total >= 0);
 
       logger?.info(`✅ Found ${total} references for table`);

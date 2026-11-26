@@ -394,6 +394,7 @@
           "enable_all_types",
           "enable_only_types",
           "disable_types",
+          "in_object",
           "detail"
         ]
       }
@@ -581,6 +582,7 @@
           "enable_all_types",
           "enable_only_types",
           "disable_types",
+          "in_object",
           "detail"
         ]
       }
@@ -1648,6 +1650,7 @@
           "enable_all_types",
           "enable_only_types",
           "disable_types",
+          "in_object",
           "detail"
         ]
       }
@@ -1835,6 +1838,7 @@
           "enable_all_types",
           "enable_only_types",
           "disable_types",
+          "in_object",
           "detail"
         ]
       }

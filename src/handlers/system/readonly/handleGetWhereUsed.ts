@@ -720,15 +720,6 @@ async function whereUsedOf(
     }
   }
 
-  const blank = typedArgs.in_object;
-  if (
-    blank !== undefined &&
-    (blank.object_type.trim() === '' || blank.object_name.trim() === '')
-  ) {
-    return return_error(
-      'in_object needs a type and a name, neither blank; nothing was sent',
-    );
-  }
   const shown = listAnswerAt(WHERE_USED_ANSWERS, levelOf(args));
   return answer(
     { tool: 'GetWhereUsed', detail: detailOf(args) },
@@ -1244,6 +1235,17 @@ export async function handleGetWhereUsed(
   context: HandlerContext,
   args: WhereUsedArgs,
 ) {
+  // Before any request on any path — a function module's group read, the
+  // scope, the usages: a blank in_object field names no object.
+  const blank = args?.in_object;
+  if (
+    blank !== undefined &&
+    (blank.object_type.trim() === '' || blank.object_name.trim() === '')
+  ) {
+    return return_error(
+      'in_object needs a type and a name, neither blank; nothing was sent',
+    );
+  }
   // Every call assembles reads — the scope with the usages, or several
   // objects: at `raw` the array of the documents, whatever the call.
   if (levelOf(args) === 'raw') {

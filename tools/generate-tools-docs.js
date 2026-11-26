@@ -463,6 +463,25 @@ function promptsOfTools(listed) {
   return byTool;
 }
 
+/**
+ * What a tool's answer holds, for the tools whose answer a consumer reads
+ * by its columns: written on the tool's entry, after its source.
+ */
+const ANSWER_NOTES = {
+  GetWhereUsed: [
+    '**Answer:** `terse` (default) is TSV: a `# total N` line, then the tab-separated header `type name element uri usage` and one row per usage, grouped under `# package P` lines. Read the columns by the header, never by position: `element` was added in 24.2.1, and a column may be added again.',
+    "- A usage inside a method or a section of a class (SAP lists it with no type, the class only as its `parentUri`) is the class's row — its type (`CLAS/OC`) and name — with the method or section in `element`; a class used in several elements has one row per element. The class is the node of the same answer at that `parentUri`, by the type SAP lists it with.",
+    '- `uri` is filled only for a reference SAP lists without a name, or without a type and with no node of the answer at its `parentUri`: such a row is answered as SAP gave it, its type empty, its URI telling where it is.',
+    "- `medium` has the same rows as JSON objects (`type`, `name`, `element`, `package_name`, `responsible`, `usage_information`; `uri` only where terse shows it). `full` keeps SAP's fields as they came (`name`, `type`, `uri`, …) and adds `parent_uri`, and for an element usage `parent_type`, `parent_name`, `parent_package` and `element`.",
+  ].join('\n'),
+};
+
+/** The answer note of `tool`'s entry, or nothing. */
+function answerNote(tool) {
+  const note = ANSWER_NOTES[tool.name];
+  return note === undefined ? '' : `${note}\n\n`;
+}
+
 /** The line a tool's entry carries when a prompt asks the model to call it. */
 function promptPointer(tool, byTool) {
   const names = byTool.get(tool.name);
@@ -750,6 +769,7 @@ function generateMarkdown(tools, surface, listedPrompts) {
         md += `**Description:** ${tool.description || 'No description'}\n\n`;
         md += `**Source:** \`${tool.filePath}\`\n\n`;
         md += promptPointer(tool, byTool);
+        md += answerNote(tool);
         md += optIn(tool);
         md += `**Parameters:**\n`;
         md += renderParams(tool);
@@ -815,6 +835,7 @@ function generateLevelMarkdown(
       md += `**Description:** ${tool.description || 'No description'}\n\n`;
       md += `**Source:** \`${tool.filePath}\`\n\n`;
       md += promptPointer(tool, byTool);
+      md += answerNote(tool);
       md += optIn(tool);
       md += `**Parameters:**\n`;
       md += renderParams(tool);
@@ -888,6 +909,7 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
         md += `**Description:** ${tool.description || 'No description'}\n\n`;
         md += `**Source:** \`${tool.filePath}\`\n\n`;
         md += `**Available in:** \`${tool.availableIn.join('`, `')}\`\n\n`;
+        md += answerNote(tool);
         md += optIn(tool);
         md += `**Parameters:**\n`;
         md += renderParams(tool);

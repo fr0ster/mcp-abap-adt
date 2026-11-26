@@ -1099,6 +1099,11 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Prompt:** the `where_used` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
+**Answer:** `terse` (default) is TSV: a `# total N` line, then the tab-separated header `type name element uri usage` and one row per usage, grouped under `# package P` lines. Read the columns by the header, never by position: `element` was added in 24.2.1, and a column may be added again.
+- A usage inside a method or a section of a class (SAP lists it with no type, the class only as its `parentUri`) is the class's row — its type (`CLAS/OC`) and name — with the method or section in `element`; a class used in several elements has one row per element. The class is the node of the same answer at that `parentUri`, by the type SAP lists it with.
+- `uri` is filled only for a reference SAP lists without a name, or without a type and with no node of the answer at its `parentUri`: such a row is answered as SAP gave it, its type empty, its URI telling where it is.
+- `medium` has the same rows as JSON objects (`type`, `name`, `element`, `package_name`, `responsible`, `usage_information`; `uri` only where terse shows it). `full` keeps SAP's fields as they came (`name`, `type`, `uri`, …) and adds `parent_uri`, and for an element usage `parent_type`, `parent_name`, `parent_package` and `element`.
+
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `container` (string, optional, one of: `program`, `function_group`) - With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.

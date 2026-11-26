@@ -2,7 +2,7 @@
  * GetWhereUsed at each `detail` (terse answers, step 3).
  *
  * - **terse** (default): the usages as TSV, grouped by package — `# total N`,
- *   the header `type\tname\telement\turi\tusage\tcode`, a `# package P` group line, one row per
+ *   the header `type\tname\telement\turi\tusage`, a `# package P` group line, one row per
  *   usage. A row is a usage when SAP gave it `usageInformation`; the package
  *   and container nodes of SAP's tree carry none and leave. The usage cell is
  *   empty for the common `gradeDirect,includeProductive`. No uri.
@@ -101,12 +101,12 @@ describe('GetWhereUsed detail', () => {
   it('terse, by default: the usages grouped by package, no node, the uri only for a nameless one', async () => {
     const expected = [
       '# total 3',
-      'type\tname\telement\turi\tusage\tcode',
+      'type\tname\telement\turi\tusage',
       '# package ZPKG',
-      'CLAS/OC\tZCL_USER\t\t\t\t',
-      'PROG/P\tZPROG\t\t\tgradeDirect,includeTest\t',
+      'CLAS/OC\tZCL_USER\t\t\t',
+      'PROG/P\tZPROG\t\t\tgradeDirect,includeTest',
       '# package ZOTHER',
-      'INTF/OI\tZIF_X\t\t\t\t',
+      'INTF/OI\tZIF_X\t\t\t',
     ].join('\n');
     assert.equal(await whereUsed(undefined), expected);
     assert.equal(await whereUsed('terse'), expected);

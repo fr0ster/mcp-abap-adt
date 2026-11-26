@@ -173,7 +173,6 @@ describe('a terse list of 200,000 items', () => {
               name: 'usage',
               cell: (r: WhereUsedRow) => r.usage_information ?? '',
             },
-            { name: 'code', cell: (r: WhereUsedRow) => r.code ?? '' },
           ],
           header: 'always',
           groups: [

@@ -10,7 +10,7 @@
  * - the other actions on `recordingConnection` with real adt-clients code,
  *   SAP's answers the corpus documents (in their envelope where the read is
  *   enveloped): `search_object` the quick search, `where_used` the usage
- *   references of a domain and the code lines of its usages, `package_tree` the package's metadata and root
+ *   references of a domain (no code-line read: no in_object), `package_tree` the package's metadata and root
  *   node structure in one envelope, `transports` one GET of the listing
  *   by user, `atc_findings` the worklist,
  *   `atc_results` the result list, `atc_result` one result.
@@ -160,18 +160,6 @@ describe('onprem', () => {
               'application/vnd.sap.adt.repository.usagereferences.request.v1+xml',
           },
           body: '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>',
-        },
-        // The code lines of the usages, by their identifiers: one request.
-        {
-          method: 'POST',
-          url: '/sap/bc/adt/repository/informationsystem/usageSnippets',
-          headers: {
-            Accept:
-              'application/vnd.sap.adt.repository.usagesnippets.result.v1+xml',
-            'Content-Type':
-              'application/vnd.sap.adt.repository.usagesnippets.request.v1+xml',
-          },
-          body: '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageSnippetRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:objectIdentifiers><usagereferences:objectIdentifier optional="false">ObjectType_BDEF/BDO;ZMCP_SHR_I_ROOT;\\TY:ZBP_MCP_SHR_I_ROOT</usagereferences:objectIdentifier></usagereferences:objectIdentifiers><usagereferences:affectedObjects/></usagereferences:usageSnippetRequest>',
         },
       ],
     },
@@ -350,18 +338,6 @@ describe('cloud', () => {
               'application/vnd.sap.adt.repository.usagereferences.request.v1+xml',
           },
           body: '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>',
-        },
-        // The code lines of the usages, by their identifiers: one request.
-        {
-          method: 'POST',
-          url: '/sap/bc/adt/repository/informationsystem/usageSnippets',
-          headers: {
-            Accept:
-              'application/vnd.sap.adt.repository.usagesnippets.result.v1+xml',
-            'Content-Type':
-              'application/vnd.sap.adt.repository.usagesnippets.request.v1+xml',
-          },
-          body: '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageSnippetRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:objectIdentifiers><usagereferences:objectIdentifier optional="false">ObjectType_BDEF/BDO;ZMCP_SHR_I_ROOT;\\TY:ZBP_MCP_SHR_I_ROOT</usagereferences:objectIdentifier></usagereferences:objectIdentifiers><usagereferences:affectedObjects/></usagereferences:usageSnippetRequest>',
         },
       ],
     },

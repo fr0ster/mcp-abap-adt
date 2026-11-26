@@ -12,7 +12,7 @@ import { TOOL_DEFINITION as RunUnitTest } from '../../handlers/unit_test/high/ha
 import type { RunTargetArgs } from '../../handlers/unit_test/shared/runTarget.js';
 import type { JsonValue } from '../json.js';
 import { askValue } from './askValue.js';
-import { closedOptionalArgument, valuesWords } from './completion.js';
+import { closedOptionalArgument } from './completion.js';
 import { jsonLiteral } from './instruction.js';
 import { objectArguments, stepValue, userValue } from './objectPrompts.js';
 import { type FullRow, fullRow } from './objectRows.js';
@@ -67,6 +67,10 @@ const PER_TYPE_RUNS: Partial<Record<RunType, FullRow>> = {
 
 const INCLUDE_SUBPACKAGES_WORDS =
   'For a package, whether the tests of its subpackages run too';
+
+/** What a package's run still to fill says of `include_subpackages`: the instruction's own words, kept apart from the argument's description. */
+const INCLUDE_SUBPACKAGES_TO_FILL =
+  'For a package: true runs the tests of its subpackages too.';
 
 /** The values `include_subpackages` takes. */
 const INCLUDE_SUBPACKAGES_VALUES: readonly string[] = ['true', 'false'];
@@ -272,10 +276,7 @@ export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
                   ...first.stillToFill,
                   {
                     name: 'include_subpackages',
-                    description: valuesWords(
-                      INCLUDE_SUBPACKAGES_WORDS,
-                      INCLUDE_SUBPACKAGES_VALUES,
-                    ),
+                    description: INCLUDE_SUBPACKAGES_TO_FILL,
                   },
                 ],
               },

@@ -79,7 +79,7 @@ describe('the texts (spec §2.3)', () => {
       text
         .split('\n')
         .includes(
-          'Still to fill before step 1: include_subpackages (For a package, whether the tests of its subpackages run too: true, false.).',
+          'Still to fill before step 1: include_subpackages (For a package: true runs the tests of its subpackages too.).',
         ),
       text,
     );

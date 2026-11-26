@@ -2257,12 +2257,11 @@ function systemProperties(
       ),
     exclude: z
       .array(z.string())
-      .max(3)
       .optional()
       .describe(
         said(actions, {
           search_source:
-            'up to 3 substrings; a line containing any of them is dropped.',
+            'substrings; a line containing any of them is dropped. Absent, no line is dropped.',
         }),
       ),
     packages: z
@@ -2330,7 +2329,7 @@ function systemProperties(
       .describe(
         said(actions, {
           search_source:
-            'the most hits of the whole answer; reached, the scan stops reading. Absent, every hit.',
+            'the most hits of the whole answer; reached, the scan stops reading the next objects. Absent, no limit: every object is read and every hit answered.',
         }),
       ),
     answer: z

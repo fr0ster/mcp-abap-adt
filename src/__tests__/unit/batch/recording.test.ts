@@ -795,6 +795,44 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
     assert.deepStrictEqual(numbers, [1]);
   });
 
+  it("params of another shape are refused by adt-clients' batch connection before recording: no number, and plain scalar params are recorded", () => {
+    const owner = new InstanceBatch({ keepRawParts: false });
+    const target = new LateBoundConnection();
+    const batch = new AdtBatchConnection(target, { endpoint: 'communication' });
+    owner.begin('communication', { connection: batch, target, recorded: [] });
+    const numbers: number[] = [];
+    const recorder = createRecorder(
+      batch,
+      owner,
+      (n) => numbers.push(n),
+      'GetProgram',
+    );
+    for (const params of [null, { names: ['A', 'B'] }, { name: undefined }]) {
+      assertThrows(
+        () =>
+          recorder.makeAdtRequest({
+            url: '/refused',
+            method: 'GET',
+            timeout: 0,
+            params,
+          }),
+        "a batch request's params must be a string, a URLSearchParams or a plain object of string, number or boolean values",
+      );
+    }
+    assert.equal(recorder.number(), undefined);
+    assert.equal(recorder.requests(), 0);
+    assert.deepStrictEqual(numbers, []);
+    void recorder.makeAdtRequest({
+      url: '/kept',
+      method: 'GET',
+      timeout: 0,
+      params: { name: 'A', max: 2, all: true },
+    });
+    assert.equal(recorder.number(), 1);
+    assert.equal(recorder.requests(), 1);
+    assert.deepStrictEqual(numbers, [1]);
+  });
+
   it('a handler settling without a request is settled, with no number', async () => {
     const { recorder, numbers } = pendingRecorder();
     const handler = (async () => ({ content: [] }))();

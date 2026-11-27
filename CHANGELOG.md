@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The data tools set no row bound of their own** (#391, items 1–3). `GetSqlQuery`'s `row_number` defaulted to 100 (`.default(100)`, and `row_number || 100` turned `0` into 100), `GetTableContents`' `max_rows` to 100 (`|| 100`), compact `HandlerGetData`'s `max_rows` to 100 (`.default(100)`, `?? 100`). A consumer reading a filtered selection got its first 100 records. Now the bound given is handed on as given, `0` included, and without one none is: the bound is SAP's. Measured on the BTP ABAP environment (2026-11-27, `/sap/bc/adt/datapreview/freestyle`): without `rowNumber` SAP answers 100 records (of selections of 163, 249, 1716 and 8466); `0`, a negative bound and 2147483647 are refused `400`, 2147483646 is the largest accepted. The descriptions name SAP's 100. Needs `@mcp-abap-adt/adt-clients` 48.0.1, which stops sending a missing or `0` bound as 100 itself.
+- **A cut is said in the answer.** When fewer records are listed than the selection holds, terse adds `# rows <listed> of <total>, cut at row_number <n>` (`max_rows <n>` for `GetTableContents`; `HandlerGetData` names the parameter of the read it routes to) or `…, cut by SAP: no row_number given` after `# total_rows`; `medium` and `full` carry `rows_listed` always and `cut_by` when cut, and `row_number` only when one was given. `total_rows` is unchanged.
+
 ## [24.2.2] - 2026-11-27
 
 ### Fixed

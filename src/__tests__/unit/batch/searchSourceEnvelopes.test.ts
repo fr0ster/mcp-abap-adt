@@ -1,7 +1,7 @@
 /**
  * `SearchSource`'s source reads in ADT batch envelopes (#89). With no bound
  * given, every target is one chunk and each round's reads one envelope. With
- * the consumer's `readsPerEnvelope` (300 below): every target, in chunks of
+ * the consumer's `partsPerEnvelope` (300 below): every target, in chunks of
  * 300, each chunk read through all its rounds (main sources and function
  * group structures, then the function groups' includes and function
  * modules), each round's unique reads in envelopes of at most 300; the call
@@ -312,6 +312,25 @@ describe('SearchSource: source reads in envelopes', () => {
     // The final scan's one match per source, and no rescan per target
     // (which would be 60 · 61 / 2 more).
     assert.ok(calls <= 60, `${calls} matches`);
+  });
+
+  it("the mask searches keep the consumer's parts bound: three masks at 2 go as 2 + 1, the same answer", async () => {
+    const masked = (): Repository => ({
+      ...programs(3),
+      masks: { 'ZB*': ['ZBIG'], 'ZBI*': ['ZBIG'], 'ZBIG*': ['ZBIG'] },
+    });
+    const args = { query: 'marker', packages: ['ZB*', 'ZBI*', 'ZBIG*'] };
+    const free = on(masked());
+    const bounded = on(masked());
+    const a = await searchOn(free, args, false, TURNS);
+    const b = await searchOn(bounded, args, false, TURNS, 2);
+    assert.equal(textOf(b), textOf(a));
+    const searches = (fake: Fake) =>
+      fake.envelopes
+        .map((e) => partKeys(e).filter((k) => k.startsWith('SEARCH ')).length)
+        .filter((n) => n > 0);
+    assert.deepStrictEqual(searches(free), [3]);
+    assert.deepStrictEqual(searches(bounded), [2, 1]);
   });
 
   it('exclude takes more than three substrings', async () => {

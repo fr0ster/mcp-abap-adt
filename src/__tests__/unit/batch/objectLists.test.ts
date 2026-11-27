@@ -209,14 +209,42 @@ function system(
 type Fake = ReturnType<typeof system>;
 
 /** A context on the fake: batch served (default) or known to be absent. */
-function contextOn(fake: Fake, batch: 'served' | 'absent' = 'served') {
+function contextOn(
+  fake: Fake,
+  batch: 'served' | 'absent' = 'served',
+  partsPerEnvelope?: number,
+): HandlerContext {
   const port = createBatchAvailability();
   if (batch === 'absent') port.noteOuterStatus(404);
   return {
     connection: fake.connection,
     logger: undefined,
     batchAvailability: port,
-  } as unknown as HandlerContext;
+    ...(partsPerEnvelope !== undefined && { partsPerEnvelope }),
+  };
+}
+
+/**
+ * `handler(args)` without a bound and with the consumer's bound of 2 parts:
+ * the same answer, every bounded envelope within 2 parts, and the unbounded
+ * call sending an envelope of more (so the bound had something to split).
+ */
+async function boundHolds(
+  handler: (context: HandlerContext, args: any) => Promise<unknown>,
+  args: Record<string, unknown>,
+  turns: number,
+) {
+  const free = system();
+  const bounded = system();
+  const a = await withinTurns(handler(contextOn(free), args), turns);
+  const b = await withinTurns(
+    handler(contextOn(bounded, 'served', 2), args),
+    turns,
+  );
+  assert.equal(JSON.stringify(b), JSON.stringify(a));
+  assert.ok(free.envelopes.some((e) => e.parts.length > 2));
+  assert.ok(bounded.envelopes.every((e) => e.parts.length <= 2));
+  assert.ok(bounded.envelopes.length > free.envelopes.length);
 }
 
 /** An answer's content, whole: text or json. */
@@ -382,6 +410,12 @@ const OBJECTS = [
   { name: 'ZT*' },
   { name: 'ZNONE' },
 ];
+
+describe("the consumer's parts bound", () => {
+  it('DescribeByList of four objects: envelopes of at most 2 parts, the same answer', async () => {
+    await boundHolds(handleDescribeByList, { objects: OBJECTS }, TURNS);
+  });
+});
 
 describe('DescribeByList', () => {
   for (const [args] of [

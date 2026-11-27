@@ -439,7 +439,7 @@ type Fake = ReturnType<typeof system>;
 function contextOn(
   fake: Fake,
   batch: 'served' | 'absent' = 'served',
-  readsPerEnvelope?: number,
+  partsPerEnvelope?: number,
 ) {
   const port = createBatchAvailability();
   if (batch === 'absent') port.noteOuterStatus(404);
@@ -447,7 +447,7 @@ function contextOn(
     connection: fake.connection,
     logger: undefined,
     batchAvailability: port,
-    ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
+    ...(partsPerEnvelope !== undefined && { partsPerEnvelope }),
   };
   return context;
 }
@@ -475,12 +475,12 @@ async function bothWays(
   handler: (context: HandlerContext, args: any) => Promise<unknown>,
   args: Record<string, unknown>,
   model: Model = {},
-  readsPerEnvelope?: number,
+  partsPerEnvelope?: number,
 ) {
   const batched = system(model);
   const sequential = system(model);
   const a = await withinTurns(
-    handler(contextOn(batched, 'served', readsPerEnvelope), args),
+    handler(contextOn(batched, 'served', partsPerEnvelope), args),
     TURNS,
   );
   const b = await withinTurns(
@@ -841,6 +841,17 @@ describe('GetIncludesList', () => {
 // ---------------------------------------------------------------------------
 // GetStructuresList
 // ---------------------------------------------------------------------------
+
+describe("GetStructuresList: the consumer's parts bound", () => {
+  it('three structures: envelopes of at most 2 parts, the same answer', async () => {
+    const args = { structure_names: ['ZS', 'ZS2', 'ZMISSING'] };
+    const free = await bothWays(handleGetStructuresList, args);
+    const bounded = await bothWays(handleGetStructuresList, args, {}, 2);
+    assert.equal(textOf(bounded.a), textOf(free.a));
+    assert.ok(free.batched.envelopes.some((e) => e.parts.length > 2));
+    assert.ok(bounded.batched.envelopes.every((e) => e.parts.length <= 2));
+  });
+});
 
 describe('GetStructuresList', () => {
   for (const [args] of [

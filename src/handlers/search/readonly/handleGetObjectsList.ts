@@ -684,11 +684,16 @@ type MetadataAnswer =
 
 /**
  * SAP's message in a refusal's body, as it came: what adt-strategies reads
- * of SAP's exception document (`readExceptionRefusal`); `undefined` when the
- * body is no such document.
+ * of SAP's exception document (`readExceptionRefusal`); for any other text
+ * body, the text itself, trimmed; `undefined` for an empty body or one that
+ * is no text. The same for every status, a `404` included.
  */
 function sapMessageIn(body: unknown): string | undefined {
-  return readExceptionRefusal(body)?.message;
+  const read = readExceptionRefusal(body)?.message;
+  if (read !== undefined) return read;
+  if (typeof body !== 'string') return undefined;
+  const text = body.trim();
+  return text === '' ? undefined : text;
 }
 
 /**

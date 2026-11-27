@@ -1228,6 +1228,49 @@ describe('GetObjectsList', () => {
     });
   }
 
+  // #398: a refusal whose body is no exception document reaches the model
+  // as SAP sent it, trimmed, on both paths; a 404 the same way.
+  for (const status of [404, 500]) {
+    it(`a metadata read SAP answers ${status} with a text body: its message is that text, on both paths`, async () => {
+      const probe = system();
+      await withinTurns(
+        handleGetObjectsListOf(contextOn(probe), {
+          ...single,
+          detail: 'medium',
+        }),
+      );
+      const metadataKey = (probe.envelopes.map(partKeys)[3] ?? [])[0] ?? '';
+      const model = {
+        refuse: { [metadataKey]: status },
+        refuseBody: { [metadataKey]: '  Service unavailable\n' },
+      };
+      for (const batch of ['served', 'absent'] as const) {
+        const result = await withinTurns(
+          handleGetObjectsListOf(contextOn(system(model), batch), {
+            ...single,
+            detail: 'full',
+          }),
+        );
+        const text = textOf(result);
+        assert.equal((result as { isError?: boolean }).isError, false, text);
+        const refused = payloadOf(result).objects.filter(
+          (o: { METADATA_ERROR?: unknown }) => o.METADATA_ERROR !== undefined,
+        );
+        assert.deepStrictEqual(
+          refused.map((o: { METADATA_ERROR: unknown }) => o.METADATA_ERROR),
+          [
+            {
+              status,
+              message: 'Service unavailable',
+              step: 'read object metadata',
+            },
+          ],
+          `${batch}: ${text}`,
+        );
+      }
+    });
+  }
+
   // #398: a credential refusal by the connection during pass 2 — before SAP
   // is asked — is the credentials', not an object's: it ends the call as it
   // came, on both paths.

@@ -180,7 +180,7 @@ describe('GetObjectsList detail', () => {
   it('medium: a metadata read SAP answers 500 lists the object with it, the rest answered', async () => {
     const connection = recordingConnection([
       { data: LEVEL },
-      { status: 500, data: 'refused' },
+      { status: 500, data: '  refused\n' },
       {
         data: '<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="Top"/>',
       },
@@ -200,8 +200,11 @@ describe('GetObjectsList detail', () => {
     const text = result.content[0]?.text ?? '';
     assert.equal(result.isError, false, text);
     const answer = JSON.parse(text);
+    // A body that is no exception document reaches the model as SAP sent
+    // it, trimmed.
     assert.deepStrictEqual(answer.objects[0].metadata_error, {
       status: 500,
+      message: 'refused',
       step: 'read object metadata',
     });
     assert.equal(answer.objects[1].description, 'Top', text);
@@ -403,6 +406,8 @@ describe('GetObjectsList detail', () => {
       'read object metadata',
       text,
     );
+    // An empty body: no message.
+    assert.equal('message' in answer.objects[0].metadata_error, false, text);
     assert.equal(answer.objects[1].description, 'Top', text);
   });
 

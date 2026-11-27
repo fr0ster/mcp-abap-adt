@@ -373,8 +373,9 @@ source:
 - A part that fails the check **shares a line** (or a statement). Examples: `ENDMETHOD. METHOD b.`
   on one line, or one name of a chained declaration.
 - Such a part is still read, and the answer says what it shares.
-- Replacing such a part by element is **refused**, since whole lines would carry the other
-  statement. The diff path (§7.3) stays open for it.
+- Replacing such a part by element, or an element-relative diff of it, is **refused**, since
+  whole lines would carry the other statement. A `relative_to: "include"` diff (§7.3) stays open
+  for it.
 - The check runs again under the lock before a `replace` (§7.2). A part read's answer is never
   trusted for a write.
 
@@ -526,9 +527,12 @@ gets its method by two calls: a `diff` into each include, each its own write; be
 inactive class is inconsistent, as between any two updates before an activation.
 
 
-**Confinement of an element-relative diff.** Its hunks are numbered from the element's first line
-(line 1) to its last (line n). They are checked against the element **before** they are placed in
-the include:
+**Confinement of an element-relative diff.** It is taken only for an element that passes the
+boundary check (§5.4): one whose lines hold that element alone. For an element that shares a line
+or a statement (`a` of `METHODS: a, b.`) an element-relative diff is refused, `shares_lines`,
+since its lines also hold another element; the change goes as a `relative_to: "include"` diff.
+Its hunks are numbered from the element's first line (line 1) to its last (line n). They are
+checked against the element **before** they are placed in the include:
 
 - every context and removed line of a hunk lies within lines 1 to n, else the hunk is refused,
   naming it, even when the text there would match;

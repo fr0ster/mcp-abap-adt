@@ -385,7 +385,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries` (`compactDataEntries`). **Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.
 
-**Description:** [read-only] Reads the data of an ABAP database table (TABL) or CDS view (DDLS), or the data an ABAP SQL SELECT selects, up to the number of records asked. A missing bound leaves the bound to SAP: at most 100 records. When fewer records come back than the selection holds, the answer names how many came back, of how many, and what cut them. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data of an ABAP database table (TABL) or CDS view (DDLS), or the data an ABAP SQL SELECT selects, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Available in:** cloud, onprem
 
@@ -394,7 +394,7 @@ per request.
 - `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself.
 - `object_name` — Table or CDS view whose rows are read, all columns. Used when sql_query is absent.
 - `sql_query` — ABAP SQL SELECT naming the columns, conditions and order to read.
-- `max_rows` — Most records to read. Absent: SAP gives at most 100.
+- `max_rows` (required) — Most records to read, required. SAP refuses 0, and the largest count it accepts is 2147483646.
 - `detail` — How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ### HandlerCreate

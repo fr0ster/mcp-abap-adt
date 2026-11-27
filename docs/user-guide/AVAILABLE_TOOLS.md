@@ -1148,6 +1148,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `max_item_count` (integer, optional) - Most object types to read. Absent: SAP gives at most 100; the largest count it accepts is 2147483647.
 - `validate_type` (string, optional) - Type name to validate (optional)
 
 ---
@@ -1247,7 +1248,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getsqlquery-read-only-system"></a>
 #### GetSqlQuery (Read-Only / System)
-**Description:** [read-only] Reads the data an ABAP SQL SELECT selects from database tables (TABL) and CDS views (DDLS), up to the number of records asked. A missing bound leaves the bound to SAP: at most 100 records. When fewer records come back than the selection holds, the answer names how many came back, of how many, and what cut them. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data an ABAP SQL SELECT selects from database tables (TABL) and CDS views (DDLS), up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
 
@@ -1256,7 +1257,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
-- `row_number` (number, optional) - [read-only] Most records to read. Absent: SAP gives at most 100.
+- `row_number` (number, required) - [read-only] Most records to read, required. SAP refuses 0, and the largest count it accepts is 2147483646.
 - `sql_query` (string, required) - SQL query to execute
 
 ---
@@ -1471,7 +1472,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
-**Description:** [read-only] Reads the data of an ABAP database table (TABL) or CDS view (DDLS), as SE16 previews it, up to the number of records asked. A missing bound leaves the bound to SAP: at most 100 records. When fewer records come back than the selection holds, the answer names how many came back, of how many, and what cut them. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data of an ABAP database table (TABL) or CDS view (DDLS), as SE16 previews it, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
 
@@ -1480,7 +1481,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
-- `max_rows` (number, optional) - [read-only] Most records to read. Absent: SAP gives at most 100.
+- `max_rows` (number, required) - [read-only] Most records to read, required. SAP refuses 0, and the largest count it accepts is 2147483646.
 - `table_name` (string, required) - Name of the ABAP table
 
 ---
@@ -5245,7 +5246,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `from_id` (string, required) - Snapshot id to compare from.
 - `key` (string, optional) - Object key, for children and references.
-- `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
+- `max_objects` (integer, required) - Most objects in a ranking, children or references answer, required; SAP requires a count for these views.
 - `to_id` (string, required) - Snapshot id to compare to.
 - `view` (string, optional (default: overview), one of: `overview`, `ranking`, `children`, `references`) - overview: memory by kind; ranking: the largest objects; children: what an object holds; references: what holds an object.
 
@@ -5260,7 +5261,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `key` (string, optional) - Object key, for children and references.
-- `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
+- `max_objects` (integer, required) - Most objects in a ranking, children or references answer, required; SAP requires a count for these views.
 - `snapshot_id` (string, required) - Snapshot id.
 - `view` (string, optional (default: overview), one of: `header`, `overview`, `ranking`, `children`, `references`) - header: the snapshot; overview: memory by kind; ranking: the largest objects; children: what an object holds; references: what holds an object.
 

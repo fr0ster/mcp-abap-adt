@@ -654,114 +654,82 @@
   "CreateTransportTask no number answered @terse": {
     "isError": false,
     "text": "{\"task_number\":null,\"task_type\":\"X\",\"note\":\"the answer carried no task number — read the request to see whether a task was created\"}",
-    "requests": [
-      "POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks"
-    ]
+    "requests": ["POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks"]
   },
   "CreateTransportTask no number answered @medium": {
     "isError": false,
     "text": "{\"success\":true,\"request\":\"SIDK900011\",\"task_number\":null,\"owner\":\"DEVELOPER\",\"task_type\":\"X\",\"note\":\"the answer carried no task number — read the request to see whether a task was created\"}",
-    "requests": [
-      "POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks"
-    ]
+    "requests": ["POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks"]
   },
   "CreateTransportTask no number answered @full": {
     "isError": false,
     "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\"}}}",
-    "requests": [
-      "POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks"
-    ]
+    "requests": ["POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks"]
   },
   "CreateTransportTask no number answered @raw": {
     "isError": false,
     "text": "[{\"status\":200,\"body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><tm:root xmlns:tm=\\\"http://www.sap.com/cts/adt/tm\\\"/>\"}]",
-    "requests": [
-      "POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks"
-    ]
+    "requests": ["POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks"]
   },
   "GetTransport a bare root @terse": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "GetTransport a bare root @medium": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "GetTransport a bare root @full": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "GetTransport a bare root @raw": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "GetTransport no transport document @terse": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "GetTransport no transport document @medium": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "GetTransport no transport document @full": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "GetTransport no transport document @raw": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "GetTransport an empty root element @terse": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "GetTransport an empty root element @medium": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "GetTransport an empty root element @full": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "GetTransport an empty root element @raw": {
     "isError": true,
     "text": "The answer is not the transport request or task asked for: its document names another number, or none.",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900011"]
   },
   "enhancementTypeOf a hit @terse": {
     "isError": false,
@@ -850,170 +818,122 @@
   "GetInactiveObjects two entries @terse": {
     "isError": false,
     "text": "# count 2\ntype\tname\tparent\nBDEF/BDO\tZI_ROOT\t\nFUGR/FF\tZ_FM\tZFG",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects two entries @medium": {
     "isError": false,
     "text": "{\"success\":true,\"count\":2,\"objects\":[{\"type\":\"BDEF/BDO\",\"name\":\"ZI_ROOT\"},{\"type\":\"FUGR/FF\",\"name\":\"Z_FM\",\"parentName\":\"ZFG\"}]}",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects two entries @full": {
     "isError": false,
     "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"ioc:inactiveObjects\":{\"ioc:entry\":[{\"ioc:object\":[{\"ioc:ref\":{\"@\":{\"adtcore:uri\":\"/sap/bc/adt/bo/behaviordefinitions/zi_root\",\"adtcore:type\":\"BDEF/BDO\",\"adtcore:name\":\"ZI_ROOT\",\"xmlns:adtcore\":\"http://www.sap.com/adt/core\"}},\"@\":{\"ioc:user\":\"SAPUSER01\",\"ioc:deleted\":\"false\"}}],\"ioc:transport\":\"\"},{\"ioc:object\":[{\"ioc:ref\":{\"@\":{\"adtcore:uri\":\"/sap/bc/adt/functions/groups/zfg/fmodules/z_fm\",\"adtcore:parentUri\":\"/sap/bc/adt/functions/groups/zfg\",\"adtcore:type\":\"FUGR/FF\",\"adtcore:name\":\"Z_FM\",\"xmlns:adtcore\":\"http://www.sap.com/adt/core\"}},\"@\":{\"ioc:user\":\"SAPUSER01\",\"ioc:deleted\":\"false\"}}]}],\"@\":{\"xmlns:ioc\":\"http://www.sap.com/abapxml/inactiveCtsObjects\"}}}",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects two entries @raw": {
     "isError": false,
     "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><ioc:inactiveObjects xmlns:ioc=\"http://www.sap.com/abapxml/inactiveCtsObjects\"><ioc:entry><ioc:object ioc:user=\"SAPUSER01\" ioc:deleted=\"false\"><ioc:ref adtcore:uri=\"/sap/bc/adt/bo/behaviordefinitions/zi_root\" adtcore:type=\"BDEF/BDO\" adtcore:name=\"ZI_ROOT\" xmlns:adtcore=\"http://www.sap.com/adt/core\"/></ioc:object><ioc:transport/></ioc:entry><ioc:entry><ioc:object ioc:user=\"SAPUSER01\" ioc:deleted=\"false\"><ioc:ref adtcore:uri=\"/sap/bc/adt/functions/groups/zfg/fmodules/z_fm\" adtcore:parentUri=\"/sap/bc/adt/functions/groups/zfg\" adtcore:type=\"FUGR/FF\" adtcore:name=\"Z_FM\" xmlns:adtcore=\"http://www.sap.com/adt/core\"/></ioc:object></ioc:entry></ioc:inactiveObjects>",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects the 7.40 form @terse": {
     "isError": false,
     "text": "# count 1\ntype\tname\tparent\nFUGR/F\tZOBJ_FGRP\t",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects the 7.40 form @medium": {
     "isError": false,
     "text": "{\"success\":true,\"count\":1,\"objects\":[{\"type\":\"FUGR/F\",\"name\":\"ZOBJ_FGRP\"}]}",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects the 7.40 form @full": {
     "isError": false,
     "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"adtcore:objectReferences\":{\"adtcore:objectReference\":[{\"@\":{\"adtcore:uri\":\"/sap/bc/adt/functions/groups/zobj_fgrp\",\"adtcore:type\":\"FUGR/F\",\"adtcore:name\":\"ZOBJ_FGRP\"}}],\"@\":{\"xmlns:adtcore\":\"http://www.sap.com/adt/core\"}}}",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects the 7.40 form @raw": {
     "isError": false,
     "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\"><adtcore:objectReference adtcore:uri=\"/sap/bc/adt/functions/groups/zobj_fgrp\" adtcore:type=\"FUGR/F\" adtcore:name=\"ZOBJ_FGRP\"/></adtcore:objectReferences>",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects none inactive @terse": {
     "isError": false,
     "text": "# count 0\ntype\tname\tparent",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects none inactive @medium": {
     "isError": false,
     "text": "{\"success\":true,\"count\":0,\"objects\":[]}",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects none inactive @full": {
     "isError": false,
     "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"ioc:inactiveObjects\":{\"@\":{\"xmlns:ioc\":\"http://www.sap.com/abapxml/inactiveCtsObjects\"}}}",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects none inactive @raw": {
     "isError": false,
     "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><ioc:inactiveObjects xmlns:ioc=\"http://www.sap.com/abapxml/inactiveCtsObjects\"/>",
-    "requests": [
-      "GET /sap/bc/adt/activation/inactiveobjects"
-    ]
+    "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "ReadTransportObjects a request with its aggregate list @terse": {
     "isError": false,
     "text": "# transport SIDK900100\n# count 3\ntype\tname\tposition\n# task SIDK900101\n# pgmid R3TR\nPROG\tZP_ONE\t000001\n# task SIDK900102\n# pgmid LIMU\nMETH\tZCL_TWO              DO\t000001\n# pgmid R3TR\nCLAS\tZCL_TWO\t000002",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900100"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900100"]
   },
   "ReadTransportObjects a request with its aggregate list @medium": {
     "isError": false,
     "text": "{\"success\":true,\"transport_number\":\"SIDK900100\",\"count\":3,\"objects\":[{\"pgmid\":\"R3TR\",\"type\":\"PROG\",\"name\":\"ZP_ONE\",\"position\":\"000001\",\"task\":\"SIDK900101\"},{\"pgmid\":\"LIMU\",\"type\":\"METH\",\"name\":\"ZCL_TWO              DO\",\"position\":\"000001\",\"task\":\"SIDK900102\"},{\"pgmid\":\"R3TR\",\"type\":\"CLAS\",\"name\":\"ZCL_TWO\",\"position\":\"000002\",\"task\":\"SIDK900102\"}]}",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900100"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900100"]
   },
   "ReadTransportObjects a request with its aggregate list @full": {
     "isError": false,
     "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"tm:request\":[{\"tm:all_objects\":{\"tm:abap_object\":[{\"@\":{\"tm:pgmid\":\"R3TR\",\"tm:type\":\"PROG\",\"tm:name\":\"ZP_ONE\",\"tm:position\":\"000001\"}},{\"@\":{\"tm:pgmid\":\"R3TR\",\"tm:type\":\"CLAS\",\"tm:name\":\"ZCL_TWO\",\"tm:position\":\"000002\"}}]},\"tm:task\":[{\"tm:abap_object\":{\"@\":{\"tm:pgmid\":\"R3TR\",\"tm:type\":\"PROG\",\"tm:name\":\"ZP_ONE\",\"tm:position\":\"000001\"}},\"@\":{\"tm:number\":\"SIDK900101\"}},{\"tm:abap_object\":[{\"@\":{\"tm:pgmid\":\"LIMU\",\"tm:type\":\"METH\",\"tm:name\":\"ZCL_TWO              DO\",\"tm:position\":\"000001\"}},{\"@\":{\"tm:pgmid\":\"R3TR\",\"tm:type\":\"CLAS\",\"tm:name\":\"ZCL_TWO\",\"tm:position\":\"000002\"}}],\"@\":{\"tm:number\":\"SIDK900102\"}}],\"@\":{\"tm:number\":\"SIDK900100\"}}],\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\",\"tm:object_type\":\"R\"}}}",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900100"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900100"]
   },
   "ReadTransportObjects a request with its aggregate list @raw": {
     "isError": false,
     "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:object_type=\"R\"><tm:request tm:number=\"SIDK900100\"><tm:all_objects><tm:abap_object tm:pgmid=\"R3TR\" tm:type=\"PROG\" tm:name=\"ZP_ONE\" tm:position=\"000001\"/><tm:abap_object tm:pgmid=\"R3TR\" tm:type=\"CLAS\" tm:name=\"ZCL_TWO\" tm:position=\"000002\"/></tm:all_objects><tm:task tm:number=\"SIDK900101\"><tm:abap_object tm:pgmid=\"R3TR\" tm:type=\"PROG\" tm:name=\"ZP_ONE\" tm:position=\"000001\"/></tm:task><tm:task tm:number=\"SIDK900102\"><tm:abap_object tm:pgmid=\"LIMU\" tm:type=\"METH\" tm:name=\"ZCL_TWO              DO\" tm:position=\"000001\"/><tm:abap_object tm:pgmid=\"R3TR\" tm:type=\"CLAS\" tm:name=\"ZCL_TWO\" tm:position=\"000002\"/></tm:task></tm:request></tm:root>",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900100"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900100"]
   },
   "ReadTransportObjects a task, an entry without a position @terse": {
     "isError": false,
     "text": "# transport SIDK900101\n# count 2\ntype\tname\tposition\n# task SIDK900101\n# pgmid R3TR\nPROG\tZP_ONE\t000001\nTABL\tZT_NOPOS\t",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900101"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900101"]
   },
   "ReadTransportObjects a task, an entry without a position @medium": {
     "isError": false,
     "text": "{\"success\":true,\"transport_number\":\"SIDK900101\",\"count\":2,\"objects\":[{\"pgmid\":\"R3TR\",\"type\":\"PROG\",\"name\":\"ZP_ONE\",\"position\":\"000001\",\"task\":\"SIDK900101\"},{\"pgmid\":\"R3TR\",\"type\":\"TABL\",\"name\":\"ZT_NOPOS\",\"position\":null,\"task\":\"SIDK900101\"}]}",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900101"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900101"]
   },
   "ReadTransportObjects a task, an entry without a position @full": {
     "isError": false,
     "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"tm:request\":[{\"@\":{\"tm:number\":\"SIDK900100\"}}],\"tm:task\":[{\"tm:abap_object\":[{\"@\":{\"tm:pgmid\":\"R3TR\",\"tm:type\":\"PROG\",\"tm:name\":\"ZP_ONE\",\"tm:position\":\"000001\"}},{\"@\":{\"tm:pgmid\":\"R3TR\",\"tm:type\":\"TABL\",\"tm:name\":\"ZT_NOPOS\"}}],\"@\":{\"tm:number\":\"SIDK900101\"}}],\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\",\"tm:object_type\":\"T\"}}}",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900101"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900101"]
   },
   "ReadTransportObjects a task, an entry without a position @raw": {
     "isError": false,
     "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:object_type=\"T\"><tm:request tm:number=\"SIDK900100\"/><tm:task tm:number=\"SIDK900101\"><tm:abap_object tm:pgmid=\"R3TR\" tm:type=\"PROG\" tm:name=\"ZP_ONE\" tm:position=\"000001\"/><tm:abap_object tm:pgmid=\"R3TR\" tm:type=\"TABL\" tm:name=\"ZT_NOPOS\"/></tm:task></tm:root>",
-    "requests": [
-      "GET /sap/bc/adt/cts/transportrequests/SIDK900101"
-    ]
+    "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900101"]
   },
   "GetPackageContents a root SAP could not load @terse": {
     "isError": false,
     "text": "type\tname\ttech_name\turi\n# package ZPKG\nDEVC/K\tnot loaded by SAP\t\t",
-    "requests": [
-      "POST /sap/bc/adt/repository/nodestructure"
-    ]
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageContents a root SAP could not load @medium": {
     "isError": false,
     "text": "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"package_name\":\"ZPKG\",\"not_loaded\":true}]",
-    "requests": [
-      "POST /sap/bc/adt/repository/nodestructure"
-    ]
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageContents a root SAP could not load @full": {
     "isError": false,
     "text": "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"notLoaded\":true}]",
-    "requests": [
-      "POST /sap/bc/adt/repository/nodestructure"
-    ]
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageContents a root SAP could not load @raw": {
     "isError": false,
     "text": "[{\"status\":200,\"body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>SAP_TEXT</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>\"}]",
-    "requests": [
-      "POST /sap/bc/adt/repository/nodestructure"
-    ]
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageTree a root SAP could not load @terse": {
     "isError": false,
@@ -1118,30 +1038,22 @@
   "GetPackageContents two objects SAP listed without a name @terse": {
     "isError": false,
     "text": "type\tname\ttech_name\turi\n# package ZPKG\nTABL/DT\t\t\t/sap/bc/adt/ddic/tables/a\nTABL/DT\t\t\t/sap/bc/adt/ddic/tables/b",
-    "requests": [
-      "POST /sap/bc/adt/repository/nodestructure"
-    ]
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageContents two objects SAP listed without a name @medium": {
     "isError": false,
     "text": "[{\"name\":\"\",\"type\":\"TABL/DT\",\"package_name\":\"ZPKG\",\"uri\":\"/sap/bc/adt/ddic/tables/a\"},{\"name\":\"\",\"type\":\"TABL/DT\",\"package_name\":\"ZPKG\",\"uri\":\"/sap/bc/adt/ddic/tables/b\"}]",
-    "requests": [
-      "POST /sap/bc/adt/repository/nodestructure"
-    ]
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageContents two objects SAP listed without a name @full": {
     "isError": false,
     "text": "[{\"name\":\"\",\"type\":\"TABL/DT\",\"kind\":\"table\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/ddic/tables/a\"},{\"name\":\"\",\"type\":\"TABL/DT\",\"kind\":\"table\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/ddic/tables/b\"}]",
-    "requests": [
-      "POST /sap/bc/adt/repository/nodestructure"
-    ]
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageContents two objects SAP listed without a name @raw": {
     "isError": false,
     "text": "[{\"status\":200,\"body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/ddic/tables/a</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/ddic/tables/b</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>\"}]",
-    "requests": [
-      "POST /sap/bc/adt/repository/nodestructure"
-    ]
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageContents a subpackage SAP listed without a name @terse": {
     "isError": false,

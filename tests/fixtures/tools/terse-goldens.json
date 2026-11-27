@@ -563,15 +563,11 @@
   },
   "GetObjectStructure an empty structure @terse": {
     "isError": false,
-    "parts": [
-      "No nodes found in object structure response."
-    ]
+    "parts": ["No nodes found in object structure response."]
   },
   "GetObjectStructure an empty structure @medium": {
     "isError": false,
-    "parts": [
-      "No nodes found in object structure response."
-    ]
+    "parts": ["No nodes found in object structure response."]
   },
   "GetObjectStructure an empty structure @full": {
     "isError": false,
@@ -653,9 +649,7 @@
   },
   "CheckAbapGitExternalRepo its branches @terse": {
     "isError": false,
-    "parts": [
-      "# access_mode PRIVATE\nname\tis_head\nrefs/heads/main\tX"
-    ]
+    "parts": ["# access_mode PRIVATE\nname\tis_head\nrefs/heads/main\tX"]
   },
   "CheckAbapGitExternalRepo its branches @medium": {
     "isError": false,
@@ -743,9 +737,7 @@
   },
   "GetAbapGitErrorLog a run's log @terse": {
     "isError": false,
-    "parts": [
-      "type\tname\tmessage_type\nCLAS\tZCL_DEMO\tE"
-    ]
+    "parts": ["type\tname\tmessage_type\nCLAS\tZCL_DEMO\tE"]
   },
   "GetAbapGitErrorLog a run's log @medium": {
     "isError": false,
@@ -833,9 +825,7 @@
   },
   "CheckAbapGitRepo the check": {
     "isError": false,
-    "parts": [
-      "{\"status\":200,\"result\":\"done\"}"
-    ]
+    "parts": ["{\"status\":200,\"result\":\"done\"}"]
   },
   "LinkAbapGitRepo a link with its objects": {
     "isError": false,
@@ -845,8 +835,6 @@
   },
   "PullAbapGitRepo a pull without objects": {
     "isError": false,
-    "parts": [
-      "{\"status\":200,\"result\":\"done\"}"
-    ]
+    "parts": ["{\"status\":200,\"result\":\"done\"}"]
   }
 }

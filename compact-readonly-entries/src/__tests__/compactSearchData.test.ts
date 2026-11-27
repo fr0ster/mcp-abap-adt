@@ -86,7 +86,23 @@ describe('HandlerGetData', () => {
     assert.deepStrictEqual(calls, [
       {
         tool: 'GetTableContents',
-        args: { table_name: 'ZT', max_rows: 100, detail: 'terse' },
+        args: { table_name: 'ZT', detail: 'terse' },
+      },
+    ]);
+  });
+
+  // No bound of the server's (#391): one given goes on as given, 0 included.
+  it('forwards no row bound when none is given, and a given one as given', async () => {
+    await handleHandlerGetData(context, { sql_query: 'SELECT * FROM ZT' });
+    await handleHandlerGetData(context, { object_name: 'ZT', max_rows: 0 });
+    assert.deepStrictEqual(calls, [
+      {
+        tool: 'GetSqlQuery',
+        args: { sql_query: 'SELECT * FROM ZT', detail: 'terse' },
+      },
+      {
+        tool: 'GetTableContents',
+        args: { table_name: 'ZT', max_rows: 0, detail: 'terse' },
       },
     ]);
   });

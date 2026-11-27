@@ -6,6 +6,7 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   longRunning,
   purpose,
+  sapRowBound,
   toolDescription,
 } from '../../../lib/description';
 import {
@@ -45,9 +46,17 @@ import type { XmlRead } from '../../../lib/xml/tree';
  */
 export interface SqlQueryResponse {
   sql_query: string;
-  row_number: number;
+  /** The bound the consumer gave; absent when none was given, SAP's own then applies. */
+  row_number?: number | undefined;
   execution_time?: number | undefined;
   total_rows?: number | undefined;
+  /** How many records are listed in `rows`. */
+  rows_listed: number;
+  /**
+   * What cut the list, present when it holds fewer records than
+   * `total_rows`: the bound given (`row_number 50`), or SAP when none was.
+   */
+  cut_by?: string | undefined;
   columns: Array<{ name: string; type: string; description?: string }>;
   rows: Array<Record<string, string | null>>;
   /**
@@ -57,6 +66,14 @@ export interface SqlQueryResponse {
   document?: XmlRead | undefined;
 }
 
+/**
+ * The row bound's parameter description, shared by the data tools. `0` and a
+ * negative bound were refused `400` by SAP, and the largest accepted was
+ * 2147483646 (BTP ABAP environment, 2026-11-27).
+ */
+export const ROW_BOUND_WORDS =
+  '[read-only] Most records to read. Absent: SAP gives at most 100.';
+
 export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
   available_in: ['onprem', 'cloud'] as const,
@@ -65,18 +82,14 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the data an ABAP SQL SELECT selects from database tables and CDS views, up to the number of records asked.',
     ),
-    notes: [longRunning],
+    notes: [sapRowBound, longRunning],
   }),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
     sql_query: requiredText('SQL query is required').describe(
       'SQL query to execute',
     ),
-    row_number: z
-      .number()
-      .default(100)
-      .optional()
-      .describe('[read-only] Maximum number of rows to return'),
+    row_number: z.number().optional().describe(ROW_BOUND_WORDS),
     ...DETAIL_SHAPE,
   }),
 } as const;
@@ -89,10 +102,12 @@ export async function handleGetSqlQuery(
   logger?.info('handleGetSqlQuery called');
 
   const sqlQuery = args.sql_query;
-  const rowNumber = args.row_number || 100; // Default to 100 rows if not specified
+  // The consumer's bound as given, `0` included; none given, none sent
+  // (SAP's own applies: `sapRowBound`).
+  const rowNumber = args.row_number;
   const detail = detailOf(args);
 
-  logger?.info(`Executing SQL query (rows=${rowNumber})`);
+  logger?.info(`Executing SQL query (rows=${rowNumber ?? 'SAP default'})`);
 
   // `getSqlQuery(params, options?)` takes `analyseException` since
   // adt-clients 23.
@@ -102,10 +117,10 @@ export async function handleGetSqlQuery(
       withAdtHeaders(context, 'utils.getSqlQuery', (headers) =>
         createAdtClient(connection, logger)
           .getUtils(ourUtils)
-          .getSqlQuery(
-            { sql_query: sqlQuery, row_number: rowNumber },
-            { headers, analyse: analyseException },
-          ),
+          .getSqlQuery(rowBoundQuery(sqlQuery, rowNumber), {
+            headers,
+            analyse: analyseException,
+          }),
       ),
     (reading) => {
       logger?.debug(
@@ -117,16 +132,52 @@ export async function handleGetSqlQuery(
       )({
         sqlQuery,
         rowNumber,
+        boundName: 'row_number',
         reading,
       });
     },
   );
 }
 
-/** What a data read answers from: the statement sent, the rows asked, and the reading. */
+/** The data preview's parameters: the statement, and the consumer's bound only when given. */
+export function rowBoundQuery(
+  sqlQuery: string,
+  rowNumber: number | undefined,
+): { sql_query: string; row_number?: number } {
+  return rowNumber === undefined
+    ? { sql_query: sqlQuery }
+    : { sql_query: sqlQuery, row_number: rowNumber };
+}
+
+/**
+ * What cut the list, when it holds fewer records than the selection: the
+ * bound given, by the parameter it was given as, or SAP when none was.
+ */
+function cutOf({
+  rowNumber,
+  boundName,
+  reading,
+}: DataRead): string | undefined {
+  const preview = reading.value;
+  if (
+    preview.total_rows === undefined ||
+    preview.rows.length >= preview.total_rows
+  ) {
+    return undefined;
+  }
+  return rowNumber === undefined
+    ? `SAP: no ${boundName} given`
+    : `${boundName} ${rowNumber}`;
+}
+
+/**
+ * What a data read answers from: the statement sent, the bound given and
+ * the parameter it was given as, and the reading.
+ */
 export interface DataRead {
   readonly sqlQuery: string;
-  readonly rowNumber: number;
+  readonly rowNumber: number | undefined;
+  readonly boundName: 'row_number' | 'max_rows';
   readonly reading: AdtReading<SqlPreview>;
 }
 
@@ -162,16 +213,24 @@ export const DATA_HEADS = [
     'total_rows',
     'how many records the selection holds, when SAP reports it',
   ),
+  headShape(
+    'rows',
+    'when fewer records are listed than the selection holds: how many are listed, of how many, and what cut them',
+  ),
 ];
 
 /** The answer of a data read before `detail` shaped it: the rows, and each column's type and description. */
-function dataAnswerOf({ sqlQuery, rowNumber, reading }: DataRead) {
+function dataAnswerOf(read: DataRead) {
+  const { sqlQuery, rowNumber, reading } = read;
   const preview = reading.value;
+  const cut = cutOf(read);
   return {
     sql_query: sqlQuery,
-    row_number: rowNumber,
+    ...(rowNumber === undefined ? {} : { row_number: rowNumber }),
     execution_time: preview.execution_time,
     total_rows: preview.total_rows,
+    rows_listed: preview.rows.length,
+    ...(cut === undefined ? {} : { cut_by: cut }),
     columns: preview.columns,
     rows: preview.rows,
   } satisfies SqlQueryResponse;
@@ -182,7 +241,9 @@ function dataAnswerOf({ sqlQuery, rowNumber, reading }: DataRead) {
  * `GetSqlQuery` and `GetTableContents`, which read the same document: terse
  * a row per record under the column names, after how many records the
  * selection holds when SAP reports it (`# total_rows`, absent when it does
- * not — the record count never stands in), written by the listing writer; medium the rows with each
+ * not — the record count never stands in) and, when SAP answered fewer, how
+ * many are listed, of how many, and what cut them (`# rows 50 of 899, cut at
+ * row_number 50`), written by the listing writer; medium the rows with each
  * column's type and description; full that with the whole document parsed
  * beside it (`keyAttribute`, `colType`, `isKeyFigure` and whatever SAP adds
  * next); raw the document as SAP sent it.
@@ -191,12 +252,24 @@ export const DATA_ANSWERS: ListAnswerTable<
   DataRead,
   string | SqlQueryResponse
 > = {
-  terse: ({ reading }) => {
-    const preview = reading.value;
-    const heads: Head[] =
-      preview.total_rows === undefined
+  terse: (read) => {
+    const preview = read.reading.value;
+    const cut = cutOf(read);
+    const heads: Head[] = [
+      ...(preview.total_rows === undefined
         ? []
-        : [{ head: 'total_rows', value: String(preview.total_rows) }];
+        : [{ head: 'total_rows', value: String(preview.total_rows) }]),
+      ...(cut === undefined
+        ? []
+        : [
+            {
+              head: 'rows',
+              value: `${preview.rows.length} of ${preview.total_rows}, ${
+                read.rowNumber === undefined ? 'cut by ' : 'cut at '
+              }${cut}`,
+            },
+          ]),
+    ];
     return writeListing({
       heads,
       reading: { records: preview.rows },

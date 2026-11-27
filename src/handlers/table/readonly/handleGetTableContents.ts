@@ -6,6 +6,7 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   longRunning,
   purpose,
+  sapRowBound,
   toolDescription,
 } from '../../../lib/description';
 import { listAnswerAt } from '../../../lib/detail';
@@ -19,7 +20,11 @@ import {
   levelOf,
 } from '../../../lib/strategies/detail';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import { DATA_ANSWERS } from '../../system/readonly/handleGetSqlQuery';
+import {
+  DATA_ANSWERS,
+  ROW_BOUND_WORDS,
+  rowBoundQuery,
+} from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
   name: 'GetTableContents',
@@ -29,17 +34,14 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the data of an ABAP database table or CDS view, as SE16 previews it, up to the number of records asked.',
     ),
-    notes: [longRunning],
+    notes: [sapRowBound, longRunning],
   }),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
     table_name: requiredText('Table name is required').describe(
       'Name of the ABAP table',
     ),
-    max_rows: z
-      .number()
-      .optional()
-      .describe('Maximum number of rows to retrieve'),
+    max_rows: z.number().optional().describe(ROW_BOUND_WORDS),
     // This tool's `inputSchema` is a bare zod raw shape (`scripts/list-tools.ts`
     // reads that shape's optionality off `.isOptional()`), not the
     // `{type:'object', properties, required}` JSON Schema `DETAIL_PROPERTY`
@@ -61,10 +63,14 @@ export async function handleGetTableContents(
 ) {
   const { connection, logger } = context;
   const tableName = args.table_name;
-  const maxRows = args.max_rows || 100;
+  // The consumer's bound as given, `0` included; none given, none sent
+  // (SAP's own applies: `sapRowBound`).
+  const maxRows = args.max_rows;
   const detail = detailOf(args);
 
-  logger?.info(`Reading table contents: ${tableName} (max_rows=${maxRows})`);
+  logger?.info(
+    `Reading table contents: ${tableName} (max_rows=${maxRows ?? 'SAP default'})`,
+  );
 
   const sqlQuery = `SELECT * FROM ${tableName}`;
 
@@ -82,10 +88,10 @@ export async function handleGetTableContents(
       withAdtHeaders(context, 'utils.getSqlQuery', (headers) =>
         createAdtClient(connection, logger)
           .getUtils(ourUtils)
-          .getSqlQuery(
-            { sql_query: sqlQuery, row_number: maxRows },
-            { headers, analyse: analyseException },
-          ),
+          .getSqlQuery(rowBoundQuery(sqlQuery, maxRows), {
+            headers,
+            analyse: analyseException,
+          }),
       ),
     (reading) => {
       logger?.debug(
@@ -99,6 +105,7 @@ export async function handleGetTableContents(
       )({
         sqlQuery,
         rowNumber: maxRows,
+        boundName: 'max_rows',
         reading,
       });
     },

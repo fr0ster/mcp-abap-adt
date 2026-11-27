@@ -32,6 +32,7 @@ import {
   longRunning,
   pairsPurpose,
   purpose,
+  sapRowBound,
   toolDescription,
 } from '../description/index';
 import { DETAIL_LEVELS } from '../detail/levels';
@@ -2762,12 +2763,12 @@ function getDataProperties(sql: boolean) {
   };
 }
 
+/** The row bound: the consumer's, sent as given; absent, SAP's own (`sapRowBound`). */
 const MAX_ROWS = {
   max_rows: z
     .number()
-    .default(100)
     .optional()
-    .describe('Maximum number of rows returned.'),
+    .describe('Most records to read. Absent: SAP gives at most 100.'),
 };
 
 /** `detail`, the data tools' own: how much of the rows' answer to return. */
@@ -2833,7 +2834,7 @@ export function handlerGetDataWithSqlDefinition() {
       purpose: purpose(
         'Reads the data of an ABAP database table or CDS view, or the data an ABAP SQL SELECT selects, up to the number of records asked.',
       ),
-      notes: [longRunning],
+      notes: [sapRowBound, longRunning],
     }),
     inputSchema: compactGetDataSchema,
   };
@@ -2847,7 +2848,7 @@ export function handlerGetDataWithoutSqlDefinition() {
       purpose: purpose(
         'Reads the data of an ABAP database table or CDS view, up to the number of records asked.',
       ),
-      notes: [longRunning],
+      notes: [sapRowBound, longRunning],
     }),
     inputSchema: withInCallSchema(
       z

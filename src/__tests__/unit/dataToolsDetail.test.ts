@@ -3,7 +3,8 @@
  * compact `HandlerGetData`, which delegates to them — over the captured
  * freestyle preview and a real adt-clients run on a recording connection:
  * terse a row per record under the column names, after how many records
- * the selection holds where SAP reports it; medium the rows with each column's type and
+ * the selection holds where SAP reports it and, when fewer are listed, how
+ * many and what cut them; medium the rows with each column's type and
  * description; full that with the whole document parsed; raw the document.
  */
 
@@ -106,14 +107,19 @@ describe('the data tools answer terse by default: a row per record', () => {
       assert.equal(terse.isError, false, terse.text);
       const lines = terse.text.split('\n');
       assert.equal(lines[0], '# total_rows 249');
-      const header = lines[1]?.split('\t') ?? [];
+      // Five of 249 listed: the answer says so, and what cut them.
+      assert.equal(
+        lines[1],
+        `# rows 5 of 249, cut at ${tool === 'GetSqlQuery' ? 'row_number' : 'max_rows'} 5`,
+      );
+      const header = lines[2]?.split('\t') ?? [];
       assert.equal(header.length, 13, terse.text);
       assert.equal(header[0], 'COUNTRY');
-      assert.equal(lines.length, 2 + 5, terse.text);
-      assert.equal(lines[2]?.split('\t')[0], 'AD');
+      assert.equal(lines.length, 3 + 5, terse.text);
+      assert.equal(lines[3]?.split('\t')[0], 'AD');
       assert.equal(
         lines
-          .slice(2)
+          .slice(3)
           .map((line) => line.split('\t')[0])
           .join(','),
         'AD,AE,AF,AG,AI',
@@ -173,6 +179,7 @@ describe('the data tools at medium, full and raw', () => {
       const medium = JSON.parse((await read(PREVIEW, 'medium')).text);
       assert.equal(medium.total_rows, 249);
       assert.equal(medium.row_number, 5);
+      assert.equal(medium.rows_listed, 5);
       assert.equal(medium.rows.length, 5);
       assert.equal(medium.rows[0].ISEUROPEANUNIONMEMBER, null);
       assert.deepStrictEqual(medium.columns[0], {

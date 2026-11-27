@@ -22,6 +22,7 @@ export {
   lockAnswersStateHandle,
   longRunning,
   type Note,
+  sapRowBound,
   stateHandleAnswered,
   underLock,
   unlockUnderLock,

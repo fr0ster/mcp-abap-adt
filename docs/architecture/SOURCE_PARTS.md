@@ -156,6 +156,10 @@ A composer above the one-endpoint members. It answers two things:
   statement with another (§5.4). The tools cut the element's lines from this, and the write
   merges into it (§7). One read path serves both. The analyzer computes no hash: lib hashes the
   text it is given (§7.2).
+- **`part(object, elements, { version, source })`** with a source given: the same, located in
+  that text instead of a text the analyzer reads. The outline and the navigation are read afresh
+  for the call; nothing comes from a cache. A locked write calls it this way (§7.2), so what is
+  hashed, located and merged is one text.
 
 It is **not a member** of any object client and builds **no request**: it never calls
 `makeAdtRequest` and writes no ADT address. Every request it causes is a member's, one request
@@ -421,21 +425,30 @@ adt-clients takes the whole source, always. **Activation stays a separate call.*
 - a list of edits, all in **one include**. Edits in two includes are refused, naming both. One
   call is one write.
 
-The sequence:
+The sequence, one snapshot under one lock:
 
-1. Lock the object: the class for any of its includes, the program or function group for its
-   includes.
-2. Under the lock, `part` locates every element the edits name. That read takes the outline, the
-   navigation and the include's source.
-3. **Drift check.** The hash of the include text read in step 2 must equal `source_hash`.
-   Otherwise the call is refused, `source_changed`, with the current hash; the server unlocks and
-   writes nothing.
-4. Resolve the edits against that text:
-   - the edits must not overlap, else a refusal naming both;
-   - they are applied bottom-up, so earlier ranges stay valid.
-5. Write the whole include once, through the include's CRUD (table below), then unlock.
-6. **The answer** names each edit with its new line range in the include, plus `sent_hash`: the
+1. **Lock** the lock target of the include (table below). From here on, whatever ends the call
+   unlocks first: the sequence runs inside lib's `withLock` (`src/lib/strategies/withLock.ts`),
+   which releases on every path after a successful lock and reports a lock it could not release.
+2. **Read the include once**, under the lock, at `version: "inactive"`: the working version, the
+   one the write replaces. Call that text **T**.
+3. **Drift check.** `hash(T)` must equal `source_hash`. Otherwise the call is refused,
+   `source_changed`, with the current hash, and nothing is written. A model that read the active
+   version while an inactive one differs gets this refusal too, and reads again.
+4. **Locate in T.** `part(object, elements, { version: "inactive", source: T })`: the outline and
+   the navigation are read afresh under the lock, and every element is located in T, never in
+   another read. The identity rule (§5.2) and the boundary check (§5.4) run on T: an outline or
+   a navigation answer that does not describe T is refused (`start_mismatch`), not trusted.
+5. **Merge into T**: the edits must not overlap, else a refusal naming both; they are applied
+   bottom-up, so earlier ranges stay valid.
+6. **Write** the merged text once, through the include's update with the lock target's handle,
+   then unlock.
+7. **The answer** names each edit with its new line range in the include, plus `sent_hash`: the
    hash of the text this call sent. It does not activate.
+
+Only `LOCK` and `UNLOCK` are stateful; the reads and the write between them go stateless, as
+every update handler of lib sends them today. While the lock is held nobody else can write the
+include, so T is what SAP holds until the write.
 
 **The source hash** is part of lib's contract, not of an analyzer: SHA-256, lowercase hex, over the
 UTF-8 bytes of the source text exactly as received, nothing normalised. lib computes it, with
@@ -456,13 +469,26 @@ ends included:
   uses the line end of the line it is placed after. A line end inside the model's code (LF or
   CRLF) is replaced by that one; nothing else in the model's code is changed.
 
-| The element's include | The write |
-|---|---|
-| a class's `source/main` | the class's `update` |
-| `includes/implementations`, `definitions`, `macros`, `testclasses` | `getLocalTypes()`, `getLocalDefinitions()`, `getLocalMacros()`, `getLocalTestClass()` and their `update` |
-| an interface's source | the interface's `update` |
-| a program's main source / one of its includes | the program's / the include's `update` (onprem only) |
-| a function group include / a function module | the function include's / the module's `update` |
+**The lock target and the write target, per kind**, from adt-clients' own CRUD (paths under
+`packages/adt-clients/src/core/` of mcp-abap-adt-clients, at its current `main`):
+
+| The include | Lock target (`?_action=LOCK&accessMode=MODIFY`) | Write (`PUT … ?lockHandle=`) | lib's handler today, the same pairing |
+|---|---|---|---|
+| a class's `source/main` | the class, `class/lock.ts:26` | `source/main` of the class, `class/update.ts:38` | `handleUpdateClass.ts:101`, `:105`, `:151` |
+| a class's `implementations` | the class: "ADT locks `/oo/classes/{name}`, never the include, and the PUT that writes the include carries the class's handle", `class/AdtClassMemberBase.ts:126-128` | `class/update.ts:63` | `handleUpdateLocalTypes.ts:97`, `:100`, `:112` |
+| a class's `definitions`, `macros` | the class, as above | `class/includes.ts:141` (`updateClassInclude`) | the local definitions and macros handlers |
+| a class's `testclasses` | the class, as above | `class/testclasses.ts:32` | the local test class handler |
+| an interface's source | the interface, `interface/lock.ts:25` | `interface/update.ts:27` | `handleUpdateInterface.ts:101`, `:105`, `:134` |
+| a program's main source | the program, `program/lock.ts:24` | `program/update.ts:25` | `handleUpdateProgram.ts:97`, `:101`, `:130` |
+| a program include (`PROG/I`) | **the include itself**, `include/lock.ts:33` | `include/update.ts:24` | `handleUpdateInclude.ts:91`, `:95`, `:107` |
+| a function group include (`FUGR/I`) | **the include itself**, `functionInclude/lock.ts:27` | `functionInclude/updateSource.ts:33` | `handleUpdateFunctionInclude.ts:118`, `:124`, `:140` |
+| a function module | **the module itself**, `functionModule/lock.ts:25` | `functionModule/update.ts:29` | `function/high/handleUpdateFunctionModule.ts:133`, `:141`, `:167` |
+| a function group's main source | — | — | not written: refused |
+
+So an include of a program or a function group is locked as itself, never through its program
+or group; a class's local includes are the one case where the parent's lock is the include's. The
+handler paths are under lib's `src/handlers/`.
+
 
 ### 7.3 The edits
 

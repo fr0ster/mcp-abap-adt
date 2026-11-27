@@ -26,6 +26,7 @@ import {
   type IObjectVersion,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
+  AdtObjectIdentity,
   IAdtError,
   IAdtResponse,
   IAdtVersionable,
@@ -69,9 +70,9 @@ export interface ResolvedVersionedObject {
 }
 
 /** `obj`'s version members with `config` bound to the history read. */
-function bound<C>(
-  obj: IAdtVersionable<C, VersionFeed, string>,
-  config: Partial<C>,
+function bound<C, K extends keyof C>(
+  obj: IAdtVersionable<C, VersionFeed, string, K>,
+  config: AdtObjectIdentity<C, K>,
 ): ResolvedVersionedObject {
   return {
     getVersions: (options) => obj.getVersions(config, options),

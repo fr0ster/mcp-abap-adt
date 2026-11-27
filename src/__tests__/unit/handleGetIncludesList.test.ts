@@ -46,7 +46,7 @@ const context = { connection: {} as any, logger: undefined };
 const body = (result: any) => JSON.parse(result.content[0].text);
 const source = (text: string) => okResponse(reading(text, text));
 /** What an include read is asked for: the include's identity, by contract. */
-type IncludeIdentity = AdtObjectIdentity<IIncludeConfig>;
+type IncludeIdentity = AdtObjectIdentity<IIncludeConfig, 'includeName'>;
 const names = (node: any): any =>
   node.children.map((c: any) =>
     c.children.length ? { [c.name]: names(c) } : c.name,

@@ -116,7 +116,11 @@ describe('RuntimeListProfilerTraceFiles', () => {
   const FEED =
     '<?xml version="1.0" encoding="utf-8"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="http://www.sap.com/adt/runtime/traces/abaptraces">' +
     '<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/TRACE0000000000001</atom:id><atom:published>2026-01-01T00:00:00Z</atom:published>' +
-    '<trc:extendedData><trc:objectName>ZCL_X=====CP</trc:objectName><trc:state value="R" text="Finished"/><trc:runtime>42</trc:runtime><trc:user>SAPUSER01</trc:user><trc:host>HOST</trc:host></trc:extendedData>' +
+    // Every field the reading's type requires (adt-strategies 0.29 throws on
+    // a missing one), placeholders where a value is not asserted.
+    '<trc:extendedData><trc:objectName>ZCL_X=====CP</trc:objectName><trc:state value="R" text="Finished"/><trc:runtime>42</trc:runtime><trc:user>SAPUSER01</trc:user><trc:host>HOST</trc:host>' +
+    '<trc:expiration>2026-01-08T00:00:00Z</trc:expiration><trc:system>SID</trc:system><trc:client>001</trc:client><trc:size>8</trc:size>' +
+    '<trc:runtimeABAP>30</trc:runtimeABAP><trc:runtimeSystem>10</trc:runtimeSystem><trc:runtimeDatabase>2</trc:runtimeDatabase><trc:isAggregated>false</trc:isAggregated><trc:amdpFileSize>0</trc:amdpFileSize></trc:extendedData>' +
     '</atom:entry></atom:feed>';
   const listing = () => {
     profiler = {

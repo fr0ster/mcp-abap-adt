@@ -292,6 +292,13 @@ export async function validateObject(
   // being left out, and the old handler never sent the former.
   const packageName = package_name || undefined;
   const normalizedDescription = description || undefined;
+  // The description where one was given, its key left out otherwise: a
+  // create config's `description` is `string` (interfaces-adt 33), so an
+  // identity takes the key or nothing.
+  const described =
+    normalizedDescription === undefined
+      ? {}
+      : { description: normalizedDescription };
 
   return answer(
     { tool: 'ValidateObjectLow', detail },
@@ -304,8 +311,9 @@ export async function validateObject(
             .validate(
               {
                 programName: objectName,
-                packageName,
-                description: normalizedDescription,
+                // Required for a program and an include, refused above when absent.
+                packageName: packageName ?? '',
+                ...described,
               },
               { analyse: analyseException },
             );
@@ -316,8 +324,9 @@ export async function validateObject(
             .validate(
               {
                 includeName: objectName,
-                packageName,
-                description: normalizedDescription,
+                // Required for a program and an include, refused above when absent.
+                packageName: packageName ?? '',
+                ...described,
               },
               { analyse: analyseException },
             );
@@ -345,7 +354,7 @@ export async function validateObject(
             {
               interfaceName: objectName,
               packageName,
-              description: normalizedDescription,
+              ...described,
             },
             { analyse: analyseException },
           );
@@ -356,7 +365,7 @@ export async function validateObject(
               {
                 functionGroupName: objectName,
                 packageName,
-                description: normalizedDescription,
+                ...described,
               },
               { analyse: analyseException },
             );
@@ -385,7 +394,7 @@ export async function validateObject(
             {
               structureName: objectName,
               packageName,
-              description: normalizedDescription,
+              ...described,
             },
             { analyse: analyseException },
           );
@@ -436,7 +445,7 @@ export async function validateObject(
               {
                 name: objectName,
                 packageName,
-                description: normalizedDescription,
+                ...described,
                 rootEntity: root_entity,
                 implementationType: normalizedImplementationType,
               },
@@ -468,7 +477,7 @@ export async function validateObject(
             .validate(
               {
                 name: objectName,
-                description: normalizedDescription,
+                ...described,
                 packageName,
               },
               { analyse: analyseException },

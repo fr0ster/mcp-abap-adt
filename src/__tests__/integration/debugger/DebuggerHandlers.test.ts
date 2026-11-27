@@ -367,7 +367,16 @@ describe('Debugger handlers (integration)', () => {
           options?: { holdSeconds?: number } & IAdtAnalyseOptions<E>,
         ) => {
           listens.sent();
-          return listen<E>(identity, options);
+          // The pair adt-clients 48 types: the generic member with its
+          // `analyse`, the plain one without.
+          const analyse = options?.analyse;
+          const hold =
+            options?.holdSeconds === undefined
+              ? {}
+              : { holdSeconds: options.holdSeconds };
+          return analyse === undefined
+            ? listen(identity, hold)
+            : listen(identity, { ...hold, analyse });
         };
         return dbg;
       },
@@ -385,7 +394,11 @@ describe('Debugger handlers (integration)', () => {
           mainId: string,
           options?: IAdtAnalyseOptions<E>,
         ) => {
-          const read = getEvents<E>(mainId, options);
+          const analyse = options?.analyse;
+          const read =
+            analyse === undefined
+              ? getEvents(mainId)
+              : getEvents(mainId, { analyse });
           const answered = read.then(
             () => undefined,
             () => undefined,

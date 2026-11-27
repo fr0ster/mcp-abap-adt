@@ -407,7 +407,7 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
     service_name: 'ZSRV',
   };
 
-  it('locks before update and unlocks after with the SAME handle, passing the documented timeout and analysePublication — the publication verdict adt-clients 22 applied on its own', async () => {
+  it('locks before update and unlocks after with the SAME handle, the publication carrying none, passing the documented timeout and analysePublication — the publication verdict adt-clients 22 applied on its own', async () => {
     const order: string[] = [];
     const seen: Record<string, unknown> = {};
     fakeClient = fakeClientOf({
@@ -435,11 +435,12 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
       desiredPublicationState: 'published',
       serviceType: 'odatav4',
     });
-    // The lock handle, a timeout and `analysePublication` travel through
-    // options: adt-clients 23 no longer reads SAP's publication refusal on its
-    // own. `classifyServiceBinding` is not called: there was never a second
+    // A timeout and `analysePublication` travel through options: adt-clients
+    // 23 no longer reads SAP's publication refusal on its own. The job takes
+    // no lock handle (adt-clients 48: a lock-free write; it was never sent).
+    // `classifyServiceBinding` is not called: there was never a second
     // member in the removed composite's replacement to call.
-    assert.equal((seen.options as any).lockHandle, 'LOCK_HANDLE_1');
+    assert.equal('lockHandle' in (seen.options as any), false);
     // No deadline of the server's (19.0.0): `0` — not absent, which would
     // take adt-clients' 120 s default into a job measured to run longer.
     assert.equal((seen.options as any).timeout, 0);

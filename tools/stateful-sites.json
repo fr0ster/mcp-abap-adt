@@ -121,7 +121,7 @@
     "function": "openStateful",
     "site": "setSessionType('stateful')",
     "count": 1,
-    "window": "the debuggee session: the debugger's own connection, opened fresh for a debug or AMDP debug session (held state), stateful for that session's life \u2014 the debugger's session, not a tool's",
+    "window": "the debuggee session: the debugger's own connection, opened fresh for a debug or AMDP debug session (held state), stateful for that session's life — the debugger's session, not a tool's",
     "stateless": "never: the connection is not reused; it ends with its logoff at the session's stop, the idle bound's stop, the host's stop or the instance's terminal close",
     "whose": "server"
   },
@@ -550,20 +550,29 @@
   },
   {
     "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/messageClass/AdtMessageClassMessage.js",
-    "function": "writeClass",
-    "site": "setSessionType('stateful')",
-    "count": 4,
-    "window": "the message lock (LOCK_MSG), the class lock for the message, and the two UNLOCKs; the PUT between them is sent stateless",
-    "stateless": "the chain's first scope-end, registered before anything else and run last on every path, sets it stateless; it is also set stateless before the PUT",
+    "function": "lockMessage",
+    "site": "inStatefulSession",
+    "count": 1,
+    "window": "the LOCK_MSG alone (one request, inStatefulSession); the server's lock window composes it (src/lib/messageClassMessageWrite.ts)",
+    "stateless": "in the same call: inStatefulSession's finally sets it stateless, also when the request is refused or throws",
     "whose": "adt-clients"
   },
   {
     "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/messageClass/AdtMessageClassMessage.js",
-    "function": "writeClass",
-    "site": "setSessionType('stateless')",
-    "count": 2,
-    "window": "the message lock (LOCK_MSG), the class lock for the message, and the two UNLOCKs; the PUT between them is sent stateless",
-    "stateless": "the chain's first scope-end, registered before anything else and run last on every path, sets it stateless; it is also set stateless before the PUT",
+    "function": "lockClassForMessage",
+    "site": "inStatefulSession",
+    "count": 1,
+    "window": "the class lock for the message alone (one request, inStatefulSession)",
+    "stateless": "in the same call: inStatefulSession's finally sets it stateless, also when the request is refused or throws",
+    "whose": "adt-clients"
+  },
+  {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/messageClass/AdtMessageClassMessage.js",
+    "function": "unlockMessages",
+    "site": "inStatefulSession",
+    "count": 1,
+    "window": "the UNLOCK_ALL alone (one request, inStatefulSession)",
+    "stateless": "in the same call: inStatefulSession's finally sets it stateless, also when the request is refused or throws",
     "whose": "adt-clients"
   },
   {

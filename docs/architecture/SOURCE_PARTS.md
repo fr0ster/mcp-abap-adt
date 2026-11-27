@@ -511,7 +511,8 @@ container's include, so the call stays one include, one write, and activation st
 The code of an `insert` is given per place: `definition` and `implementation` for a class method,
 one text otherwise. A global class's definition and implementation are both in `source/main`, so
 a new method is one write. A local class whose definition and implementation sit in two includes
-gets its method by two calls: a `diff` into each include, each its own write.
+gets its method by two calls: a `diff` into each include, each its own write; between them the
+inactive class is inconsistent, as between any two updates before an activation.
 
 
 **Confinement of an element-relative diff.** Its hunks are numbered from the element's first line
@@ -561,6 +562,9 @@ by each of its includes and modules. The answer names that source (its ADT addre
   writes are onprem only. Program parts are onprem only: programs on cloud have no outline.
   Function group parts work on both.
 - **Batch mode:** the new tools run outside it (§4.4).
+- **Legacy (SAP_BASIS 7.40):** the new tools, `part: "size"` and the outline views are not served
+  on the legacy sets until 7.40 is measured (§11). The legacy sets keep their whole reads
+  unchanged.
 
 ## 9. No server-chosen limits
 
@@ -572,6 +576,7 @@ by each of its includes and modules. The answer names that source (its ADT addre
 
 ## 10. Release order
 
+
 Every dependency is consumed from the registry, published first and in this order:
 
 1. `@mcp-abap-adt/interfaces-adt`: the navigation atom.
@@ -579,3 +584,20 @@ Every dependency is consumed from the registry, published first and in this orde
 3. `@mcp-abap-adt/adt-strategies`: `readNavigationTarget`.
 4. `@mcp-abap-adt/adt-code-analyzer`: first release.
 5. mcp-abap-adt 24.3.0.
+
+## 11. SAP_BASIS 7.40
+
+Nothing of this design is measured on 7.40. What is known:
+
+- Its discovery (the recorded fixture `tests/fixtures/adt/system-description-basis-740--03-discovery.body.xml`)
+  lists `/sap/bc/adt/navigation/target` with no template link, and `/sap/bc/adt/repository/objectstructure`
+  as a repository-level collection. It lists no per-object `objectstructure`.
+- adt-clients-legacy states `getObjectOutline` as "not measured on 7.40 — inherited", and the
+  communication batch as not served on 7.40 (`packages/adt-clients-legacy/docs/LEGACY.md`, lines
+  302 and 348, in mcp-abap-adt-clients).
+- The legacy system is reachable only at times.
+
+So on 7.40 the new reads and the partial update are off: the legacy sets do not list them, and
+nothing is sent. Navigations would go one by one there in any case (§4.4: the envelope only where
+measured). Turning them on is a measurement of the outline per object, navigation and the
+positions on 7.40 first, then a change of `available_in`.

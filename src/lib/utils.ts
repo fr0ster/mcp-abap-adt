@@ -163,16 +163,13 @@ function _safeStringifyError(error: unknown): string {
     // Safely extract response data
     if (error.response?.data) {
       if (typeof error.response.data === 'string') {
-        safeError.responseData = error.response.data.substring(0, 1000); // Limit length
+        safeError.responseData = error.response.data;
       } else {
         try {
           // Try to stringify, but catch circular reference errors
           safeError.responseData = JSON.stringify(error.response.data);
         } catch (_e) {
-          safeError.responseData = String(error.response.data).substring(
-            0,
-            1000,
-          );
+          safeError.responseData = String(error.response.data);
         }
       }
     }
@@ -232,12 +229,12 @@ export function logErrorSafely(
     // Safely extract response data
     if (data) {
       if (typeof data === 'string') {
-        errorDetails.responseData = data.substring(0, 500);
+        errorDetails.responseData = data;
       } else {
         try {
-          errorDetails.responseData = JSON.stringify(data).substring(0, 500);
+          errorDetails.responseData = JSON.stringify(data);
         } catch (_e) {
-          errorDetails.responseData = String(data).substring(0, 500);
+          errorDetails.responseData = String(data);
         }
       }
     }
@@ -277,7 +274,7 @@ export function extractAdtErrorMessage(
     if (said) return `SAP Error: ${said}`;
 
     if (raw.length > 0) {
-      return raw.slice(0, 2000);
+      return raw;
     }
   } else if (responseData && typeof responseData === 'object') {
     const dataMessage =
@@ -421,7 +418,7 @@ export function return_error(error: unknown): FailureAnswer {
       } else if (responseData) {
         // SAP's answer, as it came: a body, safely extracted
         if (typeof responseData === 'string') {
-          errorText = responseData.substring(0, 2000); // Limit length
+          errorText = responseData;
         } else {
           try {
             // Use a replacer function to avoid circular references
@@ -446,7 +443,7 @@ export function return_error(error: unknown): FailureAnswer {
                 }
                 return value;
               },
-            ).substring(0, 2000);
+            );
           } catch (_e) {
             errorText = `HTTP ${String(child(http.response, 'status'))}: ${String(child(http.response, 'statusText') || 'Error')}`;
           }
@@ -488,9 +485,9 @@ export function return_error(error: unknown): FailureAnswer {
             return '[HTTP Object]';
           }
           return value;
-        }).substring(0, 2000);
+        });
       } catch (_e) {
-        errorText = String(error).substring(0, 2000);
+        errorText = String(error);
       }
     }
   } catch (_e) {

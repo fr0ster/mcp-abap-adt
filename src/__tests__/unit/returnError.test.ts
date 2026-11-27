@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { AxiosError } from 'axios';
-import { return_error } from '../../lib/utils';
+import { pageText } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
+import { extractAdtErrorMessage, return_error } from '../../lib/utils';
 
 const textOf = (r: any): string => r.content[0].text;
 
@@ -71,5 +72,33 @@ describe('return_error emits a bare message (#155)', () => {
     const text = textOf(return_error(err));
     assert.ok(text.includes('DNS resolution failed'));
     assert.ok(text.includes('sap.example.com'));
+  });
+});
+
+// No cut of the server's (#391, the owner): SAP's text reaches the answer
+// whole, however long.
+describe('an error text is never truncated', () => {
+  const long = `${'a'.repeat(4990)}THE_END`;
+
+  it('return_error keeps a long SAP body whole', () => {
+    const err = Object.assign(
+      new Error('Request failed with status code 500'),
+      {
+        code: 'ERR_BAD_RESPONSE',
+        status: 500,
+        response: { status: 500, statusText: 'Error', headers: {}, data: long },
+      },
+    );
+    assert.ok(textOf(return_error(err)).includes('THE_END'));
+  });
+
+  it('extractAdtErrorMessage keeps a long body whole', () => {
+    assert.equal(extractAdtErrorMessage({ response: { data: long } }), long);
+  });
+
+  it("the service binding preview reads a long error page's text whole", () => {
+    assert.ok(
+      pageText(`<html><body>${long}</body></html>`).endsWith('THE_END'),
+    );
   });
 });

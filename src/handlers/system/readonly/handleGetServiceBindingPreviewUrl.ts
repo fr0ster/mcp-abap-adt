@@ -99,12 +99,15 @@ function pathOf(serviceUrl: string): string {
   return query === -1 ? serviceUrl : serviceUrl.slice(0, query);
 }
 
-/** SAP's words on a page: the text of an HTML error page without its markup and styles, else the text as it is. */
-export function pageText(body: string, ceiling = 300): string {
+/**
+ * SAP's words on a page: the text of an HTML error page without its markup
+ * and styles, else the text as it is — whole, never cut (#391, the owner).
+ */
+export function pageText(body: string): string {
   let out = '';
   let at = 0;
   const lower = body.toLowerCase();
-  while (at < body.length && out.length < ceiling * 4) {
+  while (at < body.length) {
     if (lower.startsWith('<style', at) || lower.startsWith('<script', at)) {
       const closing = lower.startsWith('<style', at) ? '</style>' : '</script>';
       const end = lower.indexOf(closing, at);
@@ -134,7 +137,7 @@ export function pageText(body: string, ceiling = 300): string {
     gap = false;
     words += ch;
   }
-  return words.slice(0, ceiling);
+  return words;
 }
 
 /** What the published service's `$metadata` answered: the service's live state. */

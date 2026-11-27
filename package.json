@@ -245,12 +245,12 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^47.0.2",
-    "@mcp-abap-adt/adt-strategies": "^0.28.3",
+    "@mcp-abap-adt/adt-clients": "^48.0.0",
+    "@mcp-abap-adt/adt-strategies": "^0.29.0",
     "@mcp-abap-adt/auth-errors": "^2.2.1",
     "@mcp-abap-adt/auth-providers": "^6.0.2",
     "@mcp-abap-adt/connection": "^25.2.1",
-    "@mcp-abap-adt/interfaces-adt": "^31.0.0",
+    "@mcp-abap-adt/interfaces-adt": "^33.0.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^5.3.0",
     "@mcp-abap-adt/interfaces-auth": "^7.5.0",
     "@mcp-abap-adt/interfaces-auth-sap": "^4.0.0",

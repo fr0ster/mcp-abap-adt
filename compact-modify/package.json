@@ -51,7 +51,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces-adt": "^31.0.0"
+    "@mcp-abap-adt/interfaces-adt": "^33.0.0"
   },
   "peerDependencies": {
     "@mcp-abap-adt/lib": "^24.2.2"

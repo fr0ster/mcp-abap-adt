@@ -767,56 +767,56 @@
     "isError": false,
     "text": "ENHO/XHH",
     "requests": [
-      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_TWO&maxResults=20&objectType=ENHO"
+      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_TWO&maxResults=100&objectType=ENHO"
     ]
   },
   "enhancementTypeOf a hit @medium": {
     "isError": false,
     "text": "ENHO/XHH",
     "requests": [
-      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_TWO&maxResults=20&objectType=ENHO"
+      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_TWO&maxResults=100&objectType=ENHO"
     ]
   },
   "enhancementTypeOf a hit @full": {
     "isError": false,
     "text": "ENHO/XHH",
     "requests": [
-      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_TWO&maxResults=20&objectType=ENHO"
+      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_TWO&maxResults=100&objectType=ENHO"
     ]
   },
   "enhancementTypeOf a hit @raw": {
     "isError": false,
     "text": "ENHO/XHH",
     "requests": [
-      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_TWO&maxResults=20&objectType=ENHO"
+      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_TWO&maxResults=100&objectType=ENHO"
     ]
   },
   "enhancementTypeOf no hit @terse": {
     "isError": false,
     "text": "undefined",
     "requests": [
-      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_NONE&maxResults=20&objectType=ENHO"
+      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_NONE&maxResults=100&objectType=ENHO"
     ]
   },
   "enhancementTypeOf no hit @medium": {
     "isError": false,
     "text": "undefined",
     "requests": [
-      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_NONE&maxResults=20&objectType=ENHO"
+      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_NONE&maxResults=100&objectType=ENHO"
     ]
   },
   "enhancementTypeOf no hit @full": {
     "isError": false,
     "text": "undefined",
     "requests": [
-      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_NONE&maxResults=20&objectType=ENHO"
+      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_NONE&maxResults=100&objectType=ENHO"
     ]
   },
   "enhancementTypeOf no hit @raw": {
     "isError": false,
     "text": "undefined",
     "requests": [
-      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_NONE&maxResults=20&objectType=ENHO"
+      "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZENH_NONE&maxResults=100&objectType=ENHO"
     ]
   },
   "GetWhereUsed read-where-used-list-structure--01 @terse": {
@@ -1033,7 +1033,7 @@
   },
   "GetPackageTree a root SAP could not load @full": {
     "isError": false,
-    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"include_descriptions\":false}}",
     "requests": [
       "GET /sap/bc/adt/packages/zpkg?version=active",
       "POST /sap/bc/adt/repository/nodestructure"
@@ -1099,7 +1099,7 @@
   },
   "GetPackageTree a subpackage node SAP could not load @full": {
     "isError": false,
-    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"include_descriptions\":false}}",
     "requests": [
       "GET /sap/bc/adt/packages/zpkg?version=active",
       "POST /sap/bc/adt/repository/nodestructure",
@@ -1195,7 +1195,7 @@
   },
   "GetPackageTree a subpackage SAP listed without a name @full": {
     "isError": false,
-    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZP_IN_SUB\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"uri\":\"/sap/bc/adt/packages/nameless\",\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZP_IN_SUB\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"uri\":\"/sap/bc/adt/packages/nameless\",\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"include_descriptions\":false}}",
     "requests": [
       "GET /sap/bc/adt/packages/zpkg?version=active",
       "POST /sap/bc/adt/repository/nodestructure",

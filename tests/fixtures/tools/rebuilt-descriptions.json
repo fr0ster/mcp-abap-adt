@@ -261,7 +261,7 @@
       "program",
       "function_group"
     ],
-    "inputSchema.maxResults.description": "search_object: maximum number of results to return (default 100).",
+    "inputSchema.maxResults.description": "search_object: most results to read; absent, SAP gives at most 200.",
     "inputSchema.detail.description": "search_source, search_object, where_used, package_tree, transports, atc_findings, atc_results, atc_result: How much of the answer to return: \"terse\" (default) what a next call needs: the identifiers and a short description; \"medium\" every item the tool read, with its main properties; \"full\" the tool's whole answer; \"raw\" what SAP sent.",
     "inputSchema.detail.enum": [
       "terse",
@@ -285,7 +285,7 @@
     "inputSchema.in_object.object_name.description": "Its name",
     "inputSchema.package_name.description": "package_tree: package name (give this or package_names).",
     "inputSchema.package_names.description": "package_tree: several package names, read together (give this or package_name).",
-    "inputSchema.max_depth.description": "package_tree: maximum depth of the walk (default 5).",
+    "inputSchema.max_depth.description": "package_tree: maximum depth of the walk; absent, every level.",
     "inputSchema.include_descriptions.description": "package_tree: each object's description in the answer (default false).",
     "inputSchema.debug.description": "package_tree: diagnostic metadata in the answer (counts, types, hierarchy; default false).",
     "inputSchema.user.description": "transports: the SAP user id whose requests are listed (default the session's user).",

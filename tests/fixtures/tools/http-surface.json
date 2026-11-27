@@ -19,7 +19,7 @@
     "ActivateTableType": "table_type_name*, detail, state_handle",
     "AddTransportObject": "transport_number*, object_name*, object_type*, pgmid, detail, state_handle",
     "AmdpDebugCancel": "state_handle*, detail",
-    "AmdpDebugGetTable": "state_handle*, variable*, query, detail",
+    "AmdpDebugGetTable": "state_handle*, variable*, query, row_number, detail",
     "AmdpDebugSetBreakpoints": "state_handle*, breakpoints*, detail",
     "AmdpDebugStart": "stop_existing, breakpoints*, run, detail, state_handle",
     "AmdpDebugStep": "state_handle*, action*, detail",

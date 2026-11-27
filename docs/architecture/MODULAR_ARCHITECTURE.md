@@ -1,4 +1,3 @@
-```markdown
 # Modular Architecture for Independent ABAP Development Tooling
 
 ## Purpose
@@ -37,4 +36,3 @@ The existing mcp-abap-adt project illustrates this architectural approach. It is
 - [Architecture and package overview](README.md)
 - [Handler exporter](HANDLER_EXPORTER.md)
 - [Tool architecture](TOOLS_ARCHITECTURE.md)
-```

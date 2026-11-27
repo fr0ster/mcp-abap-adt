@@ -292,22 +292,45 @@ it to find a block's end, and the boundary check of §5.4 uses it for every kind
   - the `.` that ends a statement.
 - A keyword inside a literal or a comment counts for nothing. Keywords are compared
   case-insensitively.
-- It locates the statement that contains the start, then the statement that ends the block:
+- A literal or template still open at the end of its line, or a statement still open at the end
+  of the include, makes the include **unlexable**: every part of it is refused, naming the line.
 
-| Element | Opens with | Ends with |
-|---|---|---|
-| form (`PU`) | `FORM` | `ENDFORM` |
-| module (`PM`) | `MODULE` | `ENDMODULE` |
-| local class definition / implementation (`PL`) | `CLASS … DEFINITION` / `CLASS … IMPLEMENTATION` | `ENDCLASS` (a `DEFINITION DEFERRED` or `LOAD` is one statement) |
-| local method (`PLM`) | `METHOD` | `ENDMETHOD` |
-| local interface (`PN`) | `INTERFACE` | `ENDINTERFACE` |
-| macro | `DEFINE` | `END-OF-DEFINITION` |
-| event (`PE`) | its event keyword | the last statement before the next event keyword or processing block (`FORM`, `MODULE`, `FUNCTION`, `CLASS … IMPLEMENTATION`), or the include's end; blank and comment lines before the next block are not part of it |
-| a declaration (`PD`, `PT`, `PC`, `PS`, …) | its statement | the same statement (a chain is one statement) |
+**The scanner's table is closed.** A kind it lists is readable on the sides it lists. Every other
+kind is informational (§5.0) and refused as a part, naming the kind:
 
-- **A kind with no rule is refused**, naming the kind. **A block with no end is refused**,
-  naming the element and the include. The scanner never guesses an end.
-- The spec lists every block-opening statement exactly.
+| Kind | Side | The opening statement (must be the one at the start) | The end |
+|---|---|---|---|
+| form (`PU`) | implementation | `FORM <name>` | the first `ENDFORM` statement after it |
+| module (`PM`) | implementation | `MODULE <name>` | the first `ENDMODULE` |
+| local class (`PL`) | definition | `CLASS <name> DEFINITION`, with none of the additions `DEFERRED`, `LOAD`, `LOCAL FRIENDS` | the first `ENDCLASS` |
+| local class (`PL`) | implementation | `CLASS <name> IMPLEMENTATION` | the first `ENDCLASS` |
+| local method (`PLM`) | implementation | `METHOD <name>` | the first `ENDMETHOD` |
+| local interface (`PN`) | definition | `INTERFACE <name>`, with neither `DEFERRED` nor `LOAD` | the first `ENDINTERFACE` |
+| event (`PE`) | implementation | the event statement the outline names (`START-OF-SELECTION`, `AT SELECTION-SCREEN …`, …) | the last statement before the next statement that opens an event block or one of `FORM`, `MODULE`, `FUNCTION`, `CLASS … IMPLEMENTATION`, or before the include's end; the blank and comment lines between are not part of it |
+
+A local method's `definition` side is not in the table: it is read as part of its local class's
+`definition` (§2: SAP's navigation refuses its declaration link).
+
+**Fail-closed rules**, each a refusal naming the element and the include; the scanner never picks
+another candidate:
+
+- **Identity.** The statement at the navigated start must be the row's opening statement, and its
+  name token must equal the element's name, compared case-insensitively. Otherwise the outline or
+  the navigation does not describe this text (`start_mismatch`).
+- **Nesting.** Between the opening statement and its end, the scanner meets no statement that
+  opens a block of the table (a `FORM` inside a `METHOD`), and, for an event, no `INCLUDE`
+  statement: an event whose statements run through another include is a cross-include construct
+  (`crosses_include`).
+- **End.** No end before the include's end is `no_end`. A form, module, class, method or interface
+  never ends at the include's end.
+- **Macros.** A `DEFINE` … `END-OF-DEFINITION` body is skipped as text up to its end statement,
+  and its contents count for nothing: a block opener or an end keyword inside a macro is not a
+  statement. A part whose start lies inside a macro body is refused (`inside_macro`).
+- **Statements.** A `.` ends a statement only outside a comment, a literal, a template and its
+  embedded expressions. Chained statements (`:`, `,`) are one statement.
+
+The spec gives the full list of event statements and the test inputs of each rule.
+
 
 ### 5.3 A function module
 

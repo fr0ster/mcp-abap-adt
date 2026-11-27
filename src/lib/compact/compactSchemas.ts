@@ -1465,7 +1465,7 @@ export const compactProfileViewSchema = z.object({
     .number()
     .optional()
     .describe(
-      'Number of top-ranked rows to include when mode is "analyze". Default 10. Ignored for mode "raw".',
+      'Number of top-ranked rows to include when mode is "analyze"; absent, every row, ranked. Ignored for mode "raw".',
     ),
   with_system_events: z
     .boolean()

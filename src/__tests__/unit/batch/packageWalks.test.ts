@@ -1193,14 +1193,82 @@ describe('GetObjectsList', () => {
           message: 'No authorization to access the resource',
           step: 'read object metadata',
         });
-        // Every object is still listed, the others read.
+        // The refused object is the one whose read SAP refused.
+        assert.equal(refused[0].OBJECT_NAME, nameAt(metadataKey), text);
+        // Every object is still listed, and every other one read: its
+        // description its metadata's.
         assert.equal(payload.total_objects, 3, text);
         assert.equal(payload.refused_objects, 1, text);
+        const descriptions: Record<string, string> = {
+          ZINCL_X1: 'Include X1',
+          ZFORM_X: 'Form X',
+          ZEVENT_X: 'Event X',
+        };
+        for (const o of payload.objects as Array<{
+          OBJECT_NAME: string;
+          DESCRIPTION?: string;
+          METADATA_ERROR?: unknown;
+        }>) {
+          if (o.METADATA_ERROR !== undefined) {
+            assert.equal(o.DESCRIPTION, undefined, text);
+            continue;
+          }
+          assert.equal(o.DESCRIPTION, descriptions[o.OBJECT_NAME], text);
+        }
+        assert.equal(
+          payload.objects.filter(
+            (o: { DESCRIPTION?: string }) => o.DESCRIPTION !== undefined,
+          ).length,
+          2,
+          text,
+        );
         answers.push(payload);
       }
       assert.deepStrictEqual(answers[0], answers[1]);
     });
   }
+
+  // #398: a credential refusal by the connection during pass 2 — before SAP
+  // is asked — is the credentials', not an object's: it ends the call as it
+  // came, on both paths.
+  it('a credential refusal during the metadata reads ends the call, on both paths', async () => {
+    const probe = system();
+    await withinTurns(
+      handleGetObjectsListOf(contextOn(probe), { ...single, detail: 'medium' }),
+    );
+    const metadataKey = (probe.envelopes.map(partKeys)[3] ?? [])[0] ?? '';
+    assert.ok(metadataKey.startsWith('GET '), metadataKey);
+    for (const batch of ['served', 'absent'] as const) {
+      const fake = system();
+      let batches = 0;
+      let refusedOnce = false;
+      fake.answerRequests(async (request, previous) => {
+        if (request.url.endsWith('/batch')) {
+          batches += 1;
+          // The node structures' three envelopes, then the metadata's.
+          if (batches === 4) {
+            refusedOnce = true;
+            throw credential();
+          }
+        } else if (keyOf(request.method, request.url) === metadataKey) {
+          refusedOnce = true;
+          throw credential();
+        }
+        return previous(request);
+      });
+      const result = await withinTurns(
+        handleGetObjectsListOf(contextOn(fake, batch), {
+          ...single,
+          detail: 'full',
+        }),
+      );
+      const text = textOf(result);
+      assert.ok(refusedOnce, `${batch}: the refusal was reached`);
+      assert.equal((result as { isError?: boolean }).isError, true, text);
+      assert.equal(payloadOf(result).error, 'authentication_failed', text);
+      assert.ok(!text.includes('METADATA_ERROR'), text);
+    }
+  });
 
   // #398: a 401 is the credentials', the same for every object: it still
   // ends the call, on both paths.

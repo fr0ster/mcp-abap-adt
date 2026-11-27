@@ -584,7 +584,7 @@ interface ParentList {
 }
 
 /** A parent's list of `objects`: the ones whose metadata read SAP refused named beside them. */
-function parentListOf(
+export function parentListOf(
   parent: Pick<ParentList, 'parent_name' | 'parent_tech_name' | 'parent_type'>,
   objects: FlatObject[],
 ): ParentList {
@@ -638,7 +638,10 @@ const mediumObject = (o: FlatObject) => ({
  * writers, one row or entry per object. Raw never reaches this table: the
  * handler answers it as the responses (`wireAnswer`).
  */
-function objectsListAnswers(): ListAnswerTable<ParentList, string | object> {
+export function objectsListAnswers(): ListAnswerTable<
+  ParentList,
+  string | object
+> {
   const full = (list: ParentList) => ({
     parent_name: list.parent_name,
     ...('parent_tech_name' in list

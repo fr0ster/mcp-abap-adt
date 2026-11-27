@@ -13,12 +13,14 @@ import { describe, it } from 'node:test';
 import {
   handleGetObjectsList,
   OBJECTS_LIST_LISTS,
+  objectsListAnswers,
+  parentListOf,
 } from '../../handlers/search/readonly/handleGetObjectsList';
 import {
   createBatchAvailability,
   NO_BATCH_ENDPOINT_STATUS,
 } from '../../lib/batch/availability';
-import { writeListing } from '../../lib/detail';
+import { listAnswerAt, writeListing } from '../../lib/detail';
 import { declareSystemKind } from '../../lib/systemKind';
 import { recordingConnection } from '../helpers/recordingConnection';
 
@@ -26,6 +28,13 @@ const LEVEL =
   '<?xml version="1.0" encoding="utf-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT>' +
   '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>FUGR/FF</OBJECT_TYPE><OBJECT_NAME>Z_FM</OBJECT_NAME><TECH_NAME>Z_FM</TECH_NAME><OBJECT_URI>/sap/bc/adt/x/z_fm</OBJECT_URI><DESCRIPTION>A module</DESCRIPTION></SEU_ADT_REPOSITORY_OBJ_NODE>' +
   '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>FUGR/I</OBJECT_TYPE><OBJECT_NAME>ZFG_TOP</OBJECT_NAME><TECH_NAME>LZFGTOP</TECH_NAME><OBJECT_URI>/sap/bc/adt/x/lzfgtop</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+  '</TREE_CONTENT><OBJECT_TYPES/></DATA></asx:values></asx:abap>';
+
+/** A level listing one object SAP gave no type, beside a typed one. */
+const TYPELESS =
+  '<?xml version="1.0" encoding="utf-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT>' +
+  '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>FUGR/FF</OBJECT_TYPE><OBJECT_NAME>Z_FM</OBJECT_NAME><TECH_NAME>Z_FM</TECH_NAME><OBJECT_URI>/sap/bc/adt/x/z_fm</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+  '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE></OBJECT_TYPE><OBJECT_NAME>ZGONE</OBJECT_NAME><TECH_NAME>ZGONE</TECH_NAME><OBJECT_URI>/sap/bc/adt/x/zgone</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE>' +
   '</TREE_CONTENT><OBJECT_TYPES/></DATA></asx:values></asx:abap>';
 
 async function objectsList(
@@ -226,11 +235,46 @@ describe('GetObjectsList detail', () => {
   // #398: at every level the answer says how many objects carry a refusal.
   for (const detail of ['terse', 'medium', 'full'] as const) {
     it(`${detail}: the answer counts the objects carrying a refusal`, async () => {
-      // At terse pass 2 reads no typed object's metadata: the count is
-      // there all the same, a head of its own.
+      // At terse pass 2 reads only an object SAP listed without a type, by
+      // its URI. A real node structure never yields one: the reading answers
+      // a node without OBJECT_TYPE as one SAP could not load (below, the
+      // handler's own answer). So the terse writer is held to a list that
+      // holds such an object's refusal, as the handler builds it.
       if (detail === 'terse') {
-        const text = await objectsList('terse');
-        assert.ok(text.split('\n').includes('# refused 0'), text);
+        const typeless = await objectsList('terse', TYPELESS);
+        assert.ok(typeless.split('\n').includes('# refused 0'), typeless);
+        assert.ok(typeless.includes('not loaded by SAP'), typeless);
+        const error = {
+          status: 403,
+          message: 'No authorization to access the resource',
+          step: 'read object metadata',
+        };
+        const refused = listAnswerAt(
+          objectsListAnswers(),
+          'terse',
+        )(
+          parentListOf({ parent_name: 'ZFG', parent_type: 'FUGR/F' }, [
+            { OBJECT_TYPE: 'FUGR/FF', OBJECT_NAME: 'Z_FM' },
+            {
+              OBJECT_TYPE: '',
+              OBJECT_NAME: 'ZGONE',
+              OBJECT_URI: '/sap/bc/adt/x/zgone',
+              METADATA_ERROR: error,
+            },
+          ]),
+        );
+        assert.equal(typeof refused, 'string');
+        const lines = String(refused).split('\n');
+        assert.ok(lines.includes('# refused 1'), String(refused));
+        const marked = lines.filter((l) => l.startsWith('# metadata_error\t'));
+        assert.equal(marked.length, 1, String(refused));
+        const [, type, name, uri, written] = (marked[0] ?? '').split('\t');
+        assert.deepStrictEqual(
+          [type, name, uri],
+          ['', 'ZGONE', '/sap/bc/adt/x/zgone'],
+          String(refused),
+        );
+        assert.deepStrictEqual(JSON.parse(String(written)), error);
         return;
       }
       const connection = recordingConnection([

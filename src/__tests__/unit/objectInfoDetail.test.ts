@@ -11,6 +11,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  TOOL_DEFINITION as GetObjectInfo,
   handleGetObjectInfo,
   searchHitsOf,
 } from '../../handlers/system/readonly/handleGetObjectInfo';
@@ -132,6 +133,31 @@ describe('GetObjectInfo answers terse by default: the tree as indented rows', ()
         '  PROG/P\tZPROG\t\t',
       ].join('\n'),
     );
+  });
+
+  // No depth of the server's (#391): without maxDepth every subpackage is
+  // walked, as deep as the package goes.
+  it('without maxDepth a package is walked into every subpackage', async () => {
+    const { maxDepth: _given, ...unbounded } = PACKAGE;
+    const terse = await info(PACKAGE_ANSWERS, unbounded);
+    assert.equal(terse.isError, false, terse.text);
+    assert.equal(
+      terse.text,
+      [
+        'DEVC/K\tZROOT\tFound ZROOT\tZPARENT',
+        '  DEVC/K\tZSUB\tFound ZSUB\tZPARENT',
+        '    PROG/P\tZPROG_SUB\t\t',
+        '  PROG/P\tZPROG\t\t',
+      ].join('\n'),
+    );
+  });
+
+  it('the schema gives no maxDepth of its own', () => {
+    const parsed = GetObjectInfo.inputSchema.parse({
+      parent_type: 'DEVC/K',
+      parent_name: 'ZROOT',
+    });
+    assert.equal('maxDepth' in parsed, false, JSON.stringify(parsed));
   });
 
   it('carries no member name of the fuller answer', async () => {

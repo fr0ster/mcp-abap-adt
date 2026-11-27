@@ -192,7 +192,7 @@ export const OBJECTS_LIST_LISTS: RowSchemas<ParentList> = {
   // An object whose metadata read SAP refused, its row above: SAP's error on
   // a line of its own, so a row left without its type never hides why.
   refused: about(
-    'for each object whose metadata read SAP refused, its error: SAP\'s status and message',
+    "for each object whose metadata read SAP refused, its error: SAP's status and message",
     marks('refused', 'metadata_error', (o: FlatObject) => [
       o.OBJECT_TYPE,
       o.OBJECT_NAME,

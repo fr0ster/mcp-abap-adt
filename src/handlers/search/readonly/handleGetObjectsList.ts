@@ -189,10 +189,10 @@ export const OBJECTS_LIST_LISTS: RowSchemas<ParentList> = {
       header: 'always',
     }),
   ),
-  // An object SAP answered 404 for, its row above: SAP's error on a line of
-  // its own, so a row left without its type never hides why.
+  // An object whose metadata read SAP refused, its row above: SAP's error on
+  // a line of its own, so a row left without its type never hides why.
   refused: about(
-    'for each object whose metadata read SAP answered it does not exist, its error',
+    "for each object whose metadata read SAP refused, its error: SAP's status and message",
     marks('refused', 'metadata_error', (o: FlatObject) => [
       o.OBJECT_TYPE,
       o.OBJECT_NAME,
@@ -206,6 +206,7 @@ export const OBJECTS_LIST_LISTS: RowSchemas<ParentList> = {
 export const OBJECTS_LIST_HEADS = [
   headShape('parent', 'type and name'),
   headShape('total', 'number of objects'),
+  headShape('refused', 'number of objects whose metadata read SAP refused'),
 ];
 
 /** Whose facts the heads tell. */
@@ -300,10 +301,11 @@ interface FlatObject {
   /** A node SAP could not load (`utilNodeContents`' `notLoaded`): its row, named {@link NOT_LOADED_BY_SAP}. */
   NOT_LOADED?: true;
   /**
-   * SAP's answer to the object's metadata read when it said the object does
-   * not exist (`404`) — an object SAP lists and serves no metadata for (a
-   * message class left without its T100A row, measured on premise): the
-   * error as it is, with its step.
+   * SAP's refusal of the object's metadata read — any status but `401`: a
+   * `404` for an object SAP lists and serves no metadata for (a message
+   * class left without its T100A row, measured on premise), a `403` on an
+   * enhancement's node URI (measured on ABAP cloud, #398) —, SAP's status
+   * and message with the step. One object's refusal ends no list.
    */
   METADATA_ERROR?: FailureEntry;
 }
@@ -577,12 +579,12 @@ interface ParentList {
   parent_tech_name?: string | undefined;
   parent_type: string | undefined;
   objects: FlatObject[];
-  /** The objects whose metadata read SAP answered 404 (`METADATA_ERROR`), each also among `objects`. */
+  /** The objects whose metadata read SAP refused (`METADATA_ERROR`), each also among `objects`. */
   refused: FlatObject[];
 }
 
-/** A parent's list of `objects`: the ones SAP answered 404 for named beside them. */
-function parentListOf(
+/** A parent's list of `objects`: the ones whose metadata read SAP refused named beside them. */
+export function parentListOf(
   parent: Pick<ParentList, 'parent_name' | 'parent_tech_name' | 'parent_type'>,
   objects: FlatObject[],
 ): ParentList {
@@ -605,6 +607,7 @@ function parentListing(list: ParentList): Listing<ParentList> {
         value: `${list.parent_type ?? ''} ${list.parent_name ?? ''}`,
       },
       { head: 'total', value: String(list.objects.length) },
+      { head: 'refused', value: String(list.refused.length) },
     ],
     reading: list,
     lists: OBJECTS_LIST_LISTS,
@@ -635,7 +638,10 @@ const mediumObject = (o: FlatObject) => ({
  * writers, one row or entry per object. Raw never reaches this table: the
  * handler answers it as the responses (`wireAnswer`).
  */
-function objectsListAnswers(): ListAnswerTable<ParentList, string | object> {
+export function objectsListAnswers(): ListAnswerTable<
+  ParentList,
+  string | object
+> {
   const full = (list: ParentList) => ({
     parent_name: list.parent_name,
     ...('parent_tech_name' in list
@@ -643,6 +649,7 @@ function objectsListAnswers(): ListAnswerTable<ParentList, string | object> {
       : {}),
     parent_type: list.parent_type,
     total_objects: list.objects.length,
+    refused_objects: list.refused.length,
     objects: list.objects,
   });
   return {
@@ -654,11 +661,12 @@ function objectsListAnswers(): ListAnswerTable<ParentList, string | object> {
           parent_name: list.parent_name,
           parent_type: list.parent_type,
           total_objects: list.objects.length,
+          refused_objects: list.refused.length,
         },
         list,
         {
           objects: entries('objects', mediumObject),
-          // The objects SAP answered 404 for, also among the objects with
+          // The objects SAP refused, also among the objects with
           // their metadata_error: named apart, as at terse; none, no member.
           refused: entries('refused', mediumObject, { omitEmpty: true }),
         },
@@ -669,43 +677,64 @@ function objectsListAnswers(): ListAnswerTable<ParentList, string | object> {
   };
 }
 
-/** A metadata read's answer, or SAP's 404 its read threw (an envelope part's), as the object's error. */
+/** A metadata read's answer, or SAP's refusal its read threw (an envelope part's), as the object's error. */
 type MetadataAnswer =
   | IAdtResponse<string, IAdtError>
-  | { readonly gone: FailureEntry };
+  | { readonly refused: FailureEntry };
 
 /**
  * SAP's message in a refusal's body, as it came: what adt-strategies reads
- * of SAP's exception document (`readExceptionRefusal`); `undefined` when the
- * body is no such document.
+ * of SAP's exception document (`readExceptionRefusal`); for any other text
+ * body, the text itself, trimmed; `undefined` for an empty body or one that
+ * is no text. The same for every status, a `404` included.
  */
 function sapMessageIn(body: unknown): string | undefined {
-  return readExceptionRefusal(body)?.message;
+  const read = readExceptionRefusal(body)?.message;
+  if (read !== undefined) return read;
+  if (typeof body !== 'string') return undefined;
+  const text = body.trim();
+  return text === '' ? undefined : text;
 }
 
 /**
- * An object SAP answered 404 for, as its error: SAP's status and SAP's
- * message as it came, with the step — the same on every path, whether the
- * 404 came as a direct request's answer, its throw, or an envelope part's.
+ * Whether SAP's `status` is an object's own refusal: an answer SAP gave that
+ * is not a success and not a `401` — a `401` is the credentials', the same
+ * for every object, and ends the call.
  */
-function notFoundEntry(body: unknown): FailureEntry {
+function objectsOwn(status: number | undefined): status is number {
+  return (
+    status !== undefined && (status < 200 || status > 299) && status !== 401
+  );
+}
+
+/**
+ * An object whose metadata read SAP refused, as its error: SAP's status and
+ * SAP's message as it came, with the step — the same on every path, whether
+ * the refusal came as a direct request's answer, its throw, or an envelope
+ * part's.
+ */
+function refusalEntry(status: number, body: unknown): FailureEntry {
   const message = sapMessageIn(body);
   return {
-    status: 404,
+    status,
     ...(message === undefined ? {} : { message }),
     step: METADATA_STEP,
   };
 }
 
 /**
- * SAP's 404 in what a metadata read threw — its response's status, read
+ * SAP's refusal in what a metadata read threw — its response's status, read
  * structurally, on the throw or on what it wraps — as the object's error;
- * `undefined` for any other throw.
+ * `undefined` for a throw that ends the call (`endsTheCall`: a credential
+ * failure, a `401` SAP answered included) and for one SAP did not answer.
  */
-function goneIn(thrown: unknown): FailureEntry | undefined {
+function refusalIn(thrown: unknown): FailureEntry | undefined {
+  if (endsTheCall(thrown)) return undefined;
   for (const each of [thrown, child(thrown, 'cause')]) {
-    if (sapAnswerOf(each)?.status === 404) {
-      return notFoundEntry(child(child(each, 'response'), 'data'));
+    const status = sapAnswerOf(each)?.status;
+    if (status === 401) return undefined;
+    if (objectsOwn(status)) {
+      return refusalEntry(status, child(child(each, 'response'), 'data'));
     }
   }
   return undefined;
@@ -807,10 +836,12 @@ function secondReads(
  * Pass 2: each object's own metadata, read in one batch envelope (the reads
  * are independent GETs), else one by one — the description from there,
  * never from the node structure, and the type for an object SAP listed
- * without one. Every object pass 1 found stays; a read that fails is the
- * call's failure, never an object answered without what it lacks — but for
- * an object SAP answers `404` for: listed, it does not exist for its
- * metadata read, and it is answered with that error as SAP gave it.
+ * without one. Every object pass 1 found stays. A read SAP refused — any
+ * status but `401` — is that object's: it is answered with SAP's status and
+ * message (`METADATA_ERROR`), and the others are read and answered (#398,
+ * the owner's decision). A `401`, a credential failure, a failure SAP did
+ * not answer and a failed envelope are the call's failure, never an object
+ * answered without what it lacks.
  */
 async function secondPass(
   context: HandlerContext,
@@ -842,10 +873,12 @@ async function secondPass(
       }
       return results.map((result): MetadataAnswer => {
         if (result.ok) return result.value;
-        // A part SAP answered 404 rejects its read: the object's answer.
-        const gone = goneIn(result.error);
-        if (gone === undefined) throw result.error;
-        return { gone };
+        // A part SAP refused rejects its read: the object's answer. The
+        // phase already ends at a 401 part (`runPhaseOutcome`); here it ends
+        // the call too.
+        const refused = refusalIn(result.error);
+        if (refused === undefined) throw result.error;
+        return { refused };
       });
     },
     async () => {
@@ -854,10 +887,11 @@ async function secondPass(
         try {
           results.push(await each.read(context.connection));
         } catch (thrown) {
-          // A read the connection rejects on SAP's 404: the object's answer.
-          const gone = goneIn(thrown);
-          if (gone === undefined) throw thrown;
-          results.push({ gone });
+          // A read the connection rejects on SAP's refusal: the object's
+          // answer, as on the batched path.
+          const refused = refusalIn(thrown);
+          if (refused === undefined) throw thrown;
+          results.push({ refused });
         }
       }
       return results;
@@ -867,17 +901,22 @@ async function secondPass(
     const answered = answers[i];
     if (answered === undefined) continue;
     const object = out[each.list]?.[each.index];
-    if ('gone' in answered) {
+    if ('refused' in answered) {
       if (object === undefined) continue;
-      object.METADATA_ERROR = answered.gone;
+      object.METADATA_ERROR = answered.refused;
       continue;
     }
     if (!answered.ok) {
       const error = answered.getError();
-      if (object === undefined || error.response?.status !== 404) {
+      const status = error.response?.status;
+      if (
+        object === undefined ||
+        !objectsOwn(status) ||
+        isCredentialPayload(failureEntry(error, METADATA_STEP))
+      ) {
         return answered;
       }
-      object.METADATA_ERROR = notFoundEntry(error.response.data);
+      object.METADATA_ERROR = refusalEntry(status, error.response?.data);
       continue;
     }
     if (object === undefined) continue;

@@ -29,9 +29,9 @@ names, CLI prefixes, top-level YAML keys, and the env names of a parameter that 
 ### The shared rows
 
 In every binary's table: `CONF_ROW` (`--conf` / `--config`), `BATCH_KEEP_RAW_PARTS_ROW` (`--batch-keep-raw-parts` / `MCP_BATCH_KEEP_RAW_PARTS` /
-`batch.keepRawParts`, a flag, default `false`, read alone by `readBatchKeepRawParts`), `BATCH_READS_PER_ENVELOPE_ROW`
-(`--batch-reads-per-envelope` / `MCP_BATCH_READS_PER_ENVELOPE` / `batch.readsPerEnvelope`, a whole number from 2, no
-default: the consumer's bound on an envelope's reads, handed to the servers as `readsPerEnvelope`; absent, no bound), `ENABLE_DATA_TOOLS_ROW`
+`batch.keepRawParts`, a flag, default `false`, read alone by `readBatchKeepRawParts`), `BATCH_PARTS_PER_ENVELOPE_ROW`
+(`--batch-parts-per-envelope` / `MCP_BATCH_PARTS_PER_ENVELOPE` / `batch.partsPerEnvelope`, a whole number from 2, no
+default: the consumer's bound on an envelope's parts (requests), handed to the servers as `partsPerEnvelope`; absent, no bound), `ENABLE_DATA_TOOLS_ROW`
 (`--enable-data-tools` / `MCP_ENABLE_DATA_TOOLS` / `enable-data-tools`, a flag, default `false`: the data tools,
 handed to the tool set as `ServedTools`), and `SYSTEM_TYPE_ROW` (`--system-type` / `SAP_SYSTEM_TYPE`, required), which is
 `@mcp-abap-adt/responsible-rules`' with the rules that read it. `ACCESS_RESTRICTION_ROWS`

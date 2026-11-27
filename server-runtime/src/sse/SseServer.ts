@@ -160,11 +160,11 @@ export interface SseServerOptions {
    */
   lineMatchStrategy?: LineMatchStrategy | undefined;
   /**
-   * The consumer's bound on the reads one ADT batch envelope of a call
-   * carries (`--batch-reads-per-envelope`), handed to every instance.
+   * The consumer's bound on the parts (requests) one ADT batch envelope of a call
+   * carries (`--batch-parts-per-envelope`), handed to every instance.
    * Absent: no bound.
    */
-  readsPerEnvelope?: number | undefined;
+  partsPerEnvelope?: number | undefined;
 }
 
 type SessionEntry = {
@@ -224,7 +224,7 @@ export class SseServer {
   private readonly abapGitRestrictions: AbapGitRestrictionSignal | undefined;
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
-  private readonly readsPerEnvelope: number | undefined;
+  private readonly partsPerEnvelope: number | undefined;
   /** The SAP system type every stream's instance builds for. */
   private readonly systemType: SapEnvironment | undefined;
   /** The running background runs' owner: this server's, shared by every stream's instance. */
@@ -273,7 +273,7 @@ export class SseServer {
     this.abapGitRestrictions = opts?.abapGitRestrictions;
     this.sapAnswerStrategy = opts?.sapAnswerStrategy;
     this.lineMatchStrategy = opts?.lineMatchStrategy;
-    this.readsPerEnvelope = opts?.readsPerEnvelope;
+    this.partsPerEnvelope = opts?.partsPerEnvelope;
     this.batchSettings =
       opts?.batch === undefined
         ? undefined
@@ -474,7 +474,7 @@ export class SseServer {
           backgroundRunOwner?: BackgroundRunOwner;
           sapAnswerStrategy?: SapAnswerStrategy;
           lineMatchStrategy?: LineMatchStrategy;
-          readsPerEnvelope?: number;
+          partsPerEnvelope?: number;
           batch?: InstanceBatch;
           heldLocks: HeldLocks;
           adtHeaderPairs?: AdtHeaderPairs;
@@ -517,8 +517,8 @@ export class SseServer {
         ...(this.lineMatchStrategy !== undefined && {
           lineMatchStrategy: this.lineMatchStrategy,
         }),
-        ...(this.readsPerEnvelope !== undefined && {
-          readsPerEnvelope: this.readsPerEnvelope,
+        ...(this.partsPerEnvelope !== undefined && {
+          partsPerEnvelope: this.partsPerEnvelope,
         }),
         ...(this.accessChecks !== undefined && {
           accessChecks: this.accessChecks,

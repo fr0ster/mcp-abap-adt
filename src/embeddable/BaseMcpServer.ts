@@ -97,7 +97,7 @@ import type {
   InstanceBatch,
   OpenBatch,
 } from '../lib/batch/InstanceBatch.js';
-import { readsPerEnvelopeOf } from '../lib/batch/phases.js';
+import { partsPerEnvelopeOf } from '../lib/batch/phases.js';
 import { createRecorder, untilSent } from '../lib/batch/recorder.js';
 import {
   OUTSIDE_BATCH_SENTENCE,
@@ -469,7 +469,7 @@ export abstract class BaseMcpServer extends McpServer {
   private readonly searchSapAnswers: SapAnswerStrategy | undefined;
   /** `SearchSource`'s line-match strategy, from the options; absent, none set. */
   private readonly searchLineMatch: LineMatchStrategy | undefined;
-  /** The consumer's bound on the reads of one envelope, from the options; absent, none. */
+  /** The consumer's bound on the parts of one envelope, from the options; absent, none. */
   private readonly envelopeBound: number | undefined;
 
   /**
@@ -613,12 +613,12 @@ export abstract class BaseMcpServer extends McpServer {
      */
     lineMatchStrategy?: LineMatchStrategy | undefined;
     /**
-     * The consumer's bound on the reads one ADT batch envelope of a call
-     * carries (`--batch-reads-per-envelope`): a whole number from 2, else
+     * The consumer's bound on the parts (requests) one ADT batch envelope of a call
+     * carries (`--batch-parts-per-envelope`): a whole number from 2, else
      * the constructor throws. Absent: no bound — a phase's independent
      * reads go in one envelope, and what SAP answers to it is SAP's.
      */
-    readsPerEnvelope?: number | undefined;
+    partsPerEnvelope?: number | undefined;
     /**
      * The owner of the running background runs (their controls, by
      * `run_handle`): handed by a host that serves one client through several
@@ -752,9 +752,9 @@ export abstract class BaseMcpServer extends McpServer {
     this.searchSapAnswers = options.sapAnswerStrategy;
     this.searchLineMatch = options.lineMatchStrategy;
     this.envelopeBound =
-      options.readsPerEnvelope === undefined
+      options.partsPerEnvelope === undefined
         ? undefined
-        : readsPerEnvelopeOf(options.readsPerEnvelope, 'readsPerEnvelope');
+        : partsPerEnvelopeOf(options.partsPerEnvelope, 'partsPerEnvelope');
     this.runOwner = options.backgroundRunOwner ?? new BackgroundRunOwner();
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
@@ -1374,11 +1374,11 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private searchStrategies(): Pick<
     HandlerContext,
-    'sapAnswerStrategy' | 'lineMatchStrategy' | 'readsPerEnvelope'
+    'sapAnswerStrategy' | 'lineMatchStrategy' | 'partsPerEnvelope'
   > {
     return {
       ...(this.envelopeBound !== undefined && {
-        readsPerEnvelope: this.envelopeBound,
+        partsPerEnvelope: this.envelopeBound,
       }),
       ...(this.searchSapAnswers !== undefined && {
         sapAnswerStrategy: this.searchSapAnswers,

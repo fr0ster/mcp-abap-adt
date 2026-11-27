@@ -577,7 +577,7 @@ export interface SearchSourceStrategies {
  * ADT batch envelopes — (1) the quickSearch of every package mask, one
  * envelope per round of the masks not resolved yet; (2) the package walk's levels (`walkPackages`: per level the root
  * node structures, then their type nodes), one envelope each; (3) the source
- * reads of every target — with the consumer's bound (`readsPerEnvelope`) in
+ * reads of every target — with the consumer's bound (`partsPerEnvelope`) in
  * chunks of that many targets, so a chunk's first round (one read per
  * target) fills one envelope; without it in one chunk; with `max_hits`, bound
  * or not, one target per chunk, so the scan stops as soon as it is reached —,

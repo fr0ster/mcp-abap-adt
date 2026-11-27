@@ -121,11 +121,11 @@ export interface EmbeddableMcpServerBaseOptions {
    */
   lineMatchStrategy?: LineMatchStrategy;
   /**
-   * The consumer's bound on the reads one ADT batch envelope of a call
+   * The consumer's bound on the parts (requests) one ADT batch envelope of a call
    * carries: a whole number from 2, else the constructor throws. Absent: no
    * bound — a phase's independent reads go in one envelope.
    */
-  readsPerEnvelope?: number;
+  partsPerEnvelope?: number;
 
   /**
    * The corrected request header pairs of the systems this instance talks
@@ -356,8 +356,8 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       ...(options.lineMatchStrategy !== undefined && {
         lineMatchStrategy: options.lineMatchStrategy,
       }),
-      ...(options.readsPerEnvelope !== undefined && {
-        readsPerEnvelope: options.readsPerEnvelope,
+      ...(options.partsPerEnvelope !== undefined && {
+        partsPerEnvelope: options.partsPerEnvelope,
       }),
       ...(options.batch !== undefined && { batch: options.batch }),
       ...(options.heldLocks !== undefined && {

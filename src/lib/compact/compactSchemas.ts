@@ -2496,7 +2496,7 @@ function systemProperties(
       .optional()
       .describe(
         said(actions, {
-          package_tree: 'maximum depth of the walk (default 5).',
+          package_tree: 'maximum depth of the walk; absent, every level.',
         }),
       ),
     include_descriptions: z

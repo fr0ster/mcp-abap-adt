@@ -19,7 +19,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents';
-import { handleGetPackageTree } from '../../handlers/system/high/handleGetPackageTree';
+import {
+  TOOL_DEFINITION as GetPackageTree,
+  handleGetPackageTree,
+} from '../../handlers/system/high/handleGetPackageTree';
 import {
   createBatchAvailability,
   NO_BATCH_ENDPOINT_STATUS,
@@ -169,6 +172,27 @@ describe('GetPackageTree detail', () => {
       ['not loaded by SAP', 'ZT_ONE'],
     );
     assert.equal(full.tree.children[1].restoreStatus, 'ok');
+  });
+
+  // No depth of the server's (#391): without max_depth the walk has no
+  // bound, and full says none was given.
+  it('full: no max_depth when none is given, the one given when given', async () => {
+    const full = JSON.parse(await tree('full'));
+    assert.equal('max_depth' in full.metadata, false, JSON.stringify(full));
+    const bounded = await handleGetPackageTree(context([METADATA]), {
+      package_name: 'ZPKG',
+      max_depth: 3,
+      detail: 'full',
+    });
+    assert.equal(
+      JSON.parse(bounded.content[0]?.text ?? '{}').metadata.max_depth,
+      3,
+    );
+  });
+
+  it('the schema gives no max_depth of its own', () => {
+    const parsed = GetPackageTree.inputSchema.parse({ package_name: 'ZPKG' });
+    assert.equal('max_depth' in parsed, false, JSON.stringify(parsed));
   });
 
   it('medium: the tree without derived or backup fields', async () => {

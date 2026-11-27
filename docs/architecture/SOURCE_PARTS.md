@@ -512,16 +512,24 @@ handler paths are under lib's `src/handlers/`.
 | Edit | What it names | Rule |
 |---|---|---|
 | `replace` (main path) | an element address (§5.0) and the new code | The element must exist in the outline, else a refusal naming it (never a guess). Its whole lines are replaced. A part that shares a line is refused (§5.4). |
-| `insert` | a container's address (§5.0), the new element's type and name, and its code | The container must exist and be readable; the new name must **not** exist in that scope, else a refusal. It is placed where its kind belongs in the container (below). |
+| `insert` | a container (below), the new element's type and name, and its code | The container must exist; the new name must **not** exist in that scope, else a refusal. It is placed where its kind belongs in the container (below). |
 | `diff` (fallback) | a unified diff, with `relative_to: "element"` and the element, or `relative_to: "include"` | Each hunk applies only where its context and removed lines equal the source **exactly**, at the position it states. A hunk that does not match is refused, naming the hunk; nothing is applied. No fuzz, no offset search, nothing partial. |
 
-**`insert` is one include and one write.** What it locates is the **container**, an element that
-exists; the new element has no address until it is written. Every place it writes is in the
-container's include, so the call stays one include, one write, and activation stays separate:
+**`insert` is one include and one write.** What it locates is the **container**, which exists;
+the new element has no address until it is written. A container is one of two things:
+
+- **an include container**, `{ include }`: an include the object's outline names (the root's
+  source, a listed program or function group include, a class's local include). This is not an
+  element address: an include listed as an element is informational for reading (§5.0), but its
+  address names the source an insert goes into;
+- **an element container**: the full address (§5.0) of a readable class, local class or interface.
+
+Every place it writes is in the container's include, so the call stays one include, one write,
+and activation stays separate:
 
 | New element | Container | Placed | Refused when |
 |---|---|---|---|
-| form, module, event, local class, local interface | the include (its address with no element) | after the include's last statement, before any trailing comment lines | — |
+| form, module, event, local class, local interface | an include container | after the include's last statement, before any trailing comment lines | the include is not one the outline names (`not_found`) |
 | method of a class (global, or local in one include) | the class, side `implementation`, and `section`: `public`, `protected` or `private` | its declaration at the end of that section of the class's definition; its implementation before the `ENDCLASS` of the class's implementation | the definition and the implementation are in two includes (`spans_includes`, naming both); the section is missing (`section_missing`); the section's last statement or the `ENDCLASS` shares its line with another statement (§5.4) |
 | method of an interface | the interface | its declaration before `ENDINTERFACE` | the `ENDINTERFACE` shares its line |
 

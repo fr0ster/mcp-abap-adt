@@ -504,6 +504,7 @@ describe('the YAML template and validation come from the table', () => {
         'batch',
         'enable-data-tools',
         'http',
+        'requests',
         'restrictions',
         'session-keep-alive-minutes',
         'shutdown-timeout',
@@ -516,6 +517,7 @@ describe('the YAML template and validation come from the table', () => {
       keepRawParts: false,
       partsPerEnvelope: null,
     });
+    assert.deepStrictEqual(parsed.requests, { inFlight: null });
     assert.deepStrictEqual(
       Object.keys(parsed.http as object).sort(),
       [

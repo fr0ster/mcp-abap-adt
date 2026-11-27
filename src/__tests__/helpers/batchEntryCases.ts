@@ -213,8 +213,11 @@ const FULL: BatchEntryCase[] = [
   },
   { tool: 'GetInactiveObjects', args: {}, body: INACTIVE_OBJECTS },
   { tool: 'GetAdtTypes', args: {} },
-  { tool: 'GetSqlQuery', args: { sql_query: 'SELECT * FROM TAB_A' } },
-  { tool: 'GetTableContents', args: { table_name: 'TAB_A' } },
+  {
+    tool: 'GetSqlQuery',
+    args: { sql_query: 'SELECT * FROM TAB_A', row_number: 100 },
+  },
+  { tool: 'GetTableContents', args: { table_name: 'TAB_A', max_rows: 100 } },
   { tool: 'GetATCRunStatus', args: { run_id: 'RUN_A' } },
   { tool: 'GetATCFindings', args: { worklist_id: 'WORKLIST_A' } },
   { tool: 'ListATCResults', args: { created_by: '*' } },
@@ -487,8 +490,11 @@ const COMPACT: BatchEntryCase[] = [
     tool: 'HandlerSystem',
     args: { action: 'atc_result', display_id: 'RESULT_A' },
   },
-  { tool: 'HandlerGetData', args: { sql_query: 'SELECT * FROM TAB_A' } },
-  { tool: 'HandlerGetData', args: { object_name: 'TAB_A' } },
+  {
+    tool: 'HandlerGetData',
+    args: { sql_query: 'SELECT * FROM TAB_A', max_rows: 100 },
+  },
+  { tool: 'HandlerGetData', args: { object_name: 'TAB_A', max_rows: 100 } },
   { tool: 'HandlerProfileList', args: {} },
   ...['hitlist', 'statements', 'db_accesses'].map((view) => ({
     tool: 'HandlerProfileView',

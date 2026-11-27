@@ -102,7 +102,7 @@ const CASES: readonly Case[] = [
     { parent_type: 'PROG/P' },
     'parent_type and parent_name are required',
   ],
-  ['HandlerGetData', {}, 'object_name or sql_query is required'],
+  ['HandlerGetData', { max_rows: 5 }, 'object_name or sql_query is required'],
   ['HandlerGet', {}, 'object_type is required'],
   [
     'HandlerGet',
@@ -162,7 +162,7 @@ const CASES: readonly Case[] = [
   ],
   ['GetPackageTree', { package_name: ' ' }, 'package_name is required'],
   ['SearchObject', { object_name: '' }, 'object_name is required'],
-  ['GetSqlQuery', { sql_query: ' ' }, 'SQL query is required'],
+  ['GetSqlQuery', { sql_query: ' ', row_number: 5 }, 'SQL query is required'],
 ];
 
 const textOf = (answer: CallAnswer): string =>

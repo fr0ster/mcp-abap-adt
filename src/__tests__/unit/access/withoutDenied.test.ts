@@ -225,6 +225,7 @@ describe('withoutDenied', () => {
         { connection: alone, logger: silentLogger },
         {
           sql_query: 'SELECT carrid FROM scarr',
+          max_rows: 5,
         },
       )
       .catch(() => undefined);
@@ -233,7 +234,11 @@ describe('withoutDenied', () => {
     declareSystemKind(beside, 'onprem');
     const answer = await entry.call(
       { connection: beside, logger: silentLogger },
-      { object_name: 'MARA', sql_query: 'SELECT carrid FROM scarr' },
+      {
+        object_name: 'MARA',
+        sql_query: 'SELECT carrid FROM scarr',
+        max_rows: 5,
+      },
     );
     assert.equal(beside.requests.length, 1, JSON.stringify(answer));
     assert.equal(beside.requests[0]?.data, 'SELECT * FROM MARA');

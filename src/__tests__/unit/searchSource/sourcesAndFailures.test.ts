@@ -76,6 +76,7 @@ import {
   nodeKey,
   payloadOf,
   type Repository,
+  type SearchArgs,
   searchesOf,
   searchOn,
   sentInOrder,
@@ -1953,16 +1954,14 @@ describe('D23b: no paging (DO20)', () => {
               absent,
             ),
           );
-          const sent = await searchOn(
-            standOn(big(5)),
-            {
-              query: 'marker',
-              packages: ['ZBIG'],
-              max_objects: 2,
-              start_at: 3,
-            },
-            absent,
-          );
+          // Arguments the schema no longer names, as a client still sends them.
+          const removed = {
+            query: 'marker',
+            packages: ['ZBIG'],
+            max_objects: 2,
+            start_at: 3,
+          };
+          const sent = await searchOn(standOn(big(5)), removed, absent);
           assert.equal(isError(sent), false);
           assert.deepStrictEqual(payloadOf(sent), plain);
           assert.equal(plain.results.length, 5);
@@ -4018,7 +4017,7 @@ describe('D23b: a program include is one object, however many groups list it (DO
   const search = (
     fake: Fake,
     absent: boolean,
-    args: Record<string, unknown> = {},
+    args: Omit<SearchArgs, 'query'>,
   ) => searchOn(fake, { query: 'marker', ...args }, absent);
   /** A hit as the tests read it. */
   interface Hit {

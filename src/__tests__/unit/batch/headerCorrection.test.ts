@@ -180,7 +180,7 @@ describe("the consumer's bound and a failed correction envelope", () => {
       connection: fake.connection,
       logger: undefined,
       adtHeaders: port,
-      readsPerEnvelope: 2,
+      partsPerEnvelope: 2,
     };
     const items = ['ITEM_A', 'ITEM_B', 'ITEM_C', 'ITEM_A'];
     const results = await withinTurns(

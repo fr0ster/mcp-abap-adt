@@ -86,7 +86,7 @@ const BOUND_CASES: ReadonlyArray<{
   readonly bound: number | undefined;
 }> = [
   { argv: [], bound: undefined },
-  { argv: ['--batch-reads-per-envelope=300'], bound: 300 },
+  { argv: ['--batch-parts-per-envelope=300'], bound: 300 },
 ];
 
 for (const { argv: boundArgv, bound } of BOUND_CASES) {
@@ -150,7 +150,7 @@ for (const { argv: boundArgv, bound } of BOUND_CASES) {
       assert.equal(seen.length, 1);
       assert.equal(seen[0]?.sapAnswerStrategy, skipSapAnswers);
       assert.equal(seen[0]?.lineMatchStrategy, substringLineMatch);
-      assert.equal(seen[0]?.readsPerEnvelope, bound);
+      assert.equal(seen[0]?.partsPerEnvelope, bound);
     } finally {
       controller.abort();
       await server.stop();

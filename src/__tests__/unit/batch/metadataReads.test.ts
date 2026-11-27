@@ -69,19 +69,19 @@ type Handler = (context: HandlerContext) => Promise<unknown>;
 const HANDLERS: Record<string, { file: string; call: Handler }> = {
   'CLAS/OC': {
     file: 'class/high/handleGetClass.ts',
-    call: (c) => handleGetClass(c, { class_name: NAME, part } as never),
+    call: (c) => handleGetClass(c, { class_name: NAME, part }),
   },
   'INTF/OI': {
     file: 'interface/high/handleGetInterface.ts',
-    call: (c) => handleGetInterface(c, { interface_name: NAME, part } as never),
+    call: (c) => handleGetInterface(c, { interface_name: NAME, part }),
   },
   'PROG/P': {
     file: 'program/high/handleGetProgram.ts',
-    call: (c) => handleGetProgram(c, { program_name: NAME, part } as never),
+    call: (c) => handleGetProgram(c, { program_name: NAME, part }),
   },
   'DDLS/DF': {
     file: 'ddl/high/handleGetDdl.ts',
-    call: (c) => handleGetDdl(c, { ddl_name: NAME, part } as never),
+    call: (c) => handleGetDdl(c, { ddl_name: NAME, part }),
   },
   'DDLX/EX': {
     file: 'metadata_extension/high/handleGetMetadataExtension.ts',
@@ -89,28 +89,27 @@ const HANDLERS: Record<string, { file: string; call: Handler }> = {
       handleGetMetadataExtension(c, {
         metadata_extension_name: NAME,
         part,
-      } as never),
+      }),
   },
   'DOMA/DD': {
     file: 'domain/high/handleGetDomain.ts',
-    call: (c) => handleGetDomain(c, { domain_name: NAME } as never),
+    call: (c) => handleGetDomain(c, { domain_name: NAME }),
   },
   'DTEL/DE': {
     file: 'data_element/high/handleGetDataElement.ts',
-    call: (c) => handleGetDataElement(c, { data_element_name: NAME } as never),
+    call: (c) => handleGetDataElement(c, { data_element_name: NAME }),
   },
   'TABL/DT': {
     file: 'table/high/handleGetTable.ts',
-    call: (c) => handleGetTable(c, { table_name: NAME, part } as never),
+    call: (c) => handleGetTable(c, { table_name: NAME, part }),
   },
   'TABL/DS': {
     file: 'structure/high/handleGetStructure.ts',
-    call: (c) => handleGetStructure(c, { structure_name: NAME, part } as never),
+    call: (c) => handleGetStructure(c, { structure_name: NAME, part }),
   },
   'FUGR/F': {
     file: 'function_group/high/handleGetFunctionGroup.ts',
-    call: (c) =>
-      handleGetFunctionGroup(c, { function_group_name: NAME } as never),
+    call: (c) => handleGetFunctionGroup(c, { function_group_name: NAME }),
   },
   'FUGR/FF': {
     file: 'function_module/high/handleGetFunctionModule.ts',
@@ -119,7 +118,7 @@ const HANDLERS: Record<string, { file: string; call: Handler }> = {
         function_module_name: NAME,
         function_group_name: GROUP,
         part,
-      } as never),
+      }),
   },
   'FUGR/I': {
     file: 'function_include/readonly/handleGetFunctionInclude.ts',
@@ -128,7 +127,7 @@ const HANDLERS: Record<string, { file: string; call: Handler }> = {
         function_group_name: GROUP,
         include_name: NAME,
         part,
-      } as never),
+      }),
   },
   'SRVD/SRV': {
     file: 'service_definition/high/handleGetServiceDefinition.ts',
@@ -136,7 +135,7 @@ const HANDLERS: Record<string, { file: string; call: Handler }> = {
       handleGetServiceDefinition(c, {
         service_definition_name: NAME,
         part,
-      } as never),
+      }),
   },
   'SRVB/SVB': {
     file: 'service_binding/high/handleGetServiceBinding.ts',
@@ -144,7 +143,7 @@ const HANDLERS: Record<string, { file: string; call: Handler }> = {
       handleGetServiceBinding(c, {
         service_binding_name: NAME,
         part,
-      } as never),
+      }),
   },
   'BDEF/BDO': {
     file: 'behavior_definition/high/handleGetBehaviorDefinition.ts',
@@ -152,21 +151,19 @@ const HANDLERS: Record<string, { file: string; call: Handler }> = {
       handleGetBehaviorDefinition(c, {
         behavior_definition_name: NAME,
         part,
-      } as never),
+      }),
   },
   'DEVC/K': {
     file: 'package/high/handleGetPackage.ts',
-    call: (c) => handleGetPackage(c, { package_name: NAME } as never),
+    call: (c) => handleGetPackage(c, { package_name: NAME }),
   },
   'MSAG/N': {
     file: 'message_class/high/handleGetMessageClass.ts',
-    call: (c) =>
-      handleGetMessageClass(c, { message_class_name: NAME } as never),
+    call: (c) => handleGetMessageClass(c, { message_class_name: NAME }),
   },
   'ENHS/XSB': {
     file: 'enhancement/readonly/handleGetEnhancementSpot.ts',
-    call: (c) =>
-      handleGetEnhancementSpot(c, { enhancement_spot: NAME } as never),
+    call: (c) => handleGetEnhancementSpot(c, { enhancement_spot: NAME }),
   },
 };
 
@@ -304,13 +301,12 @@ function withParams(url: string, params: IAbapRequestOptions['params']) {
 async function handlerRequest(type: string) {
   const fake = envelopeConnection(
     () => envelopeResponse([]),
-    async (): Promise<IAdtWireResponse> =>
-      ({
-        status: 200,
-        statusText: 'OK',
-        headers: { 'content-type': 'application/xml' },
-        data: DOC,
-      }) as IAdtWireResponse,
+    async (): Promise<IAdtWireResponse> => ({
+      status: 200,
+      statusText: 'OK',
+      headers: { 'content-type': 'application/xml' },
+      data: DOC,
+    }),
   );
   const handler = HANDLERS[type];
   if (handler === undefined) throw new Error(`no handler for ${type}`);
@@ -318,10 +314,11 @@ async function handlerRequest(type: string) {
     handler.call({
       connection: fake.connection,
       logger: undefined,
-    } as unknown as HandlerContext),
+    }),
   );
   assert.equal(fake.directs.length, 1);
-  const request = fake.directs[0] as IAbapRequestOptions;
+  const request = fake.directs[0];
+  if (request === undefined) throw new Error('no direct request was sent');
   return {
     method: request.method,
     url: withParams(request.url, request.params),
@@ -379,11 +376,11 @@ describe('one metadata read per type, shared by handler and batch', () => {
             })),
           ),
         );
-        const context = {
+        const context: HandlerContext = {
           connection: fake.connection,
           logger: undefined,
           batchAvailability: createBatchAvailability(),
-        } as unknown as HandlerContext;
+        };
         const { descriptions } = await withinTurns(
           // Two objects of the type: one envelope (one alone is a single
           // request); the first part is this target's.
@@ -431,11 +428,11 @@ describe('one metadata read per type, shared by handler and batch', () => {
             })),
           ),
         );
-        const context = {
+        const context: HandlerContext = {
           connection: fake.connection,
           logger: undefined,
           batchAvailability: createBatchAvailability(),
-        } as unknown as HandlerContext;
+        };
         const { descriptions } = await withinTurns(
           // Two objects of the type: one envelope (one alone is a single
           // request); the first part is this target's.
@@ -483,12 +480,12 @@ describe('the metadata phase is bounded (GetObjectInfo include_descriptions)', (
   const BOUND = 300;
   const contextOn = (
     fake: ReturnType<typeof envelopeConnection>,
-    readsPerEnvelope?: number,
+    partsPerEnvelope?: number,
   ): HandlerContext => ({
     connection: fake.connection,
     logger: undefined,
     batchAvailability: createBatchAvailability(),
-    ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
+    ...(partsPerEnvelope !== undefined && { partsPerEnvelope }),
   });
 
   /** Each class's own metadata document: its description names it. */

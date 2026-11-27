@@ -153,20 +153,20 @@ describe('createRegistry() hosted by an EmbeddableMcpServer', () => {
   });
 });
 
-describe("readsPerEnvelope, the consumer's envelope bound", () => {
+describe("partsPerEnvelope, the consumer's envelope bound", () => {
   it("HandlerExporter.registerOnServer: the exporter's bound reaches the call; absent, none", async () => {
     for (const bound of [7, undefined]) {
       seen.length = 0;
       const exporter = new HandlerExporter({
         systemType: 'onprem',
-        ...(bound !== undefined && { readsPerEnvelope: bound }),
+        ...(bound !== undefined && { partsPerEnvelope: bound }),
       });
       const server = new McpServer({ name: 'routes', version: '1.0.0' });
       exporter.registerOnServer(server, async () => built);
       const client = await clientOf(server);
       try {
         await client.callTool({ name: 'SearchSource', arguments: ARGS });
-        assert.equal(seen[0]?.readsPerEnvelope, bound);
+        assert.equal(seen[0]?.partsPerEnvelope, bound);
       } finally {
         await client.close();
       }
@@ -176,40 +176,40 @@ describe("readsPerEnvelope, the consumer's envelope bound", () => {
   it("getHandlerEntries(): the exporter's bound reaches the call", async () => {
     const exporter = new HandlerExporter({
       systemType: 'onprem',
-      readsPerEnvelope: 4,
+      partsPerEnvelope: 4,
     });
     const entry = exporter
       .getHandlerEntries()
       .find((e) => e.toolDefinition.name === 'SearchSource');
     assert.ok(entry !== undefined);
-    await entry.call({ connection: built, readsPerEnvelope: 99 }, ARGS);
+    await entry.call({ connection: built, partsPerEnvelope: 99 }, ARGS);
     // The exporter's option, never the embedder's context.
-    assert.equal(seen[0]?.readsPerEnvelope, 4);
+    assert.equal(seen[0]?.partsPerEnvelope, 4);
   });
 
   it("createRegistry() hosted by a server with its own bound: the server's applies, the exporter's never", async () => {
     const exporter = new HandlerExporter({
       systemType: 'onprem',
-      readsPerEnvelope: 7,
+      partsPerEnvelope: 7,
     });
     const server = new EmbeddableMcpServer({
       connection: built,
       handlersRegistry: exporter.createRegistry(),
       systemType: 'onprem',
       logger: silent,
-      readsPerEnvelope: 5,
+      partsPerEnvelope: 5,
     });
     const client = await clientOf(server);
     try {
       await client.callTool({ name: 'SearchSource', arguments: ARGS });
-      assert.equal(seen[0]?.readsPerEnvelope, 5);
+      assert.equal(seen[0]?.partsPerEnvelope, 5);
     } finally {
       await client.close();
     }
   });
 
   it('two EmbeddableMcpServer instances keep their own bounds', async () => {
-    const serverOf = (readsPerEnvelope?: number) =>
+    const serverOf = (partsPerEnvelope?: number) =>
       new EmbeddableMcpServer({
         connection: built,
         handlersRegistry: new HandlerExporter({
@@ -217,7 +217,7 @@ describe("readsPerEnvelope, the consumer's envelope bound", () => {
         }).createRegistry(),
         systemType: 'onprem',
         logger: silent,
-        ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
+        ...(partsPerEnvelope !== undefined && { partsPerEnvelope }),
       });
     const five = await clientOf(serverOf(5));
     const nine = await clientOf(serverOf(9));
@@ -227,7 +227,7 @@ describe("readsPerEnvelope, the consumer's envelope bound", () => {
       await nine.callTool({ name: 'SearchSource', arguments: ARGS });
       await none.callTool({ name: 'SearchSource', arguments: ARGS });
       assert.deepStrictEqual(
-        seen.map((context) => context.readsPerEnvelope),
+        seen.map((context) => context.partsPerEnvelope),
         [5, 9, undefined],
       );
     } finally {
@@ -243,23 +243,23 @@ describe("readsPerEnvelope, the consumer's envelope bound", () => {
             connection: built,
             systemType: 'onprem',
             logger: silent,
-            readsPerEnvelope: value,
+            partsPerEnvelope: value,
           }),
         (error: unknown) =>
           error instanceof Error &&
           error.message ===
-            'Invalid readsPerEnvelope: must be a whole number of reads from 2',
+            'Invalid partsPerEnvelope: must be a whole number of parts from 2',
       );
       assert.throws(
         () =>
           new HandlerExporter({
             systemType: 'onprem',
-            readsPerEnvelope: value,
+            partsPerEnvelope: value,
           }),
         (error: unknown) =>
           error instanceof Error &&
           error.message ===
-            'Invalid readsPerEnvelope: must be a whole number of reads from 2',
+            'Invalid partsPerEnvelope: must be a whole number of parts from 2',
       );
     }
   });

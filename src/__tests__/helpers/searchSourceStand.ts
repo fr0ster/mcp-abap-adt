@@ -328,7 +328,7 @@ export type Fake = ReturnType<typeof standOn>;
 export function contextOn(
   fake: Fake,
   batch: 'served' | 'absent' = 'served',
-  readsPerEnvelope?: number,
+  partsPerEnvelope?: number,
 ) {
   const port = createBatchAvailability();
   if (batch === 'absent') port.noteOuterStatus(404);
@@ -336,7 +336,7 @@ export function contextOn(
     connection: fake.connection,
     logger: undefined,
     batchAvailability: port,
-    ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
+    ...(partsPerEnvelope !== undefined && { partsPerEnvelope }),
   };
   return context;
 }
@@ -370,20 +370,27 @@ export const sentUrls = (fake: Fake): string[] => [
  * turns, at `detail: 'full'` — the JSON answer these cases read (terse
  * answers, step 3) — unless a case states its own.
  */
+/** `SearchSource`'s arguments as its schema types them, `detail` optional here. */
+export type SearchArgs = Omit<
+  Parameters<typeof handleSearchSource>[1],
+  'detail'
+> &
+  Partial<Pick<Parameters<typeof handleSearchSource>[1], 'detail'>>;
+
 export const searchOn = (
   fake: Fake,
-  args: Record<string, unknown>,
+  args: SearchArgs,
   absent = false,
   turns = 400,
-  readsPerEnvelope?: number,
+  partsPerEnvelope?: number,
 ) =>
   withinTurns(
     handleSearchSource(
-      contextOn(fake, absent ? 'absent' : 'served', readsPerEnvelope),
+      contextOn(fake, absent ? 'absent' : 'served', partsPerEnvelope),
       {
         detail: 'full',
         ...args,
-      } as never,
+      },
     ),
     turns,
   );

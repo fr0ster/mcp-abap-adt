@@ -4,7 +4,7 @@
  * `GetWhereUsed` of several `GROUP|FM` targets check each module's group
  * against its metadata. The metadata reads of two or more modules are
  * independent: they go in one envelope (with the consumer's
- * `readsPerEnvelope`, consecutive balanced envelopes of at most that many
+ * `partsPerEnvelope`, consecutive balanced envelopes of at most that many
  * reads), and the answer is the sequential version's —
  * the first failure in the references' order, a `404` part (a module that
  * does not exist) beside `200` parts included. One module is its one read,
@@ -122,12 +122,12 @@ type Fake = ReturnType<typeof system>;
 
 /**
  * A context on the fake: batch served (default) or known to be absent; the
- * consumer's `readsPerEnvelope` when given.
+ * consumer's `partsPerEnvelope` when given.
  */
 function contextOn(
   fake: Fake,
   batch: 'served' | 'absent' = 'served',
-  readsPerEnvelope?: number,
+  partsPerEnvelope?: number,
 ) {
   const port = createBatchAvailability();
   if (batch === 'absent') port.noteOuterStatus(404);
@@ -135,7 +135,7 @@ function contextOn(
     connection: fake.connection,
     logger: undefined,
     batchAvailability: port,
-    ...(readsPerEnvelope !== undefined && { readsPerEnvelope }),
+    ...(partsPerEnvelope !== undefined && { partsPerEnvelope }),
   };
   return context;
 }

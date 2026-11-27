@@ -118,10 +118,9 @@ function runAtcSchema(variant: ProjectionVariant) {
       .number()
       .int()
       .min(1)
-      .default(100)
       .optional()
       .describe(
-        'Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.',
+        "Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Absent, SAP's own.",
       ),
     wait: z
       .boolean()
@@ -196,8 +195,13 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
   // on a fraction — but a throw is rendered `client_threw`, which reads as a
   // fault of this process rather than an argument the caller can fix. A tool
   // that can name it in its own schema should not leave it to an exception.
-  const maximumVerdicts = args.max_findings ?? 100;
-  if (!Number.isInteger(maximumVerdicts) || maximumVerdicts < 1) {
+  // No cap of the server's (#391): absent, the run carries none — SAP
+  // accepted such a run (BTP ABAP environment, 2026-11-27).
+  const maximumVerdicts = args.max_findings;
+  if (
+    maximumVerdicts !== undefined &&
+    (!Number.isInteger(maximumVerdicts) || maximumVerdicts < 1)
+  ) {
     return return_error(
       new Error(
         `max_findings must be a whole number of at least 1; got ${JSON.stringify(args.max_findings)}.`,
@@ -244,7 +248,7 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
         atc.startRun(worklistId, target, {
           analyse: analyseException,
           wait,
-          maximumVerdicts,
+          ...(maximumVerdicts === undefined ? {} : { maximumVerdicts }),
         }),
       )();
       if (!run.ok) return run;

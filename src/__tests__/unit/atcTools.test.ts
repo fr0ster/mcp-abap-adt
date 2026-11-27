@@ -281,7 +281,7 @@ describe('RunATC composes the three calls', () => {
       },
       startRun: async (worklistId: string, target: any, options: any) => {
         calls.push(
-          `run:${worklistId}:${options.wait}:${options.maximumVerdicts}`,
+          `run:${worklistId}:${options.wait}:${'maximumVerdicts' in options ? options.maximumVerdicts : '(none)'}`,
         );
         assert.deepStrictEqual(target.objects, [
           { objectName: 'ZCL_X', objectType: 'class' },
@@ -297,7 +297,8 @@ describe('RunATC composes the three calls', () => {
     assert.deepStrictEqual(calls, [
       'variant',
       'worklist:ABAP_CLOUD_DEVELOPMENT_DEFAULT',
-      'run:WL1:false:100',
+      // No cap of the server's (#391): none given, none handed on.
+      'run:WL1:false:(none)',
     ]);
     assert.equal(result.isError, false);
     assertMatchObject(payload(result), {
@@ -306,6 +307,23 @@ describe('RunATC composes the three calls', () => {
       waited: false,
       run_id: 'RUN1',
     });
+  });
+
+  it('hands max_findings on as given', async () => {
+    let options: any;
+    atc = {
+      resolveCheckVariant: async () => okResponse('V'),
+      createWorklist: async () => okResponse('WL1'),
+      startRun: async (worklistId: string, _target: any, given: any) => {
+        options = given;
+        return okResponse({ waited: false, worklistId, runId: 'RUN1' });
+      },
+    };
+    await handleRunATC(context as any, {
+      objects: [{ name: 'ZCL_X', type: 'class' }],
+      max_findings: 7,
+    });
+    assert.equal(options.maximumVerdicts, 7);
   });
 
   it('does not ask for a variant when it was given one', async () => {

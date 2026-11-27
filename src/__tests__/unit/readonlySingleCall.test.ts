@@ -263,14 +263,15 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     assert.deepStrictEqual(call?.args, [{ query: 'ZCL*' }]);
   });
 
-  // No count of the server's (#391): none given, none handed on — SAP's own
-  // bound applies; one given is handed on as given.
-  it('GetAdtTypes calls getAllTypes(undefined, "*", "usedByProvider") when no max_item_count is given', async () => {
+  // #391, the owner: the server always passes a count — the consumer's, or
+  // SAP's measured maximum, 2147483647 — so the library's own 999 never
+  // applies.
+  it('GetAdtTypes calls getAllTypes(2147483647, "*", "usedByProvider") when no max_item_count is given', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
     await handleGetAdtTypes(context as any, {});
     const call = seen.calls.filter((c) => c.member === 'getAllTypes').at(-1);
-    assert.deepStrictEqual(call?.args, [undefined, '*', 'usedByProvider']);
+    assert.deepStrictEqual(call?.args, [2147483647, '*', 'usedByProvider']);
   });
 
   it('GetAdtTypes hands max_item_count on as given', async () => {

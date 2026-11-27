@@ -259,6 +259,11 @@ None is `not_found`. More than one is refused `ambiguous`, listing every matchin
 match is ever chosen by order. `side` may be left out only where the element is readable on one
 side.
 
+**An address is unique, or there is none.** When two outline entries would have the same full
+address, all of them are marked informational with `duplicate_address`, listed without an
+address, and refused as parts naming the address; the short form never resolves to them. Their
+lines are still reachable as a line range of the include, read by the include's own tool.
+
 ### 5.1 A class or an interface: SAP's positions
 
 - A part is the block the outline names:

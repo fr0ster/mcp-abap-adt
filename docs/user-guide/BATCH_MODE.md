@@ -343,31 +343,32 @@ choice, not a rule: an envelope of one part would be as correct.
   rounds of two or more reads go in envelopes (below).
 - **No bound of the server's own on an envelope.** By default all independent reads of
   a phase go in one envelope. The consumer may set a bound: `--batch-parts-per-envelope=<parts>`
-  (`MCP_BATCH_PARTS_PER_ENVELOPE`, YAML `batch.partsPerEnvelope`; a whole number from 2; an
+  (`MCP_BATCH_PARTS_PER_ENVELOPE`, YAML `batch.partsPerEnvelope`; a positive whole number; an
   embedder's `partsPerEnvelope` option). It applies to every phase, in one place
   (`runPhaseOutcome` / `runPhase`, `src/lib/batch/phases.ts`), and it counts **parts** — the
-  requests in the envelope. Each read's parts are counted before anything is sent (the read run
-  on a connection that answers nothing, `partsOfRead`); the reads then go in consecutive envelopes
-  of at most that many parts, balanced (`packByParts`: 302 one-request reads at 300 are 151 and
-  151, never 300 and 2), in order, each answer still its own read's. A read's requests stay
-  together: one that does not fit in the current envelope starts the next. A read that needs more
+  requests in the envelope. Every read of the phase runs once and records its requests, nothing
+  sent; the recorded parts are planned in consecutive envelopes of at most that many parts,
+  balanced (`packByParts`: 302 one-request reads at 300 are 151 and 151, never 300 and 2), each
+  read's parts together — one that does not fit starts the next envelope — and the plan's part
+  counts are checked before the first envelope is sent (`checkedEnvelopes`): a read that needs more
   parts than the bound is answered an error naming both numbers — "a read of this step needs N
-  parts in one ADT batch envelope, more than the B parts per envelope set" — and nothing is sent.
+  parts in one ADT batch envelope, more than the B parts per envelope set" — and nothing of the
+  phase is sent. The envelopes then go one after another, each read handed its own answers.
 - **A failed envelope is answered as SAP answered it.** An envelope SAP refuses or fails is every
   part's failure, as it came, and the call answers that; with a bound, an envelope that failed or
   met a credential refusal ends the phase: no later envelope is sent, and the reads it would have
   carried answer that same failure, as one envelope holding them all would have. A part SAP
-  answered `401`, and a format-correction envelope that failed, end the phase the same way. Where a step
-  judges each envelope itself — the group checks (the first failure is the answer), `GetEnhancements`
-  — no envelope is sent after the one whose answer ends the call. **The exception is
+  answered `401` — in the envelope or in its format-correction envelope — and a correction envelope
+  that failed end the phase the same way, `GetEnhancements` included. The group checks also stop
+  after an envelope holding a failure (the first failure is the answer). **The exception is
   `GetObjectInfo`'s metadata phase** (`include_descriptions: true`): a failed metadata read — a part
   SAP refused, or a whole envelope that failed — gives those leaves no description and the call
   still answers, the next envelope sent; only a credential refusal ends it.
 - **`SearchSource` and `max_hits`.** Without `max_hits` every target is read and every hit
-  answered: the targets go in one chunk (with a bound, in chunks of that many targets, a chunk's
-  first round of one read per target filling one envelope). With `max_hits` the targets are read
-  one per round, bound or not, each target's reads still in envelopes (of at most the bound), and
-  the scan stops as soon as the hits reach `max_hits`: no read of a later target is sent. SAP's own
+  answered: every target's round goes in one phase (one envelope, or the bound's). With
+  `max_hits` the targets are read one per round, bound or not, each target's reads still in
+  envelopes (of at most the bound), the hits counted after each envelope, and the scan stops as
+  soon as they reach `max_hits`: no later envelope is sent. SAP's own
   envelope limit is not measured.
 - **Descriptions are never taken from a batched node structure.** Inside an envelope a node
   structure part can carry another part's `DESCRIPTION` (measured, 2026-10-18). The package

@@ -330,7 +330,7 @@ exporter's.
 
 ## Parts per batch envelope
 
-`partsPerEnvelope` (a whole number from 2, else the constructor throws) is
+`partsPerEnvelope` (a positive whole number, else the constructor throws) is
 the consumer's bound on the parts (requests) one ADT batch envelope of a call carries,
 where a tool reads several objects at once (`GetEnhancements`,
 `SearchSource`, the package listings and walks, the function module group

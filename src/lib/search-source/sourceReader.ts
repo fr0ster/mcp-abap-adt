@@ -14,7 +14,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtCodes } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
-import { type PhaseResult, runPhaseOrAlone } from '../batch/phases';
+import { isNotSent, type PhaseResult, runPhaseOrAlone } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import type { ReadVersion } from '../handlers/readVersion';
@@ -779,7 +779,20 @@ export async function readSourcesInPhase(
   reads: readonly Read[],
   answers: AnsweredReads,
   alone = reads.length < 2,
+  afterEnvelope?: (answered: readonly Read[]) => Promise<boolean>,
 ): Promise<void> {
+  const store = (
+    asked: readonly Read[],
+    results: readonly PhaseResult<PhaseAnswer>[],
+  ): void => {
+    asked.forEach((read, i) => {
+      const result = results[i];
+      if (result === undefined) return;
+      // A read whose envelope was not sent has no answer.
+      if (!result.ok && isNotSent(result.error)) return;
+      keepAnswer(answers, read, result);
+    });
+  };
   // One read, or the reads of one target (`alone`), go as single requests.
   const { results, envelope } = await runPhaseOrAlone(
     ctx,
@@ -787,13 +800,30 @@ export async function readSourcesInPhase(
     (read, connection) =>
       perform(createSourceReaderDeps({ ...ctx, connection }), read),
     alone,
+    afterEnvelope === undefined
+      ? undefined
+      : {
+          // Each envelope's answers are kept as it answers, for the caller
+          // to decide whether the next one is sent.
+          after: async (asked, answered) => {
+            store(asked, answered);
+            return afterEnvelope(asked);
+          },
+        },
   );
   // A failed envelope is decided here, once: its parts never reach the
   // per-read classification.
   if (envelope.failed) envelopeFailure(envelope.error);
-  const answered = reads.map((read, i) => ({ read, result: results[i] }));
-  answered.forEach(({ read, result }) => {
-    if (result === undefined) return;
+  store(reads, results);
+}
+
+/** One read's settlement kept in `answers`, under its key. */
+function keepAnswer(
+  answers: AnsweredReads,
+  read: Read,
+  result: PhaseResult<PhaseAnswer>,
+): void {
+  {
     const key = sourceReadKey(read);
     if (!result.ok) {
       if (read.reader === 'functionGroupStructure') {
@@ -809,5 +839,5 @@ export async function readSourcesInPhase(
     } else {
       answers.sources.set(key, { ok: true, value: value.answer });
     }
-  });
+  }
 }

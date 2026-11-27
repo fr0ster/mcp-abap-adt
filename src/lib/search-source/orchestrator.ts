@@ -1,7 +1,6 @@
 import type { AdtCodes } from '../adtProjections';
 import { appendAll } from '../appendAll';
 import {
-  envelopesOf,
   type PhaseResult,
   runPhaseOrAlone,
   withSequentialFallback,
@@ -584,7 +583,7 @@ export interface SearchSourceStrategies {
  * each chunk's rounds
  * (the objects' own sources and function group structures, then the function
  * groups' includes and function modules) in envelopes of at most the bound,
- * else one (`envelopesOf`), each source once. The answer is assembled by
+ * else one (`runPhaseOutcome`), each source once. The answer is assembled by
  * `runSearchSource` over the phases' answers, so the hits, the counters and
  * the limits are the sequential version's.
  */
@@ -675,7 +674,7 @@ async function runSearchSourceInPhases(
   // `max_hits` every target is read together, each round's reads one phase
   // (`readSourcesInPhase`: one envelope, or the consumer's bound of reads per
   // envelope). With `max_hits` the targets are read one at a time, each
-  // round's reads in the envelopes `envelopesOf` allows, and the hits are
+  // round's reads in the envelopes the consumer's bound allows, and the hits are
   // counted after each envelope: once they reach `max_hits` nothing more is
   // sent. Either way an envelope that answered what ends the call (a
   // credential refusal) is the last one sent. No size is the server's own.
@@ -734,18 +733,21 @@ async function runSearchSourceInPhases(
       // A round of one target reads as single requests — but for the
       // one-target rounds of `max_hits`, whose reads stay in envelopes; a
       // round of one read always does.
-      const steps = perTarget ? envelopesOf(ctx, unique) : [unique];
-      for (const reads of steps) {
-        await readSourcesInPhase(
-          ctx,
-          reads,
-          sources,
-          (chunk.length < 2 && !perTarget) || reads.length < 2,
-        );
-        if (answeredAnEnd(sources, reads)) break reading;
-        // `max_hits` (DO23): reached, no read of a later object is sent.
-        if (await reachedMaxHits(reads)) break reading;
-      }
+      // With `max_hits`, each envelope's answers are counted as it answers
+      // (`readSourcesInPhase`'s hook): a credential refusal or `max_hits`
+      // reached, and no later envelope is sent.
+      const stops = async (answered: readonly Read[]): Promise<boolean> =>
+        answeredAnEnd(sources, answered) || (await reachedMaxHits(answered));
+      await readSourcesInPhase(
+        ctx,
+        unique,
+        sources,
+        (chunk.length < 2 && !perTarget) || unique.length < 2,
+        perTarget ? stops : undefined,
+      );
+      if (answeredAnEnd(sources, unique)) break reading;
+      // `max_hits` (DO23): reached, no read of a later object is sent.
+      if (await reachedMaxHits(unique)) break reading;
     }
   }
 

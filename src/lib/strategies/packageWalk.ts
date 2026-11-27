@@ -27,7 +27,7 @@ import { tableCodeOf } from '../adtTypeCode';
 import { isCredentialFailure } from '../answer';
 import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
-import { envelopesOf, type PhaseResult, runPhase } from '../batch/phases';
+import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import { readsInFlight } from '../connectionKind';
 import { parseXml, type XmlNode } from '../xml/node';
@@ -1052,8 +1052,8 @@ export interface MetadataDescriptions {
  * distinct object, the one its type's `Get<Type>` handler sends
  * (`metadataReadOf`), keyed by `metadataKeyOf`. Metadata reads do not
  * cross-talk inside an envelope, so two or more go in ADT batch envelopes
- * (`runPhase`) of at most the consumer's bound, balanced, else one
- * (`envelopesOf`); one
+ * (`runPhase`) of at most the consumer's bound of parts, balanced, else
+ * one, a failed envelope ending nothing (`failuresEnd: false`); one
  * read, or `alone` (the sequential version), goes as single requests, one
  * after another. A read SAP refused — any status, a `401` included — is
  * that object's: it has no entry, the others theirs, on both paths alike.
@@ -1106,15 +1106,20 @@ export async function metadataDescriptions(
     }
     return { descriptions };
   }
-  for (const keyed of envelopesOf(context, [...reads])) {
-    const results = await runPhase(context, keyed, ([, read], connection) =>
+  const keyed = [...reads];
+  const results = await runPhase(
+    context,
+    keyed,
+    ([, read], connection) =>
       atStep(METADATA_STEP, read)(createAdtClient(connection, context.logger)),
-    );
-    results.forEach((result, i) => {
-      const key = keyed[i]?.[0];
-      if (key !== undefined) keep(key, result);
-    });
-  }
+    // A failed metadata read, a whole failed envelope included, is its
+    // leaves' own: the next envelope is still sent.
+    { failuresEnd: false },
+  );
+  results.forEach((result, i) => {
+    const key = keyed[i]?.[0];
+    if (key !== undefined) keep(key, result);
+  });
   return { descriptions };
 }
 

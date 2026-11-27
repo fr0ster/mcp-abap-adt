@@ -46,7 +46,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../adtClientContract';
 import type { AdtCodes } from '../adtProjections';
-import { envelopesOf, runPhase, withSequentialFallback } from '../batch/phases';
+import { runPhase, withSequentialFallback } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import type { ReadVersion } from '../handlers/readVersion';
@@ -243,7 +243,7 @@ async function checkOneByOne(
 /**
  * The group checks of `modules` in ADT batch envelopes: every metadata read
  * is independent of the others, so they go together, in consecutive
- * envelopes (`envelopesOf`: the consumer's bound, else one). Each envelope's answers are
+ * envelopes (`runPhase`: the consumer's bound counted in parts, else one). Each envelope's answers are
  * judged in the references' order, as the sequential version judges them:
  * the first failure is the answer (a module that does not exist is its
  * `404` part, beside the others' `200`s), and no later envelope is sent; a
@@ -253,18 +253,21 @@ async function checkInEnvelopes(
   context: HandlerContext,
   modules: readonly ModuleInGroup[],
 ): Promise<IAdtFailure<StepError> | undefined> {
-  for (const chunk of envelopesOf(context, modules)) {
-    const results = await runPhase(context, chunk, (reference, connection) =>
+  const results = await runPhase(
+    context,
+    modules,
+    (reference, connection) =>
       checkFunctionModuleGroupOn(
         createAdtClient(connection, context.logger),
         reference.parentName,
         reference.name,
       ),
-    );
-    for (const result of results) {
-      if (!result.ok) throw result.error;
-      if (!result.value.ok) return result.value;
-    }
+    // An envelope holding a failure is the answer: no later one is sent.
+    { after: (_, answered) => answered.some((r) => !r.ok || !r.value.ok) },
+  );
+  for (const result of results) {
+    if (!result.ok) throw result.error;
+    if (!result.value.ok) return result.value;
   }
   return undefined;
 }

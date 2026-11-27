@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`@mcp-abap-adt/adt-clients` 48, `@mcp-abap-adt/adt-strategies` 0.29, `@mcp-abap-adt/interfaces-adt` 33.** No tool changes for the model: the same tools, arguments and answers.
+  - The server's client contract (`src/lib/adtClientContract.ts`) names the identity keys of every atom, as interfaces-adt 32/33 type them (the object's name, its parent's where it has one; a program's and an include's validation also the package; an enhancement's metadata read its type), and the generic answers are `E | IAdtError`.
+  - `CreateMessageClassMessage`, `UpdateMessageClassMessage` and `DeleteMessageClassMessage` compose the message's lock window themselves (`src/lib/messageClassMessageWrite.ts`), from adt-clients 48's one-request members, as the library's MIGRATION-48 gives the chain its `create`, `update` and `delete` ran: the class document read at the working area, `LOCK_MSG` (a `403` goes on with the class's handle), the class lock for the message (a `403` takes the plain class lock), the PUT (a removal with `removeMessage: true`), the class `UNLOCK`, then `UNLOCK_ALL` — the same requests in the same order, the locks stateful and the PUT stateless, every lock given up on every way out and the first error thrown the one answered. Two answers differ as the library's note says: a class read SAP refused is answered as a failure rather than thrown, and a removal is read by the `deleted` reading.
+  - The service binding's publication (`UpdateServiceBinding`, `UpdateObjectUnderLock` for a binding) no longer hands the lock handle to the job: adt-clients 48 types the publication lock-free, and the handle was never sent. The lock around it is taken and released as before.
+  - In batch mode, a request whose `params` are neither a string, a `URLSearchParams` nor a plain object of string, number or boolean values is refused by adt-clients' batch connection before it is recorded, and takes no number.
+
 ## [24.2.2] - 2026-11-27
 
 ### Fixed

@@ -21,12 +21,13 @@ import { createArguments } from '../../../lib/handlers/createArguments';
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IMessageClassMessageUpsert } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { createTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { upsertMessageClassMessage } from '../../../lib/messageClassMessageWrite';
+import { inMessageClassMessageWindow } from '../../../lib/messageClassMessageWrite';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -85,21 +86,28 @@ export async function handleCreateMessageClassMessage(
 
   const className = args.message_class_name.toUpperCase();
 
+  const message: IMessageClassMessageUpsert = {
+    className,
+    msgno: args.msgno,
+    msgtext: args.msgtext,
+    selfExplanatory: args.self_explanatory ?? false,
+    description: args.description,
+    transportRequest: args.transport_request,
+  };
+
   return answer(
     { tool: 'CreateMessageClassMessage', detail: 'terse' },
     () =>
-      withAdtHeaders(context, 'messageClassMessage.create', (headers) =>
-        upsertMessageClassMessage(
+      withAdtHeaders(context, 'messageClassMessage.update', (headers) =>
+        inMessageClassMessageWindow(
           createAdtClient(connection, logger),
-          {
-            className,
-            msgno: args.msgno,
-            msgtext: args.msgtext,
-            selfExplanatory: args.self_explanatory ?? false,
-            description: args.description,
-            transportRequest: args.transport_request,
-          },
-          { headers, analyse: analyseException },
+          message,
+          (members, window) =>
+            members.update(message, {
+              ...window,
+              headers,
+              analyse: analyseException,
+            }),
         ),
       ),
     () => ({

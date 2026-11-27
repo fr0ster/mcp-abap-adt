@@ -28,12 +28,13 @@ import * as z from 'zod';
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IMessageClassMessageRemoval } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { deleteTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { removeMessageClassMessage } from '../../../lib/messageClassMessageWrite';
+import { inMessageClassMessageWindow } from '../../../lib/messageClassMessageWrite';
 import { return_error } from '../../../lib/utils';
 
 /** What the delete answers: SAP took it, for the class and the number asked. */
@@ -85,19 +86,26 @@ export async function handleDeleteMessageClassMessage(
 
   const className = args.message_class_name.toUpperCase();
 
+  const message: IMessageClassMessageRemoval = {
+    className,
+    msgno: args.msgno,
+    transportRequest: args.transport_request,
+    removeMessage: true,
+  };
+
   return answer(
     { tool: 'DeleteMessageClassMessage', detail: 'terse' },
     () =>
-      withAdtHeaders(context, 'messageClassMessage.delete', (headers) =>
-        removeMessageClassMessage(
+      withAdtHeaders(context, 'messageClassMessage.update', (headers) =>
+        inMessageClassMessageWindow(
           createAdtClient(connection, logger),
-          {
-            className,
-            msgno: args.msgno,
-            transportRequest: args.transport_request,
-            removeMessage: true,
-          },
-          { headers, analyse: analyseException },
+          message,
+          (members, window) =>
+            members.update(message, {
+              ...window,
+              headers,
+              analyse: analyseException,
+            }),
         ),
       ),
     // A constant success, reading nothing from the answer — safe here, and

@@ -26,11 +26,7 @@ import {
 import type {
   IAdtError,
   IAdtFailure,
-  IAdtHeaders,
   IAdtResponse,
-  IAnalyse,
-  IMessageClassMessageRemoval,
-  IMessageClassMessageUpsert,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from './adtClientContract';
 
@@ -38,23 +34,27 @@ import type { IServerAdtClient } from './adtClientContract';
 const FORBIDDEN = 403;
 
 /** The handles and the document the PUT is sent with. */
-interface MessageWindow {
+export interface MessageWindow {
   readonly classDocument: string;
   readonly classLockHandle: string;
   readonly messageLockHandle: string;
 }
 
 /** The message's members, as the server's client answers them. */
-type MessageApi = ReturnType<IServerAdtClient['getMessageClassMessage']>;
+export type MessageApi = ReturnType<IServerAdtClient['getMessageClassMessage']>;
 
 /** What the window answers: the PUT's answer, or the failure that ended it. */
 type WindowAnswer<R> = R | IAdtFailure;
 
 /**
  * Run `put` inside the message's lock window: read, lock, put, unlock, and
- * release on every way out whatever is still held.
+ * release on every way out whatever is still held. `put` is the caller's
+ * `update` — an upsert, or a removal with `removeMessage: true` — sent with
+ * the window's document and handles and the pair `withAdtHeaders` hands it.
  */
-async function inMessageWindow<R extends IAdtResponse<unknown, IAdtError>>(
+export async function inMessageClassMessageWindow<
+  R extends IAdtResponse<unknown, IAdtError>,
+>(
   client: IServerAdtClient,
   address: { readonly className: string; readonly msgno: string },
   put: (message: MessageApi, window: MessageWindow) => Promise<R>,
@@ -130,32 +130,4 @@ async function inMessageWindow<R extends IAdtResponse<unknown, IAdtError>>(
   if (thrown) throw thrown.error;
   if ('error' in outcome) throw outcome.error;
   return outcome.answer;
-}
-
-/** What the PUT is sent with besides the handles: the pair and the reading. */
-export interface MessageWriteOptions<E extends IAdtError> {
-  readonly headers: IAdtHeaders;
-  readonly analyse: IAnalyse<E>;
-}
-
-/** Upsert one message: the window with the message's fields merged in. */
-export function upsertMessageClassMessage<E extends IAdtError>(
-  client: IServerAdtClient,
-  config: IMessageClassMessageUpsert,
-  options: MessageWriteOptions<E>,
-) {
-  return inMessageWindow(client, config, (message, window) =>
-    message.update(config, { ...options, ...window }),
-  );
-}
-
-/** Remove one message: the window with the message under `deletedmessages`. */
-export function removeMessageClassMessage<E extends IAdtError>(
-  client: IServerAdtClient,
-  config: IMessageClassMessageRemoval,
-  options: MessageWriteOptions<E>,
-) {
-  return inMessageWindow(client, config, (message, window) =>
-    message.update(config, { ...options, ...window }),
-  );
 }

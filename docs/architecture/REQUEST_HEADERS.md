@@ -324,6 +324,8 @@ one module, `src/lib/adtHeaders/defaultPairs.ts` (`DEFAULT_ADT_HEADERS`).
 
 #### `messageClassMessage`
 
+adt-clients 48 has no message `create` or `delete`: the three message tools send `update`'s pair (the PUT of the class document). The `create` and `delete` rows stay for the exported `AdtOperation`; no call site sends them.
+
 | Member | Accept | Content-Type | Source |
 |---|---|---|---|
 | `create` | `application/vnd.sap.adt.mc.messageclass+xml` | `application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8` | measured (35.0.0 sent Accept *(none)*, Content-Type `application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8`) |

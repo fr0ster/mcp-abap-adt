@@ -27,7 +27,7 @@ import { handleDeleteMessageClassMessage } from '../../handlers/message_class/hi
 import { handleUpdateMessageClassMessage } from '../../handlers/message_class/high/handleUpdateMessageClassMessage';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../lib/clients';
-import { upsertMessageClassMessage } from '../../lib/messageClassMessageWrite';
+import { inMessageClassMessageWindow } from '../../lib/messageClassMessageWrite';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { setSystemContext } from '../helpers/processSystemContext';
 
@@ -122,15 +122,19 @@ const sessions = (sent: readonly Sent[]) =>
   sent.map((s) => `${s.step}:${s.session}`);
 
 /** The upsert itself, outside a tool: what it throws reaches the caller. */
-const upsert = (connection: IAbapConnection) =>
-  upsertMessageClassMessage(
+const upsert = (connection: IAbapConnection) => {
+  const message = { className: 'ZMC', msgno: '001', msgtext: 'x' };
+  return inMessageClassMessageWindow(
     createAdtClient(connection),
-    { className: 'ZMC', msgno: '001', msgtext: 'x' },
-    {
-      headers: DEFAULT_ADT_HEADERS['messageClassMessage.create'],
-      analyse: analyseException,
-    },
+    message,
+    (members, window) =>
+      members.update(message, {
+        ...window,
+        headers: DEFAULT_ADT_HEADERS['messageClassMessage.update'],
+        analyse: analyseException,
+      }),
   );
+};
 
 const create = (connection: IAbapConnection) =>
   handleCreateMessageClassMessage(

@@ -283,7 +283,9 @@ describe('the message write: the lock window composed from one-request members',
   });
 
   it('a refused PUT is the answer, and both locks are given up, the class first', async () => {
-    const { connection, sent } = windowConnection({ put: { status: 400 } });
+    const { connection, sent } = windowConnection({
+      put: { status: 400, data: 'the PUT refusal' },
+    });
     const result = await create(connection);
     assert.equal(result.isError, true);
     assert.deepStrictEqual(sessions(sent), [
@@ -294,14 +296,46 @@ describe('the message write: the lock window composed from one-request members',
       'unlockClass:stateful',
       'unlockMessages:stateful',
     ]);
+    const answer = await upsert(
+      windowConnection({ put: { status: 400 } }).connection,
+    );
+    assert.equal(answer.ok, false);
+    if (!answer.ok) assert.equal(answer.getError().response?.status, 400);
+  });
+
+  it("a refused PUT stays the answer when a cleanup's unlock is refused too: the PUT's 400, not the unlock's 500", async () => {
+    const { connection, sent } = windowConnection({
+      put: { status: 400, data: 'the PUT refusal' },
+      unlockClass: { status: 500, data: 'the unlock refusal' },
+    });
+    const answer = await upsert(connection);
+    assert.equal(answer.ok, false);
+    if (!answer.ok) {
+      const error = answer.getError();
+      assert.equal(error.response?.status, 400);
+      assert.equal(error.response?.data, 'the PUT refusal');
+    }
+    assert.deepStrictEqual(steps(sent), [
+      'read',
+      'lockMessage',
+      'lockClassForMessage',
+      'put',
+      'unlockClass',
+      'unlockMessages',
+    ]);
   });
 
   it('a refused class unlock is the answer, and the class and the messages are given up again', async () => {
     const { connection, sent } = windowConnection({
-      unlockClass: { status: 500 },
+      unlockClass: { status: 500, data: 'the unlock refusal' },
     });
-    const result = await create(connection);
-    assert.equal(result.isError, true);
+    const answer = await upsert(connection);
+    assert.equal(answer.ok, false);
+    if (!answer.ok) {
+      const error = answer.getError();
+      assert.equal(error.response?.status, 500);
+      assert.equal(error.response?.data, 'the unlock refusal');
+    }
     assert.deepStrictEqual(steps(sent), [
       'read',
       'lockMessage',
@@ -311,6 +345,10 @@ describe('the message write: the lock window composed from one-request members',
       'unlockClass',
       'unlockMessages',
     ]);
+    const tool = await create(
+      windowConnection({ unlockClass: { status: 500 } }).connection,
+    );
+    assert.equal(tool.isError, true);
   });
 
   it('a throw at the PUT still gives every lock up, and the first error thrown leaves, not a later cleanup one', async () => {

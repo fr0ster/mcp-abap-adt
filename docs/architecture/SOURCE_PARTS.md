@@ -144,10 +144,12 @@ adt-clients gets **no partial-update member** and no reading. It always takes th
 
 A composer above the one-endpoint members. It answers two things:
 
-- **`outline(object)`**: the object's elements as one list. Each element carries its kind, its
-  name, its parent (a method's class), the include it lives in, and its position wherever SAP
-  states one. Every element also carries **its address**, the `{ type, name, parent? }` that
-  `part` takes.
+- **`outline(object, version)`**: SAP's outline document as it came, its tree as
+  `readObjectOutline` reads it (the hierarchy, every link), and beside them a flat list of the
+  addressable elements. Each listed element carries its kind, its name, its parent (a method's
+  class), the include it lives in, its position wherever SAP states one, and **its address**, the
+  `{ type, name, parent? }` that `part` takes. The document and the tree are what today's
+  `GetObjectOutline` answers are built from; the list is new.
 - **`part(object, elements)`**: each element located in its include. For each one it answers the
   include's address, the include's whole text and its `sourceHash`, the element's first and last
   line, and whether the element shares a line with another statement (§5.4). The tools cut the
@@ -297,24 +299,28 @@ include. A diff relative to the element (§7.3) uses the same numbering. A model
 
 ## 6. The outline answer
 
-`GetObjectOutline` stays the outline tool, and the analyzer answers it.
+`GetObjectOutline` stays the outline tool, and it reads through the analyzer's `outline`.
 
-- **Without the new arguments, its answer is unchanged.**
+- **Without `view`, its answer is today's, unchanged**, at every `detail` level: the
+  hierarchical rows at `terse`, the tree at `medium` and `full`, SAP's document at `raw`. They are
+  built from the document and the tree the analyzer keeps (§4.1), exactly as today. No address is
+  added to them.
 - It gains `PROG/I`: an include's outline, served on cloud for function group includes (§2).
-- It gains a compact form:
+- It gains two views, the new answers, given only when `view` is passed:
 
 | Argument | Answer |
 |---|---|
 | `view: "kinds"` | each kind present: its code, its words and its count; and each include with its element count. No names. |
-| `view: "elements"` (default) | the elements, at the `detail` levels as today |
-| `element_types` | only elements of these kinds |
-| `element_name` | only elements of this name: exact, or a mask with `*` (plain string matching) |
-| `parent` | only the children of this element (one local class's methods, say) |
+| `view: "parts"` | the flat list of addressable elements, each with its address |
+| `element_types` | with `view: "parts"`: only elements of these kinds |
+| `element_name` | with `view: "parts"`: only elements of this name, exact or a mask with `*` (plain string matching) |
+| `parent` | with `view: "parts"`: only the children of this element (one local class's methods, say) |
 
-Every listed element carries its address `{ type, name, parent? }`, which is exactly what
-`GetSourcePart` takes (the goal's invariant: an outline names every piece the way the part read
-takes it). Elements of a class or an interface also carry their lines. Program elements carry
-their include but no lines: navigation is not called for an outline.
+The filters without `view: "parts"` are refused before any request. In `view: "parts"` every
+element carries its address `{ type, name, parent? }`, which is exactly what `GetSourcePart`
+takes (the goal's invariant: an outline names every piece the way the part read takes it).
+Elements of a class or an interface also carry their lines. Program elements carry their include
+but no lines: navigation is not called for an outline.
 
 So the model's path through a 3 MB outline is: `kinds`, then a filter, then the details. Which
 view to ask is the model's choice; nothing switches views by size.
@@ -395,12 +401,25 @@ The existing whole reads stay as they are: same tools, same default answers.
 
 | Tool | Set | What |
 |---|---|---|
-| every source read (`GetClass`, `GetProgram`, `GetInclude`, …) | read-only | `part: "size"` added: lines, bytes and `source_hash` of the source, from the same one GET; no text |
+| every source read (`GetClass`, `GetProgram`, `GetInclude`, …) | read-only | `part: "size"` added (below); no text |
 | `GetObjectOutline` | read-only | §6 |
 | `GetSourcePart` (new) | read-only | one or several elements (`{ type, name, parent? }`, `side`), or a line range inside one (§5.5); answers each element's lines, its absolute range, the include and its `source_hash`, and whether it shares a line |
 | `UpdateSourcePart` (new) | write | §7 |
 
-- **Compact sets:** `HandlerGet` gains the parts `size` and `source_part`, and the compact update
+**What `part: "size"` measures.** The size of exactly the source that tool's whole read answers,
+from the same one GET, with the same `version`. For `GetClass` that is the class's
+`source/main`; a local include is sized by its own tool (`GetLocalTypes`, …), and a function group
+by each of its includes and modules. The answer names that source (its ADT address and the
+`version` read), and gives:
+
+- `bytes`: the UTF-8 bytes of the text as received;
+- `lines`: counted as the existing line ranges count them (`src/lib/handlers/sourceRange.ts`): a
+  line ends at a line feed, a final line feed closes the last line and opens none, and an empty
+  source has 0 lines;
+- `source_hash`: §7.2.
+
+- **Compact sets:**
+ `HandlerGet` gains the parts `size` and `source_part`, and the compact update
   gains the edits. The spec names the arguments.
 - **`available_in`:** as for the object kind's whole read and update today. Program and include
   writes are onprem only. Program parts are onprem only: programs on cloud have no outline.

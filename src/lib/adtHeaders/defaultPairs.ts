@@ -469,6 +469,9 @@ export const DEFAULT_ADT_HEADERS = Object.freeze({
     'application/vnd.sap.adt.mc.messageclass+xml',
     'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8',
   ),
+  // adt-clients 48 has no message `create` / `delete`: the three message
+  // tools send `update`'s pair. These two keys stay for the exported
+  // `AdtOperation` (`./adt-headers`); no call site names them.
   'messageClassMessage.create': pair(
     'application/vnd.sap.adt.mc.messageclass+xml',
     'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8',

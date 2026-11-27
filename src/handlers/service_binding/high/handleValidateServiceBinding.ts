@@ -129,7 +129,9 @@ export async function handleValidateServiceBinding(
           {
             bindingName,
             packageName: packageName.toUpperCase(),
-            description: args.description?.trim(),
+            ...(args.description === undefined
+              ? {}
+              : { description: args.description.trim() }),
           },
           { analyse: analyseException },
         ),

@@ -278,23 +278,39 @@ describe('the six not-deletion-service exceptions: analyseException, never analy
     );
   }
 
-  it('DeleteMessageClassMessage calls delete with analyseException, no lock available to take', async () => {
+  it('DeleteMessageClassMessage removes the message through update (removeMessage: true) with analyseException, inside the lock window', async () => {
     const lock = mock.fn<(...args: any[]) => any>();
+    const unlock = mock.fn(async () => okResponse(undefined));
+    const unlockMessages = mock.fn(async () => okResponse(undefined));
+    let seenConfig: any;
     let seenAnalyse: unknown;
     fakeClient = fakeClientOf({
-      delete: async (_c: unknown, o: any) => {
+      lockMessage: async () => okResponse('MESSAGEHANDLE'),
+      lockClassForMessage: async () => okResponse('CLASSHANDLE'),
+      update: async (c: unknown, o: any) => {
+        seenConfig = c;
         seenAnalyse = o.analyse;
         return okResponse(reading(undefined, '', 200));
       },
       lock,
+      unlock,
+      unlockMessages,
     });
     const result: any = await handleDeleteMessageClassMessage(context as any, {
       message_class_name: 'ZMSG',
       msgno: '001',
     });
     assert.equal(result.isError, false);
+    assert.deepStrictEqual(seenConfig, {
+      className: 'ZMSG',
+      msgno: '001',
+      transportRequest: undefined,
+      removeMessage: true,
+    });
     assert.equal(seenAnalyse, analyseException);
     assert.equal(lock.mock.callCount(), 0);
+    assert.equal(unlock.mock.callCount(), 1);
+    assert.equal(unlockMessages.mock.callCount(), 1);
   });
 
   it('DeleteMetadataExtension calls delete with analyseException and projects terseWrite (status-derived)', async () => {

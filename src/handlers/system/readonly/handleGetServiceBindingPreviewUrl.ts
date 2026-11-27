@@ -390,7 +390,8 @@ export async function handleGetServiceBindingPreviewUrl(
           bindingSource: AdtReading<string>,
         ): Promise<IAdtResponse<Found, IAdtError>> => {
           const facts = serviceBindingFactsOf(bindingSource.raw);
-          if (!facts.serviceDefinition) {
+          const serviceDefinitionName = facts.serviceDefinition;
+          if (!serviceDefinitionName) {
             // A binding with no definition names nothing to expose; the answer
             // says so through `missing` rather than failing the read that worked.
             return succeededWith<Found>({
@@ -402,15 +403,9 @@ export async function handleGetServiceBindingPreviewUrl(
           }
 
           const srvd = await atStep('read service definition', () =>
-            definition.read(
-              {
-                ...(facts.serviceDefinition !== undefined && {
-                  serviceDefinitionName: facts.serviceDefinition,
-                }),
-              },
-              'active',
-              { analyse: analyseException },
-            ),
+            definition.read({ serviceDefinitionName }, 'active', {
+              analyse: analyseException,
+            }),
           )();
           if (!srvd.ok) return srvd;
           const exposed = exposedEntitiesOf(srvd.getResult().value.raw);

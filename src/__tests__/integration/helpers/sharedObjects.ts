@@ -349,7 +349,8 @@ export async function ensureSharedDependency(
       );
       if (!created.ok) throw new Error(created.getError().message);
 
-      if (depConfig.source && activate) {
+      const depSource = depConfig.source;
+      if (depSource && activate) {
         log?.info?.(`Activating shared table ${name}...`);
         const obj = client.getTable(tableDocuments);
         const written = await withLock(
@@ -359,7 +360,7 @@ export async function ensureSharedDependency(
               { tableName: name, transportRequest },
               {
                 headers: DEFAULT_ADT_HEADERS['table.update'],
-                source: depConfig.source,
+                source: depSource,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -397,7 +398,8 @@ export async function ensureSharedDependency(
       );
       if (!created.ok) throw new Error(created.getError().message);
 
-      if (depConfig.source && activate) {
+      const depSource = depConfig.source;
+      if (depSource && activate) {
         log?.info?.(`Activating shared view ${name}...`);
         const obj = client.getDdl(ddlDocuments);
         const written = await withLock(
@@ -407,7 +409,7 @@ export async function ensureSharedDependency(
               { ddlName: name, transportRequest },
               {
                 headers: DEFAULT_ADT_HEADERS['ddl.update'],
-                source: depConfig.source,
+                source: depSource,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -449,7 +451,8 @@ export async function ensureSharedDependency(
         );
       if (!created.ok) throw new Error(created.getError().message);
 
-      if (depConfig.source && activate) {
+      const depSource = depConfig.source;
+      if (depSource && activate) {
         log?.info?.(`Activating shared behavior definition ${name}...`);
         const obj = client.getBehaviorDefinition(behaviorDefinitionDocuments);
         const written = await withLock(
@@ -459,7 +462,7 @@ export async function ensureSharedDependency(
               { name, transportRequest },
               {
                 headers: DEFAULT_ADT_HEADERS['behaviorDefinition.update'],
-                source: depConfig.source,
+                source: depSource,
                 lockHandle,
                 analyse: analyseException,
               },

@@ -319,6 +319,9 @@ describe('the MCP tool surface', () => {
         // asked SAP for 100 records whatever the caller wanted; `row_number`,
         // optional, no default, as compact getDataPreview already took it.
         'debug/AmdpDebugGetTable': ['row_number'],
+        // #391: the object types list asked SAP for 999 whatever the caller
+        // wanted; `max_item_count`, optional, no default.
+        'system/GetAdtTypes': ['max_item_count'],
         // Issue #261: the dumps feed filters on the attributes its descriptor
         // declares; the user filter was the only one reachable before.
         // 19.0.0, several feeds per call (spec §11): `feed_types` beside

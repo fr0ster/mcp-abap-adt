@@ -263,12 +263,22 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     assert.deepStrictEqual(call?.args, [{ query: 'ZCL*' }]);
   });
 
-  it('GetAdtTypes calls getAllTypes(999, "*", "usedByProvider")', async () => {
+  // No count of the server's (#391): none given, none handed on — SAP's own
+  // bound applies; one given is handed on as given.
+  it('GetAdtTypes calls getAllTypes(undefined, "*", "usedByProvider") when no max_item_count is given', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
     await handleGetAdtTypes(context as any, {});
     const call = seen.calls.filter((c) => c.member === 'getAllTypes').at(-1);
-    assert.deepStrictEqual(call?.args, [999, '*', 'usedByProvider']);
+    assert.deepStrictEqual(call?.args, [undefined, '*', 'usedByProvider']);
+  });
+
+  it('GetAdtTypes hands max_item_count on as given', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleGetAdtTypes(context as any, { max_item_count: 500 });
+    const call = seen.calls.filter((c) => c.member === 'getAllTypes').at(-1);
+    assert.deepStrictEqual(call?.args, [500, '*', 'usedByProvider']);
   });
 
   it('GetInactiveObjects calls getInactiveObjects() with no arguments', async () => {

@@ -71,6 +71,14 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe('Type name to validate (optional)'),
+    // No count of the server's (#391): absent, SAP's own bound applies — 100
+    // of 375 object types on the BTP ABAP environment (2026-11-27), 0 the
+    // same; 999 and 100000 read all 375.
+    max_item_count: z
+      .number()
+      .int()
+      .optional()
+      .describe('Most object types to read. Absent: SAP gives at most 100.'),
     ...DETAIL_SHAPE,
   }),
 } as const;
@@ -116,7 +124,9 @@ export async function handleGetAdtTypes(
           ...ourUtils,
           types: readingAt(TYPE_READINGS, levelOf(args)),
         })
-        .getAllTypes(999, '*', 'usedByProvider', { analyse: analyseException }),
+        .getAllTypes(args.max_item_count, '*', 'usedByProvider', {
+          analyse: analyseException,
+        }),
     answered,
   );
 }

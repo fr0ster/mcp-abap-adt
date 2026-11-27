@@ -132,17 +132,19 @@ const TOOL_NEEDS_BY_NAME = {
   CreateMessageClass: { api: 'messageClass', operation: 'create' },
   UpdateMessageClass: { api: 'messageClass', operation: 'updateMetadata' },
   DeleteMessageClass: { api: 'messageClass', operation: 'delete' },
+  // A message is upserted and removed by one PUT, `update` (adt-clients 48).
   CreateMessageClassMessage: {
     api: 'messageClassMessage',
-    operation: 'create',
+    operation: 'update',
   },
   UpdateMessageClassMessage: {
     api: 'messageClassMessage',
     operation: 'update',
   },
+  // A message is upserted and removed by one PUT, `update` (adt-clients 48).
   DeleteMessageClassMessage: {
     api: 'messageClassMessage',
-    operation: 'delete',
+    operation: 'update',
   },
   CreateDataElement: { api: 'dataElement', operation: 'create' },
   UpdateDataElement: { api: 'dataElement', operation: 'updateMetadata' },

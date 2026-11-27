@@ -366,21 +366,34 @@ The sequence:
    includes.
 2. Under the lock, `part` locates every element the edits name. That read takes the outline, the
    navigation and the include's source.
-3. **Drift check.** `sourceHash(include source)` must equal `source_hash`. Otherwise the call is
-   refused, `source_changed`, with the current hash; the server unlocks and writes nothing.
+3. **Drift check.** The hash of the include text read in step 2 must equal `source_hash`.
+   Otherwise the call is refused, `source_changed`, with the current hash; the server unlocks and
+   writes nothing.
 4. Resolve the edits against that text:
    - the edits must not overlap, else a refusal naming both;
    - they are applied bottom-up, so earlier ranges stay valid.
 5. Write the whole include once, through the include's CRUD (table below), then unlock.
-6. **The answer** names each edit with its new line range in the include, plus the new source
-   hash. It does not activate.
+6. **The answer** names each edit with its new line range in the include, plus `sent_hash`: the
+   hash of the text this call sent. It does not activate.
 
-**`sourceHash`** is SHA-256, in hex, over the UTF-8 bytes of the source text exactly as read.
-It is one function, exported by the analyzer package. The part read's answer and lib's drift
-check both use it.
+**The source hash** is part of lib's contract, not of an analyzer: SHA-256, lowercase hex, over the
+UTF-8 bytes of the source text exactly as received, nothing normalised. lib computes it, with
+`node:crypto`, from the text the analyzer hands over: in size answers, in part answers and in the
+drift check. A replaced analyzer therefore changes no hash, and lib imports no hashing from the
+analyzer package.
 
-**Line ends.** The untouched lines keep their own line ends. New lines get the include's
-(SAP sends CRLF).
+**`sent_hash` is not a stored hash.** It describes the text sent. Whether SAP stores that text
+unchanged (line ends, trailing blanks, a final line feed) is unmeasured; the spec measures it. Only
+a later read proves what SAP holds: its hash is the one the next edit must carry.
+
+**Character for character.** Every character outside the replaced lines is kept as read, line
+ends included:
+
+- Each untouched line keeps its own line end, so mixed line ends stay mixed.
+- The include's final state is kept: with or without a closing line end.
+- The new code's lines are joined with the line end of the first line they replace. An `insert`
+  uses the line end of the line it is placed after. A line end inside the model's code (LF or
+  CRLF) is replaced by that one; nothing else in the model's code is changed.
 
 | The element's include | The write |
 |---|---|

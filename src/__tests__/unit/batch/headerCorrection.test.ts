@@ -192,9 +192,47 @@ describe("the consumer's bound and a failed correction envelope", () => {
       [2, 1],
     );
     assert.equal(results.results.length, 4);
+    // A and B answered (B by the failed correction, its read's failure);
+    // the later reads settle with that failure, never sent.
     assert.deepStrictEqual(
-      results.results.map((r) => r.ok),
-      [true, true, false, false],
+      results.results.map((r) => r.ok && r.value.ok),
+      [true, false, false, false],
+    );
+  });
+});
+
+describe('a corrected part answering 401', () => {
+  it('bound 2: the correction envelope answers B with 401 — the phase ends, no later envelope is sent', async () => {
+    let envelopes = 0;
+    const fake = envelopeConnection((parts, seen) => {
+      envelopes += 1;
+      return partByPart((inner) =>
+        envelopes === 2
+          ? { status: 401, statusText: 'Unauthorized', body: '' }
+          : acceptsNewer(
+              itemOf(inner.url),
+              inner.headers.accept,
+              inner.headers['content-type'],
+            ),
+      )(parts, seen);
+    });
+    const context: HandlerContext = {
+      connection: fake.connection,
+      logger: undefined,
+      adtHeaders: new AdtHeaderPairs().forSystem('S1'),
+      partsPerEnvelope: 2,
+    };
+    await withinTurns(
+      runPhaseOutcome(
+        context,
+        ['ITEM_A', 'ITEM_B', 'ITEM_C', 'ITEM_A'],
+        whereUsed(context),
+      ),
+    );
+    // The first envelope (A, B), B's correction answering 401 — nothing after.
+    assert.deepStrictEqual(
+      fake.envelopes.map((e) => e.parts.length),
+      [2, 1],
     );
   });
 });

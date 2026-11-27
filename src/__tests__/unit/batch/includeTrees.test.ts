@@ -1721,6 +1721,26 @@ describe('GetEnhancements', () => {
     );
   });
 
+  it("bound 150: a failed first envelope of GetEnhancements' probes ends the phase — no later envelope is sent", async () => {
+    let first = true;
+    const fake = system({}, (parts) => {
+      if (first) {
+        first = false;
+        throw statusError(500, 'Internal Server Error');
+      }
+      return envelopeResponse(
+        parts.map((p) => answerOf({}, labelOf(p.method, p.url))),
+      );
+    });
+    await withinTurns(
+      handleGetEnhancements(contextOn(fake, 'served', 150), {
+        objects: probedObjects,
+      }),
+      TURNS,
+    );
+    assert.equal(fake.envelopes.length, 1);
+  });
+
   it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {
     const fake = system({}, () => {
       throw statusError(404, 'Not Found');

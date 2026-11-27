@@ -15,7 +15,6 @@ import type { HandlerContext } from '../../../handlers/interfaces';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import {
   chunksOf,
-  envelopesOf,
   partsPerEnvelopeOf,
   runPhaseOutcome,
 } from '../../../lib/batch/phases';
@@ -92,27 +91,6 @@ describe('chunksOf', () => {
   });
 });
 
-describe('envelopesOf', () => {
-  const contextWith = (partsPerEnvelope?: number): HandlerContext => ({
-    connection: envelopeConnection(() => envelopeResponse([])).connection,
-    ...(partsPerEnvelope !== undefined && { partsPerEnvelope }),
-  });
-
-  it('no bound in the context: 302 reads in one envelope', () => {
-    assert.deepStrictEqual(
-      envelopesOf(contextWith(), numbers(302)).map((c) => c.length),
-      [302],
-    );
-  });
-
-  it("the context's bound of 300: 302 reads in 151 and 151", () => {
-    assert.deepStrictEqual(
-      envelopesOf(contextWith(BOUND), numbers(302)).map((c) => c.length),
-      [151, 151],
-    );
-  });
-});
-
 describe('the consumer’s bound', () => {
   const read = (
     argv: string[],
@@ -141,14 +119,14 @@ describe('the consumer’s bound', () => {
     assert.equal(read([], { MCP_BATCH_PARTS_PER_ENVELOPE: '' }), undefined);
   });
 
-  for (const value of [1, 1.5, true, 'x', [300], { n: 300 }]) {
+  for (const value of [0, 1.5, true, 'x', [300], { n: 300 }]) {
     it(`YAML ${JSON.stringify(value)} is refused`, () => {
       assert.throws(
         () => read([], {}, { batch: { partsPerEnvelope: value } }),
         (error: unknown) =>
           error instanceof ParameterRefusal &&
           error.words ===
-            'Invalid batch.partsPerEnvelope (config file): must be a whole number of parts from 2',
+            'Invalid batch.partsPerEnvelope (config file): must be a positive whole number of parts',
       );
     });
   }
@@ -166,33 +144,35 @@ describe('the consumer’s bound', () => {
     assert.equal(BATCH_PARTS_PER_ENVELOPE_ROW.default, undefined);
   });
 
-  it('a whole number from 2 is read, from the CLI and the environment', () => {
+  it('a positive whole number is read, 1 included, from the CLI and the environment', () => {
     assert.equal(read(['--batch-parts-per-envelope=300']), 300);
     assert.equal(read(['--batch-parts-per-envelope=2']), 2);
+    assert.equal(read(['--batch-parts-per-envelope=1']), 1);
     assert.equal(read([], { MCP_BATCH_PARTS_PER_ENVELOPE: '150' }), 150);
   });
 
-  for (const value of ['1', '0', '-3', 'abc', '2.5', '1e3', 'x300']) {
+  for (const value of ['0', '-3', 'abc', '2.5', '1e3', 'x300']) {
     it(`"${value}" is refused, the value not echoed`, () => {
       assert.throws(
         () => read([`--batch-parts-per-envelope=${value}`]),
         (error: unknown) =>
           error instanceof ParameterRefusal &&
           error.words ===
-            'Invalid --batch-parts-per-envelope: must be a whole number of parts from 2',
+            'Invalid --batch-parts-per-envelope: must be a positive whole number of parts',
       );
     });
   }
 
-  it("an embedder's option: a whole number from 2, else refused", () => {
+  it("an embedder's option: a positive whole number, else refused", () => {
     assert.equal(partsPerEnvelopeOf(2, 'partsPerEnvelope'), 2);
-    for (const value of [1, 0, -1, 2.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.equal(partsPerEnvelopeOf(1, 'partsPerEnvelope'), 1);
+    for (const value of [0, -1, 2.5, Number.NaN, Number.POSITIVE_INFINITY]) {
       assert.throws(
         () => partsPerEnvelopeOf(value, 'partsPerEnvelope'),
         (error: unknown) =>
           error instanceof Error &&
           error.message ===
-            'Invalid partsPerEnvelope: must be a whole number of parts from 2',
+            'Invalid partsPerEnvelope: must be a positive whole number of parts',
       );
     }
   });
@@ -460,5 +440,96 @@ describe('the bound counts parts (requests), a read kept whole', () => {
     );
     assert.equal(fake.envelopes.length, 0);
     assert.equal(fake.directs.length, 0);
+  });
+});
+
+describe('one recording pass: each read runs once, its parts recorded once and dispatched as recorded', () => {
+  /** A phase of `n` reads, item `i` recording `partsOf(i)` requests, each read counted and its `finally` counted. */
+  const traced = (
+    partsOf: (item: number) => number,
+    n: number,
+    partsPerEnvelope: number,
+  ) => {
+    const runs = numbers(n).map(() => 0);
+    const cleaned = numbers(n).map(() => 0);
+    const recorded: string[] = [];
+    const fake = envelopeConnection((parts) =>
+      envelopeResponse(
+        parts.map((p) => ({ status: 200, statusText: 'OK', body: p.url })),
+      ),
+    );
+    const context: HandlerContext = {
+      connection: fake.connection,
+      logger: undefined,
+      batchAvailability: createBatchAvailability(),
+      partsPerEnvelope,
+    };
+    const outcome = withinTurns(
+      runPhaseOutcome(context, numbers(n), async (item, c) => {
+        runs[item] = (runs[item] ?? 0) + 1;
+        try {
+          const urls = Array.from(
+            { length: partsOf(item) },
+            (_, part) => `/sap/bc/adt/x/${item}/${part}`,
+          );
+          for (const url of urls) recorded.push(url);
+          const answers = await Promise.all(
+            urls.map((url) =>
+              c.makeAdtRequest({ url, method: 'GET', timeout: 0 }),
+            ),
+          );
+          return answers.length;
+        } finally {
+          cleaned[item] = (cleaned[item] ?? 0) + 1;
+        }
+      }),
+      2000,
+    );
+    return { fake, outcome, runs, cleaned, recorded };
+  };
+
+  it('every read runs once, and its finally runs once', async () => {
+    const { outcome, runs, cleaned } = traced(() => 2, 5, 3);
+    await outcome;
+    assert.deepStrictEqual(runs, [1, 1, 1, 1, 1]);
+    assert.deepStrictEqual(cleaned, [1, 1, 1, 1, 1]);
+  });
+
+  it('the parts dispatched are exactly the parts recorded, in order, each envelope within the bound', async () => {
+    const { fake, outcome, recorded } = traced((item) => (item % 2) + 1, 6, 3);
+    await outcome;
+    const dispatched = fake.envelopes.flatMap((e) =>
+      e.parts.map((p) => p.url.slice(p.url.indexOf('/sap/'))),
+    );
+    assert.deepStrictEqual(dispatched, recorded);
+    assert.ok(fake.envelopes.every((e) => e.parts.length <= 3));
+  });
+
+  it('an oversized read in what would be a later envelope: nothing of the phase is sent, every read cleaned up', async () => {
+    const { fake, outcome, runs, cleaned } = traced(
+      (item) => (item === 3 ? 3 : 1),
+      4,
+      2,
+    );
+    await assert.rejects(
+      outcome,
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message ===
+          'a read of this step needs 3 parts in one ADT batch envelope, more than the 2 parts per envelope set (--batch-parts-per-envelope / partsPerEnvelope); nothing was sent',
+    );
+    assert.equal(fake.envelopes.length, 0);
+    assert.equal(fake.directs.length, 0);
+    assert.deepStrictEqual(runs, [1, 1, 1, 1]);
+    assert.deepStrictEqual(cleaned, [1, 1, 1, 1]);
+  });
+
+  it('a bound of 1: one part per envelope', async () => {
+    const { fake, outcome } = traced(() => 1, 3, 1);
+    await outcome;
+    assert.deepStrictEqual(
+      fake.envelopes.map((e) => e.parts.length),
+      [1, 1, 1],
+    );
   });
 });

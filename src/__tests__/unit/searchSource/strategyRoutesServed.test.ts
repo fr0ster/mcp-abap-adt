@@ -235,8 +235,8 @@ describe("partsPerEnvelope, the consumer's envelope bound", () => {
     }
   });
 
-  it('an option below 2 or not whole is refused at construction', () => {
-    for (const value of [1, 0, 2.5]) {
+  it('an option below 1 or not whole is refused at construction', () => {
+    for (const value of [0, -1, 2.5]) {
       assert.throws(
         () =>
           new EmbeddableMcpServer({
@@ -248,7 +248,7 @@ describe("partsPerEnvelope, the consumer's envelope bound", () => {
         (error: unknown) =>
           error instanceof Error &&
           error.message ===
-            'Invalid partsPerEnvelope: must be a whole number of parts from 2',
+            'Invalid partsPerEnvelope: must be a positive whole number of parts',
       );
       assert.throws(
         () =>
@@ -259,7 +259,7 @@ describe("partsPerEnvelope, the consumer's envelope bound", () => {
         (error: unknown) =>
           error instanceof Error &&
           error.message ===
-            'Invalid partsPerEnvelope: must be a whole number of parts from 2',
+            'Invalid partsPerEnvelope: must be a positive whole number of parts',
       );
     }
   });

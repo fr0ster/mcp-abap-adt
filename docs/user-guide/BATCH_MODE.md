@@ -341,15 +341,18 @@ choice, not a rule: an envelope of one part would be as correct.
   and any phase of one read (one mask's quickSearch, a walk level of one node structure, a round of
   one source read), goes as single requests (an implementation choice). With `max_hits` a target's
   rounds of two or more reads go in envelopes (below).
-- **No bound of the server's own on the reads of an envelope.** By default all independent reads of
-  a phase go in one envelope. The consumer may set a bound: `--batch-reads-per-envelope=<reads>`
-  (`MCP_BATCH_READS_PER_ENVELOPE`, YAML `batch.readsPerEnvelope`; a whole number from 2; an
-  embedder's `readsPerEnvelope` option). It applies to every phase, in one place
-  (`runPhaseOutcome` / `runPhase`, `src/lib/batch/phases.ts`): more independent reads go in
-  consecutive envelopes of balanced size (`chunksOf`: 302 reads at 300 are 151 and 151, never 300
-  and 2), in order, each answer still its own read's. The bound counts a phase's reads — one per
-  object or source read; a read whose ADT call sends several independent requests at once carries
-  them all in its envelope, so an envelope's parts can exceed the bound by those extra requests.
+- **No bound of the server's own on an envelope.** By default all independent reads of
+  a phase go in one envelope. The consumer may set a bound: `--batch-parts-per-envelope=<parts>`
+  (`MCP_BATCH_PARTS_PER_ENVELOPE`, YAML `batch.partsPerEnvelope`; a whole number from 2; an
+  embedder's `partsPerEnvelope` option). It applies to every phase, in one place
+  (`runPhaseOutcome` / `runPhase`, `src/lib/batch/phases.ts`), and it counts **parts** — the
+  requests in the envelope. Each read's parts are counted before anything is sent (the read run
+  on a connection that answers nothing, `partsOfRead`); the reads then go in consecutive envelopes
+  of at most that many parts, balanced (`packByParts`: 302 one-request reads at 300 are 151 and
+  151, never 300 and 2), in order, each answer still its own read's. A read's requests stay
+  together: one that does not fit in the current envelope starts the next. A read that needs more
+  parts than the bound is answered an error naming both numbers — "a read of this step needs N
+  parts in one ADT batch envelope, more than the B parts per envelope set" — and nothing is sent.
 - **A failed envelope is answered as SAP answered it.** An envelope SAP refuses or fails is every
   part's failure, as it came, and the call answers that; with a bound, an envelope that failed or
   met a credential refusal ends the phase: no later envelope is sent, and the reads it would have

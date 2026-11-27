@@ -369,9 +369,10 @@ batch mode. Over Streamable HTTP, send the `state_handle` `HandlerBatch` `action
 Tools that read several objects at once (`GetEnhancements`, `SearchSource`, the package listings
 and walks, …) also send their independent reads in ADT batch envelopes. The server sets no bound
 of its own on an envelope: by default a step's reads go in one envelope, and SAP's answer to it
-is the answer. To bound it, start with `--batch-reads-per-envelope=<reads>`
-(`MCP_BATCH_READS_PER_ENVELOPE`, YAML `batch.readsPerEnvelope`); 24.2.1 and earlier split at 300
-in some of those tools — `--batch-reads-per-envelope=300` keeps that size.
+is the answer. To bound it, start with `--batch-parts-per-envelope=<parts>`
+(`MCP_BATCH_PARTS_PER_ENVELOPE`, YAML `batch.partsPerEnvelope`): the most parts (requests) in one
+envelope, each read's requests kept together. 24.2.1 and earlier split at 300 reads in some of
+those tools; `--batch-parts-per-envelope=300` gives about that size.
 
 ## Prompts
 

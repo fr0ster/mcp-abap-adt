@@ -316,10 +316,12 @@ interface IncludeNode {
    * calling it `cyclic` would name the wrong defect.
    */
   duplicate?: boolean;
-  truncated?: boolean;
 }
 
-const MAX_INCLUDE_DEPTH = 20;
+/*
+ * No depth of the server's (#391): `seen` expands each include once, so the
+ * walk ends where the includes end — a cycle and a duplicate already end it.
+ */
 
 /** A parent this tool walks: a code of `INCLUDES_PARENT_ROUTES`. */
 type ParentKind = keyof typeof INCLUDES_PARENT_ROUTES;
@@ -574,7 +576,6 @@ async function includesListOf(
     const seen = new Set<string>([parent.name]);
     const expand = async (
       names: string[],
-      depth: number,
       ancestors: Set<string>,
     ): Promise<IncludeNode[]> => {
       const children: IncludeNode[] = [];
@@ -584,13 +585,10 @@ async function includesListOf(
           node.cyclic = true;
         } else if (seen.has(name)) {
           node.duplicate = true;
-        } else if (depth >= MAX_INCLUDE_DEPTH) {
-          node.truncated = true;
         } else {
           seen.add(name);
           node.children = await expand(
             includeStatementsOf(await readInclude(name)),
-            depth + 1,
             new Set([...ancestors, name]),
           );
         }
@@ -643,7 +641,6 @@ async function includesListOf(
       }
       children = await expand(
         all.filter((name) => !nested.has(name)),
-        0,
         new Set([parent.name]),
       );
     } else {
@@ -662,7 +659,6 @@ async function includesListOf(
           : await readInclude(parent.name);
       children = await expand(
         includeStatementsOf(rootSource),
-        0,
         new Set([parent.name]),
       );
     }
@@ -937,11 +933,7 @@ async function treeFromAnswers(
       sourceOf(name, { kind: 'include', name });
 
     const seen = new Set<string>([parent.name]);
-    const expand = (
-      names: string[],
-      depth: number,
-      ancestors: Set<string>,
-    ): IncludeNode[] => {
+    const expand = (names: string[], ancestors: Set<string>): IncludeNode[] => {
       const children: IncludeNode[] = [];
       for (const name of names) {
         const node: IncludeNode = { name, children: [] };
@@ -949,13 +941,10 @@ async function treeFromAnswers(
           node.cyclic = true;
         } else if (seen.has(name)) {
           node.duplicate = true;
-        } else if (depth >= MAX_INCLUDE_DEPTH) {
-          node.truncated = true;
         } else {
           seen.add(name);
           node.children = expand(
             includeStatementsOf(readInclude(name)),
-            depth + 1,
             new Set([...ancestors, name]),
           );
         }
@@ -1008,7 +997,6 @@ async function treeFromAnswers(
       }
       children = expand(
         all.filter((name) => !nested.has(name)),
-        0,
         new Set([parent.name]),
       );
     } else {
@@ -1021,7 +1009,6 @@ async function treeFromAnswers(
           : readInclude(parent.name);
       children = expand(
         includeStatementsOf(rootSource),
-        0,
         new Set([parent.name]),
       );
     }
@@ -1043,8 +1030,8 @@ async function treeFromAnswers(
  * Every object's tree in ADT batch envelopes (spec §11), one level at a
  * time: (1) every object's first read — a program's or include's source, a
  * class's metadata, a function group's node structure; (2) the includes node
- * of every function group; then per depth, up to 20, the source of every
- * include first reached at that depth, read once for the call. Each tree is
+ * of every function group; then per depth, as deep as the includes go, the
+ * source of every include first reached at that depth, read once for the call. Each tree is
  * then the sequential version's walk over these answers. A credential
  * failure ends the call: thrown.
  */
@@ -1100,11 +1087,13 @@ async function includeTrees(
       }
       return { reached: new Set([parent.name, ...level]), level };
     });
-  for (let depth = 0; depth < MAX_INCLUDE_DEPTH; depth++) {
-    const reads = walks.flatMap((walk) =>
+  // Until no level is left: `reached` reads each include once, so the
+  // levels end where the includes end (no depth of the server's, #391).
+  const levelReads = () =>
+    walks.flatMap((walk) =>
       walk.level.map((name): IncludeRead => ({ kind: 'include', name })),
     );
-    if (reads.length === 0) break;
+  for (let reads = levelReads(); reads.length > 0; reads = levelReads()) {
     await answers.phase(reads);
     for (const walk of walks) {
       const next: string[] = [];

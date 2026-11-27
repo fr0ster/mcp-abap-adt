@@ -663,7 +663,8 @@ describe('GetIncludesList', () => {
     );
   });
 
-  it('depth: up to 20 levels, one envelope each; the answer is the sequential version’s', async () => {
+  // No depth of the server's (#391): every level of a chain of 25 is read.
+  it('depth: every level, one envelope each; the answer is the sequential version’s', async () => {
     const model = { answers: chain(25) };
     const { a, b, batched } = await bothWays(
       handleGetIncludesList,
@@ -671,7 +672,8 @@ describe('GetIncludesList', () => {
       model,
     );
     assert.equal(textOf(a), textOf(b));
-    assert.equal(batched.envelopes.length, 21);
+    // The first read, then ZDEEP_1 … ZDEEP_25 and the ZDEEP_26 the last names.
+    assert.equal(batched.envelopes.length, 27);
     for (const phase of phasesOf(batched).slice(1)) {
       assert.equal(phase.length, 1);
     }

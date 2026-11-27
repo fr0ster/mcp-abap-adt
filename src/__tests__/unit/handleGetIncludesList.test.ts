@@ -281,4 +281,36 @@ describe('GetIncludesList', () => {
       { name: 'ZLOOP', children: [], cyclic: true },
     ]);
   });
+
+  // No depth of the server's (#391): the walk ends where the includes end;
+  // a cycle and a duplicate already end it, so nothing else needs a bound.
+  it('expands a chain of includes however deep it goes', async () => {
+    const depth = 30;
+    const sources: Record<string, string> = {};
+    for (let n = 1; n < depth; n++) sources[`ZI${n}`] = `INCLUDE zi${n + 1}.`;
+    sources[`ZI${depth}`] = 'DATA a TYPE i.';
+    fakeClient = fakeClientOf({
+      readObjectSource: async () => source('REPORT zprog.\nINCLUDE zi1.\n'),
+      read: async (config: IncludeIdentity) =>
+        source(sources[config.includeName ?? ''] ?? ''),
+      fetchNodeStructure: async () => okResponse(levelOf([], [])),
+    });
+
+    const answered = body(
+      await handleGetIncludesList(context as any, {
+        object_name: 'ZPROG',
+        object_type: 'PROG/P',
+      }),
+    );
+
+    let node = answered.tree;
+    const walked: string[] = [];
+    while (node.children.length > 0) {
+      node = node.children[0];
+      walked.push(node.name);
+      assert.equal(node.truncated, undefined, node.name);
+    }
+    assert.equal(walked.length, depth);
+    assert.equal(walked.at(-1), `ZI${depth}`);
+  });
 });

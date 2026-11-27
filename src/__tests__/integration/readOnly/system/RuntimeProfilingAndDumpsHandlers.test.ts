@@ -830,11 +830,13 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           assert.ok(dumpText.includes(dumpClassName.toUpperCase()));
         }
 
+        // The summary is read from view `default` only (#396): whatever view
+        // the case reads the dump in, its summary is asked there.
         const analyze = await invoke(
           'RuntimeGetDumpById',
           {
             dump_id: dumpId,
-            view: dumpView,
+            view: 'default',
             response_mode: 'summary',
           },
           async () => {
@@ -844,7 +846,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             });
             return handleRuntimeGetDumpById(handlerContext, {
               dump_id: dumpId,
-              view: dumpView,
+              view: 'default',
               response_mode: 'summary',
             });
           },
@@ -857,7 +859,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         assert.equal(analyze.isError, false);
         const analyzeData = parseTextPayload(analyze);
         assert.equal(analyzeData.success, true);
-        assert.equal(analyzeData.view, dumpView);
+        assert.equal(analyzeData.view, 'default');
         assert.ok(analyzeData.summary !== undefined);
         assert.equal(analyzeData.payload, undefined);
       } finally {

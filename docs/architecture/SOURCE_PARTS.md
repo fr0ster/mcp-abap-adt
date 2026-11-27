@@ -243,10 +243,11 @@ tools are marked "Runs outside batch mode" in `tools/batch-handlers.json`.
    declaration is read as part of its local class's definition.
 3. **Find the end.** The block-end scanner finds it from the include's text and the start.
 
-**The scanner** is plain string code: a character loop, with **no regular expression** (the
-owner's rule).
+**The lexer and the scanner** are plain string code: character loops, with **no regular
+expression** (the owner's rule). The lexer splits an include into statements. The scanner uses
+it to find a block's end, and the boundary check of §5.4 uses it for every kind.
 
-- It reads the include from its first line, so it knows the lexical state at the start.
+- The lexer reads the include from its first line, so it knows the lexical state at any start.
 - It splits the text into statements. It knows:
   - full-line `*` comments and `"` comments;
   - `'…'` and `` `…` `` literals with their doubled-quote escapes;

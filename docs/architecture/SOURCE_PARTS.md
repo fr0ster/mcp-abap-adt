@@ -321,10 +321,21 @@ another candidate:
 - **Identity.** The statement at the navigated start must be the row's opening statement, and its
   name token must equal the element's name, compared case-insensitively. Otherwise the outline or
   the navigation does not describe this text (`start_mismatch`).
-- **Nesting.** Between the opening statement and its end, the scanner meets no statement that
-  opens a block of the table (a `FORM` inside a `METHOD`), and, for an event, no `INCLUDE`
-  statement: an event whose statements run through another include is a cross-include construct
-  (`crosses_include`).
+- **Nesting.** The scanner keeps a stack of open blocks; each opener is closed by its own
+  terminator only. What each kind permits inside it:
+
+  | Block | May contain, each closed by its own terminator | Its end |
+  |---|---|---|
+  | `FORM`, `MODULE`, `METHOD` | no block of the table | its terminator |
+  | `CLASS … DEFINITION`, `INTERFACE` | no block of the table (sections and declarations are statements) | its terminator |
+  | `CLASS … IMPLEMENTATION` | `METHOD` … `ENDMETHOD`, any number, none nested | the first `ENDCLASS` with no `METHOD` open |
+  | event | no block of the table | as in the table above |
+
+  Anything else is refused: an opener not permitted where it stands (a `FORM` inside a `METHOD`,
+  a `CLASS` inside a `CLASS`) is `bad_nesting`; a terminator that closes no open block, or the
+  wrong one (`ENDFORM` while a `METHOD` is open) is `unbalanced`. For an event, an `INCLUDE`
+  statement before its end is a cross-include construct (`crosses_include`).
+
 - **End.** No end before the include's end is `no_end`. A form, module, class, method or interface
   never ends at the include's end.
 - **Macros.** A `DEFINE` … `END-OF-DEFINITION` body is skipped as text up to its end statement,

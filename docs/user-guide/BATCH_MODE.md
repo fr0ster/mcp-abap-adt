@@ -326,7 +326,12 @@ choice, not a rule: an envelope of one part would be as correct.
   naming one — is read as the sequential version reads it (an implementation choice).
 - **`GetObjectsList`.** Pass 1 reads the node structures in envelopes, level by level, without
   descriptions — one parent included; at medium and full, pass 2 reads each object's own metadata
-  in a second batch (rule 2).
+  in a second batch (rule 2). A metadata read SAP refused with any status but `401` (a `404`, a
+  `403`, a `500`) is that object's: it stays in the list with SAP's status and message
+  (`metadata_error`, `METADATA_ERROR` at full), the others are read and answered, and the answer
+  counts such objects at every `detail` (`# refused` at terse, `refused_objects` at medium and
+  full) — on both paths alike. A `401`, a credential refusal and a failed envelope still end the
+  call.
 - **`GetObjectInfo`: the structure first, the descriptions second.** The structure comes back
   first, each node structure sent as its own request whatever `include_descriptions` says (rule 2:
   node structures cross-talk inside an envelope). `include_descriptions: false` (the default) reads no

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`GetObjectsList`: one object's refused metadata read no longer ends the whole list** (#398). At `detail` medium and full the second pass reads each object's metadata; a read SAP answered with any status but `401` ended the call — only a `404` was kept as the object's answer — so on ABAP cloud one enhancement's `403` ("No authorization to access the resource", its node URI) threw away the whole list. Now any such refusal is that object's, on the batched and the sequential path alike: it stays in the list with SAP's status and message (`metadata_error` at medium, `METADATA_ERROR` at full, the `# metadata_error` line at terse), and the rest is read and answered. A `401`, a credential refusal, a failure SAP did not answer and a failed envelope still end the call. Every level now counts the objects carrying a refusal: `# refused <n>` at terse, `refused_objects` at medium and full (`0` when none). `docs/user-guide/BATCH_MODE.md`, "`GetObjectsList`".
+
 ### Changed
 
 - **`@mcp-abap-adt/adt-clients` 48, `@mcp-abap-adt/adt-strategies` 0.29, `@mcp-abap-adt/interfaces-adt` 33.** No tool changes for the model: the same tools, arguments and answers.

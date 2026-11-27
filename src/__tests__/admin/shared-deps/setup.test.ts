@@ -284,7 +284,7 @@ async function activateGroupOnce(
     const answered = await activateGroupSynchronously(connection, objects);
     if (!answered.ok) {
       const error = answered.getError();
-      const still = error.stillInactive ?? [];
+      const still = 'stillInactive' in error ? error.stillInactive : [];
       throw new Error(
         still.length > 0
           ? `${error.message} (still inactive: ${still.map((o) => o.name).join(', ')})`

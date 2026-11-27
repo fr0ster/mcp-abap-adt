@@ -565,9 +565,10 @@ export async function handleUpdateUnderLock(
                     desiredPublicationState: state,
                     serviceType,
                   },
+              // The publication takes no lock handle (adt-clients 48: a
+              // lock-free write); the lock around it stays the caller's.
               {
                 headers,
-                lockHandle,
                 timeout: 0,
                 analyse: analysePublication,
               },

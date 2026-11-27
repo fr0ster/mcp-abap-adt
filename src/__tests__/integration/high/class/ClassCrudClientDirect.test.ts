@@ -20,7 +20,7 @@ import {
   analyseException,
   type IAdtMessageFailure,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
@@ -383,7 +383,10 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         });
       }
 
-      let createResponse!: IAdtResponse<unknown, IAdtMessageFailure>;
+      let createResponse!: IAdtResponse<
+        unknown,
+        IAdtError | IAdtMessageFailure
+      >;
       try {
         if (!client) {
           throw new Error('Client not initialized');

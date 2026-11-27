@@ -29,13 +29,43 @@ const mockMc = {
   update: mock.fn<(...args: any[]) => any>(),
   checkDeletion: mock.fn<(...args: any[]) => any>(),
   delete: mock.fn<(...args: any[]) => any>(),
+  lock: mock.fn<(...args: any[]) => any>(),
+  unlock: mock.fn<(...args: any[]) => any>(),
 };
 const mockMsg = {
-  create: mock.fn<(...args: any[]) => any>(),
   read: mock.fn<(...args: any[]) => any>(),
+  lockMessage: mock.fn<(...args: any[]) => any>(),
+  lockClassForMessage: mock.fn<(...args: any[]) => any>(),
   update: mock.fn<(...args: any[]) => any>(),
-  delete: mock.fn<(...args: any[]) => any>(),
+  unlockMessages: mock.fn<(...args: any[]) => any>(),
 };
+
+/** The lock window answering clean: the class read, both handles, unlocks. */
+function windowAnswers(): void {
+  mockMc.readMetadata.mock.mockImplementation(async () =>
+    okResponse('<mc:messageClass/>'),
+  );
+  mockMsg.lockMessage.mock.mockImplementation(async () =>
+    okResponse('MESSAGEHANDLE'),
+  );
+  mockMsg.lockClassForMessage.mock.mockImplementation(async () =>
+    okResponse('CLASSHANDLE'),
+  );
+  mockMc.unlock.mock.mockImplementation(async () => okResponse(undefined));
+  mockMsg.unlockMessages.mock.mockImplementation(async () =>
+    okResponse(undefined),
+  );
+}
+
+/** The PUT's options as the window hands them over, the reading aside. */
+function putOptionsOf(options: any) {
+  const { headers, analyse, ...rest } = options;
+  return {
+    rest,
+    headers: typeof headers?.accept === 'string',
+    analyse: typeof analyse === 'function',
+  };
+}
 
 // Read untyped: the cases hand the
 // strategy a bare { status, data }.
@@ -196,16 +226,12 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
   });
 
-  // Task 20: dispatched through `answer()`/`IAdtResponse`, not the old
-  // `{ createResult }` state bag; `getMessageClassMessage()` is called with
-  // no results argument (`IMessageClassMessageResults`'s generic bound fixes
-  // its slots to literal `string`, so `resultsFor(...)` does not type-check
-  // against it — see `CreateMessageClassMessage.ts`'s own comment) and the
-  // write carries `{ analyse }` as a second argument.
-  it('CreateMessageClassMessage dispatches to getMessageClassMessage().create', async () => {
-    mockMsg.create.mock.mockImplementation(async () =>
-      okResponse(reading(undefined, '', 200)),
-    );
+  // adt-clients 48: the message's members are one request each, and the
+  // lock window is the server's (`lib/messageClassMessageWrite.ts`): the
+  // PUT is `update`, sent with the class document and both handles.
+  it('CreateMessageClassMessage writes the message through update() inside the lock window', async () => {
+    windowAnswers();
+    mockMsg.update.mock.mockImplementation(async () => okResponse(''));
 
     const result = await handleCreateMessageClassMessage(ctx, {
       message_class_name: 'zmy_msgs',
@@ -216,30 +242,32 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
 
     assert.equal(result.isError, false);
-    assert.ok(
-      mockMsg.create.mock.calls.some(
-        ({ arguments: a }: { arguments: any[] }) =>
-          a.length === 2 &&
-          isDeepStrictEqual(a[0], {
-            className: 'ZMY_MSGS',
-            msgno: '001',
-            msgtext: 'Hello &1',
-            selfExplanatory: true,
-            description: undefined,
-            transportRequest: 'SIDK900001',
-          }) &&
-          typeof a[1]?.analyse === 'function',
-      ),
-    );
+    assert.equal(mockMsg.update.mock.calls.length, 1);
+    const [config, options] = mockMsg.update.mock.calls[0]?.arguments ?? [];
+    assert.deepStrictEqual(config, {
+      className: 'ZMY_MSGS',
+      msgno: '001',
+      msgtext: 'Hello &1',
+      selfExplanatory: true,
+      description: undefined,
+      transportRequest: 'SIDK900001',
+    });
+    assert.deepStrictEqual(putOptionsOf(options), {
+      rest: {
+        classDocument: '<mc:messageClass/>',
+        classLockHandle: 'CLASSHANDLE',
+        messageLockHandle: 'MESSAGEHANDLE',
+      },
+      headers: true,
+      analyse: true,
+    });
+    assert.equal(mockMc.unlock.mock.calls.length, 1);
+    assert.equal(mockMsg.unlockMessages.mock.calls.length, 1);
   });
 
-  // Task 20: `AdtMessageClassMessage` is not `IAdtLockable` — its write locks
-  // and unlocks itself internally — so there is no `lock_handle` parameter
-  // here at all, and `options` carries only `analyse`.
-  it('UpdateMessageClassMessage dispatches update() with the new text', async () => {
-    mockMsg.update.mock.mockImplementation(async () =>
-      okResponse(reading(undefined, '', 200)),
-    );
+  it('UpdateMessageClassMessage writes the new text through update() inside the lock window', async () => {
+    windowAnswers();
+    mockMsg.update.mock.mockImplementation(async () => okResponse(''));
 
     const result = await handleUpdateMessageClassMessage(ctx, {
       message_class_name: 'ZMY_MSGS',
@@ -248,21 +276,15 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
 
     assert.equal(result.isError, false);
-    assert.ok(
-      mockMsg.update.mock.calls.some(
-        ({ arguments: a }: { arguments: any[] }) =>
-          a.length === 2 &&
-          isDeepStrictEqual(a[0], {
-            className: 'ZMY_MSGS',
-            msgno: '001',
-            msgtext: 'Updated &1',
-            selfExplanatory: undefined,
-            description: undefined,
-            transportRequest: undefined,
-          }) &&
-          typeof a[1]?.analyse === 'function',
-      ),
-    );
+    assert.equal(mockMsg.update.mock.calls.length, 1);
+    assert.deepStrictEqual(mockMsg.update.mock.calls[0]?.arguments[0], {
+      className: 'ZMY_MSGS',
+      msgno: '001',
+      msgtext: 'Updated &1',
+      selfExplanatory: undefined,
+      description: undefined,
+      transportRequest: undefined,
+    });
   });
 
   // A message has no resource of its own: `read` answers the PARENT CLASS

@@ -1,50 +1,40 @@
-import { messageDocuments } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 /**
  * DeleteMessageClassMessage Handler - Delete a single message from a Message
- * Class (MSAG) via AdtClient.
- *
- * Uses AdtClient.getMessageClassMessage().delete from
- * @mcp-abap-adt/adt-clients 19.
+ * Class (MSAG).
  *
  * **This is not a deletion-service delete, and does not take
- * `analyseDeletion`/`terseDeletion`.** Per `AdtMessageClassMessage.d.ts` and
- * `.js`: ADT has no resource to DELETE for a single message — a message is
- * removed by PUTting the *parent class's* whole document with the target
- * message moved into `<mc:deletedmessages>` (own lock handle) and every
- * other message left in `<mc:messages>`. `delete()` answers
- * `ReturnType<R['deleted']>`, the same slot family `written` (create/update)
- * answers — a PUT result, not a `del:deletionResult`/`del:checkResponse`
- * document — so `terseDeletion` would read `del:object` off a document that
- * never carries it and mask every success as `projection_failed`. This
- * mirrors `UpdateMessageClassMessage`, which found the identical shape one
- * write over: `analyseException` and a projection built from the call's own
- * arguments, not the read-only `terseWrite`/`terseDeletion` pair.
+ * `analyseDeletion`/`terseDeletion`.** ADT has no resource to DELETE for a
+ * single message: it is removed by PUTting the parent class's whole document
+ * with the target message moved into `<mc:deletedmessages>` (own lock
+ * handle) and every other message left in `<mc:messages>` — adt-clients 48's
+ * `update` with `removeMessage: true`, read by the `deleted` slot. The answer
+ * is a PUT result, not a deletion document, so the projection is built from
+ * the call's own arguments.
  *
- * **No lock handle, and no `resultsFor(messageDocuments)` — same reasons as
- * `UpdateMessageClassMessage`.** `AdtMessageClassMessage` is not
- * `IAdtLockable`: the two locks (message-level, class-level) this PUT takes
- * are internal, never `lock()`/`unlock()` on this accessor, so there is
- * nothing for this handler to acquire or release. And
- * `IMessageClassMessageResults<TRead, TWritten, TDeleted>` fixes its three
- * type parameters to literal `string` at the factory's own generic bound, so
- * `resultsFor(...)`'s `AdtReading`-producing functions do not type-check
- * against it — the default `messageDocuments` answers the raw PUT body as a
- * plain string, with no `status` alongside it.
+ * **The lock window is the server's** (adt-clients 48). A message has one
+ * request per member — `lockMessage`, `lockClassForMessage`, `update` (the
+ * PUT of the class document; a removal with `removeMessage: true`) and `unlockMessages` — and the chain the
+ * library ran before is composed in `lib/messageClassMessageWrite.ts`, as
+ * the library's MIGRATION-48 gives it: the same requests in the same order,
+ * the locks stateful and the PUT stateless, the first error kept and every
+ * lock given up. `analyseException` judges the PUT, the one answer the old
+ * chain judged.
  *
- * **No cast.** adt-clients declares `delete` on `AdtMessageClassMessage`
- * (`delete(config, options) { return this.writeClass(config, true, options);
- * }`, different from `update`'s call with the deletion flag off); the
- * server's own contract for `getMessageClassMessage()`'s answer
- * (`MessageClassMessageApi`) states it beside create, read and update.
+ * **No `resultsFor(messageDocuments)`, and no `detail`.** The default
+ * `messageDocuments` answers the raw PUT response body as a plain string,
+ * with no `status` alongside it to build a projection from — matching why
+ * this tool carries no `detail` parameter.
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IMessageClassMessageRemoval } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { deleteTool, purpose } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { inMessageClassMessageWindow } from '../../../lib/messageClassMessageWrite';
 import { return_error } from '../../../lib/utils';
 
 /** What the delete answers: SAP took it, for the class and the number asked. */
@@ -96,20 +86,30 @@ export async function handleDeleteMessageClassMessage(
 
   const className = args.message_class_name.toUpperCase();
 
+  const message: IMessageClassMessageRemoval = {
+    className,
+    msgno: args.msgno,
+    transportRequest: args.transport_request,
+    removeMessage: true,
+  };
+
   return answer(
     { tool: 'DeleteMessageClassMessage', detail: 'terse' },
     () =>
-      withAdtHeaders(context, 'messageClassMessage.delete', (headers) =>
-        createAdtClient(connection, logger)
-          .getMessageClassMessage(messageDocuments)
-          .delete(
-            {
-              className,
-              msgno: args.msgno,
-              transportRequest: args.transport_request,
-            },
-            { headers, analyse: analyseException },
-          ),
+      // `update`, not this tool's verb: a pair is keyed by the member that
+      // sends it (one member, one endpoint), and the PUT is adt-clients 48's
+      // `update`, the one member for that endpoint.
+      withAdtHeaders(context, 'messageClassMessage.update', (headers) =>
+        inMessageClassMessageWindow(
+          createAdtClient(connection, logger),
+          message,
+          (members, window) =>
+            members.update(message, {
+              ...window,
+              headers,
+              analyse: analyseException,
+            }),
+        ),
       ),
     // A constant success, reading nothing from the answer — safe here, and
     // only here, because `answer()` never reaches this projection unless the

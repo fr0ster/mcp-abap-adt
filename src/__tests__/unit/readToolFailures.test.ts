@@ -364,8 +364,10 @@ describe('GetIncludesList: SAP answered 401 to an include', () => {
     fakeClient = fakeClientOf({
       readObjectSource: async () =>
         okResponse(reading('REPORT z.\nINCLUDE zone.\nINCLUDE ztwo.\n')),
-      read: async (config: AdtObjectIdentity<IIncludeConfig>) => {
-        read.push(config.includeName ?? '');
+      read: async (
+        config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+      ) => {
+        read.push(config.includeName);
         return unauthorized();
       },
     });

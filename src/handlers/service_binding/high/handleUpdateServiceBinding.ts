@@ -223,7 +223,9 @@ export async function handleUpdateServiceBinding(
         )();
         if (!acquired.ok) return acquired;
 
-        const publish = atStep('publish', (lockHandle: string) =>
+        // The job carries no handle (adt-clients 48: a lock-free write): the
+        // lock around it is held for the editing session's sake, as before.
+        const publish = atStep('publish', (_lockHandle: string) =>
           withAdtHeaders(context, 'serviceBinding.update', (headers) =>
             obj.update(
               serviceType === 'odatav2'
@@ -237,7 +239,6 @@ export async function handleUpdateServiceBinding(
                 : { bindingName, desiredPublicationState, serviceType },
               {
                 headers,
-                lockHandle,
                 // None of the server's: see the file header.
                 timeout: 0,
                 analyse: analysePublication,

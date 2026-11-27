@@ -1,43 +1,32 @@
-import { messageDocuments } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 /**
  * UpdateMessageClassMessage Handler - Update (upsert) a single message in a
- * Message Class (MSAG)
+ * Message Class (MSAG). `create` and `update` are the same write — ADT
+ * upserts.
  *
- * Uses AdtClient.getMessageClassMessage().update from
- * @mcp-abap-adt/adt-clients 19. `create` and `update` are the same write —
- * ADT upserts.
+ * **The lock window is the server's** (adt-clients 48). A message has one
+ * request per member — `lockMessage`, `lockClassForMessage`, `update` (the
+ * PUT of the class document) and `unlockMessages` — and the chain the
+ * library ran before is composed in `lib/messageClassMessageWrite.ts`, as
+ * the library's MIGRATION-48 gives it: the same requests in the same order,
+ * the locks stateful and the PUT stateless, the first error kept and every
+ * lock given up. `analyseException` judges the PUT, the one answer the old
+ * chain judged.
  *
- * **No lock handle — this one genuinely has none to take.**
- * `AdtMessageClassMessage` is not `IAdtLockable` at all: `update()` manages
- * its own message-level and class-level locks internally, through direct
- * module calls (`lockMessageIfGranted`/`lockClassForMessageOrPlain`/
- * `unlockMessageClass`), never through a `lock()`/`unlock()` on this
- * accessor — which does not exist on `IMessageClassMessageContract`. Fix
- * round 1: an optional `lock_handle` param was tried here (forwarded into
- * `options.lockHandle`, which the shipped member never reads) and reverted
- * — unlike its eight siblings, there is no lock this handler could acquire
- * even if it wanted to, so nothing was moved and no parameter was added.
- *
- * **No `resultsFor(messageDocuments)`, and no `detail`.**
- * `IMessageClassMessageResults<TRead, TWritten, TDeleted>` fixes its three
- * type parameters to literal `string` at the factory's own generic bound
- * (`R extends IMessageClassMessageResults`, which — no explicit type
- * arguments at that bound — means `IMessageClassMessageResults<string,
- * string, string>`), so passing `resultsFor(...)`'s `AdtReading`-producing
- * functions does not type-check against it; `GetMessageClassMessage` found
- * the same disagreement on the read side. The default `messageDocuments`
- * answers the raw PUT response body as a plain string, with no `status`
- * alongside it to build `AdtReading`/`project(detail, terseWrite)` from —
- * matching why this tool carries no `detail` parameter.
+ * **No `resultsFor(messageDocuments)`, and no `detail`.** The default
+ * `messageDocuments` answers the raw PUT response body as a plain string,
+ * with no `status` alongside it to build a projection from — matching why
+ * this tool carries no `detail` parameter.
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IMessageClassMessageUpsert } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { updateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { inMessageClassMessageWindow } from '../../../lib/messageClassMessageWrite';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -95,23 +84,29 @@ export async function handleUpdateMessageClassMessage(
 
   const className = args.message_class_name.toUpperCase();
 
+  const message: IMessageClassMessageUpsert = {
+    className,
+    msgno: args.msgno,
+    msgtext: args.msgtext,
+    selfExplanatory: args.self_explanatory,
+    description: args.description,
+    transportRequest: args.transport_request,
+  };
+
   return answer(
     { tool: 'UpdateMessageClassMessage', detail: 'terse' },
     () =>
       withAdtHeaders(context, 'messageClassMessage.update', (headers) =>
-        createAdtClient(connection, logger)
-          .getMessageClassMessage(messageDocuments)
-          .update(
-            {
-              className,
-              msgno: args.msgno,
-              msgtext: args.msgtext,
-              selfExplanatory: args.self_explanatory,
-              description: args.description,
-              transportRequest: args.transport_request,
-            },
-            { headers, analyse: analyseException },
-          ),
+        inMessageClassMessageWindow(
+          createAdtClient(connection, logger),
+          message,
+          (members, window) =>
+            members.update(message, {
+              ...window,
+              headers,
+              analyse: analyseException,
+            }),
+        ),
       ),
     () => ({
       success: true,

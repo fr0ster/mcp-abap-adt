@@ -139,7 +139,8 @@ export async function handleCreateServiceDefinition(
       // also releases, before any activation — an activated empty object is
       // the bug this write exists to avoid.
       let written: IAdtResponse<AdtReading<XmlRead>, IAdtError> = created;
-      if (args.source_code) {
+      const sourceCode = args.source_code;
+      if (sourceCode) {
         written = await withLock(
           () => obj.lock({ serviceDefinitionName }, { analyse: analyseLock }),
           atStep('update', (lockHandle) =>
@@ -151,7 +152,7 @@ export async function handleCreateServiceDefinition(
                 },
                 {
                   headers,
-                  source: args.source_code,
+                  source: sourceCode,
                   lockHandle,
                   analyse: analyseException,
                 },

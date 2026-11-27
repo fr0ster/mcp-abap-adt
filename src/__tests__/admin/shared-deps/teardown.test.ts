@@ -94,20 +94,25 @@ describe('Admin: Teardown shared dependencies', () => {
     for (const item of functionModules) {
       const status = await safeDelete(
         `function_module ${item.name}`,
-        () =>
-          client.getFunctionModule(functionModuleDocuments).delete(
+        async () => {
+          // A module is addressed under its group (adt-clients 48): one
+          // configured without it is a failed teardown, not a request.
+          const functionGroupName = item.group;
+          if (functionGroupName === undefined) {
+            throw new Error(`function_module ${item.name} names no group`);
+          }
+          return client.getFunctionModule(functionModuleDocuments).delete(
             {
               functionModuleName: item.name,
-              ...(item.group !== undefined && {
-                functionGroupName: item.group,
-              }),
+              functionGroupName,
               transportRequest,
             },
             {
               headers: DEFAULT_ADT_HEADERS['functionModule.delete'],
               analyse: analyseDeletion,
             },
-          ),
+          );
+        },
         testsLogger,
       );
       results.push({

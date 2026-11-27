@@ -795,6 +795,74 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
     assert.deepStrictEqual(numbers, [1]);
   });
 
+  it("params of another shape are refused by adt-clients' batch connection before recording: no number taken; the accepted shapes are recorded with their query", async () => {
+    const owner = new InstanceBatch({ keepRawParts: false });
+    const target = new LateBoundConnection();
+    // The envelope as it reaches the system: its body holds each part's
+    // request line, the query adt-clients encoded from the part's params.
+    const envelopes: string[] = [];
+    target.point({
+      connect: async () => undefined,
+      getBaseUrl: async () => 'https://system.invalid',
+      getSessionId: () => null,
+      setSessionType: () => undefined,
+      makeAdtRequest: async (request: IAbapRequestOptions) => {
+        envelopes.push(String(request.data));
+        return { status: 500, statusText: 'Error', headers: {}, data: '' };
+      },
+    });
+    const batch = new AdtBatchConnection(target, { endpoint: 'communication' });
+    owner.begin('communication', { connection: batch, target, recorded: [] });
+    const numbers: number[] = [];
+    const recorder = createRecorder(
+      batch,
+      owner,
+      (n) => numbers.push(n),
+      'GetProgram',
+    );
+    const refusedShapes: unknown[] = [42, new Date(), { name: null }, null];
+    for (const params of refusedShapes) {
+      assertThrows(
+        () =>
+          recorder.makeAdtRequest({
+            url: '/refused',
+            method: 'GET',
+            timeout: 0,
+            params,
+          }),
+        "a batch request's params must be a string, a URLSearchParams or a plain object of string, number or boolean values",
+      );
+    }
+    assert.equal(recorder.number(), undefined);
+    assert.equal(recorder.requests(), 0);
+    assert.deepStrictEqual(numbers, []);
+    const accepted: Array<[string, unknown]> = [
+      ['/string', 'name=A'],
+      ['/search', new URLSearchParams('name=A')],
+      ['/object', { name: 'A', max: 2, all: true }],
+      ['/none', undefined],
+    ];
+    for (const [url, params] of accepted) {
+      void recorder
+        .makeAdtRequest({ url, method: 'GET', timeout: 0, params })
+        .catch(() => undefined);
+    }
+    assert.equal(recorder.number(), 1);
+    assert.equal(recorder.requests(), 4);
+    assert.deepStrictEqual(numbers, [1]);
+    await batch.execute().catch(() => undefined);
+    const body = envelopes.join('\n');
+    for (const line of [
+      'GET /string?name=A HTTP/1.1',
+      'GET /search?name=A HTTP/1.1',
+      'GET /object?name=A&max=2&all=true HTTP/1.1',
+      'GET /none HTTP/1.1',
+    ]) {
+      assert.ok(body.includes(line), `the envelope holds ${line}`);
+    }
+    assert.equal(body.includes('/refused'), false);
+  });
+
   it('a handler settling without a request is settled, with no number', async () => {
     const { recorder, numbers } = pendingRecorder();
     const handler = (async () => ({ content: [] }))();

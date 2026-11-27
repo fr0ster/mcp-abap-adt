@@ -885,13 +885,12 @@ wins over the environment, which wins over the configuration file):
 stops the start; an empty value or YAML null counts as not given, as for every parameter, and the
 next form decides.
 
-**How many records.** The server sets no row bound of its own: `row_number` (`GetSqlQuery`),
-`max_rows` (`GetTableContents`, `HandlerGetData`) is sent to SAP as given, and without one the
-bound is SAP's — 100 records, measured on the BTP ABAP environment (2026-11-27), where SAP
-refused `0` and a negative bound with `400`. When fewer records come back than the selection
-holds, the answer says so in its head — `# rows 50 of 899, cut at row_number 50`, or
-`cut by SAP: no row_number given` — and at `medium` / `full` in `rows_listed` against
-`total_rows`, with `cut_by`.
+**How many records.** The count is the consumer's, and required: `row_number` (`GetSqlQuery`),
+`max_rows` (`GetTableContents`, `HandlerGetData`), sent to SAP as given. SAP refuses `0` (and a
+negative count) with `400`, and 2147483646 is the largest count it accepts (measured on the BTP
+ABAP environment, 2026-11-27). When fewer records come back than the selection holds, the answer
+says so in its head — `# rows 50 of 899, cut at row_number 50` — and at `medium` / `full` in
+`rows_listed` against `total_rows`, with `cut_by`.
 
 On Streamable HTTP and SSE it is a start parameter of the server; no request header turns it on.
 Without it the tools are not listed, and a call of one is answered that the tool is not found.

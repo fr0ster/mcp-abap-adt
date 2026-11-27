@@ -279,7 +279,7 @@ A function module has no outline (`404`, measured 2026-11-04). It is one element
 source:
 
 - read whole, or by line range with today's `start_line` / `end_line`;
-- changed by a diff against that source (§7.3).
+- changed by a `relative_to: "include"` diff against that source (§7.3).
 
 ### 5.4 Whole lines, and a part that shares a line
 
@@ -409,7 +409,7 @@ ends included:
 |---|---|---|
 | `replace` (main path) | an element `{ type, name, parent? }`, `side` for a method, the new code | The element must exist in the outline, else a refusal naming it (never a guess). Its whole lines are replaced. A part that shares a line is refused (§5.4). |
 | `insert` | a new element `{ type, name, parent? }` and its code | The element must **not** exist, else a refusal. It is placed where its kind belongs (below). |
-| `diff` (fallback) | a unified diff, relative to an element (line 1 = its first line) or, without one, to the whole include | Each hunk applies only where its context and removed lines equal the source **exactly**, at the position it states. A hunk that does not match is refused, naming the hunk; nothing is applied. No fuzz, no offset search, nothing partial. |
+| `diff` (fallback) | a unified diff, with `relative_to: "element"` and the element, or `relative_to: "include"` | Each hunk applies only where its context and removed lines equal the source **exactly**, at the position it states. A hunk that does not match is refused, naming the hunk; nothing is applied. No fuzz, no offset search, nothing partial. |
 
 Where `insert` places an element:
 
@@ -419,8 +419,22 @@ Where `insert` places an element:
   implementation, and its declaration (`definition`, required) at the end of the visibility
   section the edit names (required).
 
-Lines are compared without their line ends. The spec settles the diff grammar: the unified diff
-subset accepted, and `\ No newline at end of file`.
+**Confinement of an element-relative diff.** Its hunks are numbered from the element's first line
+(line 1) to its last (line n). They are checked against the element **before** they are placed in
+the include:
+
+- every context and removed line of a hunk lies within lines 1 to n, else the hunk is refused,
+  naming it, even when the text there would match;
+- a pure addition (`-k,0`) goes after element line k, with 1 ≤ k < n: strictly inside the
+  element. Lines before the element's first line or after its last are outside it; such a change
+  is a `relative_to: "include"` diff;
+- hunks come in ascending order and do not overlap; two hunks touching the same line are refused,
+  naming both.
+
+A whole-include diff is never inferred from a missing element: `relative_to` is required. Lines
+are compared without their line ends. The spec settles the diff grammar: the unified diff subset
+accepted, and `\ No newline at end of file`.
+
 
 ## 8. Tools
 

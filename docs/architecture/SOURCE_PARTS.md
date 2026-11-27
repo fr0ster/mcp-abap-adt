@@ -495,16 +495,24 @@ handler paths are under lib's `src/handlers/`.
 | Edit | What it names | Rule |
 |---|---|---|
 | `replace` (main path) | an element address (§5.0) and the new code | The element must exist in the outline, else a refusal naming it (never a guess). Its whole lines are replaced. A part that shares a line is refused (§5.4). |
-| `insert` | a new element `{ type, name, parent? }` and its code | The element must **not** exist, else a refusal. It is placed where its kind belongs (below). |
+| `insert` | a container's address (§5.0), the new element's type and name, and its code | The container must exist and be readable; the new name must **not** exist in that scope, else a refusal. It is placed where its kind belongs in the container (below). |
 | `diff` (fallback) | a unified diff, with `relative_to: "element"` and the element, or `relative_to: "include"` | Each hunk applies only where its context and removed lines equal the source **exactly**, at the position it states. A hunk that does not match is refused, naming the hunk; nothing is applied. No fuzz, no offset search, nothing partial. |
 
-Where `insert` places an element:
+**`insert` is one include and one write.** What it locates is the **container**, an element that
+exists; the new element has no address until it is written. Every place it writes is in the
+container's include, so the call stays one include, one write, and activation stays separate:
 
-- a form, a module or an event: at the end of the include the edit names (required);
-- a local class: at the end of the include the edit names;
-- a method of a global or local class: its implementation before the `ENDCLASS` of the class's
-  implementation, and its declaration (`definition`, required) at the end of the visibility
-  section the edit names (required).
+| New element | Container | Placed | Refused when |
+|---|---|---|---|
+| form, module, event, local class, local interface | the include (its address with no element) | after the include's last statement, before any trailing comment lines | — |
+| method of a class (global, or local in one include) | the class, side `implementation`, and `section`: `public`, `protected` or `private` | its declaration at the end of that section of the class's definition; its implementation before the `ENDCLASS` of the class's implementation | the definition and the implementation are in two includes (`spans_includes`, naming both); the section is missing (`section_missing`); the section's last statement or the `ENDCLASS` shares its line with another statement (§5.4) |
+| method of an interface | the interface | its declaration before `ENDINTERFACE` | the `ENDINTERFACE` shares its line |
+
+The code of an `insert` is given per place: `definition` and `implementation` for a class method,
+one text otherwise. A global class's definition and implementation are both in `source/main`, so
+a new method is one write. A local class whose definition and implementation sit in two includes
+gets its method by two calls: a `diff` into each include, each its own write.
+
 
 **Confinement of an element-relative diff.** Its hunks are numbered from the element's first line
 (line 1) to its last (line n). They are checked against the element **before** they are placed in

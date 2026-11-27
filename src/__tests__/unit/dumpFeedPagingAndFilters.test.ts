@@ -40,10 +40,10 @@ import {
   dumpIdOf,
   dumpQueryOf,
   handleRuntimeListFeeds as handleRuntimeListFeedsOf,
+  TOOL_DEFINITION as RuntimeListFeeds,
 } from '../../handlers/system/readonly/handleRuntimeListFeeds';
 import {
-  FEED_ENTRIES_CEILING,
-  FEED_PAGE_DEFAULT,
+  FEED_PAGE_MAX,
   feedPage,
   feedPages,
   nextToOf,
@@ -369,7 +369,8 @@ describe('feedPages', () => {
     assert.equal(secondBefore('20261001070000'), '20261001065959');
   });
 
-  it(`never collects more than ${FEED_ENTRIES_CEILING}`, async () => {
+  // No ceiling of the server's (#391): a count given is collected whole.
+  it('collects the count given, however many', async () => {
     let n = 0;
     const fetch = mock.fn(async ({ maxResults }: any) => {
       const answered = page(n, maxResults, `T${n + maxResults}`);
@@ -381,37 +382,51 @@ describe('feedPages', () => {
       await feedPages(fetch as never, { maxResults: 5000 }, byId),
     );
 
-    assert.equal(fetch.mock.callCount(), FEED_ENTRIES_CEILING / 100 + 1);
-    assert.equal(value.entries.length, FEED_ENTRIES_CEILING);
-    assert.equal(value.next_to, `T${FEED_ENTRIES_CEILING + 1}`);
+    assert.equal(fetch.mock.callCount(), 5000 / 100 + 1);
+    assert.equal(value.entries.length, 5000);
+    assert.equal(value.next_to, 'T5001');
   });
 
-  it("reads the default count the same way when no count is given — its next_to is ours, not SAP's inclusive link", async () => {
-    const all = stamped(0, [
-      ...Array(49).fill('2026-10-01T07:00:09Z'),
-      '2026-10-01T07:00:08Z',
-      '2026-10-01T07:00:08Z',
-      '2026-10-01T07:00:07Z',
-    ]);
-    const fetch = ((fn) => {
-      fn.mock.mockImplementationOnce(
-        async () =>
-          okResponse({ entries: all.slice(0, 51), next_to: '20261001070008' }),
-        0,
+  // No default count of the server's (#391): without one, every page SAP
+  // offers is read, each the most one request answers.
+  it('without a count reads every page until SAP offers no next one', async () => {
+    let n = 0;
+    const fetch = mock.fn(async ({ maxResults }: any) => {
+      const count = Math.min(maxResults, 250 - n);
+      const answered = page(
+        n,
+        count,
+        n + count < 250 ? `T${n + count}` : undefined,
       );
-      return fn;
-    })(mock.fn<(...args: any[]) => any>());
+      n += count;
+      return answered;
+    });
 
-    const value = pageValue(await feedPages(fetch, { to: 'T0' }, byId));
+    const value = pageValue(
+      await feedPages(fetch as never, { to: 'T0' }, byId),
+    );
 
     assert.deepStrictEqual(
       fetch.mock.calls.map((c) => c.arguments),
-      [[{ maxResults: FEED_PAGE_DEFAULT + 1, to: 'T0' }]],
+      [
+        [{ maxResults: FEED_PAGE_MAX, to: 'T0' }],
+        [{ maxResults: FEED_PAGE_MAX, to: 'T100' }],
+        [{ maxResults: FEED_PAGE_MAX, to: 'T200' }],
+      ],
     );
-    // The second ending at the cut goes whole to the next read.
-    assert.equal(value.entries.length, 49);
-    assert.equal(value.next_to, '20261001070008');
+    assert.equal(value.entries.length, 250);
+    assert.equal(value.next_to, undefined);
   });
+
+  for (const refused of [0, -1, 2.5]) {
+    it(`RuntimeListFeeds refuses max_results ${refused}: a count is a whole number of at least 1`, () => {
+      assert.equal(
+        RuntimeListFeeds.inputSchema.safeParse({ max_results: refused })
+          .success,
+        false,
+      );
+    });
+  }
 
   it('answers a failing page as itself', async () => {
     const refused = refusedResponse('page two refused');

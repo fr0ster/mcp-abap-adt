@@ -10,12 +10,17 @@
 
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it, mock } from 'node:test';
+import {
+  TOOL_DEFINITION as AmdpDebugGetTable,
+  handleAmdpDebugGetTable,
+} from '../../handlers/debugger/debug/handleAmdpDebugGetTable';
 import { includesWithin } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import {
   handleSearchObject,
   TOOL_DEFINITION as SearchObject,
 } from '../../handlers/search/readonly/handleSearchObject';
 import * as clients from '../../lib/clients';
+import * as debuggerAccess from '../../lib/debugger/access';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 
 const asked: Array<{ member: string; args: unknown[] }> = [];
@@ -88,4 +93,46 @@ describe('GetEnhancements (#391, item 10): max_includes is the consumer’s', ()
       );
     });
   }
+});
+
+describe('AmdpDebugGetTable (#391, item 14): row_number is the consumer’s or SAP’s', () => {
+  const tables: unknown[][] = [];
+  mock.method(debuggerAccess, 'debugBatchRecorder', () => undefined);
+  mock.method(debuggerAccess, 'requireDebugger', () => ({
+    amdp: {
+      getTable: async (...args: unknown[]) => {
+        tables.push(args);
+        return { value: { rows: [], columns: [] }, raw: '' };
+      },
+    },
+  }));
+
+  beforeEach(() => {
+    tables.length = 0;
+  });
+
+  it('the schema takes row_number, with no default of its own', () => {
+    const parsed = AmdpDebugGetTable.inputSchema.parse({
+      variable: 'LT',
+      state_handle: 'H',
+    });
+    assert.equal('row_number' in parsed, false, JSON.stringify(parsed));
+  });
+
+  it('without row_number the read is handed no bound', async () => {
+    await handleAmdpDebugGetTable(context, {
+      variable: 'LT',
+      state_handle: 'H',
+    });
+    assert.deepStrictEqual(tables, [['LT', undefined, undefined]]);
+  });
+
+  it('row_number is handed on as given', async () => {
+    await handleAmdpDebugGetTable(context, {
+      variable: 'LT',
+      state_handle: 'H',
+      row_number: 7,
+    });
+    assert.deepStrictEqual(tables, [['LT', undefined, 7]]);
+  });
 });

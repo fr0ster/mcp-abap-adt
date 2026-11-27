@@ -315,6 +315,10 @@ describe('the MCP tool surface', () => {
         'runtime/RuntimeRunProgram': ['background'],
         'compact/HandlerProfileView': ['mode', 'top'],
         'compact/HandlerDumpList': ['feed_type'],
+        // #391 (the owner: no bound of the server's): the AMDP table read
+        // asked SAP for 100 records whatever the caller wanted; `row_number`,
+        // optional, no default, as compact getDataPreview already took it.
+        'debug/AmdpDebugGetTable': ['row_number'],
         // Issue #261: the dumps feed filters on the attributes its descriptor
         // declares; the user filter was the only one reachable before.
         // 19.0.0, several feeds per call (spec §11): `feed_types` beside

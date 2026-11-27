@@ -39,10 +39,12 @@ import type {
   IAdtEnhancementHost,
   IAdtError,
   IAdtGroupLifecycle,
-  IAdtHeaders,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
+  IAdtLockFreeUpdatable,
   IAdtMainProgramsReadable,
+  IAdtMessageClassMessageLockable,
+  IAdtMessageClassMessageUpdatable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
   IAdtObjectActivation,
@@ -130,6 +132,7 @@ import type {
   ITransportConfig,
   ITransportResults,
   IUtilResults,
+  MessageClassMessageAddress,
 } from '@mcp-abap-adt/interfaces-adt';
 
 /**
@@ -138,32 +141,36 @@ import type {
  * working area, and adt-clients sends exactly the version it is given, so a
  * read that names none does not compile here.
  */
-interface StatedReadable<TConfig, TSource> {
+interface StatedReadable<TConfig, TSource, TRequired extends keyof TConfig> {
   read<E extends IAdtError>(
-    config: AdtObjectIdentity<TConfig>,
+    config: AdtObjectIdentity<TConfig, TRequired>,
     version: AdtReadVersion,
     options: { withLongPolling?: boolean } & IAdtOperationOptions<E> & {
         analyse: IAnalyse<E>;
       },
-  ): Promise<IAdtResponse<TSource, E>>;
+  ): Promise<IAdtResponse<TSource, E | IAdtError>>;
   read(
-    config: AdtObjectIdentity<TConfig>,
+    config: AdtObjectIdentity<TConfig, TRequired>,
     version: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions,
   ): Promise<IAdtResponse<TSource>>;
 }
 
 /** `IAdtMetadataReadable` as the server calls it: the version stated on every read. */
-interface StatedMetadataReadable<TConfig, TMetadata> {
+interface StatedMetadataReadable<
+  TConfig,
+  TMetadata,
+  TRequired extends keyof TConfig,
+> {
   readMetadata<E extends IAdtError>(
-    config: AdtObjectIdentity<TConfig>,
+    config: AdtObjectIdentity<TConfig, TRequired>,
     options: {
       withLongPolling?: boolean;
       version: AdtReadVersion;
     } & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
-  ): Promise<IAdtResponse<TMetadata, E>>;
+  ): Promise<IAdtResponse<TMetadata, E | IAdtError>>;
   readMetadata(
-    config: AdtObjectIdentity<TConfig>,
+    config: AdtObjectIdentity<TConfig, TRequired>,
     options: {
       withLongPolling?: boolean;
       version: AdtReadVersion;
@@ -193,7 +200,7 @@ type ObjectAccess<TSource, TMetadata> = Omit<
     functionGroup: string | undefined,
     version: AdtReadVersion,
     options: IReadOptions & IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
-  ): Promise<IAdtResponse<TSource, E>>;
+  ): Promise<IAdtResponse<TSource, E | IAdtError>>;
   readObjectMetadata<E extends IAdtError>(
     objectType: Parameters<
       IAdtObjectAccess<TSource, TMetadata, never>['supportsSourceCode']
@@ -203,7 +210,7 @@ type ObjectAccess<TSource, TMetadata> = Omit<
     options: IReadOptions & {
       version: AdtReadVersion;
     } & IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
-  ): Promise<IAdtResponse<TMetadata, E>>;
+  ): Promise<IAdtResponse<TMetadata, E | IAdtError>>;
   getObjectSourceUri(
     objectType: Parameters<
       IAdtObjectAccess<TSource, TMetadata, never>['getObjectSourceUri']
@@ -241,16 +248,23 @@ export type ClassApi<
 > = IAdtEnhancementHost<
   IClassConfig,
   ReturnType<R['enhancementElements']>,
-  ReturnType<R['enhancementOptions']>
+  ReturnType<R['enhancementOptions']>,
+  'className'
 > &
   IAdtCreatable<IClassConfig, ReturnType<R['created']>> &
-  StatedReadable<IClassConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IClassConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>> &
+  StatedReadable<IClassConfig, ReturnType<R['source']>, 'className'> &
+  StatedMetadataReadable<IClassConfig, ReturnType<R['metadata']>, 'className'> &
+  IAdtUpdatable<
+    Partial<IClassConfig>,
+    ReturnType<R['updated']>,
+    'className',
+    'source'
+  > &
   Omit<
     IAdtDeletable<
       IClassConfig,
       ReturnType<R['deletion']>,
+      'className',
       ReturnType<R['deletionCheck']>
     >,
     'checkDeletion'
@@ -263,19 +277,21 @@ export type ClassApi<
       IAdtDeletable<
         IClassConfig,
         ReturnType<R['deletion']>,
+        'className',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
     >
   > &
-  IAdtValidatable<IClassConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IClassConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IClassConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IClassConfig> &
+  IAdtValidatable<IClassConfig, ReturnType<R['validation']>, 'className'> &
+  IAdtCheckable<IClassConfig, ReturnType<R['check']>, 'className'> &
+  IAdtActivatable<IClassConfig, ReturnType<R['activation']>, 'className'> &
+  IAdtLockable<IClassConfig, 'className'> &
   IAdtVersionable<
     IClassConfig,
     ReturnType<R['versions']>,
-    ReturnType<R['versionSource']>
+    ReturnType<R['versionSource']>,
+    'className'
   >;
 
 /**
@@ -291,7 +307,8 @@ export type ProgramApi<
 > = IAdtEnhancementHost<
   IProgramConfig,
   ReturnType<R['enhancementElements']>,
-  ReturnType<R['enhancementOptions']>
+  ReturnType<R['enhancementOptions']>,
+  'programName'
 > &
   PerformedOn<
     V,
@@ -299,13 +316,22 @@ export type ProgramApi<
     'create',
     IAdtCreatable<IProgramConfig, ReturnType<R['created']>>
   > &
-  StatedReadable<IProgramConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IProgramConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IProgramConfig, ReturnType<R['source']>, 'programName'> &
+  StatedMetadataReadable<
+    IProgramConfig,
+    ReturnType<R['metadata']>,
+    'programName'
+  > &
   PerformedOn<
     V,
     'program',
     'update',
-    IAdtUpdatable<Partial<IProgramConfig>, ReturnType<R['updated']>>
+    IAdtUpdatable<
+      Partial<IProgramConfig>,
+      ReturnType<R['updated']>,
+      'programName',
+      'source'
+    >
   > &
   PerformedOn<
     V,
@@ -315,6 +341,7 @@ export type ProgramApi<
       IAdtDeletable<
         IProgramConfig,
         ReturnType<R['deletion']>,
+        'programName',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
@@ -328,6 +355,7 @@ export type ProgramApi<
       IAdtDeletable<
         IProgramConfig,
         ReturnType<R['deletion']>,
+        'programName',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
@@ -337,20 +365,30 @@ export type ProgramApi<
     V,
     'program',
     'validate',
-    IAdtValidatable<IProgramConfig, ReturnType<R['validation']>>
+    IAdtValidatable<
+      IProgramConfig,
+      ReturnType<R['validation']>,
+      'programName' | 'packageName'
+    >
   > &
-  IAdtCheckable<IProgramConfig, ReturnType<R['check']>> &
+  IAdtCheckable<IProgramConfig, ReturnType<R['check']>, 'programName'> &
   PerformedOn<
     V,
     'program',
     'activate',
-    IAdtActivatable<IProgramConfig, ReturnType<R['activation']>>
+    IAdtActivatable<IProgramConfig, ReturnType<R['activation']>, 'programName'>
   > &
-  PerformedOn<V, 'program', 'lock', IAdtLockable<IProgramConfig>> &
+  PerformedOn<
+    V,
+    'program',
+    'lock',
+    IAdtLockable<IProgramConfig, 'programName'>
+  > &
   IAdtVersionable<
     IProgramConfig,
     ReturnType<R['versions']>,
-    ReturnType<R['versionSource']>
+    ReturnType<R['versionSource']>,
+    'programName'
   >;
 
 /**
@@ -365,7 +403,8 @@ export type IncludeApi<
 > = IAdtIncludeEnhancementHost<
   IIncludeConfig,
   ReturnType<R['enhancementElements']>,
-  ReturnType<R['enhancementOptions']>
+  ReturnType<R['enhancementOptions']>,
+  'includeName'
 > &
   PerformedOn<
     V,
@@ -373,19 +412,32 @@ export type IncludeApi<
     'create',
     IAdtCreatable<IIncludeConfig, ReturnType<R['created']>>
   > &
-  StatedReadable<IIncludeConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>> &
+  StatedReadable<IIncludeConfig, ReturnType<R['source']>, 'includeName'> &
+  StatedMetadataReadable<
+    IIncludeConfig,
+    ReturnType<R['metadata']>,
+    'includeName'
+  > &
   PerformedOn<
     V,
     'include',
     'mainPrograms',
-    IAdtMainProgramsReadable<IIncludeConfig, ReturnType<R['mainPrograms']>>
+    IAdtMainProgramsReadable<
+      IIncludeConfig,
+      ReturnType<R['mainPrograms']>,
+      'includeName'
+    >
   > &
   PerformedOn<
     V,
     'include',
     'update',
-    IAdtUpdatable<Partial<IIncludeConfig>, ReturnType<R['updated']>>
+    IAdtUpdatable<
+      Partial<IIncludeConfig>,
+      ReturnType<R['updated']>,
+      'includeName',
+      'source'
+    >
   > &
   PerformedOn<
     V,
@@ -395,6 +447,7 @@ export type IncludeApi<
       IAdtDeletable<
         IIncludeConfig,
         ReturnType<R['deletion']>,
+        'includeName',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
@@ -404,7 +457,7 @@ export type IncludeApi<
     V,
     'include',
     'activate',
-    IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>>
+    IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>, 'includeName'>
   > &
   PerformedOn<
     V,
@@ -412,7 +465,9 @@ export type IncludeApi<
     'updateMetadata',
     IAdtMetadataUpdatable<
       Partial<IIncludeConfig>,
-      ReturnType<R['metadataUpdated']>
+      ReturnType<R['metadataUpdated']>,
+      'includeName',
+      'source'
     >
   > &
   PerformedOn<
@@ -423,6 +478,7 @@ export type IncludeApi<
       IAdtDeletable<
         IIncludeConfig,
         ReturnType<R['deletion']>,
+        'includeName',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
@@ -432,22 +488,41 @@ export type IncludeApi<
     V,
     'include',
     'validate',
-    IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>>
+    IAdtValidatable<
+      IIncludeConfig,
+      ReturnType<R['validation']>,
+      'includeName' | 'packageName'
+    >
   > &
-  PerformedOn<V, 'include', 'lock', IAdtLockable<IIncludeConfig>>;
+  PerformedOn<
+    V,
+    'include',
+    'lock',
+    IAdtLockable<IIncludeConfig, 'includeName'>
+  >;
 
 /** What the server calls on `getInterface()`'s answer. */
 export type InterfaceApi<
   R extends IInterfaceResults,
   V extends AdtVariant,
 > = IAdtCreatable<IInterfaceConfig, ReturnType<R['created']>> &
-  StatedReadable<IInterfaceConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IInterfaceConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<IInterfaceConfig>, ReturnType<R['updated']>> &
+  StatedReadable<IInterfaceConfig, ReturnType<R['source']>, 'interfaceName'> &
+  StatedMetadataReadable<
+    IInterfaceConfig,
+    ReturnType<R['metadata']>,
+    'interfaceName'
+  > &
+  IAdtUpdatable<
+    Partial<IInterfaceConfig>,
+    ReturnType<R['updated']>,
+    'interfaceName',
+    'source'
+  > &
   Omit<
     IAdtDeletable<
       IInterfaceConfig,
       ReturnType<R['deletion']>,
+      'interfaceName',
       ReturnType<R['deletionCheck']>
     >,
     'checkDeletion'
@@ -460,19 +535,29 @@ export type InterfaceApi<
       IAdtDeletable<
         IInterfaceConfig,
         ReturnType<R['deletion']>,
+        'interfaceName',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
     >
   > &
-  IAdtValidatable<IInterfaceConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IInterfaceConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IInterfaceConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IInterfaceConfig> &
+  IAdtValidatable<
+    IInterfaceConfig,
+    ReturnType<R['validation']>,
+    'interfaceName'
+  > &
+  IAdtCheckable<IInterfaceConfig, ReturnType<R['check']>, 'interfaceName'> &
+  IAdtActivatable<
+    IInterfaceConfig,
+    ReturnType<R['activation']>,
+    'interfaceName'
+  > &
+  IAdtLockable<IInterfaceConfig, 'interfaceName'> &
   IAdtVersionable<
     IInterfaceConfig,
     ReturnType<R['versions']>,
-    ReturnType<R['versionSource']>
+    ReturnType<R['versionSource']>,
+    'interfaceName'
   >;
 
 /** What the server calls on `getDomain()`'s answer. */
@@ -480,62 +565,103 @@ export type DomainApi<
   R extends IDomainResults,
   V extends AdtVariant,
 > = IAdtCreatable<IDomainConfig, ReturnType<R['created']>> &
-  StatedMetadataReadable<IDomainConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<
+    IDomainConfig,
+    ReturnType<R['metadata']>,
+    'domainName'
+  > &
   IAdtMetadataUpdatable<
     Partial<IDomainConfig>,
-    ReturnType<R['metadataUpdated']>
+    ReturnType<R['metadataUpdated']>,
+    'domainName',
+    'source'
   > &
   IAdtDeletable<
     IDomainConfig,
     ReturnType<R['deletion']>,
+    'domainName',
     ReturnType<R['deletionCheck']>
   > &
-  IAdtValidatable<IDomainConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IDomainConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IDomainConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IDomainConfig>;
+  IAdtValidatable<IDomainConfig, ReturnType<R['validation']>, 'domainName'> &
+  IAdtCheckable<IDomainConfig, ReturnType<R['check']>, 'domainName'> &
+  IAdtActivatable<IDomainConfig, ReturnType<R['activation']>, 'domainName'> &
+  IAdtLockable<IDomainConfig, 'domainName'>;
 
 /** What the server calls on `getDataElement()`'s answer. */
 export type DataElementApi<
   R extends IDataElementResults,
   V extends AdtVariant,
 > = IAdtCreatable<IDataElementConfig, ReturnType<R['created']>> &
-  StatedMetadataReadable<IDataElementConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<
+    IDataElementConfig,
+    ReturnType<R['metadata']>,
+    'dataElementName'
+  > &
   IAdtMetadataUpdatable<
     Partial<IDataElementConfig>,
-    ReturnType<R['metadataUpdated']>
+    ReturnType<R['metadataUpdated']>,
+    'dataElementName',
+    'source'
   > &
   IAdtDeletable<
     IDataElementConfig,
     ReturnType<R['deletion']>,
+    'dataElementName',
     ReturnType<R['deletionCheck']>
   > &
-  IAdtValidatable<IDataElementConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IDataElementConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IDataElementConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IDataElementConfig>;
+  IAdtValidatable<
+    IDataElementConfig,
+    ReturnType<R['validation']>,
+    'dataElementName'
+  > &
+  IAdtCheckable<IDataElementConfig, ReturnType<R['check']>, 'dataElementName'> &
+  IAdtActivatable<
+    IDataElementConfig,
+    ReturnType<R['activation']>,
+    'dataElementName'
+  > &
+  IAdtLockable<IDataElementConfig, 'dataElementName'>;
 
 /** What the server calls on `getStructure()`'s answer. */
 export type StructureApi<
   R extends IStructureResults,
   V extends AdtVariant,
 > = IAdtCreatable<IStructureConfig, ReturnType<R['created']>> &
-  StatedReadable<IStructureConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IStructureConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<IStructureConfig>, ReturnType<R['updated']>> &
+  StatedReadable<IStructureConfig, ReturnType<R['source']>, 'structureName'> &
+  StatedMetadataReadable<
+    IStructureConfig,
+    ReturnType<R['metadata']>,
+    'structureName'
+  > &
+  IAdtUpdatable<
+    Partial<IStructureConfig>,
+    ReturnType<R['updated']>,
+    'structureName',
+    'source'
+  > &
   IAdtDeletable<
     IStructureConfig,
     ReturnType<R['deletion']>,
+    'structureName',
     ReturnType<R['deletionCheck']>
   > &
-  IAdtValidatable<IStructureConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IStructureConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IStructureConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IStructureConfig> &
+  IAdtValidatable<
+    IStructureConfig,
+    ReturnType<R['validation']>,
+    'structureName'
+  > &
+  IAdtCheckable<IStructureConfig, ReturnType<R['check']>, 'structureName'> &
+  IAdtActivatable<
+    IStructureConfig,
+    ReturnType<R['activation']>,
+    'structureName'
+  > &
+  IAdtLockable<IStructureConfig, 'structureName'> &
   IAdtVersionable<
     IStructureConfig,
     ReturnType<R['versions']>,
-    ReturnType<R['versionSource']>
+    ReturnType<R['versionSource']>,
+    'structureName'
   >;
 
 /** What the server calls on `getTable()`'s answer. */
@@ -543,22 +669,29 @@ export type TableApi<
   R extends ITableResults,
   V extends AdtVariant,
 > = IAdtCreatable<ITableConfig, ReturnType<R['created']>> &
-  StatedReadable<ITableConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<ITableConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<ITableConfig>, ReturnType<R['updated']>> &
+  StatedReadable<ITableConfig, ReturnType<R['source']>, 'tableName'> &
+  StatedMetadataReadable<ITableConfig, ReturnType<R['metadata']>, 'tableName'> &
+  IAdtUpdatable<
+    Partial<ITableConfig>,
+    ReturnType<R['updated']>,
+    'tableName',
+    'source'
+  > &
   IAdtDeletable<
     ITableConfig,
     ReturnType<R['deletion']>,
+    'tableName',
     ReturnType<R['deletionCheck']>
   > &
-  IAdtValidatable<ITableConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<ITableConfig, ReturnType<R['check']>> &
-  IAdtActivatable<ITableConfig, ReturnType<R['activation']>> &
-  IAdtLockable<ITableConfig> &
+  IAdtValidatable<ITableConfig, ReturnType<R['validation']>, 'tableName'> &
+  IAdtCheckable<ITableConfig, ReturnType<R['check']>, 'tableName'> &
+  IAdtActivatable<ITableConfig, ReturnType<R['activation']>, 'tableName'> &
+  IAdtLockable<ITableConfig, 'tableName'> &
   IAdtVersionable<
     ITableConfig,
     ReturnType<R['versions']>,
-    ReturnType<R['versionSource']>
+    ReturnType<R['versionSource']>,
+    'tableName'
   >;
 
 /**
@@ -571,12 +704,16 @@ export type TableApi<
 export type TableSettingsApi<
   R extends ITableSettingsResults,
   V extends AdtVariant,
-> = StatedMetadataReadable<ITableSettingsConfig, ReturnType<R['metadata']>> &
+> = StatedMetadataReadable<
+  ITableSettingsConfig,
+  ReturnType<R['metadata']>,
+  'tableName'
+> &
   IAdtTableSettingsPatchable<
     ReturnType<R['metadataUpdated']>,
     Extract<V, AdtModernVariant>
   > &
-  IAdtLockable<ITableSettingsConfig>;
+  IAdtLockable<ITableSettingsConfig, 'tableName'>;
 
 /**
  * What the server calls on `getTextElements()`'s answer: one part read at a
@@ -601,14 +738,20 @@ export type DdicTableTypeApi<
   'create',
   IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>>
 > &
-  StatedMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<
+    ITableTypeConfig,
+    ReturnType<R['metadata']>,
+    'tableTypeName'
+  > &
   PerformedOn<
     V,
     'tableType',
     'updateMetadata',
     IAdtMetadataUpdatable<
       Partial<ITableTypeConfig>,
-      ReturnType<R['metadataUpdated']>
+      ReturnType<R['metadataUpdated']>,
+      'tableTypeName',
+      'source'
     >
   > &
   PerformedOn<
@@ -619,6 +762,7 @@ export type DdicTableTypeApi<
       IAdtDeletable<
         ITableTypeConfig,
         ReturnType<R['deletion']>,
+        'tableTypeName',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
@@ -632,6 +776,7 @@ export type DdicTableTypeApi<
       IAdtDeletable<
         ITableTypeConfig,
         ReturnType<R['deletion']>,
+        'tableTypeName',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
@@ -641,21 +786,34 @@ export type DdicTableTypeApi<
     V,
     'tableType',
     'validate',
-    IAdtValidatable<ITableTypeConfig, ReturnType<R['validation']>>
+    IAdtValidatable<
+      ITableTypeConfig,
+      ReturnType<R['validation']>,
+      'tableTypeName'
+    >
   > &
   PerformedOn<
     V,
     'tableType',
     'check',
-    IAdtCheckable<ITableTypeConfig, ReturnType<R['check']>>
+    IAdtCheckable<ITableTypeConfig, ReturnType<R['check']>, 'tableTypeName'>
   > &
   PerformedOn<
     V,
     'tableType',
     'activate',
-    IAdtActivatable<ITableTypeConfig, ReturnType<R['activation']>>
+    IAdtActivatable<
+      ITableTypeConfig,
+      ReturnType<R['activation']>,
+      'tableTypeName'
+    >
   > &
-  PerformedOn<V, 'tableType', 'lock', IAdtLockable<ITableTypeConfig>> &
+  PerformedOn<
+    V,
+    'tableType',
+    'lock',
+    IAdtLockable<ITableTypeConfig, 'tableTypeName'>
+  > &
   PerformedOn<
     V,
     'tableType',
@@ -663,7 +821,8 @@ export type DdicTableTypeApi<
     IAdtVersionable<
       ITableTypeConfig,
       ReturnType<R['versions']>,
-      ReturnType<R['versionSource']>
+      ReturnType<R['versionSource']>,
+      'tableTypeName'
     >
   >;
 
@@ -672,13 +831,19 @@ export type DdlApi<R extends IDdlResults, V extends AdtVariant> = IAdtCreatable<
   IDdlConfig,
   ReturnType<R['created']>
 > &
-  StatedReadable<IDdlConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IDdlConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<IDdlConfig>, ReturnType<R['updated']>> &
+  StatedReadable<IDdlConfig, ReturnType<R['source']>, 'ddlName'> &
+  StatedMetadataReadable<IDdlConfig, ReturnType<R['metadata']>, 'ddlName'> &
+  IAdtUpdatable<
+    Partial<IDdlConfig>,
+    ReturnType<R['updated']>,
+    'ddlName',
+    'source'
+  > &
   Omit<
     IAdtDeletable<
       IDdlConfig,
       ReturnType<R['deletion']>,
+      'ddlName',
       ReturnType<R['deletionCheck']>
     >,
     'checkDeletion'
@@ -691,15 +856,16 @@ export type DdlApi<R extends IDdlResults, V extends AdtVariant> = IAdtCreatable<
       IAdtDeletable<
         IDdlConfig,
         ReturnType<R['deletion']>,
+        'ddlName',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
     >
   > &
-  IAdtValidatable<IDdlConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IDdlConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IDdlConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IDdlConfig> &
+  IAdtValidatable<IDdlConfig, ReturnType<R['validation']>, 'ddlName'> &
+  IAdtCheckable<IDdlConfig, ReturnType<R['check']>, 'ddlName'> &
+  IAdtActivatable<IDdlConfig, ReturnType<R['activation']>, 'ddlName'> &
+  IAdtLockable<IDdlConfig, 'ddlName'> &
   PerformedOn<
     V,
     'ddl',
@@ -708,7 +874,8 @@ export type DdlApi<R extends IDdlResults, V extends AdtVariant> = IAdtCreatable<
       IAdtVersionable<
         IDdlConfig,
         ReturnType<R['versions']>,
-        ReturnType<R['versionSource']>
+        ReturnType<R['versionSource']>,
+        'ddlName'
       >,
       'getVersions'
     >
@@ -721,7 +888,8 @@ export type DdlApi<R extends IDdlResults, V extends AdtVariant> = IAdtCreatable<
       IAdtVersionable<
         IDdlConfig,
         ReturnType<R['versions']>,
-        ReturnType<R['versionSource']>
+        ReturnType<R['versionSource']>,
+        'ddlName'
       >,
       'getVersionSource'
     >
@@ -743,10 +911,15 @@ export type FunctionGroupApi<
 > = IAdtEnhancementHost<
   IFunctionGroupConfig,
   ReturnType<R['enhancementElements']>,
-  ReturnType<R['enhancementOptions']>
+  ReturnType<R['enhancementOptions']>,
+  'functionGroupName'
 > &
   IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>> &
-  StatedMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<
+    IFunctionGroupConfig,
+    ReturnType<R['metadata']>,
+    'functionGroupName'
+  > &
   PerformedOn<
     V,
     'functionGroup',
@@ -754,7 +927,9 @@ export type FunctionGroupApi<
     Pick<
       IAdtMetadataUpdatable<
         Partial<IFunctionGroupConfig>,
-        ReturnType<R['metadataUpdated']>
+        ReturnType<R['metadataUpdated']>,
+        'functionGroupName',
+        'source'
       >,
       'updateMetadata'
     >
@@ -763,6 +938,7 @@ export type FunctionGroupApi<
     IAdtDeletable<
       IFunctionGroupConfig,
       ReturnType<R['deletion']>,
+      'functionGroupName',
       ReturnType<R['deletionCheck']>
     >,
     'checkDeletion'
@@ -775,28 +951,55 @@ export type FunctionGroupApi<
       IAdtDeletable<
         IFunctionGroupConfig,
         ReturnType<R['deletion']>,
+        'functionGroupName',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
     >
   > &
-  IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IFunctionGroupConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IFunctionGroupConfig>;
+  IAdtValidatable<
+    IFunctionGroupConfig,
+    ReturnType<R['validation']>,
+    'functionGroupName'
+  > &
+  IAdtCheckable<
+    IFunctionGroupConfig,
+    ReturnType<R['check']>,
+    'functionGroupName'
+  > &
+  IAdtActivatable<
+    IFunctionGroupConfig,
+    ReturnType<R['activation']>,
+    'functionGroupName'
+  > &
+  IAdtLockable<IFunctionGroupConfig, 'functionGroupName'>;
 
 /** What the server calls on `getFunctionModule()`'s answer. */
 export type FunctionModuleApi<
   R extends IFunctionModuleResults,
   V extends AdtVariant,
 > = IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>> &
-  StatedReadable<IFunctionModuleConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IFunctionModuleConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<IFunctionModuleConfig>, ReturnType<R['updated']>> &
+  StatedReadable<
+    IFunctionModuleConfig,
+    ReturnType<R['source']>,
+    'functionGroupName' | 'functionModuleName'
+  > &
+  StatedMetadataReadable<
+    IFunctionModuleConfig,
+    ReturnType<R['metadata']>,
+    'functionGroupName' | 'functionModuleName'
+  > &
+  IAdtUpdatable<
+    Partial<IFunctionModuleConfig>,
+    ReturnType<R['updated']>,
+    'functionGroupName' | 'functionModuleName',
+    'source'
+  > &
   Omit<
     IAdtDeletable<
       IFunctionModuleConfig,
       ReturnType<R['deletion']>,
+      'functionGroupName' | 'functionModuleName',
       ReturnType<R['deletionCheck']>
     >,
     'checkDeletion'
@@ -809,6 +1012,7 @@ export type FunctionModuleApi<
       IAdtDeletable<
         IFunctionModuleConfig,
         ReturnType<R['deletion']>,
+        'functionGroupName' | 'functionModuleName',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
@@ -819,15 +1023,27 @@ export type FunctionModuleApi<
   IAdtValidatable<
     IFunctionModuleConfig,
     ReturnType<R['validation']>,
-    'functionGroupName' | 'description'
+    'functionGroupName' | 'functionModuleName' | 'description'
   > &
-  IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IFunctionModuleConfig> &
+  IAdtCheckable<
+    IFunctionModuleConfig,
+    ReturnType<R['check']>,
+    'functionGroupName' | 'functionModuleName'
+  > &
+  IAdtActivatable<
+    IFunctionModuleConfig,
+    ReturnType<R['activation']>,
+    'functionGroupName' | 'functionModuleName'
+  > &
+  IAdtLockable<
+    IFunctionModuleConfig,
+    'functionGroupName' | 'functionModuleName'
+  > &
   IAdtVersionable<
     IFunctionModuleConfig,
     ReturnType<R['versions']>,
-    ReturnType<R['versionSource']>
+    ReturnType<R['versionSource']>,
+    'functionGroupName' | 'functionModuleName'
   >;
 
 /** What the server calls on `getFunctionInclude()`'s answer. */
@@ -835,9 +1051,22 @@ export type FunctionIncludeApi<
   R extends IFunctionIncludeResults,
   V extends AdtVariant,
 > = IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>> &
-  StatedReadable<IFunctionIncludeConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IFunctionIncludeConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<IFunctionIncludeConfig>, ReturnType<R['updated']>> &
+  StatedReadable<
+    IFunctionIncludeConfig,
+    ReturnType<R['source']>,
+    'functionGroupName' | 'includeName'
+  > &
+  StatedMetadataReadable<
+    IFunctionIncludeConfig,
+    ReturnType<R['metadata']>,
+    'functionGroupName' | 'includeName'
+  > &
+  IAdtUpdatable<
+    Partial<IFunctionIncludeConfig>,
+    ReturnType<R['updated']>,
+    'functionGroupName' | 'includeName',
+    'source'
+  > &
   PerformedOn<
     V,
     'functionInclude',
@@ -846,6 +1075,7 @@ export type FunctionIncludeApi<
       IAdtDeletable<
         IFunctionIncludeConfig,
         ReturnType<R['deletion']>,
+        'functionGroupName' | 'includeName',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
@@ -859,39 +1089,55 @@ export type FunctionIncludeApi<
       IAdtDeletable<
         IFunctionIncludeConfig,
         ReturnType<R['deletion']>,
+        'functionGroupName' | 'includeName',
         ReturnType<R['deletionCheck']>
       >,
       'delete'
     >
   > &
-  IAdtActivatable<IFunctionIncludeConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IFunctionIncludeConfig>;
+  IAdtActivatable<
+    IFunctionIncludeConfig,
+    ReturnType<R['activation']>,
+    'functionGroupName' | 'includeName'
+  > &
+  IAdtLockable<IFunctionIncludeConfig, 'functionGroupName' | 'includeName'>;
 
 /** What the server calls on `getPackage()`'s answer. */
 export type PackageApi<
   R extends IPackageResults,
   V extends AdtVariant,
 > = IAdtCreatable<IPackageConfig, ReturnType<R['created']>> &
-  StatedMetadataReadable<IPackageConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<
+    IPackageConfig,
+    ReturnType<R['metadata']>,
+    'packageName'
+  > &
   IAdtMetadataUpdatable<
     Partial<IPackageConfig>,
-    ReturnType<R['metadataUpdated']>
+    ReturnType<R['metadataUpdated']>,
+    'packageName',
+    'source'
   > &
   IAdtDeletable<
     IPackageConfig,
     ReturnType<R['deletion']>,
+    'packageName',
     ReturnType<R['deletionCheck']>
   > &
-  IAdtValidatable<IPackageConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IPackageConfig, ReturnType<R['check']>> &
-  IAdtLockable<IPackageConfig>;
+  IAdtValidatable<IPackageConfig, ReturnType<R['validation']>, 'packageName'> &
+  IAdtCheckable<IPackageConfig, ReturnType<R['check']>, 'packageName'> &
+  IAdtLockable<IPackageConfig, 'packageName'>;
 
 /** What the server calls on `getMessageClass()`'s answer. */
 export type MessageClassApi<
   R extends IMessageClassResults,
   V extends AdtVariant,
 > = IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>> &
-  StatedMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>> &
+  StatedMetadataReadable<
+    IMessageClassConfig,
+    ReturnType<R['metadata']>,
+    'name'
+  > &
   PerformedOn<
     V,
     'messageClass',
@@ -899,7 +1145,9 @@ export type MessageClassApi<
     Pick<
       IAdtMetadataUpdatable<
         Partial<IMessageClassConfig>,
-        ReturnType<R['metadataUpdated']>
+        ReturnType<R['metadataUpdated']>,
+        'name',
+        'source'
       >,
       'updateMetadata'
     >
@@ -908,6 +1156,7 @@ export type MessageClassApi<
     IAdtDeletable<
       IMessageClassConfig,
       ReturnType<R['deletion']>,
+      'name',
       ReturnType<R['deletionCheck']>
     >,
     'checkDeletion'
@@ -920,40 +1169,45 @@ export type MessageClassApi<
       IAdtDeletable<
         IMessageClassConfig,
         ReturnType<R['deletion']>,
+        'name',
         ReturnType<R['deletionCheck']>
       >,
       'checkDeletion'
     >
   > &
-  IAdtLockable<IMessageClassConfig>;
+  IAdtLockable<IMessageClassConfig, 'name'>;
 
 /**
- * What the server calls on `getMessageClassMessage()`'s answer — `delete`
- * included: removing a message is a write of its parent class, so it is a
- * member of the message's own (`AdtMessageClassMessage.delete`), not the
- * deletion atom.
+ * What the server calls on `getMessageClassMessage()`'s answer: the class
+ * document read for one message, the message's two locks and their release,
+ * and the one PUT that upserts or (`removeMessage: true`) removes it
+ * (adt-clients 48). The chain around them is the caller's
+ * (`lib/messageClassMessageWrite.ts`).
  */
 export type MessageClassMessageApi<
   R extends IMessageClassMessageResults,
   V extends AdtVariant,
-> = IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
-  StatedReadable<IMessageClassMessageConfig, ReturnType<R['read']>> &
-  IAdtUpdatable<
-    Partial<IMessageClassMessageConfig>,
-    ReturnType<R['written']>
-  > & {
-    delete<E extends IAdtError = IAdtError>(
-      config: Partial<IMessageClassMessageConfig>,
-      options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-    ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>>;
-  };
+> = StatedReadable<
+  IMessageClassMessageConfig,
+  ReturnType<R['read']>,
+  MessageClassMessageAddress
+> &
+  IAdtMessageClassMessageLockable &
+  IAdtMessageClassMessageUpdatable<
+    ReturnType<R['written']>,
+    ReturnType<R['deleted']>
+  >;
 
 /** What the server calls on `getAccessControl()`'s answer. */
 export type AccessControlApi<
   R extends IAccessControlResults,
   V extends AdtVariant,
 > = IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>> &
-  StatedMetadataReadable<IAccessControlConfig, ReturnType<R['metadata']>>;
+  StatedMetadataReadable<
+    IAccessControlConfig,
+    ReturnType<R['metadata']>,
+    'accessControlName'
+  >;
 
 /** What the server calls on `getTransformation()`'s answer. */
 export type TransformationApi<
@@ -966,43 +1220,96 @@ export type ServiceDefinitionApi<
   R extends IServiceDefinitionResults,
   V extends AdtVariant,
 > = IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>> &
-  StatedReadable<IServiceDefinitionConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IServiceDefinitionConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<IServiceDefinitionConfig>, ReturnType<R['updated']>> &
+  StatedReadable<
+    IServiceDefinitionConfig,
+    ReturnType<R['source']>,
+    'serviceDefinitionName'
+  > &
+  StatedMetadataReadable<
+    IServiceDefinitionConfig,
+    ReturnType<R['metadata']>,
+    'serviceDefinitionName'
+  > &
+  IAdtUpdatable<
+    Partial<IServiceDefinitionConfig>,
+    ReturnType<R['updated']>,
+    'serviceDefinitionName',
+    'source'
+  > &
   IAdtDeletable<
     IServiceDefinitionConfig,
     ReturnType<R['deletion']>,
+    'serviceDefinitionName',
     ReturnType<R['deletionCheck']>
   > &
-  IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IServiceDefinitionConfig>;
+  IAdtCheckable<
+    IServiceDefinitionConfig,
+    ReturnType<R['check']>,
+    'serviceDefinitionName'
+  > &
+  IAdtActivatable<
+    IServiceDefinitionConfig,
+    ReturnType<R['activation']>,
+    'serviceDefinitionName'
+  > &
+  IAdtLockable<IServiceDefinitionConfig, 'serviceDefinitionName'>;
 
 /** What the server calls on `getAppendStructure()`'s answer. */
 export type AppendStructureApi<
   R extends IAppendStructureResults,
   V extends AdtVariant,
 > = IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>> &
-  StatedReadable<IAppendStructureConfig, ReturnType<R['source']>> &
-  IAdtUpdatable<Partial<IAppendStructureConfig>, ReturnType<R['updated']>> &
-  IAdtLockable<IAppendStructureConfig>;
+  StatedReadable<
+    IAppendStructureConfig,
+    ReturnType<R['source']>,
+    'appendStructureName'
+  > &
+  IAdtUpdatable<
+    Partial<IAppendStructureConfig>,
+    ReturnType<R['updated']>,
+    'appendStructureName',
+    'source'
+  > &
+  IAdtLockable<IAppendStructureConfig, 'appendStructureName'>;
 
 /** What the server calls on `getServiceBinding()`'s answer. */
 export type ServiceBindingApi<
   R extends IServiceResults,
   V extends AdtVariant,
 > = IAdtCreatable<IServiceBindingConfig, ReturnType<R['created']>> &
-  StatedReadable<IServiceBindingConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IServiceBindingConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IServiceBindingPublicationConfig, ReturnType<R['updated']>> &
+  StatedReadable<
+    IServiceBindingConfig,
+    ReturnType<R['source']>,
+    'bindingName'
+  > &
+  StatedMetadataReadable<
+    IServiceBindingConfig,
+    ReturnType<R['metadata']>,
+    'bindingName'
+  > &
+  // The publication takes no lock of the caller's (ERRATA): lock-free.
+  IAdtLockFreeUpdatable<
+    IServiceBindingPublicationConfig,
+    ReturnType<R['updated']>,
+    'bindingName'
+  > &
   IAdtDeletable<
     IServiceBindingConfig,
     ReturnType<R['deletion']>,
+    'bindingName',
     ReturnType<R['deletionCheck']>
   > &
-  IAdtValidatable<IServiceBindingConfig, ReturnType<R['validation']>> &
-  IAdtActivatable<IServiceBindingConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IServiceBindingConfig> &
+  IAdtValidatable<
+    IServiceBindingConfig,
+    ReturnType<R['validation']>,
+    'bindingName'
+  > &
+  IAdtActivatable<
+    IServiceBindingConfig,
+    ReturnType<R['activation']>,
+    'bindingName'
+  > &
+  IAdtLockable<IServiceBindingConfig, 'bindingName'> &
   IAdtServiceBindingTypes<ReturnType<R['bindingTypes']>> &
   IAdtServiceGroupReadable<ReturnType<R['odata']>>;
 
@@ -1011,22 +1318,41 @@ export type BehaviorDefinitionApi<
   R extends IBehaviorDefinitionResults,
   V extends AdtVariant,
 > = IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>> &
-  StatedReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IBehaviorDefinitionConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<IBehaviorDefinitionConfig>, ReturnType<R['updated']>> &
+  StatedReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>, 'name'> &
+  StatedMetadataReadable<
+    IBehaviorDefinitionConfig,
+    ReturnType<R['metadata']>,
+    'name'
+  > &
+  IAdtUpdatable<
+    Partial<IBehaviorDefinitionConfig>,
+    ReturnType<R['updated']>,
+    'name',
+    'source'
+  > &
   IAdtDeletable<
     IBehaviorDefinitionConfig,
     ReturnType<R['deletion']>,
+    'name',
     ReturnType<R['deletionCheck']>
   > &
-  IAdtValidatable<IBehaviorDefinitionConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IBehaviorDefinitionConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IBehaviorDefinitionConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IBehaviorDefinitionConfig> &
+  IAdtValidatable<
+    IBehaviorDefinitionConfig,
+    ReturnType<R['validation']>,
+    'name'
+  > &
+  IAdtCheckable<IBehaviorDefinitionConfig, ReturnType<R['check']>, 'name'> &
+  IAdtActivatable<
+    IBehaviorDefinitionConfig,
+    ReturnType<R['activation']>,
+    'name'
+  > &
+  IAdtLockable<IBehaviorDefinitionConfig, 'name'> &
   IAdtVersionable<
     IBehaviorDefinitionConfig,
     ReturnType<R['versions']>,
-    ReturnType<R['versionSource']>
+    ReturnType<R['versionSource']>,
+    'name'
   >;
 
 /** What the server calls on `getBehaviorImplementation()`'s answer. */
@@ -1034,53 +1360,96 @@ export type BehaviorImplementationApi<
   R extends IClassResults,
   V extends AdtVariant,
 > = IAdtCreatable<IBehaviorImplementationConfig, ReturnType<R['created']>> &
-  StatedReadable<IBehaviorImplementationConfig, ReturnType<R['source']>> &
+  StatedReadable<
+    IBehaviorImplementationConfig,
+    ReturnType<R['source']>,
+    'className'
+  > &
   StatedMetadataReadable<
     IBehaviorImplementationConfig,
-    ReturnType<R['metadata']>
+    ReturnType<R['metadata']>,
+    'className'
   > &
   IAdtUpdatable<
     Partial<IBehaviorImplementationConfig>,
-    ReturnType<R['updated']>
+    ReturnType<R['updated']>,
+    'className',
+    'source'
   > &
   IAdtDeletable<
     IBehaviorImplementationConfig,
     ReturnType<R['deletion']>,
+    'className',
     ReturnType<R['deletionCheck']>
   > &
-  IAdtValidatable<IBehaviorImplementationConfig, ReturnType<R['validation']>> &
-  IAdtActivatable<IBehaviorImplementationConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IBehaviorImplementationConfig>;
+  IAdtValidatable<
+    IBehaviorImplementationConfig,
+    ReturnType<R['validation']>,
+    'className'
+  > &
+  IAdtActivatable<
+    IBehaviorImplementationConfig,
+    ReturnType<R['activation']>,
+    'className'
+  > &
+  IAdtLockable<IBehaviorImplementationConfig, 'className'>;
 
 /** What the server calls on `getMetadataExtension()`'s answer. */
 export type MetadataExtensionApi<
   R extends IMetadataExtensionResults,
   V extends AdtVariant,
 > = IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>> &
-  StatedReadable<IMetadataExtensionConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IMetadataExtensionConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<Partial<IMetadataExtensionConfig>, ReturnType<R['updated']>> &
+  StatedReadable<IMetadataExtensionConfig, ReturnType<R['source']>, 'name'> &
+  StatedMetadataReadable<
+    IMetadataExtensionConfig,
+    ReturnType<R['metadata']>,
+    'name'
+  > &
+  IAdtUpdatable<
+    Partial<IMetadataExtensionConfig>,
+    ReturnType<R['updated']>,
+    'name',
+    'source'
+  > &
   IAdtDeletable<
     IMetadataExtensionConfig,
     ReturnType<R['deletion']>,
+    'name',
     ReturnType<R['deletionCheck']>
   > &
-  IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IMetadataExtensionConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IMetadataExtensionConfig> &
+  IAdtValidatable<
+    IMetadataExtensionConfig,
+    ReturnType<R['validation']>,
+    'name'
+  > &
+  IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>, 'name'> &
+  IAdtActivatable<
+    IMetadataExtensionConfig,
+    ReturnType<R['activation']>,
+    'name'
+  > &
+  IAdtLockable<IMetadataExtensionConfig, 'name'> &
   IAdtVersionable<
     IMetadataExtensionConfig,
     ReturnType<R['versions']>,
-    ReturnType<R['versionSource']>
+    ReturnType<R['versionSource']>,
+    'name'
   >;
 
 /** What the server calls on `getEnhancement()`'s answer. */
 export type EnhancementApi<
   R extends IEnhancementResults,
   V extends AdtVariant,
-> = StatedReadable<IEnhancementConfig, ReturnType<R['source']>> &
-  StatedMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>>;
+> = StatedReadable<
+  IEnhancementConfig,
+  ReturnType<R['source']>,
+  'enhancementName'
+> &
+  StatedMetadataReadable<
+    IEnhancementConfig,
+    ReturnType<R['metadata']>,
+    'enhancementName' | 'enhancementType'
+  >;
 
 /** A request status the listing selects: `D` modifiable, `R` released. */
 export type TransportListStatus = 'D' | 'R';
@@ -1113,7 +1482,7 @@ export interface TransportListing<TList> {
   list<E extends IAdtError>(
     options: TransportListQuery &
       IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
-  ): Promise<IAdtResponse<TList, E>>;
+  ): Promise<IAdtResponse<TList, E | IAdtError>>;
 }
 
 /** What the server calls on `getRequest()`'s answer. */
@@ -1134,6 +1503,7 @@ export type RequestApi<
       IAdtDeletable<
         ITransportConfig,
         ReturnType<R['deleted']>,
+        'transportNumber',
         ReturnType<R['deletionCheck']>
       >,
       'delete'
@@ -1256,37 +1626,73 @@ export type RequestApi<
 export type LocalTestClassApi<
   R extends IClassResults,
   V extends AdtVariant,
-> = StatedReadable<ILocalTestClassConfig, ReturnType<R['source']>> &
-  IAdtUpdatable<Partial<ILocalTestClassConfig>, ReturnType<R['updated']>> &
-  IAdtActivatable<ILocalTestClassConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IClassConfig>;
+> = StatedReadable<
+  ILocalTestClassConfig,
+  ReturnType<R['source']>,
+  'className'
+> &
+  IAdtUpdatable<
+    Partial<ILocalTestClassConfig>,
+    ReturnType<R['updated']>,
+    'className'
+  > &
+  IAdtActivatable<
+    ILocalTestClassConfig,
+    ReturnType<R['activation']>,
+    'className'
+  > &
+  IAdtLockable<IClassConfig, 'className'>;
 
 /** What the server calls on `getLocalTypes()`'s answer. */
 export type LocalTypesApi<
   R extends IClassResults,
   V extends AdtVariant,
-> = StatedReadable<ILocalTypesConfig, ReturnType<R['source']>> &
-  IAdtUpdatable<Partial<ILocalTypesConfig>, ReturnType<R['updated']>> &
-  IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IClassConfig>;
+> = StatedReadable<ILocalTypesConfig, ReturnType<R['source']>, 'className'> &
+  IAdtUpdatable<
+    Partial<ILocalTypesConfig>,
+    ReturnType<R['updated']>,
+    'className'
+  > &
+  IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>, 'className'> &
+  IAdtLockable<IClassConfig, 'className'>;
 
 /** What the server calls on `getLocalDefinitions()`'s answer. */
 export type LocalDefinitionsApi<
   R extends IClassResults,
   V extends AdtVariant,
-> = StatedReadable<ILocalDefinitionsConfig, ReturnType<R['source']>> &
-  IAdtUpdatable<Partial<ILocalDefinitionsConfig>, ReturnType<R['updated']>> &
-  IAdtActivatable<ILocalDefinitionsConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IClassConfig>;
+> = StatedReadable<
+  ILocalDefinitionsConfig,
+  ReturnType<R['source']>,
+  'className'
+> &
+  IAdtUpdatable<
+    Partial<ILocalDefinitionsConfig>,
+    ReturnType<R['updated']>,
+    'className'
+  > &
+  IAdtActivatable<
+    ILocalDefinitionsConfig,
+    ReturnType<R['activation']>,
+    'className'
+  > &
+  IAdtLockable<IClassConfig, 'className'>;
 
 /** What the server calls on `getLocalMacros()`'s answer. */
 export type LocalMacrosApi<
   R extends IClassResults,
   V extends AdtVariant,
-> = StatedReadable<ILocalMacrosConfig, ReturnType<R['source']>> &
-  IAdtUpdatable<Partial<ILocalMacrosConfig>, ReturnType<R['updated']>> &
-  IAdtActivatable<ILocalMacrosConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IClassConfig>;
+> = StatedReadable<ILocalMacrosConfig, ReturnType<R['source']>, 'className'> &
+  IAdtUpdatable<
+    Partial<ILocalMacrosConfig>,
+    ReturnType<R['updated']>,
+    'className'
+  > &
+  IAdtActivatable<
+    ILocalMacrosConfig,
+    ReturnType<R['activation']>,
+    'className'
+  > &
+  IAdtLockable<IClassConfig, 'className'>;
 
 /**
  * The kinds SAP serves an outline for (`GET <object uri>/objectstructure`):
@@ -1327,7 +1733,7 @@ export interface IServerObjectSearch<TSearch, V extends AdtVariant> {
   search<E extends IAdtError>(
     criteria: IAdtSearchObjectsParamsOf<V>,
     options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
-  ): Promise<IAdtResponse<TSearch, E>>;
+  ): Promise<IAdtResponse<TSearch, E | IAdtError>>;
   search(
     criteria: IAdtSearchObjectsParamsOf<V>,
     options?: IAdtAnalyseOptions,

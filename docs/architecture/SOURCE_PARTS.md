@@ -323,9 +323,20 @@ A local method's `definition` side is not in the table: it is read as part of it
 **Fail-closed rules**, each a refusal naming the element and the include; the scanner never picks
 another candidate:
 
-- **Identity.** The statement at the navigated start must be the row's opening statement, and its
-  name token must equal the element's name, compared case-insensitively. Otherwise the outline or
-  the navigation does not describe this text (`start_mismatch`).
+- **Identity.** The located block must be the addressed element in every field of its address
+  (§5.0), checked from the lexer's own reading of the text the call works on (under the lock,
+  T of §7.2), never from the outline or the navigation answer:
+  - `include`: the text is the include the address names;
+  - `type` and `side`: the statement at the start is the row's opening statement for that kind
+    and side;
+  - `name`: its name token equals the element's name, compared case-insensitively;
+  - `scope`: the lexer's stack of enclosing blocks at the start, outermost first, has the names of
+    `scope` (a local method's start lies inside `CLASS <scope> IMPLEMENTATION`, and a top-level
+    block inside none).
+
+  Any field that differs is `start_mismatch`, and nothing is read or written: a stale position
+  that lands on a method of the same name in another local class is refused, never taken. The
+  same check runs for a class or an interface on SAP's positions.
 - **Nesting.** The scanner keeps a stack of open blocks; each opener is closed by its own
   terminator only. What each kind permits inside it:
 

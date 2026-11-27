@@ -35,6 +35,12 @@ part of it that was asked for) and the elements it touches.
 Read-only measurements. Onprem numbers come from the PR's measurements of 2026-11-27. Cloud
 numbers were measured on ABAP Cloud on 2026-11-28 unless another date is given.
 
+**Why parts at all (onprem, 2026-11-27).** Whole reads are fast: the largest class answers
+2.3 million characters in 1.4 s, and the largest program 5.4 million in 0.7 s. At roughly 3 to 4
+characters a token (an estimate), that is 0.6 to 1.8 million tokens, beyond a model's context.
+The bound is the model's context, not ADT's response time. So nothing here makes a read faster;
+it makes the answer smaller.
+
 **The outline (`GET <object uri>/objectstructure`, adt-clients' `getObjectOutline`):**
 
 - **Class (onprem and cloud).** Every element's links carry a position,
@@ -92,25 +98,34 @@ numbers were measured on ABAP Cloud on 2026-11-28 unless another date is given.
 - `HEAD` on a source answers `400` (cloud).
 - A source `GET` carries `etag` and `last-modified` (cloud).
 
-**To be measured onprem.** A probe handed to the owner checks three
-things on a program: the local method's `definitionIdentifier`, the batch envelope, and `HEAD`.
-The design does not depend on the outcome. A local method is located by its
-`implementationIdentifier`, and its declaration through its local class (§5.2).
+**To be measured onprem.** A probe handed to the owner checks three things on a program: the
+local method's `definitionIdentifier`, the batch envelope, and `HEAD`. Nothing here needs the
+first or the third: a local method is located by its `implementationIdentifier`, and its
+declaration through its local class (§5.2). Whether navigations share an envelope onprem decides
+only how they are sent (§4.4), not what they answer.
 
 ## 3. Where each piece sits
 
 ```text
-mcp-abap-adt (lib)         tools, the outline views, size, the merge, the drift check, the write sequence
+mcp-abap-adt (lib)         tools, the outline views, size and the hash, the merge, the drift check,
+  |                        the write sequence
   |  calls the analyzer through the contract lib declares (CodeAnalyzer)
   v
-@mcp-abap-adt/adt-code-analyzer   AdtCodeAnalyzer: outline + parts; the block-end scanner; sourceHash
+@mcp-abap-adt/adt-code-analyzer   AdtCodeAnalyzer: outline + parts; the lexer and the block-end scanner
   |  calls members only, one request each
   v
-@mcp-abap-adt/adt-clients   getObjectOutline, getNavigationTarget (new), the source reads, the CRUD
-@mcp-abap-adt/adt-strategies  readObjectOutline, readNavigationTarget (new)
+@mcp-abap-adt/adt-clients   members: getObjectOutline, getNavigationTarget (new), the source reads,
+  |                         the CRUD
+  |                         AdtBatchConnection: an IAbapConnection that packs the members' requests
+  |                         into one /communication/batch envelope (exists today)
+@mcp-abap-adt/adt-strategies  readings: readObjectOutline, readNavigationTarget (new)
   v
-@mcp-abap-adt/connection    unchanged (AdtBatchConnection of adt-clients rides on it)
+@mcp-abap-adt/connection    the IAbapConnection the envelope, or each request alone, is sent on;
+                            unchanged
 ```
+
+Two words are kept apart below. A **request** is one member's one ADT request. An **envelope** is
+one HTTP exchange of `AdtBatchConnection` that carries several requests.
 
 | Piece | Package | What changes |
 |---|---|---|
@@ -118,7 +133,7 @@ mcp-abap-adt (lib)         tools, the outline views, size, the merge, the drift 
 | Navigation member | `@mcp-abap-adt/adt-clients` | `AdtUtils.getNavigationTarget(uri, options)`: one `POST /sap/bc/adt/navigation/target`; its address in `endpoints/objects.ts` |
 | Navigation atom | `@mcp-abap-adt/interfaces-adt` | the atom that declares `getNavigationTarget` (`factoryReturnsCoverClass` refuses an `AdtUtils` member that no atom declares) |
 | Navigation reading | `@mcp-abap-adt/adt-strategies` | `readNavigationTarget`: the reference's include and its `start` |
-| Analyzer | `@mcp-abap-adt/adt-code-analyzer` (new, `packages/adt-code-analyzer` in the mcp-abap-adt-clients repository) | `AdtCodeAnalyzer`, the block-end scanner, `sourceHash` |
+| Analyzer | `@mcp-abap-adt/adt-code-analyzer` (new, `packages/adt-code-analyzer` in the mcp-abap-adt-clients repository) | `AdtCodeAnalyzer`, the lexer, the block-end scanner |
 | Tools, merge, write | mcp-abap-adt `lib` | §8 |
 
 adt-clients gets **no partial-update member** and no reading. It always takes the whole source.
@@ -185,10 +200,15 @@ There are two seams, each a contract declared where it is accepted (adt-clients'
 
 ### 4.4 Batching
 
-When one `part` call names several elements whose starts come from navigation, the analyzer
-sends their navigations through adt-clients' `AdtBatchConnection` in one envelope. Measured on
-cloud, that is one round trip with each part answered as if sent alone. Each navigation is
-still its own member call with one inner request; the envelope belongs to the connection.
+When one `part` call names several elements whose starts come from navigation, the analyzer can
+send their navigation requests in one envelope, through adt-clients' `AdtBatchConnection`.
+Measured on cloud, that is one round trip with each request answered as if sent alone. Each
+navigation is still its own member call with one request; the envelope belongs to
+`AdtBatchConnection`, not to the member.
+
+The envelope is used per declared variant where it is measured to answer (cloud today). Anywhere
+else each navigation request is sent alone, on the plain connection. Both give the same starts.
+
 
 A part read or a partial update cannot itself be recorded into the server's batch mode
 (`HandlerBatch`). Each needs the answer of one request before it can build the next. So the new

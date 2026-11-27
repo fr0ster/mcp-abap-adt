@@ -145,11 +145,11 @@ adt-clients gets **no partial-update member** and no reading. It always takes th
 A composer above the one-endpoint members. It answers two things:
 
 - **`outline(object, version)`**: SAP's outline document as it came, its tree as
-  `readObjectOutline` reads it (the hierarchy, every link), and beside them a flat list of the
-  addressable elements. Each listed element carries its kind, its name, its parent (a method's
-  class), the include it lives in, its position wherever SAP states one, and **its address**, the
-  `{ type, name, parent? }` that `part` takes. The document and the tree are what today's
-  `GetObjectOutline` answers are built from; the list is new.
+  `readObjectOutline` reads it (the hierarchy, every link), and beside them a flat list of every
+  element. Each listed element carries its kind, its name, its scope, the include it lives in, its
+  position wherever SAP states one, and `readable`: whether it can be read as a part (§5.0). Only
+  a readable element carries **its address** (§5.0), the address `part` takes. The document and
+  the tree are what today's `GetObjectOutline` answers are built from; the list is new.
 - **`part(object, elements)`**: each element located in its include. For each one it answers the
   include's address, the include's whole text as read, the element's first and last line (and,
   where SAP gives them, its start and end columns), and whether the element shares a line or a
@@ -220,6 +220,41 @@ tools are marked "Runs outside batch mode" in `tools/batch-handlers.json`.
 
 ## 5. Parts
 
+### 5.0 Which elements are parts, and how one is named
+
+**Readable or informational.** The outline lists every element SAP names. Only some of them can
+be read as a part, and the outline marks which (`readable`):
+
+| Object | Readable, on these sides | Informational only |
+|---|---|---|
+| class, interface | every element whose links carry a block position, on each side SAP gives one: `definition` (a `definitionBlock`), `implementation` (an `implementationBlock`). The class itself has both. | elements with no block position (an alias, a friend, the text pool link) |
+| program, include, function group | the kinds of the scanner's table (§5.2), on the sides that table gives | every other kind: data, types, constants, parameters and the other declarations; includes (`PROG/I`, `FUGR/I`: read them as their own objects); the text pool |
+| function group's function module (`FUGR/FF`) | its whole source, as the function module itself (§5.3) | — |
+
+An informational element is listed with its kind, name, scope and include, so the model knows it
+is there and which include to read. It has no address, and `GetSourcePart` refuses it, naming its
+kind. A kind is never offered as a part when the analyzer cannot locate it.
+
+**The address** names exactly one element:
+
+```text
+{ include, type, name, scope, side }
+```
+
+- `include`: the ADT address of the source the element lives in, as the outline's link names it
+  (`./source/main` resolved, `…/includes/testclasses`, `…/includes/lzx_f01/source/main`);
+- `type` and `name`: SAP's `adtcore:type` and `adtcore:name`;
+- `scope`: the names of the enclosing elements, outermost first (`[]` for a top-level element; a
+  local method's local class; a method's class);
+- `side`: `definition` or `implementation`, one of the sides the element is readable on.
+
+The outline's `parts` view answers each readable element's address whole. `GetSourcePart` and
+`UpdateSourcePart` take it as it was answered. They also take a short form, `{ type, name }` with
+any of the other fields: it is resolved only when **exactly one** readable element matches.
+None is `not_found`. More than one is refused `ambiguous`, listing every matching address. No
+match is ever chosen by order. `side` may be left out only where the element is readable on one
+side.
+
 ### 5.1 A class or an interface: SAP's positions
 
 - A part is the block the outline names:
@@ -230,8 +265,8 @@ tools are marked "Runs outside batch mode" in `tools/batch-handlers.json`.
 - The analyzer takes the include from the link and the lines and columns from the position. It
   calls no navigation, and the scanner finds no end here. The lexer still runs over the include,
   for the boundary check of §5.4.
-- A method has two sides. `side` is `implementation` (the default for a method) or `definition`.
-  For the class itself, `definition` is the "definitions first" read.
+- A method has two sides, `implementation` and `definition`; an interface's method has only
+  `definition`. For the class itself, `definition` is the "definitions first" read.
 
 ### 5.2 A program, an include, a function group: navigation plus the scanner
 
@@ -331,11 +366,13 @@ include. A diff relative to the element (§7.3) uses the same numbering. A model
 | `element_name` | with `view: "parts"`: only elements of this name, exact or a mask with `*` (plain string matching) |
 | `parent` | with `view: "parts"`: only the children of this element (one local class's methods, say) |
 
-The filters without `view: "parts"` are refused before any request. In `view: "parts"` every
-element carries its address `{ type, name, parent? }`, which is exactly what `GetSourcePart`
-takes (the goal's invariant: an outline names every piece the way the part read takes it).
-Elements of a class or an interface also carry their lines. Program elements carry their include
-but no lines: navigation is not called for an outline.
+The filters without `view: "parts"` are refused before any request. `view: "parts"` lists every
+element with `readable`; a readable element carries its whole address (§5.0), exactly what
+`GetSourcePart` takes (the goal's invariant: an outline names every piece the way the part read
+takes it), and an informational one carries none. Elements of a class or an interface also carry
+their lines. Program elements carry their include but no lines: navigation is not called for an
+outline. `parent` matches the innermost name of `scope`.
+
 
 So the model's path through a 3 MB outline is: `kinds`, then a filter, then the details. Which
 view to ask is the model's choice; nothing switches views by size.
@@ -408,7 +445,7 @@ ends included:
 
 | Edit | What it names | Rule |
 |---|---|---|
-| `replace` (main path) | an element `{ type, name, parent? }`, `side` for a method, the new code | The element must exist in the outline, else a refusal naming it (never a guess). Its whole lines are replaced. A part that shares a line is refused (§5.4). |
+| `replace` (main path) | an element address (§5.0) and the new code | The element must exist in the outline, else a refusal naming it (never a guess). Its whole lines are replaced. A part that shares a line is refused (§5.4). |
 | `insert` | a new element `{ type, name, parent? }` and its code | The element must **not** exist, else a refusal. It is placed where its kind belongs (below). |
 | `diff` (fallback) | a unified diff, with `relative_to: "element"` and the element, or `relative_to: "include"` | Each hunk applies only where its context and removed lines equal the source **exactly**, at the position it states. A hunk that does not match is refused, naming the hunk; nothing is applied. No fuzz, no offset search, nothing partial. |
 
@@ -445,7 +482,7 @@ The existing whole reads stay as they are: same tools, same default answers.
 |---|---|---|
 | every source read (`GetClass`, `GetProgram`, `GetInclude`, …) | read-only | `part: "size"` added (below); no text |
 | `GetObjectOutline` | read-only | §6 |
-| `GetSourcePart` (new) | read-only | one or several elements (`{ type, name, parent? }`, `side`), or a line range inside one (§5.5); answers each element's lines, its absolute range, the include and its `source_hash`, and whether it shares a line |
+| `GetSourcePart` (new) | read-only | one or several element addresses (§5.0), or a line range inside one (§5.5); answers each element's lines, its absolute range, the include and its `source_hash`, and whether it shares a line |
 | `UpdateSourcePart` (new) | write | §7 |
 
 **What `part: "size"` measures.** The size of exactly the source that tool's whole read answers,

@@ -49,17 +49,6 @@ export const stateHandleAnswered: Note = new Note(
   'Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).',
 );
 
-/**
- * A data read: SAP's own row bound, which applies when the consumer gives
- * none. Measured on the BTP ABAP environment (2026-11-27,
- * `/sap/bc/adt/datapreview/freestyle`): without `rowNumber` SAP answered 100
- * records of selections of 163, 249, 1716 and 8466 (fr0ster/mcp-abap-adt#391).
- */
-export const sapRowBound: Note = new Note(
-  minted,
-  'A missing bound leaves the bound to SAP: at most 100 records. When fewer records come back than the selection holds, the answer names how many came back, of how many, and what cut them.',
-);
-
 /** Whether and how `tool` runs in batch mode. */
 export function batchable(tool: string): Note {
   return new Note(minted, batchSentence(tool));

@@ -6,7 +6,6 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   longRunning,
   purpose,
-  sapRowBound,
   toolDescription,
 } from '../../../lib/description';
 import { listAnswerAt } from '../../../lib/detail';
@@ -23,7 +22,6 @@ import { ourUtils } from '../../../lib/strategies/resultSets';
 import {
   DATA_ANSWERS,
   ROW_BOUND_WORDS,
-  rowBoundQuery,
 } from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
@@ -34,14 +32,14 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the data of an ABAP database table or CDS view, as SE16 previews it, up to the number of records asked.',
     ),
-    notes: [sapRowBound, longRunning],
+    notes: [longRunning],
   }),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
     table_name: requiredText('Table name is required').describe(
       'Name of the ABAP table',
     ),
-    max_rows: z.number().optional().describe(ROW_BOUND_WORDS),
+    max_rows: z.number().describe(ROW_BOUND_WORDS),
     // This tool's `inputSchema` is a bare zod raw shape (`scripts/list-tools.ts`
     // reads that shape's optionality off `.isOptional()`), not the
     // `{type:'object', properties, required}` JSON Schema `DETAIL_PROPERTY`
@@ -63,14 +61,11 @@ export async function handleGetTableContents(
 ) {
   const { connection, logger } = context;
   const tableName = args.table_name;
-  // The consumer's bound as given, `0` included; none given, none sent
-  // (SAP's own applies: `sapRowBound`).
+  // The consumer's count as given, `0` included (#391).
   const maxRows = args.max_rows;
   const detail = detailOf(args);
 
-  logger?.info(
-    `Reading table contents: ${tableName} (max_rows=${maxRows ?? 'SAP default'})`,
-  );
+  logger?.info(`Reading table contents: ${tableName} (max_rows=${maxRows})`);
 
   const sqlQuery = `SELECT * FROM ${tableName}`;
 
@@ -86,12 +81,13 @@ export async function handleGetTableContents(
     { tool: 'GetTableContents', detail },
     () =>
       withAdtHeaders(context, 'utils.getSqlQuery', (headers) =>
-        createAdtClient(connection, logger)
-          .getUtils(ourUtils)
-          .getSqlQuery(rowBoundQuery(sqlQuery, maxRows), {
+        createAdtClient(connection, logger).getUtils(ourUtils).getSqlQuery(
+          { sql_query: sqlQuery, row_number: maxRows },
+          {
             headers,
             analyse: analyseException,
-          }),
+          },
+        ),
       ),
     (reading) => {
       logger?.debug(

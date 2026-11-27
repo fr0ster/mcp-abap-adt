@@ -112,10 +112,13 @@ describe('GetSqlQuery Handler Integration', () => {
 
       const result = await tester.invokeToolOrHandler(
         'GetSqlQuery',
-        { sql_query: '' },
+        { sql_query: '', row_number: 1 },
         async () => {
           const handlerContext = createHandlerContext({ connection, logger });
-          return handleGetSqlQuery(handlerContext, { sql_query: '' });
+          return handleGetSqlQuery(handlerContext, {
+            sql_query: '',
+            row_number: 1,
+          });
         },
       );
 

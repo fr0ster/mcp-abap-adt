@@ -365,14 +365,17 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     );
   });
 
-  // No row bound of the server's (#391): none given, none handed on.
-  it('GetSqlQuery calls getSqlQuery({sql_query}) when no row_number is given', async () => {
+  // No row bound of the server's (#391): the required row_number, as given.
+  it('GetSqlQuery calls getSqlQuery({sql_query, row_number}) with the row_number given', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
-    await handleGetSqlQuery(context as any, { sql_query: 'SELECT 1' });
+    await handleGetSqlQuery(context as any, {
+      sql_query: 'SELECT 1',
+      row_number: 3,
+    });
     const call = seen.calls.filter((c) => c.member === 'getSqlQuery').at(-1);
     assert.deepStrictEqual(call?.args, [
-      { sql_query: 'SELECT 1' },
+      { sql_query: 'SELECT 1', row_number: 3 },
       { headers: DEFAULT_ADT_HEADERS['utils.getSqlQuery'] },
     ]);
   });

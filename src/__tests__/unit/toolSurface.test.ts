@@ -246,6 +246,10 @@ describe('the MCP tool surface', () => {
         'debug/DebugTakeOverListener': 'breakpoints',
         'high/ValidateServiceBinding': 'package_name',
         'high/CreateDomain': 'package_name',
+        // **A fourth, decided by the owner (#391).** The data tools' row
+        // count is required: the model states it, the server picks none.
+        'data/GetSqlQuery': 'row_number',
+        'data/GetTableContents': 'max_rows',
       };
       const tightened = MAY_TIGHTEN_REQUIRED[tool];
       // **19.0.0, internal batches (spec §11).** A parallelism knob the

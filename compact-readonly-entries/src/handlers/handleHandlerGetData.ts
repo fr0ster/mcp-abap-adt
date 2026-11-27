@@ -37,21 +37,20 @@ export async function handleHandlerGetData(
   context: HandlerContext,
   args: HandlerGetDataArgs,
 ) {
-  // The consumer's bound, forwarded as given; none given, none forwarded
-  // (SAP's own applies). The level asked, forwarded: each read answers it as
-  // its own tool does.
+  // The consumer's count, required, forwarded as given (#391). The level
+  // asked, forwarded: each read answers it as its own tool does.
   const maxRows = args.max_rows;
   const detail = args.detail === undefined ? {} : { detail: args.detail };
   if (stated(args.sql_query)) {
     return sqlQuery(context, {
       sql_query: args.sql_query,
-      ...(maxRows === undefined ? {} : { row_number: maxRows }),
+      row_number: maxRows,
       ...detail,
     });
   }
   return tableContents(context, {
     table_name: args.object_name,
-    ...(maxRows === undefined ? {} : { max_rows: maxRows }),
+    max_rows: maxRows,
     ...detail,
   });
 }

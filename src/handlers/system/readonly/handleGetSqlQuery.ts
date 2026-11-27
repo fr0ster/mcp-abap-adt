@@ -6,7 +6,6 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   longRunning,
   purpose,
-  sapRowBound,
   toolDescription,
 } from '../../../lib/description';
 import {
@@ -46,15 +45,15 @@ import type { XmlRead } from '../../../lib/xml/tree';
  */
 export interface SqlQueryResponse {
   sql_query: string;
-  /** The bound the consumer gave; absent when none was given, SAP's own then applies. */
-  row_number?: number | undefined;
+  /** The count the consumer gave. */
+  row_number: number;
   execution_time?: number | undefined;
   total_rows?: number | undefined;
   /** How many records are listed in `rows`. */
   rows_listed: number;
   /**
    * What cut the list, present when it holds fewer records than
-   * `total_rows`: the bound given (`row_number 50`), or SAP when none was.
+   * `total_rows`: the count given (`row_number 50`).
    */
   cut_by?: string | undefined;
   columns: Array<{ name: string; type: string; description?: string }>;
@@ -67,12 +66,14 @@ export interface SqlQueryResponse {
 }
 
 /**
- * The row bound's parameter description, shared by the data tools. `0` and a
- * negative bound were refused `400` by SAP, and the largest accepted was
- * 2147483646 (BTP ABAP environment, 2026-11-27).
+ * The row count's description, shared by the data tools: a required argument
+ * (the owner, #391: the model states it; the server picks none). Measured on
+ * the BTP ABAP environment (2026-11-27, `/datapreview/freestyle`): `0`, a
+ * negative count and 2147483647 were refused `400`, 2147483646 was the
+ * largest accepted, and a request without `rowNumber` answered 100.
  */
 export const ROW_BOUND_WORDS =
-  '[read-only] Most records to read. Absent: SAP gives at most 100.';
+  '[read-only] Most records to read, required. SAP refuses 0, and the largest count it accepts is 2147483646.';
 
 export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
@@ -82,14 +83,14 @@ export const TOOL_DEFINITION = {
     purpose: purpose(
       'Reads the data an ABAP SQL SELECT selects from database tables and CDS views, up to the number of records asked.',
     ),
-    notes: [sapRowBound, longRunning],
+    notes: [longRunning],
   }),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
     sql_query: requiredText('SQL query is required').describe(
       'SQL query to execute',
     ),
-    row_number: z.number().optional().describe(ROW_BOUND_WORDS),
+    row_number: z.number().describe(ROW_BOUND_WORDS),
     ...DETAIL_SHAPE,
   }),
 } as const;
@@ -102,12 +103,11 @@ export async function handleGetSqlQuery(
   logger?.info('handleGetSqlQuery called');
 
   const sqlQuery = args.sql_query;
-  // The consumer's bound as given, `0` included; none given, none sent
-  // (SAP's own applies: `sapRowBound`).
+  // The consumer's count as given, `0` included (#391).
   const rowNumber = args.row_number;
   const detail = detailOf(args);
 
-  logger?.info(`Executing SQL query (rows=${rowNumber ?? 'SAP default'})`);
+  logger?.info(`Executing SQL query (rows=${rowNumber})`);
 
   // `getSqlQuery(params, options?)` takes `analyseException` since
   // adt-clients 23.
@@ -115,12 +115,13 @@ export async function handleGetSqlQuery(
     { tool: 'GetSqlQuery', detail },
     () =>
       withAdtHeaders(context, 'utils.getSqlQuery', (headers) =>
-        createAdtClient(connection, logger)
-          .getUtils(ourUtils)
-          .getSqlQuery(rowBoundQuery(sqlQuery, rowNumber), {
+        createAdtClient(connection, logger).getUtils(ourUtils).getSqlQuery(
+          { sql_query: sqlQuery, row_number: rowNumber },
+          {
             headers,
             analyse: analyseException,
-          }),
+          },
+        ),
       ),
     (reading) => {
       logger?.debug(
@@ -139,19 +140,9 @@ export async function handleGetSqlQuery(
   );
 }
 
-/** The data preview's parameters: the statement, and the consumer's bound only when given. */
-export function rowBoundQuery(
-  sqlQuery: string,
-  rowNumber: number | undefined,
-): { sql_query: string; row_number?: number } {
-  return rowNumber === undefined
-    ? { sql_query: sqlQuery }
-    : { sql_query: sqlQuery, row_number: rowNumber };
-}
-
 /**
  * What cut the list, when it holds fewer records than the selection: the
- * bound given, by the parameter it was given as, or SAP when none was.
+ * count given, by the parameter it was given as.
  */
 function cutOf({
   rowNumber,
@@ -165,9 +156,7 @@ function cutOf({
   ) {
     return undefined;
   }
-  return rowNumber === undefined
-    ? `SAP: no ${boundName} given`
-    : `${boundName} ${rowNumber}`;
+  return `${boundName} ${rowNumber}`;
 }
 
 /**
@@ -176,7 +165,7 @@ function cutOf({
  */
 export interface DataRead {
   readonly sqlQuery: string;
-  readonly rowNumber: number | undefined;
+  readonly rowNumber: number;
   readonly boundName: 'row_number' | 'max_rows';
   readonly reading: AdtReading<SqlPreview>;
 }
@@ -226,7 +215,7 @@ function dataAnswerOf(read: DataRead) {
   const cut = cutOf(read);
   return {
     sql_query: sqlQuery,
-    ...(rowNumber === undefined ? {} : { row_number: rowNumber }),
+    row_number: rowNumber,
     execution_time: preview.execution_time,
     total_rows: preview.total_rows,
     rows_listed: preview.rows.length,
@@ -264,9 +253,7 @@ export const DATA_ANSWERS: ListAnswerTable<
         : [
             {
               head: 'rows',
-              value: `${preview.rows.length} of ${preview.total_rows}, ${
-                read.rowNumber === undefined ? 'cut by ' : 'cut at '
-              }${cut}`,
+              value: `${preview.rows.length} of ${preview.total_rows}, cut at ${cut}`,
             },
           ]),
     ];

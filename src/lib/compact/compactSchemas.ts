@@ -32,7 +32,6 @@ import {
   longRunning,
   pairsPurpose,
   purpose,
-  sapRowBound,
   toolDescription,
 } from '../description/index';
 import { DETAIL_LEVELS } from '../detail/levels';
@@ -2763,12 +2762,17 @@ function getDataProperties(sql: boolean) {
   };
 }
 
-/** The row bound: the consumer's, sent as given; absent, SAP's own (`sapRowBound`). */
+/**
+ * The row count: required, the consumer's, sent as given (#391). Measured on
+ * the BTP ABAP environment (2026-11-27): SAP refuses 0, and 2147483646 is the
+ * largest it accepts.
+ */
 const MAX_ROWS = {
   max_rows: z
     .number()
-    .optional()
-    .describe('Most records to read. Absent: SAP gives at most 100.'),
+    .describe(
+      'Most records to read, required. SAP refuses 0, and the largest count it accepts is 2147483646.',
+    ),
 };
 
 /** `detail`, the data tools' own: how much of the rows' answer to return. */
@@ -2834,7 +2838,7 @@ export function handlerGetDataWithSqlDefinition() {
       purpose: purpose(
         'Reads the data of an ABAP database table or CDS view, or the data an ABAP SQL SELECT selects, up to the number of records asked.',
       ),
-      notes: [sapRowBound, longRunning],
+      notes: [longRunning],
     }),
     inputSchema: compactGetDataSchema,
   };
@@ -2848,7 +2852,7 @@ export function handlerGetDataWithoutSqlDefinition() {
       purpose: purpose(
         'Reads the data of an ABAP database table or CDS view, up to the number of records asked.',
       ),
-      notes: [sapRowBound, longRunning],
+      notes: [longRunning],
     }),
     inputSchema: withInCallSchema(
       z

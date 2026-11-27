@@ -82,24 +82,24 @@ describe('HandlerGetData', () => {
   });
 
   it('reads every column of the object otherwise', async () => {
-    await handleHandlerGetData(context, { object_name: 'ZT' });
+    await handleHandlerGetData(context, { object_name: 'ZT', max_rows: 9 });
     assert.deepStrictEqual(calls, [
       {
         tool: 'GetTableContents',
-        args: { table_name: 'ZT', detail: 'terse' },
+        args: { table_name: 'ZT', max_rows: 9, detail: 'terse' },
       },
     ]);
   });
 
-  // No bound of the server's (#391): one given goes on as given, 0 included.
-  it('forwards no row bound when none is given, and a given one as given', async () => {
-    await handleHandlerGetData(context, { sql_query: 'SELECT * FROM ZT' });
+  // No bound of the server's (#391): max_rows is required, and handed on as
+  // given, 0 included.
+  it('refuses a call without max_rows, and forwards a given one as given', async () => {
+    assert.equal(
+      GetData_Tool.inputSchema.safeParse({ object_name: 'ZT' }).success,
+      false,
+    );
     await handleHandlerGetData(context, { object_name: 'ZT', max_rows: 0 });
     assert.deepStrictEqual(calls, [
-      {
-        tool: 'GetSqlQuery',
-        args: { sql_query: 'SELECT * FROM ZT', detail: 'terse' },
-      },
       {
         tool: 'GetTableContents',
         args: { table_name: 'ZT', max_rows: 0, detail: 'terse' },
@@ -112,10 +112,12 @@ describe('HandlerGetData', () => {
     it(`forwards detail ${detail} to the read it routes to`, async () => {
       await defineTool(GetData_Tool, handleHandlerGetData).call(context, {
         object_name: 'ZT',
+        max_rows: 5,
         detail,
       });
       await defineTool(GetData_Tool, handleHandlerGetData).call(context, {
         sql_query: 'SELECT * FROM ZT',
+        max_rows: 5,
         detail,
       });
       assert.deepStrictEqual(
@@ -130,7 +132,9 @@ describe('HandlerGetData', () => {
 
   it('refuses with neither, asking nothing: its schema holds the rule', async () => {
     await assertRejects(
-      defineTool(GetData_Tool, handleHandlerGetData).call(context, {}),
+      defineTool(GetData_Tool, handleHandlerGetData).call(context, {
+        max_rows: 5,
+      }),
       'object_name or sql_query is required',
     );
     assert.equal(calls.length, 0);

@@ -8,7 +8,6 @@ import {
   readAmdpStart,
   terseAmdpEvent,
 } from '../../../lib/debugger/amdpReadings';
-import { TERSE_STACK_FRAMES } from '../../../lib/debugger/readings';
 import { corpusBody, corpusSidecar } from '../../helpers/adtCorpus';
 import { assertMatchObject } from '../../helpers/assertions';
 import {
@@ -114,7 +113,7 @@ describe('AMDP readings', () => {
       },
     ]);
   });
-  it('terse names a frame not compiled for debugging; a deep stack keeps its top frames and its depth', () => {
+  it('terse names a frame not compiled for debugging; a deep stack keeps every frame', () => {
     const recorded = corpusBody('amdp-debugger--05-events-on-break');
     const entry =
       /<amdpdbg:callstackEntry\b[\s\S]*?<\/amdpdbg:callstackEntry>/.exec(
@@ -125,13 +124,11 @@ describe('AMDP readings', () => {
       'amdpdbg:isDebugCompiled="false"',
     );
     assert.notEqual(cold, entry);
-    const xml = recorded.replace(
-      entry,
-      cold + entry.repeat(TERSE_STACK_FRAMES + 2),
-    );
+    const xml = recorded.replace(entry, cold + entry.repeat(52));
     const terse = terseAmdpEvent(readAmdpEvents(xml)[0]);
-    assert.equal(terse.stack?.length, TERSE_STACK_FRAMES);
-    assert.equal(terse.stack_depth, TERSE_STACK_FRAMES + 3);
+    // No cut of the server's (#391, the owner): every frame.
+    assert.equal(terse.stack?.length, 53);
+    assert.equal('stack_depth' in terse, false);
     assert.equal(terse.stack?.[0].not_debug_compiled, true);
     assert.equal(terse.stack?.[1].not_debug_compiled, undefined);
   });

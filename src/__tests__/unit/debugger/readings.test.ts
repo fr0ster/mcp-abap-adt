@@ -11,7 +11,6 @@ import {
   readSettings,
   readStack,
   readVariables,
-  TERSE_STACK_FRAMES,
   terseSettings,
   terseStop,
   terseVariables,
@@ -162,12 +161,13 @@ describe('readings of the debugger documents (recorded answers)', () => {
       line: 105,
     });
   });
-  it('terse cuts a deep stack at its top frames and says how deep it was', () => {
+  // No cut of the server's (#391, the owner): terse lists every frame.
+  it('terse lists every frame of a deep stack', () => {
     const stack = readStack(corpusBody('debugger-run-to-line--04-stack'));
     const deep = {
       ...stack,
       frames: Array.from(
-        { length: TERSE_STACK_FRAMES + 7 },
+        { length: 57 },
         (_, i) => stack.frames[i % stack.frames.length],
       ),
     };
@@ -176,8 +176,8 @@ describe('readings of the debugger documents (recorded answers)', () => {
       deep,
       readAttach(corpusBody('debugger-run-to-line--03-attach')),
     );
-    assert.equal(t.frames.length, TERSE_STACK_FRAMES);
-    assert.equal(t.stack_depth, TERSE_STACK_FRAMES + 7);
+    assert.equal(t.frames.length, 57);
+    assertNoProperty(t, 'stack_depth');
   });
 
   it('terse variables: name, type, value', () => {

@@ -256,7 +256,6 @@ export async function handleHandlerDebugMaintain(
           return {
             ...(top ? { at: placeOf(top) } : {}),
             frames: kept.frames,
-            ...(kept.depth ? { stack_depth: kept.depth } : {}),
           };
         },
       );

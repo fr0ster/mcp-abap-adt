@@ -333,9 +333,8 @@ The listener attaches the first program caught **automatically**: a caught progr
 is attachable only while it waits, and the seconds between two model calls can
 lose it. `DebugWait` then answers `stopped`, with where
 the program stands — the object address a breakpoint takes and the system's
-technical place — and the stack. Under `terse` the stack keeps up to 50 frames
-from the top, so an ordinary one (some 20–25 frames) comes whole; a deeper one
-is cut and `stack_depth` says how deep it was — `detail: full` answers all of it.
+technical place — and the stack. Under `terse` the stack lists every frame,
+innermost first, each by its place; `detail: full` answers each frame whole.
 
 One debuggee at a time. While one is stopped, the listener does not poll; it
 resumes once that one is released (a step that runs it to its end, `continue`
@@ -762,8 +761,8 @@ class (`class_name`, `line`).
   session of this user left behind. `AmdpDebugSetBreakpoints` replaces the set and
   answers each breakpoint's state as confirmed.
 - `AmdpDebugWait` answers the events that arrived — a break with its variables and
-  its call stack, the end of the execution, a warning. Under `terse` a break keeps
-  up to 50 frames from the top, as the ABAP stop does (`stack_depth` when cut) —
+  its call stack, the end of the execution, a warning. Under `terse` a break lists
+  every frame, as the ABAP stop does —
   the system sends the innermost first (measured on premise, 2026-10-11) — each as the procedure, the ABAP address (`object_type`,
   `object_name`, `line`) and the line in the database procedure (`native_line`).
   A caller not compiled for debugging is marked `not_debug_compiled` and keeps

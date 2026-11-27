@@ -359,21 +359,15 @@ export function terseSettings(r: SettingsReading) {
 }
 
 /**
- * How many frames, from the top, a terse stop keeps. Real stacks run to some 20
- * or 25 frames, so an ordinary one passes whole; only a deep one is cut, and then
- * `stack_depth` says how deep it was, so a model can ask for `full`.
+ * The frames a terse answer writes: every one, each as `project` shapes it.
+ * No cut of the server's (#391, the owner): until then terse kept the top 50
+ * frames and named the depth in `stack_depth`.
  */
-export const TERSE_STACK_FRAMES = 50;
-
-/** The frames a terse answer keeps, and the depth when it cut them. */
 export function terseFrames<F, T>(
   frames: F[],
   project: (frame: F) => T,
-): { frames: T[]; depth?: number } {
-  return {
-    frames: frames.slice(0, TERSE_STACK_FRAMES).map(project),
-    ...(frames.length > TERSE_STACK_FRAMES ? { depth: frames.length } : {}),
-  };
+): { frames: T[] } {
+  return { frames: frames.map(project) };
 }
 
 /**
@@ -404,7 +398,6 @@ export function terseStop(
   return {
     at,
     frames: kept.frames,
-    ...(kept.depth ? { stack_depth: kept.depth } : {}),
     ...(debuggee.attachImpossible ? { attach_impossible: true } : {}),
     ...(debuggee.dump ? { dump: debuggee.dump } : {}),
     // DEBUGGEE is the ordinary catch (every recorded one); any other kind relates to the dump.

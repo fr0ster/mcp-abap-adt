@@ -113,11 +113,10 @@ describe("the shipped line match (substringLineMatch) keeps today's match", () =
     );
   });
 
-  it('snippet is trimmed to 255 chars when the source line is longer', () => {
+  it('a snippet is the whole line, however long: no cut of the server’s own', () => {
     const long = 'WRITE ' + 'X'.repeat(400);
     const r = scanLines([long], { query: 'write', max_hits: 10 });
     assert.equal(r.hits.length, 1);
-    assert.equal(r.hits[0].snippet.length, 255);
-    assert.equal(r.hits[0].snippet.startsWith('WRITE '), true);
+    assert.equal(r.hits[0].snippet, long);
   });
 });

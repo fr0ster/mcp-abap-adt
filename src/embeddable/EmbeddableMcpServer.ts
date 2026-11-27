@@ -120,6 +120,12 @@ export interface EmbeddableMcpServerBaseOptions {
    * hits. Absent: the shipped one, `substringLineMatch`.
    */
   lineMatchStrategy?: LineMatchStrategy;
+  /**
+   * The consumer's bound on the parts (requests) one ADT batch envelope of a call
+   * carries: a positive whole number, else the constructor throws. Absent: no
+   * bound — a phase's independent reads go in one envelope.
+   */
+  partsPerEnvelope?: number;
 
   /**
    * The corrected request header pairs of the systems this instance talks
@@ -349,6 +355,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       }),
       ...(options.lineMatchStrategy !== undefined && {
         lineMatchStrategy: options.lineMatchStrategy,
+      }),
+      ...(options.partsPerEnvelope !== undefined && {
+        partsPerEnvelope: options.partsPerEnvelope,
       }),
       ...(options.batch !== undefined && { batch: options.batch }),
       ...(options.heldLocks !== undefined && {

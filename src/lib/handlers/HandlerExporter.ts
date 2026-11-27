@@ -16,6 +16,7 @@ import {
   longToolInTheCall,
   withoutBackgroundParameter,
 } from '../backgroundRuns/tools.js';
+import { partsPerEnvelopeOf } from '../batch/phases.js';
 import { noopLogger } from '../handlerLogger.js';
 import { isLongTool } from '../longTools.js';
 import {
@@ -117,6 +118,15 @@ export interface HandlerExporterOptions {
    * applies. Absent: the shipped one, `substringLineMatch`.
    */
   lineMatchStrategy?: LineMatchStrategy;
+
+  /**
+   * The consumer's bound on the parts (requests) one ADT batch envelope of a call
+   * carries: a positive whole number, else the constructor throws. As
+   * `sapAnswerStrategy`, on `getHandlerEntries()` and `registerOnServer`;
+   * on `createRegistry()` the hosting server's option applies. Absent: no
+   * bound — a phase's independent reads go in one envelope.
+   */
+  partsPerEnvelope?: number;
 
   /**
    * The denied actions (`readAccessRestrictions`, `parseDeniedEntry`):
@@ -250,6 +260,7 @@ export class HandlerExporter {
   private readonly systemType: string | undefined;
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
+  private readonly partsPerEnvelope: number | undefined;
   private readonly access:
     | { readonly checks: IAccessChecks; readonly readOnly: ReadonlySet<string> }
     | undefined;
@@ -259,6 +270,10 @@ export class HandlerExporter {
     this.statedLogger = options?.logger;
     this.sapAnswerStrategy = options?.sapAnswerStrategy;
     this.lineMatchStrategy = options?.lineMatchStrategy;
+    this.partsPerEnvelope =
+      options?.partsPerEnvelope === undefined
+        ? undefined
+        : partsPerEnvelopeOf(options.partsPerEnvelope, 'partsPerEnvelope');
     this.systemType = options?.systemType;
     this.systemContextResolver = options?.systemContextResolver ?? null;
     this.systemContextRules = options?.systemContextRules ?? null;
@@ -449,6 +464,7 @@ export class HandlerExporter {
     const {
       sapAnswerStrategy: _sap,
       lineMatchStrategy: _lines,
+      partsPerEnvelope: _bound,
       ...rest
     } = context;
     return {
@@ -458,12 +474,15 @@ export class HandlerExporter {
     };
   }
 
-  /** This exporter's `SearchSource` strategies: a field per option given. */
+  /** This exporter's `SearchSource` strategies and envelope bound: a field per option given. */
   private strategies(): Pick<
     HandlerContext,
-    'sapAnswerStrategy' | 'lineMatchStrategy'
+    'sapAnswerStrategy' | 'lineMatchStrategy' | 'partsPerEnvelope'
   > {
     return {
+      ...(this.partsPerEnvelope !== undefined && {
+        partsPerEnvelope: this.partsPerEnvelope,
+      }),
       ...(this.sapAnswerStrategy !== undefined && {
         sapAnswerStrategy: this.sapAnswerStrategy,
       }),

@@ -83,6 +83,13 @@ export interface IServerConfig {
   batchKeepRawParts?: boolean | undefined;
 
   /**
+   * The consumer's bound on the parts (requests) one ADT batch envelope of a call
+   * carries (`--batch-parts-per-envelope`, `MCP_BATCH_PARTS_PER_ENVELOPE`,
+   * `batch.partsPerEnvelope`): a positive whole number. Absent: no bound.
+   */
+  batchPartsPerEnvelope?: number | undefined;
+
+  /**
    * Whether the binary serves the data tools (`--enable-data-tools`,
    * `MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`). Default `false`.
    */

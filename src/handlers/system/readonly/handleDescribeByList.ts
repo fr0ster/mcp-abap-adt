@@ -1,5 +1,6 @@
 import type { ISearchResult } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
+import { appendAll } from '../../../lib/appendAll';
 import {
   longRunning,
   purpose,
@@ -355,7 +356,7 @@ function describedBy(
     }
     const listed = isAnswerObject(parsedItem) ? parsedItem.results : undefined;
     if (listed !== undefined && isAnswerList(listed)) {
-      allResults.push(...listed);
+      appendAll(allResults, listed);
     } else allResults.push(parsedItem);
   }
   return {

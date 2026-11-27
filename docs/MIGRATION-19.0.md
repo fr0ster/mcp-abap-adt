@@ -244,6 +244,7 @@ section but one): it cannot be cut, so it gets no `timeout`.
 - **`SearchSource` reads in ADT batch envelopes** (the package mask searches, each level of the
   package walk, then the sources of the scanned objects in envelopes of at most 300 reads), so its
   `concurrency` parameter (parallel source fetches, default 8, max 16) is removed from the schema.
+  (Since 24.2.2 the 300 is gone: the envelopes carry no bound unless `--batch-parts-per-envelope` sets one.)
   **Drop `concurrency` from your calls**; the hits are the same. `time_budget_ms` is checked before
   every envelope, and a scan it stops answers whole objects only, with `next_start_at` at the first
   object not answered: pass it as `start_at` to go on (a deadline during the package walk answers

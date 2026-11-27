@@ -77,6 +77,14 @@ export interface HandlerContext {
    */
   lineMatchStrategy?: LineMatchStrategy;
   /**
+   * @internal Set by the server from its options; not part of the context a
+   * consumer builds. The consumer's bound on the parts (requests) one ADT batch
+   * envelope of the call carries (`envelopesOf`, `src/lib/batch/phases.ts`):
+   * a positive whole number. Absent: no bound — a phase's independent reads
+   * go in one envelope. Kept in every context derived from this one.
+   */
+  partsPerEnvelope?: number;
+  /**
    * The request header pairs of the call's system (`AdtHeaderPairs`): the
    * pair a header-taking member is called with (`withAdtHeaders`), and
    * where a corrected one is kept. Kept in every context derived from this

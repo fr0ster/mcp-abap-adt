@@ -314,7 +314,10 @@ only as options — `HandlerExporter`'s, or the hosting server's:
   refusal. A credential refusal always ends the call; a failed batch envelope
   and anything else are always thrown. Absent: `skipSapAnswers`.
 - **`lineMatchStrategy`** (`LineMatchStrategy`): which lines of a source are
-  hits (`ScanInput` in, `ScanResult` out). Absent: `substringLineMatch`.
+  hits (`ScanInput` in, `ScanResult` out). Absent: `substringLineMatch`. A
+  strategy whose hits are only lines holding `query` may say so
+  (`hitsHoldQuery: true`, as the shipped one does): with `max_hits`, a step
+  whose sources hold no query is then not scanned again.
 
 Both contracts and both shipped strategies are exported from
 `@mcp-abap-adt/lib/embeddable`. On `getHandlerEntries()` and
@@ -324,6 +327,20 @@ from its options). On `createRegistry()` the tools run in the contexts of the
 server the registry is handed to: there the server's own `systemType`, resolver,
 rules, logger and `sapAnswerStrategy` / `lineMatchStrategy` options apply, never the
 exporter's.
+
+## Parts per batch envelope
+
+`partsPerEnvelope` (a positive whole number, else the constructor throws) is
+the consumer's bound on the parts (requests) one ADT batch envelope of a call carries,
+where a tool reads several objects at once (`GetEnhancements`,
+`SearchSource`, the package listings and walks, the function module group
+checks): the reads go in consecutive envelopes of balanced size, each
+read's requests together; a read needing more parts than the bound is an
+error naming both numbers, nothing sent. Absent: no
+bound — a phase's independent reads go in one envelope, and SAP's answer to
+it is the answer. It applies as the strategies above do: the exporter's on
+`getHandlerEntries()` and `registerOnServer`, the hosting server's
+(`EmbeddableMcpServer`'s `partsPerEnvelope`) on `createRegistry()`.
 
 ## Logging
 

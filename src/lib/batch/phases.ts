@@ -59,26 +59,42 @@ import type {
 import type { HandlerContext } from '../../handlers/interfaces';
 import { adtCallScope, type HeaderInvocation } from '../adtHeaders/scope';
 import { correctedPair } from '../adtHeaders/withAdtHeaders';
+import { appendAll } from '../appendAll';
 import { failureOf, readOwn } from '../auth/failures';
+import {
+  MIN_PARTS_PER_ENVELOPE,
+  partsPerEnvelopeRefusal,
+} from '../config/authParameters';
 import { withSystemKindOf } from '../connectionFactory';
 import { NO_BATCH_ENDPOINT_STATUS } from './availability';
 
 /**
- * The most reads one envelope carries where a call's independent reads may
- * outnumber it: past it, they go in consecutive envelopes of at most this
- * many (`SearchSource`'s source reads, the function module group checks,
- * `GetEnhancements`' phases). SAP's own limit is not measured.
+ * `value` when it is a bound the envelopes can keep — a whole number from
+ * `MIN_PARTS_PER_ENVELOPE` —, else a throw naming `name`. For a bound an
+ * embedder states in its options (`partsPerEnvelope`); the configured one
+ * is read by `BATCH_PARTS_PER_ENVELOPE_ROW`.
  */
-export const READS_PER_ENVELOPE = 300;
+export function partsPerEnvelopeOf(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < MIN_PARTS_PER_ENVELOPE) {
+    throw new Error(partsPerEnvelopeRefusal(name));
+  }
+  return value;
+}
 
 /**
- * The consecutive slices of `items`, in order: as few as hold at most
- * `size` each, balanced — their lengths differ by one at most, so past the
- * bound no slice is a single read beside a full one (301 reads at 300 are
- * 151 and 150, never 300 and 1).
+ * The consecutive slices of `items`, in order. `size` absent: no bound,
+ * every item in one slice (none for no item) — whatever SAP answers to it
+ * is SAP's. `size` given (the consumer's bound): as few slices as hold at
+ * most `size` each, balanced — their lengths differ by one at most, so past
+ * the bound no slice is a single read beside a full one (301 reads at 300
+ * are 151 and 150, never 300 and 1).
  */
-export function chunksOf<I>(items: readonly I[], size: number): I[][] {
-  const count = Math.ceil(items.length / size);
+export function chunksOf<I>(
+  items: readonly I[],
+  size: number | undefined,
+): I[][] {
+  if (items.length === 0) return [];
+  const count = size === undefined ? 1 : Math.ceil(items.length / size);
   const chunks: I[][] = [];
   let at = 0;
   for (let i = 0; i < count; i++) {
@@ -89,6 +105,52 @@ export function chunksOf<I>(items: readonly I[], size: number): I[][] {
     at += length;
   }
   return chunks;
+}
+
+/** The fixed words of a read that needs more parts than the consumer's bound: both numbers. */
+export function oversizedReadWords(parts: number, bound: number): string {
+  return `a read of this step needs ${parts} parts in one ADT batch envelope, more than the ${bound} parts per envelope set (--batch-parts-per-envelope / partsPerEnvelope); nothing was sent`;
+}
+
+/**
+ * The items in consecutive envelopes of at most `bound` parts, each item's
+ * `parts` together in one, in item order: as few envelopes as a greedy fill
+ * needs, balanced when that takes no more envelopes (302 one-part reads at
+ * 300 are 151 and 151). An item over the bound goes alone in its envelope,
+ * which the dispatch check then refuses (`checkedEnvelopes`).
+ */
+export function packByParts<I>(
+  items: readonly I[],
+  parts: readonly number[],
+  bound: number,
+): I[][] {
+  const fill = (cap: number): I[][] => {
+    const out: I[][] = [];
+    let current: I[] = [];
+    let used = 0;
+    items.forEach((item, at) => {
+      const own = parts[at] ?? 0;
+      if (current.length > 0 && used + own > cap) {
+        out.push(current);
+        current = [];
+        used = 0;
+      }
+      current.push(item);
+      used += own;
+    });
+    if (current.length > 0) out.push(current);
+    return out;
+  };
+  const greedy = fill(bound);
+  if (greedy.length < 2) return greedy;
+  let total = 0;
+  let largest = 0;
+  for (const own of parts) {
+    total += own;
+    if (own > largest) largest = own;
+  }
+  const balanced = fill(Math.max(largest, Math.ceil(total / greedy.length)));
+  return balanced.length <= greedy.length ? balanced : greedy;
 }
 
 /** One item's settlement in a phase. */
@@ -241,10 +303,14 @@ function settledOf(answer: Promise<IAdtWireResponse>): Promise<PartAnswer> {
  */
 async function correctPhaseParts(
   context: HandlerContext,
-  phase: AdtBatchConnection,
+  phase: object,
   parts: readonly RecordedPart[],
   firsts: readonly PartAnswer[],
-): Promise<void> {
+): Promise<{
+  failed?: { error: unknown };
+  oversized?: Error;
+  answers: readonly PartAnswer[];
+}> {
   const corrected: { invocation: HeaderInvocation; pair: IAdtHeaders }[] = [];
   const seen = new Set<HeaderInvocation>();
   firsts.forEach((first, at) => {
@@ -255,15 +321,13 @@ async function correctPhaseParts(
     seen.add(invocation);
     corrected.push({ invocation, pair });
   });
-  if (corrected.length === 0) return;
-  const watch = outerStatusWatch(context.connection);
-  const batch = withSystemKindOf(
-    new AdtBatchConnection(watch.forwarding, {
-      endpoint: 'communication',
-      ...(context.logger !== undefined ? { logger: context.logger } : {}),
-    }),
-    watch.forwarding,
-  );
+  if (corrected.length === 0) return { answers: [] };
+  // The corrected calls' requests, recorded first and sent only once their
+  // count is checked against the consumer's bound.
+  const recordedAgain: {
+    request: IAbapRequestOptions;
+    answer: (final: PartAnswer) => void;
+  }[] = [];
   const waits = corrected.map(({ invocation, pair }) => {
     invocation.port?.remember(invocation.operation, pair);
     let signal: () => void = () => {};
@@ -275,9 +339,15 @@ async function correctPhaseParts(
         correcting: {
           phase,
           record: (request) => {
-            const answer = batch.makeAdtRequest(request);
+            let answer: (final: PartAnswer) => void = () => {};
+            const final = new Promise<PartAnswer>((resolve) => {
+              answer = resolve;
+            });
+            recordedAgain.push({ request, answer });
             signal();
-            return answer;
+            return final.then((settled) =>
+              settled.ok ? settled.response : Promise.reject(settled.error),
+            );
           },
         },
       },
@@ -289,12 +359,63 @@ async function correctPhaseParts(
   });
   await Promise.all(waits);
   await new Promise((resolve) => setImmediate(resolve));
+  // The correction envelope keeps the consumer's bound as every envelope
+  // does: over it, nothing is sent and the calls answer the refusal.
+  const bound = context.partsPerEnvelope;
+  if (bound !== undefined && recordedAgain.length > bound) {
+    const oversized = new Error(
+      oversizedReadWords(recordedAgain.length, bound),
+    );
+    for (const part of recordedAgain) {
+      part.answer({ ok: false, error: oversized });
+    }
+    return { oversized, answers: [] };
+  }
+  const watch = outerStatusWatch(context.connection);
+  const batch = withSystemKindOf(
+    new AdtBatchConnection(watch.forwarding, {
+      endpoint: 'communication',
+      ...(context.logger !== undefined ? { logger: context.logger } : {}),
+    }),
+    watch.forwarding,
+  );
+  // The corrected parts' answers, for the phase's decision to go on.
+  const answers = recordedAgain.map((part) =>
+    settledOf(batch.makeAdtRequest(part.request)),
+  );
+  let failed: { error: unknown } | undefined;
   try {
     await batch.execute();
-  } catch {
+  } catch (error) {
     // Every part recorded again settles with the envelope's failure: its
-    // call's answer.
+    // call's answer. The phase is told, so no later envelope is sent.
+    failed = { error };
   }
+  const settled = await Promise.all(answers);
+  recordedAgain.forEach((part, at) => {
+    const answer = settled[at];
+    if (answer !== undefined) part.answer(answer);
+  });
+  return { ...(failed !== undefined && { failed }), answers: settled };
+}
+
+/**
+ * What ends a phase after one of its envelopes, besides the envelope's own
+ * failure: a failed correction envelope, or a part SAP answered `401` — the
+ * credential's refusal, which ends the call whatever its read makes of it.
+ * The error the items not sent settle with.
+ */
+type PhaseEnd = { readonly error: unknown } | undefined;
+
+/** A part SAP answered `401`, as its first answer carries it. */
+function unauthorizedPart(firsts: readonly PartAnswer[]): PhaseEnd {
+  for (const first of firsts) {
+    if (first.ok) continue;
+    if (statusOf(readOwn(first.error, 'response')) === 401) {
+      return { error: first.error };
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -319,20 +440,63 @@ async function correctPhaseParts(
 export interface PhaseOutcome<R> {
   results: PhaseResult<R>[];
   /**
+   * The items whose envelope was not sent — the phase ended before it —, by
+   * index: their settlements are what their reads made of that, no answer.
+   * Absent where every item was sent.
+   */
+  unsent?: ReadonlySet<number>;
+  /**
    * `outer`: the envelope request's own status, when it had one — a `404`
    * there is the envelope's failure, not each part's "not found".
    */
   envelope:
     | { failed: false }
-    | { failed: true; error: unknown; outer: number | undefined };
+    | {
+        failed: true;
+        error: unknown;
+        outer: number | undefined;
+        /**
+         * The first item of the envelope that failed: the items before it
+         * were answered by envelopes that did not (absent: the first item).
+         */
+        from?: number;
+      };
 }
+
+/**
+ * How a phase decides to go on after each envelope, beside the rule that a
+ * credential refusal always ends it.
+ */
+export interface PhaseRules<I, R> {
+  /**
+   * Whether a failed envelope — its own request, its correction envelope —
+   * or a part SAP answered `401` ends the phase. Default `true`; `false` for
+   * a phase whose every failure is the item's own (`GetObjectInfo`'s
+   * metadata phase).
+   */
+  readonly failuresEnd?: boolean;
+  /**
+   * Asked after each envelope but the last, with its items and their
+   * settlements, in item order: `true` ends the phase — the later envelopes
+   * are not sent, and their reads settle with `NOT_SENT_WORDS`.
+   */
+  readonly after?: (
+    items: readonly I[],
+    results: readonly PhaseResult<R>[],
+  ) => boolean | Promise<boolean>;
+}
+
+/** The fixed words a read settles with when its envelope was not sent: the phase ended before it. */
+export const NOT_SENT_WORDS =
+  "the step ended before this read's envelope was sent";
 
 export async function runPhase<I, R>(
   context: HandlerContext,
   items: readonly I[],
   read: (item: I, batch: IAbapConnection) => Promise<R>,
+  rules?: PhaseRules<I, R>,
 ): Promise<PhaseResult<R>[]> {
-  const { results } = await runPhaseOutcome(context, items, read);
+  const { results } = await runPhaseOutcome(context, items, read, rules);
   // A credential refusal reaches every part as the same object
   // (adt-clients): the call ends with it, as it came.
   for (const result of results) {
@@ -343,45 +507,98 @@ export async function runPhase<I, R>(
   return results;
 }
 
-/** `runPhase`, its envelope's failure reported beside the settlements (`PhaseOutcome`). */
+/** One request a read recorded, waiting for its envelope. */
+interface Pending extends RecordedPart {
+  readonly item: number;
+  readonly request: IAbapRequestOptions;
+}
+
+/**
+ * The planned envelopes, each a run of item indexes, checked against the
+ * bound by the parts recorded — right before anything is sent: an envelope
+ * over the bound (a read needing more parts than the bound) is refused with
+ * both numbers, and nothing of the phase goes out.
+ */
+function checkedEnvelopes(
+  planned: readonly (readonly number[])[],
+  partsOf: readonly number[],
+  bound: number | undefined,
+): { envelopes: readonly (readonly number[])[] } | { refused: Error } {
+  if (bound === undefined) return { envelopes: planned };
+  for (const envelope of planned) {
+    let parts = 0;
+    for (const item of envelope) parts += partsOf[item] ?? 0;
+    if (parts > bound) {
+      return { refused: new Error(oversizedReadWords(parts, bound)) };
+    }
+  }
+  return { envelopes: planned };
+}
+
+/**
+ * `runPhase`, its envelope's failure reported beside the settlements
+ * (`PhaseOutcome`). Every read records its requests once, on a connection
+ * that sends nothing; the recorded parts are then planned by the
+ * consumer's bound (`context.partsPerEnvelope`): absent, one envelope; given,
+ * balanced envelopes of at most that many parts, each read's parts together
+ * (`packByParts`), checked before the first is sent (`checkedEnvelopes`).
+ * The envelopes go one after another, each read handed its answers. An
+ * envelope that met a credential refusal — and, unless `rules.failuresEnd`
+ * is `false`, one that failed, whose correction envelope failed or that
+ * holds a part SAP answered `401` — ends the phase, as `rules.after` may:
+ * no later envelope is sent, and its reads settle with that failure (or
+ * `NOT_SENT_WORDS`). The settlements stay one per item, in item order; the
+ * outcome's `envelope` is the first failed envelope's.
+ */
 export async function runPhaseOutcome<I, R>(
   context: HandlerContext,
   items: readonly I[],
   read: (item: I, batch: IAbapConnection) => Promise<R>,
+  rules?: PhaseRules<I, R>,
 ): Promise<PhaseOutcome<R>> {
-  const watch = outerStatusWatch(context.connection);
-  const batch = withSystemKindOf(
-    new AdtBatchConnection(watch.forwarding, {
+  const failuresEnd = rules?.failuresEnd !== false;
+  // The connection the reads record on: nothing is sent through it.
+  const planning = withSystemKindOf(
+    new AdtBatchConnection(context.connection, {
       endpoint: 'communication',
       ...(context.logger !== undefined ? { logger: context.logger } : {}),
     }),
-    watch.forwarding,
+    context.connection,
   );
   let sealed = false;
-  const parts: RecordedPart[] = [];
-  // A part's answer reaches its read once the correction is made.
-  const record = (request: IAbapRequestOptions): Promise<IAdtWireResponse> => {
-    const invocation = adtCallScope.getStore()?.invocation;
-    if (invocation !== undefined) invocation.parts += 1;
-    const first = settledOf(batch.makeAdtRequest(request));
-    let answer: (final: PartAnswer) => void = () => {};
-    const final = new Promise<PartAnswer>((resolve) => {
-      answer = resolve;
-    });
-    parts.push({ first, answer, invocation });
-    return final.then((settled) =>
-      settled.ok ? settled.response : Promise.reject(settled.error),
-    );
-  };
-  const entries = items.map((item) => {
+  const pending: Pending[] = [];
+  const entries = items.map((item, at) => {
     let signal: () => void = () => {};
     const recorded = new Promise<void>((resolve) => {
       signal = resolve;
     });
-    const view = itemView(batch, () => sealed, signal, record);
+    // A part's answer reaches its read once its envelope (and correction)
+    // answered.
+    const record = (
+      request: IAbapRequestOptions,
+    ): Promise<IAdtWireResponse> => {
+      const invocation = adtCallScope.getStore()?.invocation;
+      if (invocation !== undefined) invocation.parts += 1;
+      let answer: (final: PartAnswer) => void = () => {};
+      const final = new Promise<PartAnswer>((resolve) => {
+        answer = resolve;
+      });
+      // `first` is set when the part is dispatched.
+      pending.push({
+        item: at,
+        request,
+        first: final,
+        answer,
+        invocation,
+      });
+      return final.then((settled) =>
+        settled.ok ? settled.response : Promise.reject(settled.error),
+      );
+    };
+    const view = itemView(planning, () => sealed, signal, record);
     const outer = adtCallScope.getStore();
     const settled = adtCallScope
-      .run({ ...outer, phase: batch, invocation: undefined }, async () =>
+      .run({ ...outer, phase: planning, invocation: undefined }, async () =>
         read(item, view),
       )
       .then(
@@ -393,9 +610,159 @@ export async function runPhaseOutcome<I, R>(
   // Every item has recorded or settled.
   await Promise.all(entries.map((e) => Promise.race([e.recorded, e.settled])));
   // The parts an item records in the same stretch as its first: every
-  // pending continuation runs before the envelope is sealed.
+  // pending continuation runs before the recording is sealed.
   await new Promise((resolve) => setImmediate(resolve));
   sealed = true;
+
+  const partsOf = items.map(() => 0);
+  for (const part of pending)
+    partsOf[part.item] = (partsOf[part.item] ?? 0) + 1;
+  const indexes = items.map((_, at) => at);
+  const bound = context.partsPerEnvelope;
+  const planned =
+    items.length === 0
+      ? []
+      : bound === undefined
+        ? [indexes]
+        : packByParts(indexes, partsOf, bound);
+  const checked = checkedEnvelopes(planned, partsOf, bound);
+  const settleUnsent = (parts: readonly Pending[], error: unknown): void => {
+    for (const part of parts) part.answer({ ok: false, error });
+  };
+  if ('refused' in checked) {
+    // Nothing is sent: every read settles with the refusal, which is thrown.
+    settleUnsent(pending, checked.refused);
+    await Promise.all(entries.map((e) => e.settled));
+    throw checked.refused;
+  }
+
+  let envelope: PhaseOutcome<R>['envelope'] = { failed: false };
+  let ended: { error: unknown } | undefined;
+  // Items of an envelope the phase was refused: nothing of theirs is kept.
+  const refusedItems = new Map<number, Error>();
+  // Items whose envelope was not sent: the phase ended before it.
+  const unsent = new Set<number>();
+  for (const [at, run] of checked.envelopes.entries()) {
+    const members = new Set(run);
+    const parts = pending.filter((part) => members.has(part.item));
+    if (ended !== undefined) {
+      settleUnsent(parts, ended.error);
+      for (const item of run) unsent.add(item);
+      continue;
+    }
+    const sent = await sendEnvelope(context, planning, parts);
+    if (sent.oversized !== undefined) {
+      // Nothing more is sent: every read not answered settles with the
+      // refusal, which is thrown.
+      const refused = sent.oversized;
+      settleUnsent(
+        pending.filter((part) => !members.has(part.item)),
+        refused,
+      );
+      await Promise.all(entries.map((e) => e.settled));
+      throw refused;
+    }
+    if (sent.absent !== undefined) {
+      // The destination has no communication batch: nothing else is sent.
+      settleUnsent(
+        pending.filter((part) => !members.has(part.item)),
+        sent.absent,
+      );
+      await Promise.all(entries.map((e) => e.settled));
+      throw sent.absent;
+    }
+    const results = await Promise.all(
+      run.map(
+        (item): Promise<PhaseResult<R>> =>
+          entries[item]?.settled ??
+          Promise.resolve({ ok: false, error: sent.failed?.error }),
+      ),
+    );
+    if (sent.failed !== undefined && !envelope.failed) {
+      envelope = {
+        failed: true,
+        error: sent.failed.error,
+        outer: sent.failed.outer,
+        from: run[0] ?? 0,
+      };
+    }
+    const refusal = results.find(
+      (result) => !result.ok && failureOf(result.error) !== undefined,
+    );
+    if (sent.refused !== undefined) {
+      // Nothing of the envelope is kept: every item fails with the fixed
+      // words, and the phase ends.
+      const refused = sent.refused;
+      for (const item of run) refusedItems.set(item, refused);
+      if (!envelope.failed) {
+        envelope = { failed: true, error: refused, outer: undefined };
+      }
+      ended = { error: refused };
+    } else if (refusal !== undefined && !refusal.ok) {
+      ended = { error: refusal.error };
+    } else if (failuresEnd && sent.failed !== undefined) {
+      ended = { error: sent.failed.error };
+    } else if (failuresEnd && sent.end !== undefined) {
+      ended = sent.end;
+    } else if (
+      at < checked.envelopes.length - 1 &&
+      rules?.after !== undefined &&
+      (await rules.after(
+        run.flatMap((item) => {
+          const value = items[item];
+          return value === undefined ? [] : [value];
+        }),
+        results,
+      ))
+    ) {
+      ended = { error: new Error(NOT_SENT_WORDS) };
+    }
+  }
+  const settled = await Promise.all(entries.map((e) => e.settled));
+  const results = settled.map((result, at): PhaseResult<R> => {
+    const refused = refusedItems.get(at);
+    return refused === undefined ? result : { ok: false, error: refused };
+  });
+  return { results, envelope, unsent };
+}
+
+/** What one envelope's dispatch came to. */
+interface SentEnvelope {
+  /** The envelope request failed: every part's failure, as it came. */
+  readonly failed?: { error: unknown; outer: number | undefined };
+  /** The phase was refused a second envelope request (`MORE_ENVELOPES_WORDS`). */
+  readonly refused?: Error;
+  /** A part SAP answered `401`, or a failed correction envelope. */
+  readonly end?: { error: unknown };
+  /** The outer `404` that is the endpoint's absence: thrown by the phase. */
+  readonly absent?: unknown;
+  /** A correction envelope over the consumer's bound: nothing more is sent, the phase throws it. */
+  readonly oversized?: Error;
+}
+
+/**
+ * One envelope: `parts` recorded on a batch connection of its own, sent
+ * once, their 406/415 parts corrected (not in a call recorded in batch
+ * mode), and every part handed its answer. The envelope request's outer
+ * status is reported to `context.batchAvailability`.
+ */
+async function sendEnvelope(
+  context: HandlerContext,
+  phase: object,
+  parts: readonly Pending[],
+): Promise<SentEnvelope> {
+  const watch = outerStatusWatch(context.connection);
+  const batch = withSystemKindOf(
+    new AdtBatchConnection(watch.forwarding, {
+      endpoint: 'communication',
+      ...(context.logger !== undefined ? { logger: context.logger } : {}),
+    }),
+    watch.forwarding,
+  );
+  const dispatched = parts.map((part) => ({
+    ...part,
+    first: settledOf(batch.makeAdtRequest(part.request)),
+  }));
   let failed = false;
   let error: unknown;
   try {
@@ -407,24 +774,25 @@ export async function runPhaseOutcome<I, R>(
   // Every part has its first answer once the envelope settled. An envelope
   // that answered: its 406/415 parts are corrected before any answer is
   // handed on — not in a call recorded in batch mode, made once.
-  const firsts = await Promise.all(parts.map((part) => part.first));
+  const firsts = await Promise.all(dispatched.map((part) => part.first));
+  let end: { error: unknown } | undefined = unauthorizedPart(firsts);
+  let oversized: Error | undefined;
   if (!failed && adtCallScope.getStore()?.recorded !== true) {
-    await correctPhaseParts(context, batch, parts, firsts);
+    const correction = await correctPhaseParts(
+      context,
+      phase,
+      dispatched,
+      firsts,
+    );
+    if (correction.oversized !== undefined) oversized = correction.oversized;
+    end ??= correction.failed ?? unauthorizedPart(correction.answers);
   }
-  parts.forEach((part, at) => {
+  dispatched.forEach((part, at) => {
     const first = firsts[at];
     if (first !== undefined) part.answer(first);
   });
-  const settled = entries.map((e) => e.settled);
   const refused = watch.refused();
-  if (refused !== undefined) {
-    // Nothing of the phase is kept: every item fails with the fixed words.
-    await Promise.all(settled);
-    return {
-      results: items.map(() => ({ ok: false, error: refused })),
-      envelope: { failed: true, error: refused, outer: undefined },
-    };
-  }
+  if (refused !== undefined) return { refused };
   const outer = watch.outer();
   const port = context.batchAvailability;
   if (outer !== undefined) port?.noteOuterStatus(outer);
@@ -442,12 +810,12 @@ export async function runPhaseOutcome<I, R>(
     ) {
       noBatchEndpoint.add(error);
     }
-    throw error;
+    return { absent: error };
   }
-  const results = await Promise.all(settled);
   return {
-    results,
-    envelope: failed ? { failed: true, error, outer } : { failed: false },
+    ...(failed && { failed: { error, outer } }),
+    ...(end !== undefined && { end }),
+    ...(oversized !== undefined && { oversized }),
   };
 }
 
@@ -464,8 +832,9 @@ export async function runPhaseOrAlone<I, R>(
   items: readonly I[],
   read: (item: I, connection: IAbapConnection) => Promise<R>,
   alone = items.length < 2,
+  rules?: PhaseRules<I, R>,
 ): Promise<PhaseOutcome<R>> {
-  if (!alone) return runPhaseOutcome(context, items, read);
+  if (!alone) return runPhaseOutcome(context, items, read, rules);
   const results: PhaseResult<R>[] = [];
   for (const item of items) {
     results.push(

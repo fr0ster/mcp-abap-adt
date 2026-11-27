@@ -60,54 +60,71 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-it('the HTTP launcher passes the shipped strategies to its per-request server', async () => {
-  const port = await freePort();
-  const server = await main(
-    {
-      toolSet: fullToolSet,
-      program: 'mcp-abap-adt-http',
-      version: '0.0.0',
-      packageName: '@mcp-abap-adt/http',
-    },
-    {
-      argv: ['--host=127.0.0.1', `--port=${port}`, '--system-type=onprem'],
-      stdout: () => {},
-      stderr: () => {},
-      exit: () => {},
-      processLike: Object.assign(new EventEmitter(), {
-        stdin: new EventEmitter(),
-      }),
-    },
-  );
-  if (server === undefined) throw new Error('the launcher started no server');
-  const client = new Client({ name: 'http-strategies', version: '1.0.0' });
-  try {
-    await client.connect(
-      clientTransport(
-        new StreamableHTTPClientTransport(
-          new URL(`http://127.0.0.1:${port}/mcp/stream/http`),
-          {
-            requestInit: {
-              headers: {
-                'x-sap-url': standIn.url,
-                'x-sap-client': '100',
-                'x-sap-login': 'STRATEGY_USER',
-                'x-sap-password': 'strategy-password',
+const BOUND_CASES: ReadonlyArray<{
+  readonly argv: readonly string[];
+  readonly bound: number | undefined;
+}> = [
+  { argv: [], bound: undefined },
+  { argv: ['--batch-parts-per-envelope=300'], bound: 300 },
+];
+
+for (const { argv: boundArgv, bound } of BOUND_CASES) {
+  it(`the HTTP launcher passes the shipped strategies to its per-request server, the envelope bound ${bound ?? 'none'} included`, async () => {
+    seen.length = 0;
+    const port = await freePort();
+    const server = await main(
+      {
+        toolSet: fullToolSet,
+        program: 'mcp-abap-adt-http',
+        version: '0.0.0',
+        packageName: '@mcp-abap-adt/http',
+      },
+      {
+        argv: [
+          '--host=127.0.0.1',
+          `--port=${port}`,
+          '--system-type=onprem',
+          ...boundArgv,
+        ],
+        stdout: () => {},
+        stderr: () => {},
+        exit: () => {},
+        processLike: Object.assign(new EventEmitter(), {
+          stdin: new EventEmitter(),
+        }),
+      },
+    );
+    if (server === undefined) throw new Error('the launcher started no server');
+    const client = new Client({ name: 'http-strategies', version: '1.0.0' });
+    try {
+      await client.connect(
+        clientTransport(
+          new StreamableHTTPClientTransport(
+            new URL(`http://127.0.0.1:${port}/mcp/stream/http`),
+            {
+              requestInit: {
+                headers: {
+                  'x-sap-url': standIn.url,
+                  'x-sap-client': '100',
+                  'x-sap-login': 'STRATEGY_USER',
+                  'x-sap-password': 'strategy-password',
+                },
               },
             },
-          },
+          ),
         ),
-      ),
-    );
-    await client.callTool({
-      name: 'SearchSource',
-      arguments: { query: 'x', packages: ['Z'], background: false },
-    });
-    assert.equal(seen.length, 1);
-    assert.equal(seen[0]?.sapAnswerStrategy, skipSapAnswers);
-    assert.equal(seen[0]?.lineMatchStrategy, substringLineMatch);
-  } finally {
-    await client.close();
-    await server.stop();
-  }
-});
+      );
+      await client.callTool({
+        name: 'SearchSource',
+        arguments: { query: 'x', packages: ['Z'], background: false },
+      });
+      assert.equal(seen.length, 1);
+      assert.equal(seen[0]?.sapAnswerStrategy, skipSapAnswers);
+      assert.equal(seen[0]?.lineMatchStrategy, substringLineMatch);
+      assert.equal(seen[0]?.partsPerEnvelope, bound);
+    } finally {
+      await client.close();
+      await server.stop();
+    }
+  });
+}

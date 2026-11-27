@@ -81,6 +81,11 @@ function isCredential(failure: unknown): boolean {
   );
 }
 
+/** Whether `failure` ends the call: a credential refusal, the chain's or SAP's `401`. */
+export function endsTheSearch(failure: unknown): boolean {
+  return isCredential(failure) || failureOf(failure) !== undefined;
+}
+
 /**
  * The fixed classification (owner, DO22), by structure only: a credential
  * refusal or the server's own refusal ends the call; a SAP answer is the

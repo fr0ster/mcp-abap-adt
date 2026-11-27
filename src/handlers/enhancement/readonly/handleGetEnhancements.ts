@@ -32,9 +32,7 @@ import {
 } from '../../../lib/answer';
 import { failureOf } from '../../../lib/auth/failures';
 import {
-  chunksOf,
   type PhaseResult,
-  READS_PER_ENVELOPE,
   runPhaseOutcome,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
@@ -1419,8 +1417,9 @@ function enhancementAnswers(context: HandlerContext) {
     },
     /**
      * The reads not answered yet. Reads of two or more objects go in ADT
-     * batch envelopes of at most `READS_PER_ENVELOPE`, each judged as it
-     * answered, so a credential failure sends no later one; an envelope
+     * batch envelopes (`runPhaseOutcome`: the consumer's bound counted in
+     * parts, else one), and a failed envelope, a credential failure or a
+     * part SAP answered `401` sends no later one; an envelope
      * whose own request answered `404` (the endpoint once served) is every
      * read's failure, never each read's "not found". Reads of one object
      * go as single requests, one after another, as the sequential version
@@ -1451,20 +1450,22 @@ function enhancementAnswers(context: HandlerContext) {
         }
         return;
       }
-      for (const chunk of chunksOf(pending, READS_PER_ENVELOPE)) {
-        const { results, envelope } = await runPhaseOutcome(
-          context,
-          chunk,
-          (read, connection) => sendEnhancementRead(context, connection, read),
-        );
-        keep(
-          chunk,
-          envelope.failed && envelope.outer === NOT_FOUND
-            ? results.map((result, i) => envelopeFailureOf(result, chunk[i]))
-            : results,
-          probes,
-        );
-      }
+      const { results, envelope } = await runPhaseOutcome(
+        context,
+        pending,
+        (read, connection) => sendEnhancementRead(context, connection, read),
+      );
+      keep(
+        pending,
+        envelope.failed && envelope.outer === NOT_FOUND
+          ? results.map((result, i) =>
+              i >= (envelope.from ?? 0)
+                ? envelopeFailureOf(result, pending[i])
+                : result,
+            )
+          : results,
+        probes,
+      );
     },
   };
 }

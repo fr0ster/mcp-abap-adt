@@ -28,7 +28,6 @@ import {
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { handleGetStructuresList as handleGetStructuresListOf } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { createBatchAvailability } from '../../../lib/batch/availability';
-import { READS_PER_ENVELOPE } from '../../../lib/batch/phases';
 import { assertMatchObject } from '../../helpers/assertions';
 import {
   envelopeConnection,
@@ -437,14 +436,20 @@ function system(
 type Fake = ReturnType<typeof system>;
 
 /** A context on the fake: batch served (default) or known to be absent. */
-function contextOn(fake: Fake, batch: 'served' | 'absent' = 'served') {
+function contextOn(
+  fake: Fake,
+  batch: 'served' | 'absent' = 'served',
+  partsPerEnvelope?: number,
+) {
   const port = createBatchAvailability();
   if (batch === 'absent') port.noteOuterStatus(404);
-  return {
+  const context: HandlerContext = {
     connection: fake.connection,
     logger: undefined,
     batchAvailability: port,
-  } as unknown as HandlerContext;
+    ...(partsPerEnvelope !== undefined && { partsPerEnvelope }),
+  };
+  return context;
 }
 
 const textOf = (result: unknown): string =>
@@ -470,10 +475,14 @@ async function bothWays(
   handler: (context: HandlerContext, args: any) => Promise<unknown>,
   args: Record<string, unknown>,
   model: Model = {},
+  partsPerEnvelope?: number,
 ) {
   const batched = system(model);
   const sequential = system(model);
-  const a = await withinTurns(handler(contextOn(batched), args), TURNS);
+  const a = await withinTurns(
+    handler(contextOn(batched, 'served', partsPerEnvelope), args),
+    TURNS,
+  );
   const b = await withinTurns(
     handler(contextOn(sequential, 'absent'), args),
     TURNS,
@@ -526,6 +535,36 @@ describe('GetIncludesList', () => {
       assert.equal(sequential.envelopes.length, 0);
     });
   }
+
+  const fourObjects = {
+    objects: [
+      { object_name: 'ZPROG', object_type: 'PROG/P' },
+      { object_name: 'ZFG', object_type: 'FUGR/F' },
+      { object_name: 'ZCL', object_type: 'CLAS/OC' },
+      { object_name: 'ZNONE', object_type: 'PROG/P' },
+    ],
+  };
+
+  it('no bound given: a phase of four objects goes in one envelope of four', async () => {
+    const { a, b, batched } = await bothWays(
+      handleGetIncludesList,
+      fourObjects,
+    );
+    assert.equal(textOf(a), textOf(b));
+    assert.equal(batched.envelopes[0]?.parts.length, 4);
+  });
+
+  it("the consumer's bound of 2 (runPhase): every envelope carries at most two reads, the answer unchanged", async () => {
+    const { a, b, batched } = await bothWays(
+      handleGetIncludesList,
+      fourObjects,
+      {},
+      2,
+    );
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(batched.envelopes[0]?.parts.length, 2);
+    assert.ok(batched.envelopes.every((e) => e.parts.length <= 2));
+  });
 
   it('the tree is the depth-first walk: cycles and duplicates marked where the sequential walk marks them', async () => {
     const { a } = await bothWays(handleGetIncludesList, {
@@ -802,6 +841,17 @@ describe('GetIncludesList', () => {
 // ---------------------------------------------------------------------------
 // GetStructuresList
 // ---------------------------------------------------------------------------
+
+describe("GetStructuresList: the consumer's parts bound", () => {
+  it('three structures: envelopes of at most 2 parts, the same answer', async () => {
+    const args = { structure_names: ['ZS', 'ZS2', 'ZMISSING'] };
+    const free = await bothWays(handleGetStructuresList, args);
+    const bounded = await bothWays(handleGetStructuresList, args, {}, 2);
+    assert.equal(textOf(bounded.a), textOf(free.a));
+    assert.ok(free.batched.envelopes.some((e) => e.parts.length > 2));
+    assert.ok(bounded.batched.envelopes.every((e) => e.parts.length <= 2));
+  });
+});
 
 describe('GetStructuresList', () => {
   for (const [args] of [
@@ -1640,19 +1690,55 @@ describe('GetEnhancements', () => {
     assert.equal(progf.error, undefined);
   });
 
-  it(`a phase of more than ${READS_PER_ENVELOPE} reads goes in consecutive envelopes of at most ${READS_PER_ENVELOPE}`, async () => {
-    const objects = Array.from(
-      { length: READS_PER_ENVELOPE / 3 + 1 },
-      (_, i) => ({ object_name: `ZNONE_${i}`, object_type: 'unknown' }),
-    );
+  // 101 untyped objects: three probes each, 303 reads in one phase.
+  const probedObjects = Array.from({ length: 101 }, (_, i) => ({
+    object_name: `ZNONE_${i}`,
+    object_type: 'unknown',
+  }));
+
+  it('no bound given: a phase of 303 reads goes in one envelope', async () => {
     const { a, b, batched } = await bothWays(handleGetEnhancements, {
-      objects,
+      objects: probedObjects,
     });
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(
+      batched.envelopes.map((e) => e.parts.length),
+      [303],
+    );
+  });
+
+  it("the consumer's bound of 300: a phase of 303 reads goes in balanced envelopes of at most 300", async () => {
+    const { a, b, batched } = await bothWays(
+      handleGetEnhancements,
+      { objects: probedObjects },
+      {},
+      300,
+    );
     assert.equal(textOf(a), textOf(b));
     assert.deepStrictEqual(
       batched.envelopes.map((e) => e.parts.length),
       [152, 151],
     );
+  });
+
+  it("bound 150: a failed first envelope of GetEnhancements' probes ends the phase — no later envelope is sent", async () => {
+    let first = true;
+    const fake = system({}, (parts) => {
+      if (first) {
+        first = false;
+        throw statusError(500, 'Internal Server Error');
+      }
+      return envelopeResponse(
+        parts.map((p) => answerOf({}, labelOf(p.method, p.url))),
+      );
+    });
+    await withinTurns(
+      handleGetEnhancements(contextOn(fake, 'served', 150), {
+        objects: probedObjects,
+      }),
+      TURNS,
+    );
+    assert.equal(fake.envelopes.length, 1);
   });
 
   it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {

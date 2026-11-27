@@ -175,10 +175,9 @@ export const TOOL_DEFINITION = {
       ),
     exclude: z
       .array(z.string())
-      .max(3)
       .optional()
       .describe(
-        'Up to 3 substrings; a line containing any of them is dropped.',
+        'Substrings; a line containing any of them is dropped. Absent, no line is dropped.',
       ),
     packages: z
       .array(z.string().min(1))
@@ -222,7 +221,7 @@ export const TOOL_DEFINITION = {
       .min(1)
       .optional()
       .describe(
-        'The most hits of the whole answer, counted in the scan order after max_hits_per_object; reached, the scan stops reading and truncated.by_max_hits is true when anything was left. Absent, no limit.',
+        'The most hits of the whole answer, counted in the scan order after max_hits_per_object; reached, the scan stops reading the next objects and truncated.by_max_hits is true when anything was left. Absent, no limit: every object is read and every hit answered.',
       ),
     answer: z
       .enum(ANSWER_LEVELS)

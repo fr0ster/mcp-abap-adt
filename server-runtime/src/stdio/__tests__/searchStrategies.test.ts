@@ -59,61 +59,74 @@ afterEach(async () => {
   process.env = { ...savedEnv };
 });
 
-it('the stdio launcher passes the shipped strategies to its server', async () => {
-  const envFile = path.join(root, 'strategies.env');
-  fs.writeFileSync(
-    envFile,
-    [
-      `SAP_URL=${standIn.url}`,
-      'SAP_CLIENT=100',
-      'SAP_AUTH_TYPE=basic',
-      'SAP_CONNECTION_TYPE=http',
-      'SAP_USERNAME=STRATEGY_USER',
-      'SAP_PASSWORD=strategy-password',
-      '',
-    ].join('\n'),
-  );
-  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  const processLike = Object.assign(new EventEmitter(), {
-    stdin: new EventEmitter(),
-  });
-  await launch(
-    readCoreConfig(
+const BOUND_CASES: ReadonlyArray<{
+  readonly argv: readonly string[];
+  readonly bound: number | undefined;
+}> = [
+  { argv: [], bound: undefined },
+  { argv: ['--batch-parts-per-envelope=300'], bound: 300 },
+];
+
+for (const { argv: boundArgv, bound } of BOUND_CASES) {
+  it(`the stdio launcher passes the shipped strategies to its server, the envelope bound ${bound ?? 'none'} included`, async () => {
+    seen.length = 0;
+    const envFile = path.join(root, 'strategies.env');
+    fs.writeFileSync(
+      envFile,
       [
-        `--env-path=${envFile}`,
-        `--auth-broker-path=${root}`,
-        '--system-type=onprem',
-      ],
-      process.env,
-      null,
-    ),
-    {
-      toolSet: fullToolSet,
-      program: 'mcp-abap-adt',
-      version: '0.0.0-test',
-      packageName: '@mcp-abap-adt/core',
-    },
-    {
-      browserStrategy: browserCallbackStrategy,
-      stderr: () => {},
-      exit: () => {},
-      processLike,
-      platform: 'linux',
-      transport: serverSide,
-    },
-  );
-  const client = new Client({ name: 'stdio-strategies', version: '1.0.0' });
-  await client.connect(clientSide);
-  try {
-    const answer = await client.callTool({
-      name: 'SearchSource',
-      arguments: { query: 'x', packages: ['Z'], background: false },
+        `SAP_URL=${standIn.url}`,
+        'SAP_CLIENT=100',
+        'SAP_AUTH_TYPE=basic',
+        'SAP_CONNECTION_TYPE=http',
+        'SAP_USERNAME=STRATEGY_USER',
+        'SAP_PASSWORD=strategy-password',
+        '',
+      ].join('\n'),
+    );
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const processLike = Object.assign(new EventEmitter(), {
+      stdin: new EventEmitter(),
     });
-    console.log('ANSWER', JSON.stringify(answer).slice(0, 300));
-    assert.equal(seen.length, 1);
-    assert.equal(seen[0]?.sapAnswerStrategy, skipSapAnswers);
-    assert.equal(seen[0]?.lineMatchStrategy, substringLineMatch);
-  } finally {
-    await client.close();
-  }
-});
+    await launch(
+      readCoreConfig(
+        [
+          `--env-path=${envFile}`,
+          `--auth-broker-path=${root}`,
+          '--system-type=onprem',
+          ...boundArgv,
+        ],
+        process.env,
+        null,
+      ),
+      {
+        toolSet: fullToolSet,
+        program: 'mcp-abap-adt',
+        version: '0.0.0-test',
+        packageName: '@mcp-abap-adt/core',
+      },
+      {
+        browserStrategy: browserCallbackStrategy,
+        stderr: () => {},
+        exit: () => {},
+        processLike,
+        platform: 'linux',
+        transport: serverSide,
+      },
+    );
+    const client = new Client({ name: 'stdio-strategies', version: '1.0.0' });
+    await client.connect(clientSide);
+    try {
+      const answer = await client.callTool({
+        name: 'SearchSource',
+        arguments: { query: 'x', packages: ['Z'], background: false },
+      });
+      console.log('ANSWER', JSON.stringify(answer).slice(0, 300));
+      assert.equal(seen.length, 1);
+      assert.equal(seen[0]?.sapAnswerStrategy, skipSapAnswers);
+      assert.equal(seen[0]?.lineMatchStrategy, substringLineMatch);
+      assert.equal(seen[0]?.partsPerEnvelope, bound);
+    } finally {
+      await client.close();
+    }
+  });
+}

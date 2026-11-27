@@ -308,14 +308,42 @@ const directLabel = (r: IAbapRequestOptions) =>
 type Fake = ReturnType<typeof system>;
 
 /** A context on the fake: batch served (default) or known to be absent. */
-function contextOn(fake: Fake, batch: 'served' | 'absent' = 'served') {
+function contextOn(
+  fake: Fake,
+  batch: 'served' | 'absent' = 'served',
+  partsPerEnvelope?: number,
+): HandlerContext {
   const port = createBatchAvailability();
   if (batch === 'absent') port.noteOuterStatus(404);
   return {
     connection: fake.connection,
     logger: undefined,
     batchAvailability: port,
-  } as unknown as HandlerContext;
+    ...(partsPerEnvelope !== undefined && { partsPerEnvelope }),
+  };
+}
+
+/**
+ * `handler(args)` without a bound and with the consumer's bound of 2 parts:
+ * the same answer, every bounded envelope within 2 parts, and the unbounded
+ * call sending an envelope of more (so the bound had something to split).
+ */
+async function boundHolds(
+  handler: (context: HandlerContext, args: any) => Promise<unknown>,
+  args: Record<string, unknown>,
+  turns: number,
+) {
+  const free = system();
+  const bounded = system();
+  const a = await withinTurns(handler(contextOn(free), args), turns);
+  const b = await withinTurns(
+    handler(contextOn(bounded, 'served', 2), args),
+    turns,
+  );
+  assert.equal(JSON.stringify(b), JSON.stringify(a));
+  assert.ok(free.envelopes.some((e) => e.parts.length > 2));
+  assert.ok(bounded.envelopes.every((e) => e.parts.length <= 2));
+  assert.ok(bounded.envelopes.length > free.envelopes.length);
 }
 
 const textOf = (result: unknown): string =>
@@ -1174,6 +1202,20 @@ describe('RuntimeListFeeds', () => {
 
 // Batch mode is the compact sets': their where-used and feed reads of one
 // request are recorded; the full set's tools are not listed at all.
+describe("the consumer's parts bound", () => {
+  it('GetWhereUsed of three objects: envelopes of at most 2 parts, the same answer', async () => {
+    await boundHolds(handleGetWhereUsed, { objects: THREE }, TURNS);
+  });
+
+  it('RuntimeListFeeds of three feeds: envelopes of at most 2 parts, the same answer', async () => {
+    await boundHolds(
+      handleRuntimeListFeeds,
+      { feed_types: PAGED, max_results: 230 },
+      TURNS,
+    );
+  });
+});
+
 describe('batch mode records the one-request calls only', () => {
   for (const [tool, args, recorded] of [
     [

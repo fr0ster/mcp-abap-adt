@@ -27,12 +27,7 @@ import { tableCodeOf } from '../adtTypeCode';
 import { isCredentialFailure } from '../answer';
 import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
-import {
-  chunksOf,
-  type PhaseResult,
-  READS_PER_ENVELOPE,
-  runPhase,
-} from '../batch/phases';
+import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import { readsInFlight } from '../connectionKind';
 import { parseXml, type XmlNode } from '../xml/node';
@@ -132,22 +127,16 @@ export type LevelReader<I, R> = ((
 
 /**
  * One level's reads in ADT batch envelopes (spec §11): `read(item,
- * connection)` for every item, on the phase's batch connection (`runPhase`),
- * in consecutive envelopes of at most `READS_PER_ENVELOPE` (`chunksOf`);
- * each item's settlement, in item order. A failure that ends the call is
+ * connection)` for every item, on the phase's batch connection (`runPhase`,
+ * which keeps the consumer's bound: consecutive envelopes of at most that
+ * many, else one); each item's settlement, in item order. A failure that ends the call is
  * thrown at its envelope, and no later envelope is sent.
  */
 export function batchReader<I, R>(
   context: HandlerContext,
   read: (item: I, connection: IAbapConnection) => Promise<R>,
 ): LevelReader<I, R> {
-  return async (items) => {
-    const results: PhaseResult<R>[] = [];
-    for (const chunk of chunksOf(items, READS_PER_ENVELOPE)) {
-      results.push(...(await runPhase(context, chunk, read)));
-    }
-    return results;
-  };
+  return async (items) => runPhase(context, items, read);
 }
 
 /** How many node structure requests `concurrentReader` keeps open at once. */
@@ -1063,7 +1052,8 @@ export interface MetadataDescriptions {
  * distinct object, the one its type's `Get<Type>` handler sends
  * (`metadataReadOf`), keyed by `metadataKeyOf`. Metadata reads do not
  * cross-talk inside an envelope, so two or more go in ADT batch envelopes
- * (`runPhase`) of at most `READS_PER_ENVELOPE`, balanced (`chunksOf`); one
+ * (`runPhase`) of at most the consumer's bound of parts, balanced, else
+ * one, a failed envelope ending nothing (`failuresEnd: false`); one
  * read, or `alone` (the sequential version), goes as single requests, one
  * after another. A read SAP refused — any status, a `401` included — is
  * that object's: it has no entry, the others theirs, on both paths alike.
@@ -1116,15 +1106,20 @@ export async function metadataDescriptions(
     }
     return { descriptions };
   }
-  for (const keyed of chunksOf([...reads], READS_PER_ENVELOPE)) {
-    const results = await runPhase(context, keyed, ([, read], connection) =>
+  const keyed = [...reads];
+  const results = await runPhase(
+    context,
+    keyed,
+    ([, read], connection) =>
       atStep(METADATA_STEP, read)(createAdtClient(connection, context.logger)),
-    );
-    results.forEach((result, i) => {
-      const key = keyed[i]?.[0];
-      if (key !== undefined) keep(key, result);
-    });
-  }
+    // A failed metadata read, a whole failed envelope included, is its
+    // leaves' own: the next envelope is still sent.
+    { failuresEnd: false },
+  );
+  results.forEach((result, i) => {
+    const key = keyed[i]?.[0];
+    if (key !== undefined) keep(key, result);
+  });
   return { descriptions };
 }
 
@@ -1225,7 +1220,10 @@ export function assembleTree(
   const attach = (owner: string, owned: WalkedItem[]) => {
     if (placed.has(owner)) return;
     placed.add(owner);
-    children.push(...owned.map((o) => nodeOf(o)));
+    appendAll(
+      children,
+      owned.map((o) => nodeOf(o)),
+    );
   };
   for (const [owner, owned] of byOwner) {
     if (!listedPackages.has(owner)) attach(owner, owned);

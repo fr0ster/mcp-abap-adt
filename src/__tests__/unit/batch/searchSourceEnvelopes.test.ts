@@ -16,6 +16,12 @@ import { describe, it } from 'node:test';
 import { handleSearchSource } from '../../../handlers/system/readonly/handleSearchSource';
 import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 import {
+  noAnsweredReads,
+  type Read,
+  readSourcesInPhase,
+  sourceReadKey,
+} from '../../../lib/search-source/sourceReader';
+import {
   contextOn,
   type Fake,
   hitNames,
@@ -331,6 +337,30 @@ describe('SearchSource: source reads in envelopes', () => {
         .filter((n) => n > 0);
     assert.deepStrictEqual(searches(free), [3]);
     assert.deepStrictEqual(searches(bounded), [2, 1]);
+  });
+
+  it('the real source reader, bound 1, the hook ending after the first envelope: the unsent source has no answer', async () => {
+    const fake = on(programs(2));
+    const answers = noAnsweredReads();
+    const reads: Read[] = [
+      { reader: 'program', name: 'ZP000', version: 'active' },
+      { reader: 'program', name: 'ZP001', version: 'active' },
+    ];
+    await withinTurns(
+      readSourcesInPhase(
+        contextOn(fake, 'served', 1),
+        reads,
+        answers,
+        false,
+        async () => true,
+      ),
+      TURNS,
+    );
+    assert.equal(fake.envelopes.length, 1);
+    const [first, second] = reads;
+    assert.ok(first !== undefined && second !== undefined);
+    assert.equal(answers.sources.has(sourceReadKey(first)), true);
+    assert.equal(answers.sources.has(sourceReadKey(second)), false);
   });
 
   it('exclude takes more than three substrings', async () => {

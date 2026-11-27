@@ -201,6 +201,50 @@ describe("the consumer's bound and a failed correction envelope", () => {
   });
 });
 
+describe('a correction envelope keeps the bound', () => {
+  it('bound 1: the corrected call records two parts — nothing past the bound is sent, the answer names both numbers', async () => {
+    const fake = system(acceptsNewer);
+    const context: HandlerContext = {
+      connection: fake.connection,
+      logger: undefined,
+      adtHeaders: new AdtHeaderPairs().forSystem('S1'),
+      partsPerEnvelope: 1,
+    };
+    // One call: a where-used read whose correction records it twice.
+    let calls = 0;
+    const read = async (item: string, connection: IAbapConnection) => {
+      calls += 1;
+      return withAdtHeaders(context, OP, async (headers) => {
+        const utils = new AdtClient(connection).getUtils();
+        const ask = () =>
+          utils.getWhereUsed(
+            { object_name: item, object_type: 'CLAS/OC' },
+            { headers },
+          );
+        // The first round records one part; the redone round two.
+        if (headers.accept === NEWER) {
+          const [a] = await Promise.all([ask(), ask()]);
+          return a;
+        }
+        return ask();
+      });
+    };
+    await assert.rejects(
+      withinTurns(runPhaseOutcome(context, ['ITEM_B'], read)),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message ===
+          'a read of this step needs 2 parts in one ADT batch envelope, more than the 1 parts per envelope set (--batch-parts-per-envelope / partsPerEnvelope); nothing was sent',
+    );
+    // The first envelope only: the correction was not sent.
+    assert.deepStrictEqual(
+      fake.envelopes.map((e) => e.parts.length),
+      [1],
+    );
+    assert.equal(calls, 1);
+  });
+});
+
 describe('a corrected part answering 401', () => {
   it('bound 2: the correction envelope answers B with 401 — the phase ends, no later envelope is sent', async () => {
     let envelopes = 0;

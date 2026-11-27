@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [24.2.2] - 2026-11-27
+
+### Fixed
+
+- **`RuntimeGetDumpById` no longer answers an empty success** (#396). With `view: summary` or `formatted` and `response_mode: summary`, it answered `success: true` with no summary and no payload, and with `both` the payload alone. The summary fields are read from the default view's `dump:dump` root. The summary view is an HTML fragment and the formatted view plain text, both labelled in the logon language (measured on ABAP cloud, 2026-11-27), so neither carries a field a reading can rely on. An explicit `response_mode` `summary` or `both` with `view` `summary` or `formatted` is now refused before any request, the refusal naming the view and saying the summary comes only with `view: default`. Without `response_mode`, the default follows the view: `both` for `default`, `payload` for `summary` and `formatted` (it was `both` for every view). The compact `HandlerDumpView` is unchanged: its `summary` already reads the default view.
+  - **Migration:** a call that asked `view: summary` or `formatted` with `response_mode: both` gets a refusal now; ask `response_mode: payload` (or leave it out) for that view's document, and `view: default` for the summary.
+
 ## [24.2.1] - 2026-11-27
 
 ### Fixed

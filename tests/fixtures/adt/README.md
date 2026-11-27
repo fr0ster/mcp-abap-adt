@@ -163,6 +163,17 @@ so); the S/4HANA 2025 cases were taken by a hand-run probe, transport numbers an
 placeholders. The activation tests replay them (`activationNotActivated`, the group path's
 discovery choice, the read after a run's silent results).
 
+| Case | What provoked it | What came back |
+|---|---|---|
+| `dump-views-cloud` | `GET /sap/bc/adt/runtime/dump/{id}` (01), `…/summary` Accept `text/html` (02), `…/formatted` Accept `text/plain` (03): one dump in the three views `RuntimeGetDumpById` offers, the ABAP cloud trial system, 2026-11-27 (fr0ster/mcp-abap-adt#396) | 200 each: a `dump:dump` root whose attributes and termination link name the summary fields (01); an HTML fragment with a "Header Information" table (02); plain text with a header block (03). 02 and 03 are labelled in the logon language |
+
+Taken by a hand-run probe through adt-clients' `getById`; the response headers were not
+recorded. The user id is `SAPUSER01`, the user's GUID and the hex ids are zeroed, the
+application server is `APPSERVER`, the system `SID`, the dump id `DUMPID`, the HTTP host
+`sap.example.invalid`. The formatted body is cut after its chapter "Information on where
+terminated" (the rest holds the variables of every active call); its last line says so.
+`dumpSummaryViews.test.ts` replays the three.
+
 ## Refusals
 
 | Case | What provoked it | How SAP refused |

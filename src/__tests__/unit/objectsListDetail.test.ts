@@ -57,6 +57,7 @@ describe('GetObjectsList detail', () => {
     const expected = [
       '# parent FUGR/F ZFG',
       '# total 2',
+      '# refused 0',
       'type\tname\ttech_name\turi',
       'FUGR/FF\tZ_FM\t\t',
       'FUGR/I\tZFG_TOP\tLZFGTOP\t',
@@ -164,13 +165,16 @@ describe('GetObjectsList detail', () => {
     assert.equal(connection.requests.length, 1);
   });
 
-  // A failed pass-2 read is the call's error, never an object answered
-  // without its description as if complete.
-  it('medium: a metadata read SAP refuses makes the call its error', async () => {
+  // #398, the owner's decision: a metadata read SAP refuses with any status
+  // but 401 is that object's — listed with SAP's status and message — and
+  // the rest is read and answered; only a 401 ends the call.
+  it('medium: a metadata read SAP answers 500 lists the object with it, the rest answered', async () => {
     const connection = recordingConnection([
       { data: LEVEL },
       { status: 500, data: 'refused' },
-      { data: '<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core"/>' },
+      {
+        data: '<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="Top"/>',
+      },
     ]);
     declareSystemKind(connection, 'onprem');
     const batchAvailability = createBatchAvailability();
@@ -184,13 +188,79 @@ describe('GetObjectsList detail', () => {
         detail: 'medium',
       },
     );
-    assert.equal(result.isError, true, result.content[0]?.text);
+    const text = result.content[0]?.text ?? '';
+    assert.equal(result.isError, false, text);
+    const answer = JSON.parse(text);
+    assert.deepStrictEqual(answer.objects[0].metadata_error, {
+      status: 500,
+      step: 'read object metadata',
+    });
+    assert.equal(answer.objects[1].description, 'Top', text);
   });
+
+  it('medium: a metadata read SAP answers 401 ends the call', async () => {
+    const connection = recordingConnection([
+      { data: LEVEL },
+      { status: 401, data: 'Unauthorized' },
+      {
+        data: '<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="Top"/>',
+      },
+    ]);
+    declareSystemKind(connection, 'onprem');
+    const batchAvailability = createBatchAvailability();
+    batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+    const result = await handleGetObjectsList(
+      { connection, logger: undefined, batchAvailability },
+      {
+        parent_name: 'ZFG',
+        parent_tech_name: 'ZFG',
+        parent_type: 'FUGR/F',
+        detail: 'medium',
+      },
+    );
+    const text = result.content[0]?.text ?? '';
+    assert.equal(result.isError, true, text);
+    assert.ok(text.includes('401'), text);
+  });
+
+  // #398: at every level the answer says how many objects carry a refusal.
+  for (const detail of ['terse', 'medium', 'full'] as const) {
+    it(`${detail}: the answer counts the objects carrying a refusal`, async () => {
+      // At terse pass 2 reads no typed object's metadata: the count is
+      // there all the same, a head of its own.
+      if (detail === 'terse') {
+        const text = await objectsList('terse');
+        assert.ok(text.split('\n').includes('# refused 0'), text);
+        return;
+      }
+      const connection = recordingConnection([
+        { data: LEVEL },
+        { status: 403, data: 'refused' },
+        { data: '<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core"/>' },
+      ]);
+      declareSystemKind(connection, 'onprem');
+      const batchAvailability = createBatchAvailability();
+      batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+      const result = await handleGetObjectsList(
+        { connection, logger: undefined, batchAvailability },
+        {
+          parent_name: 'ZFG',
+          parent_tech_name: 'ZFG',
+          parent_type: 'FUGR/F',
+          detail,
+        },
+      );
+      const text = result.content[0]?.text ?? '';
+      assert.equal(result.isError, false, text);
+      assert.equal(JSON.parse(text).refused_objects, 1, text);
+      assert.equal(JSON.parse(await objectsList(detail)).refused_objects, 0);
+    });
+  }
 
   // Onprem live run: SAP lists an object (a message class left without its
   // T100A row) whose metadata it answers 404, "does not exist". The object
   // is answered as SAP answered it — listed, with that error — and the call
-  // goes on; any other refused read stays the call's error (above).
+  // goes on, as any refusal but a 401 does (above).
   for (const detail of ['medium', 'full'] as const) {
     it(`${detail}: an object whose metadata SAP answers 404 is listed with that error, the call answered`, async () => {
       const connection = recordingConnection([

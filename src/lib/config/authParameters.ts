@@ -1043,6 +1043,53 @@ export const BATCH_PARTS_PER_ENVELOPE_ROW: Parameter = {
   help: `The most parts (requests) one ADT batch envelope carries when a single tool call reads several objects at once (GetEnhancements, SearchSource, package listings and walks, function module group checks, …): the reads go in consecutive envelopes of balanced size, a read's requests always together in one envelope; a read that needs more parts than this is answered an error naming both numbers, and nothing is sent. A positive whole number. Default (not given or blank): no bound — all independent reads of a step go in one envelope, and an envelope SAP refuses or fails is answered as SAP answered it.`,
 };
 
+export const REQUESTS_IN_FLIGHT_CLI = '--requests-in-flight';
+export const REQUESTS_IN_FLIGHT_ENV = 'MCP_REQUESTS_IN_FLIGHT';
+export const REQUESTS_IN_FLIGHT_YAML = 'requests.inFlight';
+
+/** The refusal of a requests-in-flight bound, in fixed words: the value is never echoed. */
+export function requestsInFlightRefusal(name: string): string {
+  return `Invalid ${name}: must be a positive whole number of requests`;
+}
+
+/**
+ * `--requests-in-flight`'s value: a whole number of at least 1, read by plain
+ * code — ASCII digits as a string, or a YAML integer.
+ */
+export function parseRequestsInFlight(raw: JsonValue, name: string): number {
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  const value =
+    typeof raw === 'number'
+      ? raw
+      : isDigits(text)
+        ? Number.parseInt(text, 10)
+        : Number.NaN;
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new ParameterRefusal(requestsInFlightRefusal(name));
+  }
+  return value;
+}
+
+/**
+ * `--requests-in-flight` / `MCP_REQUESTS_IN_FLIGHT` / YAML
+ * `requests.inFlight`: the consumer's bound on the requests a call keeps in
+ * flight at once where it reads several objects one request each (#391, the
+ * owner: no number of the server's). No default: not given, one at a time.
+ * An RFC connection keeps one whatever this says (`readsInFlight`). In every
+ * binary's table.
+ */
+export const REQUESTS_IN_FLIGHT_ROW: Parameter = {
+  key: 'requestsInFlight',
+  cli: REQUESTS_IN_FLIGHT_CLI,
+  env: REQUESTS_IN_FLIGHT_ENV,
+  yaml: REQUESTS_IN_FLIGHT_YAML,
+  kind: 'custom',
+  parse: parseRequestsInFlight,
+  valueHint: '=<requests>',
+  section: 'OPTIONS',
+  help: 'The most requests one tool call keeps in flight at once where it reads several objects one request each (SearchSource without an ADT batch, package listings and walks with descriptions, …). A positive whole number. Default (not given or blank): one at a time. Over RFC always one at a time: one RFC session answers one call at a time.',
+};
+
 export const ENABLE_DATA_TOOLS_CLI = '--enable-data-tools';
 export const ENABLE_DATA_TOOLS_ENV = 'MCP_ENABLE_DATA_TOOLS';
 export const ENABLE_DATA_TOOLS_YAML = 'enable-data-tools';

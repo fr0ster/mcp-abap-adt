@@ -17,6 +17,7 @@ import {
   withoutBackgroundParameter,
 } from '../backgroundRuns/tools.js';
 import { partsPerEnvelopeOf } from '../batch/phases.js';
+import { requestsInFlightOf } from '../connectionKind.js';
 import { noopLogger } from '../handlerLogger.js';
 import { isLongTool } from '../longTools.js';
 import {
@@ -127,6 +128,14 @@ export interface HandlerExporterOptions {
    * bound — a phase's independent reads go in one envelope.
    */
   partsPerEnvelope?: number;
+
+  /**
+   * The consumer's bound on the requests a call keeps in flight at once
+   * where it reads several objects one request each: a positive whole
+   * number, else the constructor throws. As `partsPerEnvelope`. Absent: one
+   * at a time.
+   */
+  requestsInFlight?: number;
 
   /**
    * The denied actions (`readAccessRestrictions`, `parseDeniedEntry`):
@@ -261,6 +270,7 @@ export class HandlerExporter {
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
   private readonly partsPerEnvelope: number | undefined;
+  private readonly requestsInFlight: number | undefined;
   private readonly access:
     | { readonly checks: IAccessChecks; readonly readOnly: ReadonlySet<string> }
     | undefined;
@@ -274,6 +284,10 @@ export class HandlerExporter {
       options?.partsPerEnvelope === undefined
         ? undefined
         : partsPerEnvelopeOf(options.partsPerEnvelope, 'partsPerEnvelope');
+    this.requestsInFlight =
+      options?.requestsInFlight === undefined
+        ? undefined
+        : requestsInFlightOf(options.requestsInFlight, 'requestsInFlight');
     this.systemType = options?.systemType;
     this.systemContextResolver = options?.systemContextResolver ?? null;
     this.systemContextRules = options?.systemContextRules ?? null;
@@ -465,6 +479,7 @@ export class HandlerExporter {
       sapAnswerStrategy: _sap,
       lineMatchStrategy: _lines,
       partsPerEnvelope: _bound,
+      requestsInFlight: _inFlight,
       ...rest
     } = context;
     return {
@@ -477,11 +492,17 @@ export class HandlerExporter {
   /** This exporter's `SearchSource` strategies and envelope bound: a field per option given. */
   private strategies(): Pick<
     HandlerContext,
-    'sapAnswerStrategy' | 'lineMatchStrategy' | 'partsPerEnvelope'
+    | 'sapAnswerStrategy'
+    | 'lineMatchStrategy'
+    | 'partsPerEnvelope'
+    | 'requestsInFlight'
   > {
     return {
       ...(this.partsPerEnvelope !== undefined && {
         partsPerEnvelope: this.partsPerEnvelope,
+      }),
+      ...(this.requestsInFlight !== undefined && {
+        requestsInFlight: this.requestsInFlight,
       }),
       ...(this.sapAnswerStrategy !== undefined && {
         sapAnswerStrategy: this.sapAnswerStrategy,

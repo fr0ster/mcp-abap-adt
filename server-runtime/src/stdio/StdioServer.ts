@@ -97,6 +97,11 @@ export interface StdioServerOptions {
    */
   partsPerEnvelope?: number | undefined;
   /**
+   * The consumer's bound on the requests a call keeps in flight
+   * (`--requests-in-flight`), handed to the instance. Absent: one at a time.
+   */
+  requestsInFlight?: number | undefined;
+  /**
    * The owner of this instance's batch state (the launcher's, one for the
    * process's one instance). Absent: the batch tools answer
    * `batch_mode_unavailable`.
@@ -189,6 +194,9 @@ export class StdioServer extends BaseMcpServer {
       }),
       ...(opts?.partsPerEnvelope !== undefined && {
         partsPerEnvelope: opts.partsPerEnvelope,
+      }),
+      ...(opts?.requestsInFlight !== undefined && {
+        requestsInFlight: opts.requestsInFlight,
       }),
       ...(opts?.batch !== undefined && { batch: opts.batch }),
       // --deferred-logon --restore-session: the first call's birth takes up

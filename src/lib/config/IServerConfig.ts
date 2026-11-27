@@ -90,6 +90,14 @@ export interface IServerConfig {
   batchPartsPerEnvelope?: number | undefined;
 
   /**
+   * The consumer's bound on the requests a call keeps in flight at once where
+   * it reads several objects one request each (`--requests-in-flight`,
+   * `MCP_REQUESTS_IN_FLIGHT`, `requests.inFlight`): a positive whole number.
+   * Absent: one at a time.
+   */
+  requestsInFlight?: number | undefined;
+
+  /**
    * Whether the binary serves the data tools (`--enable-data-tools`,
    * `MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`). Default `false`.
    */

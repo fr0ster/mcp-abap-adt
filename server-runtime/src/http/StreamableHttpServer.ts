@@ -174,6 +174,12 @@ export interface StreamableHttpServerOptions {
    * Absent: no bound.
    */
   partsPerEnvelope?: number | undefined;
+  /**
+   * The consumer's bound on the requests a call keeps in flight
+   * (`--requests-in-flight`), handed to every instance. Absent: one at a
+   * time.
+   */
+  requestsInFlight?: number | undefined;
 }
 
 /** What the pool keeps of a per-request server, and what the request handler drives on it. */
@@ -271,6 +277,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
   private readonly partsPerEnvelope: number | undefined;
+  private readonly requestsInFlight: number | undefined;
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
 
   constructor(
@@ -306,6 +313,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.sapAnswerStrategy = opts?.sapAnswerStrategy;
     this.lineMatchStrategy = opts?.lineMatchStrategy;
     this.partsPerEnvelope = opts?.partsPerEnvelope;
+    this.requestsInFlight = opts?.requestsInFlight;
     this.batchSettings =
       opts?.batch === undefined
         ? undefined
@@ -652,6 +660,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           sapAnswerStrategy?: SapAnswerStrategy;
           lineMatchStrategy?: LineMatchStrategy;
           partsPerEnvelope?: number;
+          requestsInFlight?: number;
           batch?: InstanceBatch;
           heldLocks?: HeldLocks;
           longSession?: LongSession;
@@ -723,6 +732,9 @@ export class StreamableHttpServer extends BaseMcpServer {
         }),
         ...(this.partsPerEnvelope !== undefined && {
           partsPerEnvelope: this.partsPerEnvelope,
+        }),
+        ...(this.requestsInFlight !== undefined && {
+          requestsInFlight: this.requestsInFlight,
         }),
         ...(this.instanceAccessChecks !== undefined && {
           accessChecks: this.instanceAccessChecks,

@@ -374,6 +374,11 @@ is the answer. To bound it, start with `--batch-parts-per-envelope=<parts>`
 envelope, each read's requests kept together. 24.2.1 and earlier split at 300 reads in some of
 those tools; `--batch-parts-per-envelope=300` gives about that size.
 
+Where such a tool reads one request at a time instead (`SearchSource` on a destination without an
+ADT batch, the package walks with descriptions), the server keeps one request in flight unless the
+consumer sets more: `--requests-in-flight=<requests>` (`MCP_REQUESTS_IN_FLIGHT`, YAML
+`requests.inFlight`). Over RFC it is always one. 24.2.2 and earlier kept 8.
+
 ## Prompts
 
 Every binary lists MCP prompts beside its tools: ready-made requests an MCP client offers the

@@ -1,0 +1,22 @@
+{
+  "case": "dump-views-cloud",
+  "step": 1,
+  "stepTag": "default",
+  "note": "fr0ster/mcp-abap-adt#396 measurement, the ABAP cloud trial system, 2026-11-27: one dump (a division by zero in a class run) read in the three views RuntimeGetDumpById offers, by a hand-run probe through adt-clients' getById. The user id is SAPUSER01, the user's GUID and the hex ids zeroed, the application server APPSERVER, the system SID, the dump id DUMPID, the HTTP host sap.example.invalid. Only the default view names the summary fields by attribute; the summary view is an HTML fragment and the formatted view plain text, both labelled in the logon language (asked with sap-language=DE they read Laufzeitfehler, Ausnahme, Programm, …).",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/runtime/dump/DUMPID",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/runtime/dump/DUMPID",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.runtime.dump.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only (adt-clients' getById for the view). The response headers were not recorded."
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {},
+    "bodyFile": "dump-views-cloud--01-default.body.xml"
+  }
+}

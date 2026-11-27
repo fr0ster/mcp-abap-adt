@@ -250,6 +250,11 @@ describe('the MCP tool surface', () => {
         // count is required: the model states it, the server picks none.
         'data/GetSqlQuery': 'row_number',
         'data/GetTableContents': 'max_rows',
+        // and MemorySnapshotGet/Delta's `max_objects`: SAP requires a count
+        // of the ranking, children and references views, and the server's
+        // 50 went.
+        'debug/MemorySnapshotGet': 'max_objects',
+        'debug/MemorySnapshotDelta': 'max_objects',
       };
       const tightened = MAY_TIGHTEN_REQUIRED[tool];
       // **19.0.0, internal batches (spec §11).** A parallelism knob the

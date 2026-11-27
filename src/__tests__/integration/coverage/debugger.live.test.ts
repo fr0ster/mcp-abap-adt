@@ -612,12 +612,16 @@ liveSuite(['onprem', 'cloud'], 'The ABAP debugger at a stop', () => {
     const to = idOf.get(second);
     if (from === undefined || to === undefined) throw new Error('unreachable');
 
-    const read = await liveCall('MemorySnapshotGet', { snapshot_id: from });
+    const read = await liveCall('MemorySnapshotGet', {
+      snapshot_id: from,
+      max_objects: 50,
+    });
     succeeded('MemorySnapshotGet', read);
     assert.equal(typeof member(payloadOf(read), 'overview'), 'object');
     const delta = await liveCall('MemorySnapshotDelta', {
       from_id: from,
       to_id: to,
+      max_objects: 50,
     });
     succeeded('MemorySnapshotDelta', delta);
     assert.equal(typeof member(payloadOf(delta), 'overview'), 'object');

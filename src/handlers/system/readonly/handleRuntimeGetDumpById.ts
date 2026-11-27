@@ -39,14 +39,13 @@ export const TOOL_DEFINITION = {
       .default('default')
       .optional()
       .describe(
-        'Dump view mode: default payload, summary section, or formatted long text.',
+        'Dump view mode: default payload, summary section, or formatted long text. The summary fields are read from view "default" only.',
       ),
     response_mode: z
       .enum(['payload', 'summary', 'both'])
-      .default('both')
       .optional()
       .describe(
-        'What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.',
+        'What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload. "summary" and "both" need view "default". Default: "both" with view "default", "payload" with the other views.',
       ),
   }),
 } as const;
@@ -163,7 +162,20 @@ export async function handleRuntimeGetDumpById(
   }
 
   const view = args.view ?? 'default';
-  const responseMode = args.response_mode ?? 'both';
+  // The summary is the default view's `dump:dump` root. The summary view is
+  // an HTML fragment and the formatted view plain text, both labelled in the
+  // logon language (measured on ABAP cloud, 2026-11-27, #396): they name no
+  // field a reading can rely on, so a summary is asked of view `default`
+  // only, and an absent mode follows the view.
+  const responseMode =
+    args.response_mode ?? (view === 'default' ? 'both' : 'payload');
+  if (view !== 'default' && responseMode !== 'payload') {
+    return return_error(
+      new Error(
+        `response_mode "${responseMode}" is refused with view "${view}": the summary is read only with view "default". Use view "default" for the summary, or response_mode "payload" for view "${view}".`,
+      ),
+    );
+  }
   const dumps = new AdtRuntimeClient(connection, logger).getDumps();
 
   // `getById` still answers the raw document (`IAdtResponse<string>`,
@@ -186,8 +198,7 @@ export async function handleRuntimeGetDumpById(
       };
 
       if (responseMode === 'summary' || responseMode === 'both') {
-        // The summary is the default view's root; the other views answer
-        // a document without one, and then there is none to give.
+        // Only view `default` reaches here with a summary asked (above).
         const summary = dumpSummaryOf(raw);
         if (summary) result.summary = summary;
       }

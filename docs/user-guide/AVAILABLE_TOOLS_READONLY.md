@@ -1016,8 +1016,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `dump_id` (string, required) - The dump's id, or its URI as a dumps feed entry carries it.
-- `response_mode` (string, optional (default: both), one of: `payload`, `summary`, `both`) - What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.
-- `view` (string, optional (default: default), one of: `default`, `summary`, `formatted`) - Dump view mode: default payload, summary section, or formatted long text.
+- `response_mode` (string, optional, one of: `payload`, `summary`, `both`) - What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload. "summary" and "both" need view "default". Default: "both" with view "default", "payload" with the other views.
+- `view` (string, optional (default: default), one of: `default`, `summary`, `formatted`) - Dump view mode: default payload, summary section, or formatted long text. The summary fields are read from view "default" only.
 
 ---
 
@@ -1470,4 +1470,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-26*
+*Last updated: 2026-11-27*

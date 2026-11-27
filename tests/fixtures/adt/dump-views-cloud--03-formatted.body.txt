@@ -1,0 +1,145 @@
+----------------------------------------------------------------------------------------------------
+Category               ABAP programming error                                                                                                                                                                                                                                                       
+Runtime Errors         COMPUTE_INT_ZERODIVIDE                                                                                                                                                                                                                                                       
+Except.                CX_SY_ZERODIVIDE                                                                                                                                                                                                                                                             
+ABAP: Program          ZMCP_SHR_DUMP_CLS=============CP                                                                                                                                                                                                                                             
+Application Component  Not assigned                                                                                                                                                                                                                                                                 
+Date and Time          11/26/2026 20:24:13 (UTC)                                                                                                                                                                                                                                                    
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+|Short Text                                                                                        |
+|    Division by 0 (type I or INT8)                                                                |
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+|What happened?                                                                                    |
+|    Error in the ABAP application program.                                                        |
+|                                                                                                  |
+|    The current ABAP program "ZMCP_SHR_DUMP_CLS=============CP" had to be                         |
+|     terminated because it found a                                                                |
+|    statement that could not be executed.                                                         |
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+|What can I do?                                                                                    |
+|    Note which actions and entries caused the error to occur.                                     |
+|                                                                                                  |
+|    Consult your SAP administrator.                                                               |
+|                                                                                                  |
+|    Using transaction ST22 for ABAP dump analysis, you can view, manage,                          |
+|    and retain termination messages for longer periods.                                           |
+|    Note which actions and entries caused the error to occur.                                     |
+|                                                                                                  |
+|    Consult your SAP administrator.                                                               |
+|                                                                                                  |
+|    Using transaction ST22 for ABAP dump analysis, you can view, manage,                          |
+|    and retain termination messages for longer periods.                                           |
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+|Error Analysis                                                                                    |
+|    An exception has occurred in class "CX_SY_ZERODIVIDE". This exception was not                 |
+|     caught                                                                                       |
+|    in procedure "IF_OO_ADT_CLASSRUN~MAIN" "(METHOD)" or propagated by a RAISING                  |
+|     clause.                                                                                      |
+|    Since the caller of the procedure could not have anticipated this                             |
+|    exception, the current program was terminated.                                                |
+|    The reason for the exception occurring was:                                                   |
+|    The reason for the exception is:                                                              |
+|    In the current program "ZMCP_SHR_DUMP_CLS=============CP", a division                         |
+|     ('DIVIDE', '/', 'DIV' or 'MOD')                                                              |
+|    attempted to use operands of type I or INT8 to divide by 0.                                   |
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+|How to correct the error                                                                          |
+|    If the exception cannot be prevented, "CX_SY_ZERODIVIDE" must be caught within                |
+|    procedure "IF_OO_ADT_CLASSRUN~MAIN" "(METHOD)" or declared in the procedure's                 |
+|     RAISING clause.                                                                              |
+|    To prevent the exception, note the following:                                                 |
+|                                                                                                  |
+|    If the error occurs in one of your own ABAP programs or an SAP program                        |
+|    that you have modified, try to remedy the error.                                              |
+|    If the error occurs in a non-modfied SAP program, you might be able to                        |
+|    find a solution in the SAP Notes system. If you have access to the SAP                        |
+|    Notes system, check there first using the following keywords:                                 |
+|                                                                                                  |
+|    "COMPUTE_INT_ZERODIVIDE" CX_SY_ZERODIVIDE                                                     |
+|    "ZMCP_SHR_DUMP_CLS=============CP" bzw. ZMCP_SHR_DUMP_CLS=============CM001                   |
+|    "IF_OO_ADT_CLASSRUN~MAIN"                                                                     |
+|    If you cannot solve the problem yourself, please send the following                           |
+|    information to SAP:                                                                           |
+|                                                                                                  |
+|    1. The description of the problem (short dump)                                                |
+|    Please press the "Local File” button in the current display.                                  |
+|                                                                                                  |
+|    2. The relevant system log                                                                    |
+|    To do this, call the system log in transaction SM21. Restrict the time                        |
+|    interval to ten minutes before the short dump and five minutes after                          |
+|    it. In the display, choose System -> List -> Save -> Local File                               |
+|    (unconverted).                                                                                |
+|                                                                                                  |
+|    3. If these are programs of your own, or modified SAP programs: The                           |
+|    source text of the programs                                                                   |
+|    To do this, please choose                                                                     |
+|    "Other Utilities -> Upload/Download -> Download".                                             |
+|                                                                                                  |
+|    4. Details regarding the conditions under which the error occurred or                         |
+|    which actions and input caused the error.                                                     |
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+|User and Transaction                                                                              |
+|    Client................. 100                                                                   |
+|    User.................. SAPUSER01                                                           |
+|    Language key.......... E                                                                      |
+|    Transaction.........                                                                          |
+|    Transaction ID...... 00000000000000000000000000000000                                         |
+|                                                                                                  |
+|    EPP Root Context ID.... 00000000000000000000000000000000                                      |
+|    EPP Connection ID...... 00000000000000000000000000000000                                      |
+|    EPP Connection Counter. 1                                                                     |
+|    EPP Component Name..... 000000000000000000                                                    |
+|                                                                                                  |
+|    Program....................... ZMCP_SHR_DUMP_CLS=============CP                               |
+|    Screen......................... SAPMHTTP                                0010                  |
+|    Screen line.................... 2                                                             |
+|    Debugger interpretor loop... "none"                                                           |
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+|Chain of Exception Objects                                                                        |
+----------------------------------------------------------------------------------------------------
+|Level        Class                                                                                |
+|Attrib. Name                   Value                                                              |
+----------------------------------------------------------------------------------------------------
+|1            CX_SY_ZERODIVIDE                                                                     |
+|(Program)                      ZMCP_SHR_DUMP_CLS=============CP                                   |
+|(Include)                      ZMCP_SHR_DUMP_CLS=============CM001                                |
+|(Row)                          5                                                                  |
+|(Short Text)                   Division by zero                                                   |
+|(Long Text)                    You tried to divide by zero during the operation '/'.              |
+|IS_RESUMABLE                                                                                      |
+|KERNEL_ERRID                   COMPUTE_INT_ZERODIVIDE                                             |
+|OPERATION                      /                                                                  |
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+|Information on where terminated                                                                   |
+|    The termination occurred in ABAP program or include                                           |
+|     "ZMCP_SHR_DUMP_CLS=============CM001", in "IF_OO_ADT_CLASSRUN~MAIN". The                     |
+|    main program was "SAPMHTTP".                                                                  |
+|                                                                                                  |
+|    In the source code, the termination point is in line 5 of include                             |
+|     "ZMCP_SHR_DUMP_CLS=============CM001".                                                       |
+|    The termination is due to exception "CX_SY_ZERODIVIDE" occurring in procedure                 |
+|     "IF_OO_ADT_CLASSRUN~MAIN" "(METHOD)",                                                        |
+|    but not being handled locally there or being declared in the RAISING                          |
+|    clause.                                                                                       |
+|    The procedure is in program "ZMCP_SHR_DUMP_CLS=============CP". Its source                    |
+|     code begins in line 1 of                                                                     |
+|    include "ZMCP_SHR_DUMP_CLS=============CM001".                                                |
+----------------------------------------------------------------------------------------------------
+
+[... 1940 lines in all; the rest is not kept]

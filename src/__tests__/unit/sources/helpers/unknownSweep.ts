@@ -121,7 +121,7 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
   'src/lib/batch/phases.ts#PhaseOutcome(error)',
   'src/lib/batch/phases.ts#PhaseResult(error)',
   'src/lib/batch/phases.ts#isNoBatchEndpoint(error)',
-  'src/lib/batch/phases.ts#runEnvelope(error)',
+  'src/lib/batch/phases.ts#sendEnvelope(error)',
   'src/lib/batch/phases.ts#statusOf(response)',
   'src/lib/batch/recorder.ts#thrownRawPart(response)',
   'src/lib/debugger/AmdpSession.ts#thrown(e)',

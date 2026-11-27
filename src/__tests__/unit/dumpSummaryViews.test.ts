@@ -147,6 +147,19 @@ describe('RuntimeGetDumpById: response_mode not given (#396)', () => {
     assert.ok(answered.payload);
   });
 
+  it('neither view nor response_mode: view default, both', async () => {
+    const args = TOOL_DEFINITION.inputSchema.parse({ dump_id: 'DUMPID' });
+    const answered = bodyOf(
+      await handleRuntimeGetDumpById(context as any, args),
+    );
+    assert.equal(answered.view, 'default');
+    assert.deepStrictEqual(answered.summary, RECORDED_SUMMARY);
+    assert.deepStrictEqual(
+      answered.payload,
+      parseRuntimePayloadToJson(RECORDED.default),
+    );
+  });
+
   for (const view of ['summary', 'formatted'] as const) {
     it(`view ${view}: payload`, async () => {
       const result: any = await read(view);

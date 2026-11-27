@@ -254,12 +254,13 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     ]);
   });
 
-  it('SearchObject calls search({query, maxResults})', async () => {
+  // No bound of the server's (#391): none given, none handed on.
+  it('SearchObject calls search({query}) when no maxResults is given', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
     await handleSearchObject(context as any, { object_name: 'ZCL*' });
     const call = seen.calls.filter((c) => c.member === 'search').at(-1);
-    assert.deepStrictEqual(call?.args, [{ query: 'ZCL*', maxResults: 100 }]);
+    assert.deepStrictEqual(call?.args, [{ query: 'ZCL*' }]);
   });
 
   it('GetAdtTypes calls getAllTypes(999, "*", "usedByProvider")', async () => {

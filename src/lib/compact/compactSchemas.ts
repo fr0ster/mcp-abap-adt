@@ -2384,7 +2384,7 @@ function systemProperties(
       .optional()
       .describe(
         said(actions, {
-          search_object: 'maximum number of results to return (default 100).',
+          search_object: 'most results to read; absent, SAP gives at most 200.',
         }),
       ),
     detail: z

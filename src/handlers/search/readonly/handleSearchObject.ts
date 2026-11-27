@@ -58,11 +58,15 @@ const FIELDS = {
     .string()
     .optional()
     .describe(`[read-only] ${SEARCH_TYPE_DESCRIPTION}`),
+  // No bound of the server's (#391): absent, SAP's own applies — the quick
+  // search answered 200 hits of 8886, and `maxResults=0` 200 as well (BTP
+  // ABAP environment, 2026-11-27).
   maxResults: z
     .number()
-    .default(100)
     .optional()
-    .describe('[read-only] Maximum number of results to return'),
+    .describe(
+      '[read-only] Most results to read. Absent: SAP gives at most 200.',
+    ),
   ...DETAIL_SHAPE,
 };
 
@@ -175,7 +179,7 @@ type SearchResults = typeof ourUtils & {
 function searchOn(
   served: ServerAdtClient,
   query: string,
-  maxResults: number,
+  maxResults: number | undefined,
   objectType: string | undefined,
   results: SearchResults,
 ) {
@@ -187,7 +191,7 @@ function searchOn(
     }
     const params: IAdtSearchObjectsParamsOf<'onprem'> = {
       query,
-      maxResults,
+      ...(maxResults === undefined ? {} : { maxResults }),
       ...(name === undefined ? {} : { objectType: name }),
     };
     return () =>
@@ -202,7 +206,7 @@ function searchOn(
   }
   const params: IAdtSearchObjectsParamsOf<'cloud'> = {
     query,
-    maxResults,
+    ...(maxResults === undefined ? {} : { maxResults }),
     ...(name === undefined ? {} : { objectType: name }),
   };
   return () =>
@@ -267,7 +271,7 @@ async function searchWith(
   const search = searchOn(
     served,
     object_name,
-    maxResults || 100,
+    maxResults,
     object_type || undefined,
     results,
   );

@@ -6,7 +6,8 @@ A model can read an ABAP object's source either whole or in the parts it needs. 
 the object's structure first, then any one piece of it on request. A class or a report too large
 for the model's context can still be analysed: the model reads its outline, then the methods,
 events or routines it needs, and keeps them in context together with the other entities it works
-with.
+with. It can also change one part without holding the whole object: it sends the new code of an
+element, or a diff relative to the element it read, and the server writes the whole source.
 
 ## What MCP reads, in three groups
 
@@ -33,6 +34,16 @@ with.
   for any of them.
 - The model can tell an object's size before reading it whole, so it can decide between the whole
   read and the outline.
+- A partial update is resolved at the MCP level only: the server merges it into the whole
+  source, and adt-clients' CRUD writes that whole source (lock, update, unlock). adt-clients gets
+  no partial-update member.
+- Replacing an element by its name and kind is the main path; a diff relative to the element is
+  the fallback. A diff applies only where its context matches the current source exactly,
+  otherwise it is refused, naming the hunk; nothing fuzzy and nothing partial. An element name
+  that is not found is refused, never guessed.
+- The source the model edited must be the source now in SAP: the hash of the source it read is
+  checked under the lock, before the write.
+- One write per call. Activation stays a separate call.
 - No limit of the server's own: what a read answers is what the model asked for (the owner's rule
   on limits).
 - The architecture document describes this before any code is written.
@@ -48,4 +59,4 @@ not the server's time.
 ## Out of scope
 
 - Groups 1 and 2: their answers stay as they are.
-- Changing or rewriting source; reads only.
+- A partial update inside adt-clients: it always takes the whole source.

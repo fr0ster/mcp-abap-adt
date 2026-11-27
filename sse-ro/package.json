@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/sse-ro",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-sse-ro",
-  "version": "24.2.1",
+  "version": "24.2.2",
   "description": "The read-only MCP server for SAP ABAP ADT over HTTP+SSE, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: nothing that changes the system: where-used, search, source and metadata reads, ATC and unit-test results, transport reads, the abapGit reads, background long reads, MCP prompts and access restrictions. Credentials only from the x-sap-* headers of the request that opens each SSE connection. No auth broker, no stores.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -69,10 +69,10 @@
     "start": "node ./bin/mcp-abap-adt-sse-ro.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^24.2.1",
-    "@mcp-abap-adt/lib": "^24.2.1",
-    "@mcp-abap-adt/responsible-rules": "^24.2.1",
-    "@mcp-abap-adt/server-runtime": "^24.2.1"
+    "@mcp-abap-adt/background-runs-memory": "^24.2.2",
+    "@mcp-abap-adt/lib": "^24.2.2",
+    "@mcp-abap-adt/responsible-rules": "^24.2.2",
+    "@mcp-abap-adt/server-runtime": "^24.2.2"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

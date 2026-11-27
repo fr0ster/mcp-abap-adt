@@ -213,6 +213,10 @@ export async function launch(
     // SearchSource's strategies: the shipped ones (DO22, DO24).
     sapAnswerStrategy: skipSapAnswers,
     lineMatchStrategy: substringLineMatch,
+    // --batch-parts-per-envelope: the consumer's bound; absent, none.
+    ...(config.batchPartsPerEnvelope !== undefined && {
+      partsPerEnvelope: config.batchPartsPerEnvelope,
+    }),
   });
   installTransportShutdown({
     stopListening: () => server.stopListening(),

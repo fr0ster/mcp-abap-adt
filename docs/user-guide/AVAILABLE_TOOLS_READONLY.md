@@ -1266,10 +1266,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `answer` (string, optional, one of: `objects`, `lines`, `snippets`) - What each hit is answered as: lines (line, no snippet; the default at detail terse), snippets (line and snippet; the default at medium and full) or objects (one entry per object and include with its number of hits).
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
-- `exclude` (array, optional) - Up to 3 substrings; a line containing any of them is dropped.
+- `exclude` (array, optional) - Substrings; a line containing any of them is dropped. Absent, no line is dropped.
 - `exclude_comments` (boolean, optional) - Skip col-1 '*' and full-line '"' comment lines. Default false (comments are scanned).
 - `include_subpackages` (boolean, optional) - Recurse into subpackages (default true).
-- `max_hits` (integer, optional) - The most hits of the whole answer, counted in the scan order after max_hits_per_object; reached, the scan stops reading and truncated.by_max_hits is true when anything was left. Absent, no limit.
+- `max_hits` (integer, optional) - The most hits of the whole answer, counted in the scan order after max_hits_per_object; reached, the scan stops reading the next objects and truncated.by_max_hits is true when anything was left. Absent, no limit: every object is read and every hit answered.
 - `max_hits_per_object` (integer, optional) - The most hits answered per object, across its sources; absent, no limit. When an object has more, truncated.by_object_cap is true.
 - `object_filter` (string, optional) - Glob applied to object names within each package (e.g. "Z*").
 - `object_types` (array, optional) - Object types to scan, by main type: PROG (programs and program includes), FUGR, CLAS, INTF, DDLS, BDEF, DDLX, SRVD. Default: all of them.

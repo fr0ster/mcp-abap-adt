@@ -23,6 +23,7 @@ import {
   type McpResult,
   thrownEntry,
 } from '../../../lib/answer';
+import { appendAll } from '../../../lib/appendAll';
 import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
@@ -725,7 +726,10 @@ async function buildTrees(
     tier.forEach((node, i) => {
       const level = settle(node, rootAnswers[i]);
       if (level === undefined) return;
-      node.children.push(...nodeItemsOf(level).map((o) => bareLeaf(node, o)));
+      appendAll(
+        node.children,
+        nodeItemsOf(level).map((o) => bareLeaf(node, o)),
+      );
       for (const child of childNodesOf(level)) {
         typeNodes.push({ node, nodeId: child.nodeId });
       }

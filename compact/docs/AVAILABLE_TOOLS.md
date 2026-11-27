@@ -129,14 +129,14 @@ per request.
 - `action` (required) — The read: search_source (source text in packages), search_object (objects by name or mask), where_used (the objects that use an object), package_tree (a package tree), transports (transport requests), atc_findings (the findings of an ATC run), atc_results (the stored ATC results), atc_result (one stored ATC result).
 - `query` — search_source: primary substring to match (case-insensitive, ABAP CS).
 - `query2` — search_source: a second substring; when set, both query and query2 must appear on the same line.
-- `exclude` — search_source: up to 3 substrings; a line containing any of them is dropped.
+- `exclude` — search_source: substrings; a line containing any of them is dropped. Absent, no line is dropped.
 - `packages` — search_source: packages to scan, each an exact package name or a mask (`*` zero or more characters, `?` one character; `+`, `_`, `%` and `#` are characters of the name).
 - `include_subpackages` — search_source: recurse into subpackages (default true). package_tree: expand subpackages recursively (default true).
 - `object_filter` — search_source: glob applied to object names within each package (e.g. "Z*").
 - `object_types` — search_source: object types to scan, by main type: PROG (programs and program includes), FUGR, CLAS, INTF, DDLS, BDEF, DDLX, SRVD (default all of them).
 - `exclude_comments` — search_source: skip col-1 '*' and full-line '"' comment lines (default false).
 - `max_hits_per_object` — search_source: the most hits answered per object; absent, every hit.
-- `max_hits` — search_source: the most hits of the whole answer; reached, the scan stops reading. Absent, every hit.
+- `max_hits` — search_source: the most hits of the whole answer; reached, the scan stops reading the next objects. Absent, no limit: every object is read and every hit answered.
 - `answer` — search_source: what each hit is answered as: lines (the default at detail terse), snippets (the default at medium and full) or objects.
 - `version` — search_source: the version every source is read at (default active).
 - `object_name` — search_object: object name or mask (e.g. 'MARA*'). where_used: name of the object (with object_type), a function module as 'GROUP|FM_NAME'.

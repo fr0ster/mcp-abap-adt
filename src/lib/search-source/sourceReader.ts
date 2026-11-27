@@ -27,6 +27,7 @@ import { ourUtils } from '../strategies/resultSets';
 import { carryingFailure } from '../strategies/step';
 import type { EnumeratedObject } from './packageEnumerator';
 import {
+  endsTheSearch,
   envelopeFailure,
   failedRead,
   type SapAnswerPlace,
@@ -223,6 +224,30 @@ export function sourceReadKey(read: Read): string {
   return read.reader === 'functionGroupStructure'
     ? `structure|${read.name.toUpperCase()}`
     : `${sourceUriOf(read)}|${read.version}`;
+}
+
+/**
+ * Whether any read of `reads` was answered with what ends the call — a
+ * credential refusal, thrown or SAP's answered `401` — so no later envelope
+ * of the call is sent.
+ */
+export function answeredAnEnd(
+  answers: AnsweredReads,
+  reads: readonly Read[],
+): boolean {
+  return reads.some((read) => {
+    const key = sourceReadKey(read);
+    const result =
+      read.reader === 'functionGroupStructure'
+        ? answers.structures.get(key)
+        : answers.sources.get(key);
+    if (result === undefined) return false;
+    if (!result.ok) return endsTheSearch(result.error);
+    return (
+      !result.value.ok &&
+      endsTheSearch(thrownOf(result.value.error, STEP[read.reader]))
+    );
+  });
 }
 
 /** A failed answer as a thrown failure, with its step. */
@@ -754,21 +779,52 @@ export async function readSourcesInPhase(
   reads: readonly Read[],
   answers: AnsweredReads,
   alone = reads.length < 2,
+  afterEnvelope?: (answered: readonly Read[]) => Promise<boolean>,
 ): Promise<void> {
+  const store = (
+    asked: readonly Read[],
+    results: readonly PhaseResult<PhaseAnswer>[],
+    unsent?: ReadonlySet<number>,
+  ): void => {
+    asked.forEach((read, i) => {
+      const result = results[i];
+      if (result === undefined) return;
+      // A read whose envelope was not sent has no answer.
+      if (unsent?.has(i) === true) return;
+      keepAnswer(answers, read, result);
+    });
+  };
   // One read, or the reads of one target (`alone`), go as single requests.
-  const { results, envelope } = await runPhaseOrAlone(
+  const { results, envelope, unsent } = await runPhaseOrAlone(
     ctx,
     reads,
     (read, connection) =>
       perform(createSourceReaderDeps({ ...ctx, connection }), read),
     alone,
+    afterEnvelope === undefined
+      ? undefined
+      : {
+          // Each envelope's answers are kept as it answers, for the caller
+          // to decide whether the next one is sent.
+          after: async (asked, answered) => {
+            store(asked, answered);
+            return afterEnvelope(asked);
+          },
+        },
   );
   // A failed envelope is decided here, once: its parts never reach the
   // per-read classification.
   if (envelope.failed) envelopeFailure(envelope.error);
-  const answered = reads.map((read, i) => ({ read, result: results[i] }));
-  answered.forEach(({ read, result }) => {
-    if (result === undefined) return;
+  store(reads, results, unsent);
+}
+
+/** One read's settlement kept in `answers`, under its key. */
+function keepAnswer(
+  answers: AnsweredReads,
+  read: Read,
+  result: PhaseResult<PhaseAnswer>,
+): void {
+  {
     const key = sourceReadKey(read);
     if (!result.ok) {
       if (read.reader === 'functionGroupStructure') {
@@ -784,5 +840,5 @@ export async function readSourcesInPhase(
     } else {
       answers.sources.set(key, { ok: true, value: value.answer });
     }
-  });
+  }
 }

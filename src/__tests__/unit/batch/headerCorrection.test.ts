@@ -25,7 +25,7 @@ import {
 } from '../../../lib/adtHeaders/AdtHeaderPairs';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { runPhase } from '../../../lib/batch/phases';
+import { runPhase, runPhaseOutcome } from '../../../lib/batch/phases';
 import { assertMatchObject } from '../../helpers/assertions';
 import {
   envelopeConnection,
@@ -159,6 +159,127 @@ const phase = (fake: Fake, port: AdtHeaderPort) => {
   const context = contextOn(fake, port);
   return withinTurns(runPhase(context, ITEMS, whereUsed(context)));
 };
+
+describe("the consumer's bound and a failed correction envelope", () => {
+  it('bound 2: the correction envelope of the first envelope fails — the phase ends, no later envelope is sent', async () => {
+    let envelopes = 0;
+    const fake = envelopeConnection((parts, seen) => {
+      envelopes += 1;
+      // The correction envelope (the second request) fails as a whole.
+      if (envelopes === 2) throw statusError(500, 'Internal Server Error');
+      return partByPart((inner) =>
+        acceptsNewer(
+          itemOf(inner.url),
+          inner.headers.accept,
+          inner.headers['content-type'],
+        ),
+      )(parts, seen);
+    });
+    const port = new AdtHeaderPairs().forSystem('S1');
+    const context: HandlerContext = {
+      connection: fake.connection,
+      logger: undefined,
+      adtHeaders: port,
+      partsPerEnvelope: 2,
+    };
+    const items = ['ITEM_A', 'ITEM_B', 'ITEM_C', 'ITEM_A'];
+    const results = await withinTurns(
+      runPhaseOutcome(context, items, whereUsed(context)),
+    );
+    // The first envelope (A, B), B's correction — and nothing after it.
+    assert.deepStrictEqual(
+      fake.envelopes.map((e) => e.parts.length),
+      [2, 1],
+    );
+    assert.equal(results.results.length, 4);
+    // A and B answered (B by the failed correction, its read's failure);
+    // the later reads settle with that failure, never sent.
+    assert.deepStrictEqual(
+      results.results.map((r) => r.ok && r.value.ok),
+      [true, false, false, false],
+    );
+  });
+});
+
+describe('a correction envelope keeps the bound', () => {
+  it('bound 1: the corrected call records two parts — nothing past the bound is sent, the answer names both numbers', async () => {
+    const fake = system(acceptsNewer);
+    const context: HandlerContext = {
+      connection: fake.connection,
+      logger: undefined,
+      adtHeaders: new AdtHeaderPairs().forSystem('S1'),
+      partsPerEnvelope: 1,
+    };
+    // One call: a where-used read whose correction records it twice.
+    let calls = 0;
+    const read = async (item: string, connection: IAbapConnection) => {
+      calls += 1;
+      return withAdtHeaders(context, OP, async (headers) => {
+        const utils = new AdtClient(connection).getUtils();
+        const ask = () =>
+          utils.getWhereUsed(
+            { object_name: item, object_type: 'CLAS/OC' },
+            { headers },
+          );
+        // The first round records one part; the redone round two.
+        if (headers.accept === NEWER) {
+          const [a] = await Promise.all([ask(), ask()]);
+          return a;
+        }
+        return ask();
+      });
+    };
+    await assert.rejects(
+      withinTurns(runPhaseOutcome(context, ['ITEM_B'], read)),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message ===
+          'a read of this step needs 2 parts in one ADT batch envelope, more than the 1 parts per envelope set (--batch-parts-per-envelope / partsPerEnvelope); nothing was sent',
+    );
+    // The first envelope only: the correction was not sent.
+    assert.deepStrictEqual(
+      fake.envelopes.map((e) => e.parts.length),
+      [1],
+    );
+    assert.equal(calls, 1);
+  });
+});
+
+describe('a corrected part answering 401', () => {
+  it('bound 2: the correction envelope answers B with 401 — the phase ends, no later envelope is sent', async () => {
+    let envelopes = 0;
+    const fake = envelopeConnection((parts, seen) => {
+      envelopes += 1;
+      return partByPart((inner) =>
+        envelopes === 2
+          ? { status: 401, statusText: 'Unauthorized', body: '' }
+          : acceptsNewer(
+              itemOf(inner.url),
+              inner.headers.accept,
+              inner.headers['content-type'],
+            ),
+      )(parts, seen);
+    });
+    const context: HandlerContext = {
+      connection: fake.connection,
+      logger: undefined,
+      adtHeaders: new AdtHeaderPairs().forSystem('S1'),
+      partsPerEnvelope: 2,
+    };
+    await withinTurns(
+      runPhaseOutcome(
+        context,
+        ['ITEM_A', 'ITEM_B', 'ITEM_C', 'ITEM_A'],
+        whereUsed(context),
+      ),
+    );
+    // The first envelope (A, B), B's correction answering 401 — nothing after.
+    assert.deepStrictEqual(
+      fake.envelopes.map((e) => e.parts.length),
+      [2, 1],
+    );
+  });
+});
 
 describe('the format correction of an internal batch phase', () => {
   it('only the 406 part is recorded again, by its member with the corrected Accept, in one envelope', async () => {

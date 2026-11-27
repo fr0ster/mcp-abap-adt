@@ -10,6 +10,7 @@
 import {
   ACCESS_RESTRICTION_ROWS,
   BATCH_KEEP_RAW_PARTS_ROW,
+  BATCH_PARTS_PER_ENVELOPE_ROW,
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
   ENABLE_DATA_TOOLS_ROW,
@@ -130,6 +131,7 @@ export function sseParameters(
       ...tlsRows('sse'),
       STATE_IDLE_ROW,
       BATCH_KEEP_RAW_PARTS_ROW,
+      BATCH_PARTS_PER_ENVELOPE_ROW,
       ENABLE_DATA_TOOLS_ROW,
       SESSION_KEEP_ALIVE_ROW,
       SHUTDOWN_TIMEOUT_ROW,
@@ -206,6 +208,7 @@ export function readSseConfig(
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),
     stateIdleMinutes: numberValue(values.stateIdleMinutes),
     batchKeepRawParts: values.batchKeepRawParts === true,
+    batchPartsPerEnvelope: numberValue(values.batchPartsPerEnvelope),
     enableDataTools: values.enableDataTools === true,
     sessionKeepAliveMinutes: numberValue(values.sessionKeepAliveMinutes),
     accessRestrictions: readAccessRestrictions(argv, env, yaml),

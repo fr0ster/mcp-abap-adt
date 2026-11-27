@@ -153,6 +153,118 @@ describe('createRegistry() hosted by an EmbeddableMcpServer', () => {
   });
 });
 
+describe("partsPerEnvelope, the consumer's envelope bound", () => {
+  it("HandlerExporter.registerOnServer: the exporter's bound reaches the call; absent, none", async () => {
+    for (const bound of [7, undefined]) {
+      seen.length = 0;
+      const exporter = new HandlerExporter({
+        systemType: 'onprem',
+        ...(bound !== undefined && { partsPerEnvelope: bound }),
+      });
+      const server = new McpServer({ name: 'routes', version: '1.0.0' });
+      exporter.registerOnServer(server, async () => built);
+      const client = await clientOf(server);
+      try {
+        await client.callTool({ name: 'SearchSource', arguments: ARGS });
+        assert.equal(seen[0]?.partsPerEnvelope, bound);
+      } finally {
+        await client.close();
+      }
+    }
+  });
+
+  it("getHandlerEntries(): the exporter's bound reaches the call", async () => {
+    const exporter = new HandlerExporter({
+      systemType: 'onprem',
+      partsPerEnvelope: 4,
+    });
+    const entry = exporter
+      .getHandlerEntries()
+      .find((e) => e.toolDefinition.name === 'SearchSource');
+    assert.ok(entry !== undefined);
+    await entry.call({ connection: built, partsPerEnvelope: 99 }, ARGS);
+    // The exporter's option, never the embedder's context.
+    assert.equal(seen[0]?.partsPerEnvelope, 4);
+  });
+
+  it("createRegistry() hosted by a server with its own bound: the server's applies, the exporter's never", async () => {
+    const exporter = new HandlerExporter({
+      systemType: 'onprem',
+      partsPerEnvelope: 7,
+    });
+    const server = new EmbeddableMcpServer({
+      connection: built,
+      handlersRegistry: exporter.createRegistry(),
+      systemType: 'onprem',
+      logger: silent,
+      partsPerEnvelope: 5,
+    });
+    const client = await clientOf(server);
+    try {
+      await client.callTool({ name: 'SearchSource', arguments: ARGS });
+      assert.equal(seen[0]?.partsPerEnvelope, 5);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('two EmbeddableMcpServer instances keep their own bounds', async () => {
+    const serverOf = (partsPerEnvelope?: number) =>
+      new EmbeddableMcpServer({
+        connection: built,
+        handlersRegistry: new HandlerExporter({
+          systemType: 'onprem',
+        }).createRegistry(),
+        systemType: 'onprem',
+        logger: silent,
+        ...(partsPerEnvelope !== undefined && { partsPerEnvelope }),
+      });
+    const five = await clientOf(serverOf(5));
+    const nine = await clientOf(serverOf(9));
+    const none = await clientOf(serverOf());
+    try {
+      await five.callTool({ name: 'SearchSource', arguments: ARGS });
+      await nine.callTool({ name: 'SearchSource', arguments: ARGS });
+      await none.callTool({ name: 'SearchSource', arguments: ARGS });
+      assert.deepStrictEqual(
+        seen.map((context) => context.partsPerEnvelope),
+        [5, 9, undefined],
+      );
+    } finally {
+      await Promise.all([five.close(), nine.close(), none.close()]);
+    }
+  });
+
+  it('an option below 1 or not whole is refused at construction', () => {
+    for (const value of [0, -1, 2.5]) {
+      assert.throws(
+        () =>
+          new EmbeddableMcpServer({
+            connection: built,
+            systemType: 'onprem',
+            logger: silent,
+            partsPerEnvelope: value,
+          }),
+        (error: unknown) =>
+          error instanceof Error &&
+          error.message ===
+            'Invalid partsPerEnvelope: must be a positive whole number of parts',
+      );
+      assert.throws(
+        () =>
+          new HandlerExporter({
+            systemType: 'onprem',
+            partsPerEnvelope: value,
+          }),
+        (error: unknown) =>
+          error instanceof Error &&
+          error.message ===
+            'Invalid partsPerEnvelope: must be a positive whole number of parts',
+      );
+    }
+  });
+});
+
 describe('batch mode', () => {
   for (const [_name, strategies] of [
     ['the SAP-answer strategy given', { sapAnswerStrategy: serverSap }],

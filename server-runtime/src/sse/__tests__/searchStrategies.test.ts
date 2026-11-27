@@ -81,66 +81,79 @@ function eventReader(body: ReadableStream<Uint8Array>) {
   };
 }
 
-it('the SSE launcher passes the shipped strategies to its session server', async () => {
-  const port = await freePort();
-  const server = await main(
-    {
-      toolSet: fullToolSet,
-      program: 'mcp-abap-adt-sse',
-      version: '0.0.0',
-      packageName: '@mcp-abap-adt/sse',
-    },
-    {
-      argv: [
-        '--sse-host=127.0.0.1',
-        `--sse-port=${port}`,
-        '--system-type=onprem',
-      ],
-      stdout: () => {},
-      stderr: () => {},
-      exit: () => {},
-      processLike: Object.assign(new EventEmitter(), {
-        stdin: new EventEmitter(),
-      }),
-    },
-  );
-  if (server === undefined) throw new Error('the launcher started no server');
-  const baseUrl = `http://127.0.0.1:${port}`;
-  const controller = new AbortController();
-  try {
-    const res = await fetch(`${baseUrl}/sse`, {
-      headers: {
-        'x-sap-url': standIn.url,
-        'x-sap-client': '100',
-        'x-sap-login': 'STRATEGY_USER',
-        'x-sap-password': 'strategy-password',
+const BOUND_CASES: ReadonlyArray<{
+  readonly argv: readonly string[];
+  readonly bound: number | undefined;
+}> = [
+  { argv: [], bound: undefined },
+  { argv: ['--batch-parts-per-envelope=300'], bound: 300 },
+];
+
+for (const { argv: boundArgv, bound } of BOUND_CASES) {
+  it(`the SSE launcher passes the shipped strategies to its session server, the envelope bound ${bound ?? 'none'} included`, async () => {
+    seen.length = 0;
+    const port = await freePort();
+    const server = await main(
+      {
+        toolSet: fullToolSet,
+        program: 'mcp-abap-adt-sse',
+        version: '0.0.0',
+        packageName: '@mcp-abap-adt/sse',
       },
-      signal: controller.signal,
-    });
-    assert.equal(res.status, 200);
-    if (res.body === null) throw new Error('no stream');
-    const next = eventReader(res.body);
-    const endpoint = new URL(await next('endpoint'), baseUrl);
-    const accepted = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'tools/call',
-        params: {
-          name: 'SearchSource',
-          arguments: { query: 'x', packages: ['Z'], background: false },
+      {
+        argv: [
+          '--sse-host=127.0.0.1',
+          `--sse-port=${port}`,
+          '--system-type=onprem',
+          ...boundArgv,
+        ],
+        stdout: () => {},
+        stderr: () => {},
+        exit: () => {},
+        processLike: Object.assign(new EventEmitter(), {
+          stdin: new EventEmitter(),
+        }),
+      },
+    );
+    if (server === undefined) throw new Error('the launcher started no server');
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const controller = new AbortController();
+    try {
+      const res = await fetch(`${baseUrl}/sse`, {
+        headers: {
+          'x-sap-url': standIn.url,
+          'x-sap-client': '100',
+          'x-sap-login': 'STRATEGY_USER',
+          'x-sap-password': 'strategy-password',
         },
-      }),
-    });
-    assert.equal(accepted.status, 202);
-    await next('message');
-    assert.equal(seen.length, 1);
-    assert.equal(seen[0]?.sapAnswerStrategy, skipSapAnswers);
-    assert.equal(seen[0]?.lineMatchStrategy, substringLineMatch);
-  } finally {
-    controller.abort();
-    await server.stop();
-  }
-});
+        signal: controller.signal,
+      });
+      assert.equal(res.status, 200);
+      if (res.body === null) throw new Error('no stream');
+      const next = eventReader(res.body);
+      const endpoint = new URL(await next('endpoint'), baseUrl);
+      const accepted = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: 'SearchSource',
+            arguments: { query: 'x', packages: ['Z'], background: false },
+          },
+        }),
+      });
+      assert.equal(accepted.status, 202);
+      await next('message');
+      assert.equal(seen.length, 1);
+      assert.equal(seen[0]?.sapAnswerStrategy, skipSapAnswers);
+      assert.equal(seen[0]?.lineMatchStrategy, substringLineMatch);
+      assert.equal(seen[0]?.partsPerEnvelope, bound);
+    } finally {
+      controller.abort();
+      await server.stop();
+    }
+  });
+}

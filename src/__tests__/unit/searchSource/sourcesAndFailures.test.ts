@@ -76,6 +76,7 @@ import {
   nodeKey,
   payloadOf,
   type Repository,
+  type SearchArgs,
   searchesOf,
   searchOn,
   sentInOrder,
@@ -1953,16 +1954,14 @@ describe('D23b: no paging (DO20)', () => {
               absent,
             ),
           );
-          const sent = await searchOn(
-            standOn(big(5)),
-            {
-              query: 'marker',
-              packages: ['ZBIG'],
-              max_objects: 2,
-              start_at: 3,
-            },
-            absent,
-          );
+          // Arguments the schema no longer names, as a client still sends them.
+          const removed = {
+            query: 'marker',
+            packages: ['ZBIG'],
+            max_objects: 2,
+            start_at: 3,
+          };
+          const sent = await searchOn(standOn(big(5)), removed, absent);
           assert.equal(isError(sent), false);
           assert.deepStrictEqual(payloadOf(sent), plain);
           assert.equal(plain.results.length, 5);
@@ -2706,23 +2705,24 @@ describe('D23b: the caller sets how much the answer holds (DO23)', () => {
           await lim(absent, { object_types: ['PROG'], max_hits: 3 }).result,
         );
         assert.equal(payload.results.length, 3);
-        // Sequential: ZP1 alone was read. Batched: the stopped chunk's
-        // sources were read, ZP2 and ZP3 included.
+        // Both paths: ZP1 alone was read — the batched one reads one
+        // target per round under max_hits.
         assert.deepStrictEqual(payload.scanned, {
           objects: 1,
-          sources: absent ? 1 : 3,
+          sources: 1,
           objects_with_hits: 1,
         });
       },
     );
   }
 
-  it('the batched path stops at a chunk boundary: no envelope of a later chunk is sent', async () => {
+  /** `ZBIGL`: 305 programs, the first holding `firstHits` markers, every other one. */
+  const bigList = (firstHits = 1): Repository => {
     const names = Array.from(
       { length: 305 },
       (_, i) => `ZQ${String(i + 1).padStart(4, '0')}`,
     );
-    const repo: Repository = {
+    return {
       nodes: {
         [nodeKey('ZBIGL')]: { types: [{ type: 'PROG/P', nodeId: '000001' }] },
         [nodeKey('ZBIGL', '1')]: {
@@ -2730,27 +2730,56 @@ describe('D23b: the caller sets how much the answer holds (DO23)', () => {
         },
       },
       sources: Object.fromEntries(
-        names.map((name) => [`PROGRAM ${name}`, 'marker']),
+        names.map((name, i) => [
+          `PROGRAM ${name}`,
+          i === 0 ? Array(firstHits).fill('marker').join('\n') : 'marker',
+        ]),
       ),
       fugrChildren: {},
       masks: {},
     };
-    const batched = standOn(repo);
-    const sequential = standOn(repo);
-    const args = { query: 'marker', packages: ['ZBIGL'], max_hits: 2 };
-    const a = payloadOf(await searchOn(batched, args, false, 4000));
-    const b = payloadOf(await searchOn(sequential, args, true, 4000));
-    assert.equal(sourceRequests(batched).length, 300);
-    assert.equal(sourceRequests(sequential).length, 2);
-    assert.deepStrictEqual(a.results, b.results);
-    assert.deepStrictEqual(a.truncated, {
-      by_object_cap: false,
-      by_max_hits: true,
+  };
+  const BOUNDS = [
+    ['no bound', undefined],
+    ['bound 300', 300],
+  ] as const;
+
+  for (const [label, bound] of BOUNDS) {
+    it(`max_hits given (${label}): the batched path reads as many targets as the hits need, not 305`, async () => {
+      const batched = standOn(bigList());
+      const sequential = standOn(bigList());
+      const args = { query: 'marker', packages: ['ZBIGL'], max_hits: 2 };
+      const a = payloadOf(await searchOn(batched, args, false, 4000, bound));
+      const b = payloadOf(await searchOn(sequential, args, true, 4000));
+      assert.equal(sourceRequests(batched).length, 2);
+      assert.equal(sourceRequests(sequential).length, 2);
+      assert.deepStrictEqual(a.results, b.results);
+      assert.deepStrictEqual(a.truncated, {
+        by_object_cap: false,
+        by_max_hits: true,
+      });
+      assert.deepStrictEqual(b.truncated, a.truncated);
+      assert.equal(a.scanned.sources, 2);
     });
-    assert.deepStrictEqual(b.truncated, a.truncated);
-    assert.equal(a.scanned.sources, 300);
-    assert.equal(b.scanned.sources, 2);
-  });
+
+    it(`max_hits reached in the first target (${label}): no further read is sent`, async () => {
+      const batched = standOn(bigList(3));
+      const args = { query: 'marker', packages: ['ZBIGL'], max_hits: 2 };
+      const a = payloadOf(await searchOn(batched, args, false, 4000, bound));
+      assert.equal(sourceRequests(batched).length, 1);
+      assert.equal(a.results.length, 2);
+      assert.equal(a.truncated.by_max_hits, true);
+    });
+
+    it(`no max_hits (${label}): no cap and no early stop — every target read, every hit answered`, async () => {
+      const batched = standOn(bigList(3));
+      const args = { query: 'marker', packages: ['ZBIGL'] };
+      const a = payloadOf(await searchOn(batched, args, false, 4000, bound));
+      assert.equal(sourceRequests(batched).length, 305);
+      assert.equal(a.results.length, 307);
+      assert.equal(a.truncated.by_max_hits, undefined);
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -3988,7 +4017,7 @@ describe('D23b: a program include is one object, however many groups list it (DO
   const search = (
     fake: Fake,
     absent: boolean,
-    args: Record<string, unknown> = {},
+    args: Omit<SearchArgs, 'query'>,
   ) => searchOn(fake, { query: 'marker', ...args }, absent);
   /** A hit as the tests read it. */
   interface Hit {

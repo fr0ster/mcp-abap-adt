@@ -91,6 +91,12 @@ export interface StdioServerOptions {
    */
   lineMatchStrategy?: LineMatchStrategy;
   /**
+   * The consumer's bound on the parts (requests) one ADT batch envelope of a call
+   * carries (`--batch-parts-per-envelope`), handed to the instance. Absent:
+   * no bound.
+   */
+  partsPerEnvelope?: number | undefined;
+  /**
    * The owner of this instance's batch state (the launcher's, one for the
    * process's one instance). Absent: the batch tools answer
    * `batch_mode_unavailable`.
@@ -180,6 +186,9 @@ export class StdioServer extends BaseMcpServer {
       }),
       ...(opts?.lineMatchStrategy !== undefined && {
         lineMatchStrategy: opts.lineMatchStrategy,
+      }),
+      ...(opts?.partsPerEnvelope !== undefined && {
+        partsPerEnvelope: opts.partsPerEnvelope,
       }),
       ...(opts?.batch !== undefined && { batch: opts.batch }),
       // --deferred-logon --restore-session: the first call's birth takes up

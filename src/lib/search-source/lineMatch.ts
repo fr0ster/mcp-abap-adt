@@ -30,4 +30,11 @@ export interface ScanResult {
 /** A line match: one source's lines and the scan input in, its hits out. */
 export interface LineMatchStrategy {
   match(lines: readonly string[], input: ScanInput): ScanResult;
+  /**
+   * `true` when a hit is only ever a line holding `query` (in either case),
+   * so a source without the query holds no hit: with `max_hits`, the scan is
+   * not repeated after a step whose sources hold no query. Absent: every
+   * step is scanned.
+   */
+  readonly hitsHoldQuery?: boolean;
 }

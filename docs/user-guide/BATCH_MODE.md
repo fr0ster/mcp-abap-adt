@@ -337,18 +337,39 @@ choice, not a rule: an envelope of one part would be as correct.
   description is its metadata's. The sequential version reads the same metadata, one request
   each, so both paths answer from one source. A leaf whose metadata read SAP refused — a `401`
   included — has no description, and the call answers, on both paths.
-- **`SearchSource`.** Several targets' rounds go in envelopes; a single target, and any phase of
-  one read (one mask's quickSearch, a walk level of one node structure, a round of one source
-  read), goes as single requests (an implementation choice).
-- **At most 300 reads per envelope** (`READS_PER_ENVELOPE`, `src/lib/batch/phases.ts`): more
-  independent reads go in consecutive envelopes of balanced size (`chunksOf`: 301 reads are 151 and
-  150, never 300 and 1), each judged as it answers. Where a credential refusal ends the call — the
-  group checks, `GetEnhancements`, the level walks — no envelope is sent after the one that met it;
-  `GetObjectInfo`'s metadata phase is the exception: a leaf's refused metadata read, a `401`
-  included, is that leaf's (no description) and the phase goes on with the next envelope. Every
-  phase splits so: the group checks, `GetEnhancements`, the metadata phase, the level walks
-  (`batchReader`: the package walks, `GetObjectsList`, `GetObjectInfo`'s enrichment searches) and
-  `SearchSource`'s source reads. SAP's own limit is not measured.
+- **`SearchSource`.** Several targets' rounds go in envelopes; without `max_hits` a single target,
+  and any phase of one read (one mask's quickSearch, a walk level of one node structure, a round of
+  one source read), goes as single requests (an implementation choice). With `max_hits` a target's
+  rounds of two or more reads go in envelopes (below).
+- **No bound of the server's own on an envelope.** By default all independent reads of
+  a phase go in one envelope. The consumer may set a bound: `--batch-parts-per-envelope=<parts>`
+  (`MCP_BATCH_PARTS_PER_ENVELOPE`, YAML `batch.partsPerEnvelope`; a positive whole number; an
+  embedder's `partsPerEnvelope` option). It applies to every phase, in one place
+  (`runPhaseOutcome` / `runPhase`, `src/lib/batch/phases.ts`), and it counts **parts** — the
+  requests in the envelope. Every read of the phase runs once and records its requests, nothing
+  sent; the recorded parts are planned in consecutive envelopes of at most that many parts,
+  balanced (`packByParts`: 302 one-request reads at 300 are 151 and 151, never 300 and 2), each
+  read's parts together — one that does not fit starts the next envelope — and the plan's part
+  counts are checked before the first envelope is sent (`checkedEnvelopes`): a read that needs more
+  parts than the bound is answered an error naming both numbers — "a read of this step needs N
+  parts in one ADT batch envelope, more than the B parts per envelope set" — and nothing of the
+  phase is sent. The envelopes then go one after another, each read handed its own answers.
+- **A failed envelope is answered as SAP answered it.** An envelope SAP refuses or fails is every
+  part's failure, as it came, and the call answers that; with a bound, an envelope that failed or
+  met a credential refusal ends the phase: no later envelope is sent, and the reads it would have
+  carried answer that same failure, as one envelope holding them all would have. A part SAP
+  answered `401` — in the envelope or in its format-correction envelope — and a correction envelope
+  that failed end the phase the same way, `GetEnhancements` included. The group checks also stop
+  after an envelope holding a failure (the first failure is the answer). **The exception is
+  `GetObjectInfo`'s metadata phase** (`include_descriptions: true`): a failed metadata read — a part
+  SAP refused, or a whole envelope that failed — gives those leaves no description and the call
+  still answers, the next envelope sent; only a credential refusal ends it.
+- **`SearchSource` and `max_hits`.** Without `max_hits` every target is read and every hit
+  answered: every target's round goes in one phase (one envelope, or the bound's). With
+  `max_hits` the targets are read one per round, bound or not, each target's reads still in
+  envelopes (of at most the bound), the hits counted after each envelope, and the scan stops as
+  soon as they reach `max_hits`: no later envelope is sent. SAP's own
+  envelope limit is not measured.
 - **Descriptions are never taken from a batched node structure.** Inside an envelope a node
   structure part can carry another part's `DESCRIPTION` (measured, 2026-10-18). The package
   listings with `include_descriptions: true` send each node structure as its own request and take

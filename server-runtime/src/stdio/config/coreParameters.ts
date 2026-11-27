@@ -9,6 +9,7 @@
 import {
   ACCESS_RESTRICTION_ROWS,
   BATCH_KEEP_RAW_PARTS_ROW,
+  BATCH_PARTS_PER_ENVELOPE_ROW,
   CONF_ROW,
   DESTINATION_KEY_ENV,
   DESTINATION_KEYS,
@@ -412,6 +413,7 @@ export function coreParameters(
       LOGIN_TIMEOUT_ROW,
       AUTH_DEBUG_ROW,
       BATCH_KEEP_RAW_PARTS_ROW,
+      BATCH_PARTS_PER_ENVELOPE_ROW,
       ENABLE_DATA_TOOLS_ROW,
       SESSION_KEEP_ALIVE_ROW,
       SHUTDOWN_TIMEOUT_ROW,
@@ -606,6 +608,7 @@ export function readCoreConfig(
     // connection type, and passes it to the server.
     systemTypeSource: source('systemType'),
     batchKeepRawParts: values.batchKeepRawParts === true,
+    batchPartsPerEnvelope: numberValue(values.batchPartsPerEnvelope),
     enableDataTools: values.enableDataTools === true,
     sessionKeepAliveMinutes: numberValue(values.sessionKeepAliveMinutes),
     accessRestrictions: readAccessRestrictions(argv, env, yaml),

@@ -24,11 +24,10 @@
  * `getCdsUnitTest()`) also composes `IAdtLockable`, delegating to the
  * object's own lock — so this handler acquires it, exactly as every
  * already-migrated high-tier locked write in this repository does, through
- * `withLock`. `UpdateMessageClassMessage` is the one genuine exception:
- * `AdtMessageClassMessage` is not `IAdtLockable` at all — its write locks
- * and unlocks itself internally, through direct module calls never exposed
- * on this accessor — so there is truly no lock for this handler to take,
- * and it calls `update()` directly.
+ * `withLock`. The message tools are the exception: adt-clients 48 gives a
+ * message its own one-request lock members (`lockMessage`,
+ * `lockClassForMessage`, `unlockMessages`), and the window around the PUT
+ * is composed in `lib/messageClassMessageWrite.ts`.
  *
  * **A refused create is unrecorded in the corpus for every family** — the
  * spec says so. These tests therefore assert the handler's behaviour given
@@ -142,11 +141,6 @@ describe('high-tier creates: no lock, single POST', () => {
       'CreateMessageClass',
       handleCreateMessageClass,
       { message_class_name: 'ZMC', package_name: 'ZP' },
-    ],
-    [
-      'CreateMessageClassMessage',
-      handleCreateMessageClassMessage,
-      { message_class_name: 'ZMC', msgno: '001', msgtext: 'x' },
     ],
     [
       'CreatePackage',
@@ -390,30 +384,54 @@ describe('high-tier updates that still have a lock to take: they take it themsel
   }
 });
 
-describe('UpdateMessageClassMessage: no lock to take, and none is asked for', () => {
-  it('reports a refused update as an error', async () => {
-    fakeClient = fakeClientOf({
-      update: async () => refusedResponse('Object is locked by another user'),
-    });
-    const result: any = await handleUpdateMessageClassMessage(context as any, {
-      message_class_name: 'ZMC',
-      msgno: '001',
-      msgtext: 'x',
-    });
-    assert.equal(result.isError, true);
-    assert.equal(
-      JSON.parse(result.content[0].text).message,
-      'Object is locked by another user',
+describe("the message tools: the lock window is the server's (adt-clients 48)", () => {
+  for (const [name, handler] of [
+    ['CreateMessageClassMessage', handleCreateMessageClassMessage],
+    ['UpdateMessageClassMessage', handleUpdateMessageClassMessage],
+  ] as const) {
+    it(
+      format(
+        '%s reports a refused PUT as an error, and gives both locks up',
+        name,
+      ),
+      async () => {
+        const unlock = mock.fn(async () => okResponse(undefined));
+        const unlockMessages = mock.fn(async () => okResponse(undefined));
+        fakeClient = fakeClientOf({
+          update: async () =>
+            refusedResponse('Object is locked by another user'),
+          unlock,
+          unlockMessages,
+        });
+        const result: any = await handler(context as any, {
+          message_class_name: 'ZMC',
+          msgno: '001',
+          msgtext: 'x',
+        });
+        assert.equal(result.isError, true);
+        assert.equal(
+          JSON.parse(result.content[0].text).message,
+          'Object is locked by another user',
+        );
+        assert.equal(unlock.mock.callCount(), 1);
+        assert.equal(unlockMessages.mock.callCount(), 1);
+      },
     );
-  });
+  }
 
-  it('never calls lock or unlock — AdtMessageClassMessage is not IAdtLockable', async () => {
+  it('takes the class lock for the message, not the plain class lock, when it is granted', async () => {
     const lock = mock.fn<(...args: any[]) => any>();
-    const unlock = mock.fn<(...args: any[]) => any>();
+    const lockMessage = mock.fn(async () => okResponse('MESSAGEHANDLE'));
+    const lockClassForMessage = mock.fn(async () => okResponse('CLASSHANDLE'));
+    let seen: any;
     fakeClient = fakeClientOf({
-      update: async () => okResponse(reading(undefined, '', 200)),
+      lockMessage,
+      lockClassForMessage,
+      update: async (_c: unknown, o: any) => {
+        seen = o;
+        return okResponse(reading(undefined, '', 200));
+      },
       lock,
-      unlock,
     });
     const result: any = await handleUpdateMessageClassMessage(context as any, {
       message_class_name: 'ZMC',
@@ -422,6 +440,10 @@ describe('UpdateMessageClassMessage: no lock to take, and none is asked for', ()
     });
     assert.equal(result.isError, false);
     assert.equal(lock.mock.callCount(), 0);
-    assert.equal(unlock.mock.callCount(), 0);
+    assert.equal(lockMessage.mock.callCount(), 1);
+    assert.equal(lockClassForMessage.mock.callCount(), 1);
+    assert.equal(seen.classLockHandle, 'CLASSHANDLE');
+    assert.equal(seen.messageLockHandle, 'MESSAGEHANDLE');
+    assert.equal(seen.analyse, analyseException);
   });
 });

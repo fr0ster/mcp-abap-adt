@@ -151,9 +151,11 @@ A composer above the one-endpoint members. It answers two things:
   `{ type, name, parent? }` that `part` takes. The document and the tree are what today's
   `GetObjectOutline` answers are built from; the list is new.
 - **`part(object, elements)`**: each element located in its include. For each one it answers the
-  include's address, the include's whole text and its `sourceHash`, the element's first and last
-  line, and whether the element shares a line with another statement (§5.4). The tools cut the
-  element's lines from this, and the write merges into it (§7). One read path serves both.
+  include's address, the include's whole text as read, the element's first and last line (and,
+  where SAP gives them, its start and end columns), and whether the element shares a line or a
+  statement with another (§5.4). The tools cut the element's lines from this, and the write
+  merges into it (§7). One read path serves both. The analyzer computes no hash: lib hashes the
+  text it is given (§7.2).
 
 It is **not a member** of any object client and builds **no request**: it never calls
 `makeAdtRequest` and writes no ADT address. Every request it causes is a member's, one request
@@ -225,8 +227,9 @@ tools are marked "Runs outside batch mode" in `tools/batch-handlers.json`.
   - a declaration: its `definitionBlock`;
   - a local class's definition or implementation;
   - the class's own definition: the attributes, signatures and types, without any method body.
-- The analyzer takes the include from the link and the lines from the position. It calls no
-  navigation and no scanner.
+- The analyzer takes the include from the link and the lines and columns from the position. It
+  calls no navigation, and the scanner finds no end here. The lexer still runs over the include,
+  for the boundary check of §5.4.
 - A method has two sides. `side` is `implementation` (the default for a method) or `definition`.
   For the class itself, `definition` is the "definitions first" read.
 
@@ -283,12 +286,23 @@ source:
 - **A part is whole lines**, from the block's first line to its last, exactly as SAP holds them
   (the goal's invariant). Because `end` stops before the period (§2), whole lines are what
   carries the period.
-- A part **shares a line** when its first line holds a statement before the start, or its last
-  line holds a statement after the end. Examples: `ENDMETHOD. METHOD b.` on one line, or one name
-  of a chained declaration.
-- Such a part is still read, and the answer says that it shares a line.
-- Replacing such a part by element is **refused**: whole lines would carry the other statement.
-  The diff path (§7.3) stays open for it.
+- **Locating and checking are two steps.** Locating gives the block: SAP's positions for a class
+  or an interface (lines and columns, kept), navigation plus the scanner elsewhere. Checking runs
+  the same lexer over the include, for every kind, and decides whether the block's whole lines
+  hold only that element.
+- The check reads the text around the block with the lexer, never by column arithmetic alone:
+  - before the start on the first line: only blanks are allowed;
+  - after the end on the last line: only the closing period, blanks, a `"` comment and a pragma;
+  - the block's statement: it must not be a chain carrying another element. A chained declaration
+    (`METHODS: a, b.`) is one statement for two elements, and SAP's block for `a` starts at the
+    chain's keyword (§2).
+- A part that fails the check **shares a line** (or a statement). Examples: `ENDMETHOD. METHOD b.`
+  on one line, or one name of a chained declaration.
+- Such a part is still read, and the answer says what it shares.
+- Replacing such a part by element is **refused**, since whole lines would carry the other
+  statement. The diff path (§7.3) stays open for it.
+- The check runs again under the lock before a `replace` (§7.2). A part read's answer is never
+  trusted for a write.
 
 ### 5.5 A line range inside an element
 

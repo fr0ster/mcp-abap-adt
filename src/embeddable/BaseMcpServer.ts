@@ -614,7 +614,7 @@ export abstract class BaseMcpServer extends McpServer {
     lineMatchStrategy?: LineMatchStrategy | undefined;
     /**
      * The consumer's bound on the parts (requests) one ADT batch envelope of a call
-     * carries (`--batch-parts-per-envelope`): a whole number from 2, else
+     * carries (`--batch-parts-per-envelope`): a positive whole number, else
      * the constructor throws. Absent: no bound — a phase's independent
      * reads go in one envelope, and what SAP answers to it is SAP's.
      */

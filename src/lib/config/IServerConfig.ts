@@ -85,7 +85,7 @@ export interface IServerConfig {
   /**
    * The consumer's bound on the parts (requests) one ADT batch envelope of a call
    * carries (`--batch-parts-per-envelope`, `MCP_BATCH_PARTS_PER_ENVELOPE`,
-   * `batch.partsPerEnvelope`): a whole number from 2. Absent: no bound.
+   * `batch.partsPerEnvelope`): a positive whole number. Absent: no bound.
    */
   batchPartsPerEnvelope?: number | undefined;
 

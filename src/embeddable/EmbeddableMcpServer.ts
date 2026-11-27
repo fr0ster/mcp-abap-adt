@@ -122,7 +122,7 @@ export interface EmbeddableMcpServerBaseOptions {
   lineMatchStrategy?: LineMatchStrategy;
   /**
    * The consumer's bound on the parts (requests) one ADT batch envelope of a call
-   * carries: a whole number from 2, else the constructor throws. Absent: no
+   * carries: a positive whole number, else the constructor throws. Absent: no
    * bound — a phase's independent reads go in one envelope.
    */
   partsPerEnvelope?: number;

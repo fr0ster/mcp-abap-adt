@@ -121,7 +121,7 @@ export interface HandlerExporterOptions {
 
   /**
    * The consumer's bound on the parts (requests) one ADT batch envelope of a call
-   * carries: a whole number from 2, else the constructor throws. As
+   * carries: a positive whole number, else the constructor throws. As
    * `sapAnswerStrategy`, on `getHandlerEntries()` and `registerOnServer`;
    * on `createRegistry()` the hosting server's option applies. Absent: no
    * bound — a phase's independent reads go in one envelope.

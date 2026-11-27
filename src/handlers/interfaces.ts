@@ -80,7 +80,7 @@ export interface HandlerContext {
    * @internal Set by the server from its options; not part of the context a
    * consumer builds. The consumer's bound on the parts (requests) one ADT batch
    * envelope of the call carries (`envelopesOf`, `src/lib/batch/phases.ts`):
-   * a whole number from 2. Absent: no bound — a phase's independent reads
+   * a positive whole number. Absent: no bound — a phase's independent reads
    * go in one envelope. Kept in every context derived from this one.
    */
   partsPerEnvelope?: number;

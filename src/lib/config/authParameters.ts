@@ -998,11 +998,11 @@ export const BATCH_PARTS_PER_ENVELOPE_ENV = 'MCP_BATCH_PARTS_PER_ENVELOPE';
 export const BATCH_PARTS_PER_ENVELOPE_YAML = 'batch.partsPerEnvelope';
 
 /** The fewest reads a consumer's bound on an envelope may set. */
-export const MIN_PARTS_PER_ENVELOPE = 2;
+export const MIN_PARTS_PER_ENVELOPE = 1;
 
 /** The refusal of a parts-per-envelope bound, in fixed words: the value is never echoed. */
 export function partsPerEnvelopeRefusal(name: string): string {
-  return `Invalid ${name}: must be a whole number of parts from ${MIN_PARTS_PER_ENVELOPE}`;
+  return `Invalid ${name}: must be a positive whole number of parts`;
 }
 
 /**
@@ -1040,7 +1040,7 @@ export const BATCH_PARTS_PER_ENVELOPE_ROW: Parameter = {
   parse: parsePartsPerEnvelope,
   valueHint: '=<parts>',
   section: 'BATCH MODE',
-  help: `The most parts (requests) one ADT batch envelope carries when a single tool call reads several objects at once (GetEnhancements, SearchSource, package listings and walks, function module group checks, …): the reads go in consecutive envelopes of balanced size, a read's requests always together in one envelope; a read that needs more parts than this is answered an error naming both numbers, and nothing is sent. A whole number from ${MIN_PARTS_PER_ENVELOPE}. Default (not given or blank): no bound — all independent reads of a step go in one envelope, and an envelope SAP refuses or fails is answered as SAP answered it.`,
+  help: `The most parts (requests) one ADT batch envelope carries when a single tool call reads several objects at once (GetEnhancements, SearchSource, package listings and walks, function module group checks, …): the reads go in consecutive envelopes of balanced size, a read's requests always together in one envelope; a read that needs more parts than this is answered an error naming both numbers, and nothing is sent. A positive whole number. Default (not given or blank): no bound — all independent reads of a step go in one envelope, and an envelope SAP refuses or fails is answered as SAP answered it.`,
 };
 
 export const ENABLE_DATA_TOOLS_CLI = '--enable-data-tools';

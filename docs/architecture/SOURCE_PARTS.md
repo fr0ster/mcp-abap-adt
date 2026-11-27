@@ -487,7 +487,10 @@ ends included:
   CRLF) is replaced by that one; nothing else in the model's code is changed.
 
 **The lock target and the write target, per kind**, from adt-clients' own CRUD (paths under
-`packages/adt-clients/src/core/` of mcp-abap-adt-clients, at its current `main`):
+`packages/adt-clients/src/core/` of mcp-abap-adt-clients at the tag `adt-clients-v48.0.0`, the
+version lib depends on; the published package ships `dist/` only, so the lines are the tag's
+sources):
+
 
 | The include | Lock target (`?_action=LOCK&accessMode=MODIFY`) | Write (`PUT … ?lockHandle=`) | lib's handler today, the same pairing |
 |---|---|---|---|

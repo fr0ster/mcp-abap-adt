@@ -245,11 +245,16 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
       const worklistId = worklist.getResult().value;
 
       const run = await atStep('start run', () =>
-        atc.startRun(worklistId, target, {
-          analyse: analyseException,
-          wait,
-          ...(maximumVerdicts === undefined ? {} : { maximumVerdicts }),
-        }),
+        maximumVerdicts === undefined
+          ? atc.startRun(worklistId, target, {
+              analyse: analyseException,
+              wait,
+            })
+          : atc.startRun(worklistId, target, {
+              analyse: analyseException,
+              wait,
+              maximumVerdicts,
+            }),
       )();
       if (!run.ok) return run;
 

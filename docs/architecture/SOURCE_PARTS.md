@@ -476,8 +476,8 @@ ends included:
 |---|---|---|---|
 | a class's `source/main` | the class, `class/lock.ts:26` | `source/main` of the class, `class/update.ts:38` | `handleUpdateClass.ts:101`, `:105`, `:151` |
 | a class's `implementations` | the class: "ADT locks `/oo/classes/{name}`, never the include, and the PUT that writes the include carries the class's handle", `class/AdtClassMemberBase.ts:126-128` | `class/update.ts:63` | `handleUpdateLocalTypes.ts:97`, `:100`, `:112` |
-| a class's `definitions`, `macros` | the class, as above | `class/includes.ts:141` (`updateClassInclude`) | the local definitions and macros handlers |
-| a class's `testclasses` | the class, as above | `class/testclasses.ts:32` | the local test class handler |
+| a class's `definitions`, `macros` | the class, as above | `class/includes.ts:141` (`updateClassInclude`) | `handleUpdateLocalDefinitions.ts:97`, `:100`, `:112`; `handleUpdateLocalMacros.ts:95`, `:98`, `:110` |
+| a class's `testclasses` | the class, as above | `class/testclasses.ts:32` | `handleUpdateLocalTestClass.ts:113`, `:116`, `:128` |
 | an interface's source | the interface, `interface/lock.ts:25` | `interface/update.ts:27` | `handleUpdateInterface.ts:101`, `:105`, `:134` |
 | a program's main source | the program, `program/lock.ts:24` | `program/update.ts:25` | `handleUpdateProgram.ts:97`, `:101`, `:130` |
 | a program include (`PROG/I`) | **the include itself**, `include/lock.ts:33` | `include/update.ts:24` | `handleUpdateInclude.ts:91`, `:95`, `:107` |

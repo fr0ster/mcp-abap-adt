@@ -9,7 +9,7 @@ import { beforeEach, describe, it, mock } from 'node:test';
 import { handleSearchSource } from '../../handlers/system/readonly/handleSearchSource';
 import { substringLineMatch } from '../../lib/search-source/lineScanner';
 import * as orchestrator from '../../lib/search-source/orchestrator';
-import { assertMatchObject, assertNoProperty } from '../helpers/assertions';
+import { assertMatchObject } from '../helpers/assertions';
 
 /** SearchSource at `detail: 'full'`, the JSON answer these cases read (terse answers, step 3). */
 const searchSourceFull = (
@@ -33,14 +33,27 @@ const args = { query: 'Echo:', packages: ['ZPKG'] } as any;
 describe('SearchSource concurrency by connection', () => {
   beforeEach(() => run.mock.resetCalls());
 
-  it('runs one fetch at a time over RFC, whatever was asked', async () => {
-    await searchSourceFull({ connection: connectionOf('rfc') } as any, args);
+  // No concurrency of the server's (#391, the owner): the consumer's
+  // --requests-in-flight, one at a time without it; RFC one at a time always.
+  it('runs one fetch at a time over RFC, whatever the consumer set', async () => {
+    await searchSourceFull(
+      { connection: connectionOf('rfc'), requestsInFlight: 6 } as any,
+      args,
+    );
     assertMatchObject(run.mock.calls[0]?.arguments[1], { concurrency: 1 });
   });
 
-  it("over HTTP the sequential version's own default applies", async () => {
+  it('over HTTP without a bound, one fetch at a time', async () => {
     await searchSourceFull({ connection: connectionOf('http') } as any, args);
-    assertNoProperty(run.mock.calls[0]?.arguments[1], 'concurrency');
+    assertMatchObject(run.mock.calls[0]?.arguments[1], { concurrency: 1 });
+  });
+
+  it("over HTTP, the consumer's bound as given", async () => {
+    await searchSourceFull(
+      { connection: connectionOf('http'), requestsInFlight: 20 } as any,
+      args,
+    );
+    assertMatchObject(run.mock.calls[0]?.arguments[1], { concurrency: 20 });
   });
 
   it('the handler wires the shipped strategy', async () => {

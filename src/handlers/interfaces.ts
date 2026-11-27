@@ -85,6 +85,15 @@ export interface HandlerContext {
    */
   partsPerEnvelope?: number;
   /**
+   * @internal Set by the server from its options; not part of the context a
+   * consumer builds. The consumer's bound on the requests a call keeps in
+   * flight at once where it reads several objects one request each
+   * (`--requests-in-flight`): a positive whole number. Absent: one at a time.
+   * A connection that answers one call at a time (RFC) keeps one whatever
+   * this says (`readsInFlight`). Kept in every context derived from this one.
+   */
+  requestsInFlight?: number;
+  /**
    * The request header pairs of the call's system (`AdtHeaderPairs`): the
    * pair a header-taking member is called with (`withAdtHeaders`), and
    * where a corrected one is kept. Kept in every context derived from this

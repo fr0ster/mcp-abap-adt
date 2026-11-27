@@ -11,7 +11,6 @@ import {
   concurrentReader,
   isNotLoaded,
   kindOf,
-  NODE_READ_CONCURRENCY,
   type NodeLevel,
   type NodeStructureSource,
   nodeItemsOf,
@@ -432,28 +431,50 @@ describe('the tree holds every walked object', () => {
 });
 
 describe('concurrentReader', () => {
-  const context = { connection: {} } as unknown as HandlerContext;
+  /** The consumer's bound the stopping cases run with. */
+  const BOUND = 8;
+  const context = {
+    connection: {},
+    requestsInFlight: BOUND,
+  } as unknown as HandlerContext;
   const tick = () => new Promise((resolve) => setImmediate(resolve));
 
-  it('answers in item order, never more than NODE_READ_CONCURRENCY open at once', async () => {
+  /** The most reads open at once over 30 items, with the context's bound. */
+  async function mostOpen(bound?: number): Promise<number> {
     let open = 0;
     let most = 0;
-    const read = concurrentReader<number, number>(context, async (n) => {
-      open += 1;
-      most = Math.max(most, open);
-      // Later items finish first.
-      for (let i = 0; i < 30 - n; i++) await tick();
-      open -= 1;
-      return n * 10;
-    });
+    const read = concurrentReader<number, number>(
+      {
+        connection: {},
+        ...(bound === undefined ? {} : { requestsInFlight: bound }),
+      } as unknown as HandlerContext,
+      async (n) => {
+        open += 1;
+        most = Math.max(most, open);
+        // Later items finish first.
+        for (let i = 0; i < 30 - n; i++) await tick();
+        open -= 1;
+        return n * 10;
+      },
+    );
     const items = Array.from({ length: 30 }, (_, i) => i);
     const out = await read(items);
     assert.deepStrictEqual(
       out,
       items.map((n) => ({ ok: true, value: n * 10 })),
     );
-    assert.equal(most, NODE_READ_CONCURRENCY);
     assert.equal(read.ownAnswers, true);
+    return most;
+  }
+
+  // No concurrency of the server's (#391, the owner): the consumer's
+  // --requests-in-flight; none given, one at a time.
+  it('answers in item order, one read at a time when no bound is given', async () => {
+    assert.equal(await mostOpen(), 1);
+  });
+
+  it("answers in item order, as many open at once as the consumer's bound", async () => {
+    assert.equal(await mostOpen(12), 12);
   });
 
   it("an item's failure is its own", async () => {
@@ -492,12 +513,12 @@ describe('concurrentReader', () => {
     // The refused read's pump stopped; the other pumps hold their reads.
     assert.deepStrictEqual(
       started,
-      Array.from({ length: NODE_READ_CONCURRENCY }, (_, i) => i),
+      Array.from({ length: BOUND }, (_, i) => i),
     );
     assert.equal(settled, false);
     for (const release of held.values()) release();
     assert.equal(await rejectionOf(answer), refusal);
-    assert.equal(started.length, NODE_READ_CONCURRENCY);
+    assert.equal(started.length, BOUND);
   });
 
   it('an answer stopsAt accepts starts no further read; the items read are answered', async () => {
@@ -518,14 +539,14 @@ describe('concurrentReader', () => {
     for (let i = 0; i < 5; i++) await tick();
     assert.deepStrictEqual(
       started,
-      Array.from({ length: NODE_READ_CONCURRENCY }, (_, i) => i),
+      Array.from({ length: BOUND }, (_, i) => i),
     );
     for (const release of held.values()) release();
     const out = await answer;
-    assert.equal(started.length, NODE_READ_CONCURRENCY);
+    assert.equal(started.length, BOUND);
     assert.deepStrictEqual(out, [
       { ok: true, value: 'refused' },
-      ...Array.from({ length: NODE_READ_CONCURRENCY - 1 }, (_, i) => ({
+      ...Array.from({ length: BOUND - 1 }, (_, i) => ({
         ok: true,
         value: `read ${i + 1}`,
       })),

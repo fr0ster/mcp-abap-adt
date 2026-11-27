@@ -139,13 +139,11 @@ export function batchReader<I, R>(
   return async (items) => runPhase(context, items, read);
 }
 
-/** How many node structure requests `concurrentReader` keeps open at once. */
-export const NODE_READ_CONCURRENCY = 8;
-
 /**
- * One level's reads as requests sent alone, `NODE_READ_CONCURRENCY` at a
- * time over HTTP and one at a time over RFC (`readsInFlight`), on the
- * call's connection: `read(item, connection)` for every item;
+ * One level's reads as requests sent alone, as many at a time as the
+ * consumer set (`context.requestsInFlight`, `--requests-in-flight`; absent,
+ * one at a time — no number of the server's, #391) and one at a time over
+ * RFC (`readsInFlight`), on the call's connection: `read(item, connection)` for every item;
  * each item's settlement, in item order. Every answer is its own request's
  * (`ownAnswers`), so a node structure's `DESCRIPTION` is the object's own —
  * which an envelope part's is not (measured on an on-premise system: inside
@@ -184,7 +182,7 @@ export function concurrentReader<I, R>(
     const pumps = Math.max(
       1,
       Math.min(
-        readsInFlight(context.connection, NODE_READ_CONCURRENCY),
+        readsInFlight(context.connection, context.requestsInFlight ?? 1),
         items.length,
       ),
     );

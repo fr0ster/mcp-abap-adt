@@ -21,7 +21,11 @@ import {
 } from '../../handlers/search/readonly/handleSearchObject';
 import * as clients from '../../lib/clients';
 import * as debuggerAccess from '../../lib/debugger/access';
+import { substringLineMatch } from '../../lib/search-source/lineScanner';
+import { runSearchSource } from '../../lib/search-source/orchestrator';
+import { skipSapAnswers } from '../../lib/search-source/readFailure';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
+import { exactPackages, listing } from '../helpers/sourceReaderFake';
 
 const asked: Array<{ member: string; args: unknown[] }> = [];
 
@@ -134,5 +138,55 @@ describe('AmdpDebugGetTable (#391, item 14): row_number is the consumer’s or S
       row_number: 7,
     });
     assert.deepStrictEqual(tables, [['LT', undefined, 7]]);
+  });
+});
+
+describe('SearchSource (#391): the reads in flight are the consumer’s', () => {
+  const target = (name: string) => ({
+    name,
+    type: 'PROG/P',
+    packageName: 'ZPKG',
+    isPackage: false,
+  });
+  const names = Array.from({ length: 30 }, (_, n) => `ZP${n}`);
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+  /** The most source reads open at once, with `concurrency` as given or none. */
+  async function mostOpen(concurrency?: number): Promise<number> {
+    let open = 0;
+    let most = 0;
+    await runSearchSource(
+      {
+        fetchPackageContents: async (name) => listing(name, names.map(target)),
+        sourceReader: {
+          async readSource() {
+            open += 1;
+            most = Math.max(most, open);
+            for (let i = 0; i < 5; i++) await tick();
+            open -= 1;
+            return { ok: true, value: 'nothing here' };
+          },
+          readStructure: async () => ({ ok: true, value: [] }),
+        },
+        lineMatch: substringLineMatch,
+        sapAnswers: skipSapAnswers,
+        resolvePackages: exactPackages,
+      },
+      {
+        query: 'marker',
+        packages: ['ZPKG'],
+        object_types: ['PROG'],
+        ...(concurrency === undefined ? {} : { concurrency }),
+      },
+    );
+    return most;
+  }
+
+  it('one read at a time when none is given', async () => {
+    assert.equal(await mostOpen(), 1);
+  });
+
+  it('as many as given, with no cap of the server’s', async () => {
+    assert.equal(await mostOpen(20), 20);
   });
 });

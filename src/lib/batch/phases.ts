@@ -62,21 +62,21 @@ import { correctedPair } from '../adtHeaders/withAdtHeaders';
 import { appendAll } from '../appendAll';
 import { failureOf, readOwn } from '../auth/failures';
 import {
-  MIN_READS_PER_ENVELOPE,
-  readsPerEnvelopeRefusal,
+  MIN_PARTS_PER_ENVELOPE,
+  partsPerEnvelopeRefusal,
 } from '../config/authParameters';
 import { withSystemKindOf } from '../connectionFactory';
 import { NO_BATCH_ENDPOINT_STATUS } from './availability';
 
 /**
  * `value` when it is a bound the envelopes can keep — a whole number from
- * `MIN_READS_PER_ENVELOPE` —, else a throw naming `name`. For a bound an
- * embedder states in its options (`readsPerEnvelope`); the configured one
- * is read by `BATCH_READS_PER_ENVELOPE_ROW`.
+ * `MIN_PARTS_PER_ENVELOPE` —, else a throw naming `name`. For a bound an
+ * embedder states in its options (`partsPerEnvelope`); the configured one
+ * is read by `BATCH_PARTS_PER_ENVELOPE_ROW`.
  */
-export function readsPerEnvelopeOf(value: number, name: string): number {
-  if (!Number.isSafeInteger(value) || value < MIN_READS_PER_ENVELOPE) {
-    throw new Error(readsPerEnvelopeRefusal(name));
+export function partsPerEnvelopeOf(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < MIN_PARTS_PER_ENVELOPE) {
+    throw new Error(partsPerEnvelopeRefusal(name));
   }
   return value;
 }
@@ -108,15 +108,129 @@ export function chunksOf<I>(
 }
 
 /**
- * A phase's independent reads in the envelopes the call's context allows:
- * `chunksOf` by `context.readsPerEnvelope`, the consumer's bound — absent,
- * all of them in one envelope.
+ * A step's reads pre-split for a caller that judges each envelope itself:
+ * `chunksOf` by `context.partsPerEnvelope` (absent, all of them together).
+ * Each slice is then sent by `runPhase` / `runPhaseOutcome`, which keeps
+ * every envelope within the bound counted in parts (`envelopesByParts`).
  */
 export function envelopesOf<I>(
   context: HandlerContext,
   items: readonly I[],
 ): I[][] {
-  return chunksOf(items, context.readsPerEnvelope);
+  return chunksOf(items, context.partsPerEnvelope);
+}
+
+/** The fixed words of a read that needs more parts than the consumer's bound: both numbers. */
+export function oversizedReadWords(parts: number, bound: number): string {
+  return `a read of this step needs ${parts} parts in one ADT batch envelope, more than the ${bound} parts per envelope set (--batch-parts-per-envelope / partsPerEnvelope); nothing was sent`;
+}
+
+/**
+ * The items in consecutive envelopes of at most `bound` parts, each item's
+ * `parts` together in one, in item order: as few envelopes as a greedy fill
+ * needs, balanced when that takes no more envelopes (302 one-part reads at
+ * 300 are 151 and 151). An item over the bound alone is the caller's to
+ * refuse first.
+ */
+export function packByParts<I>(
+  items: readonly I[],
+  parts: readonly number[],
+  bound: number,
+): I[][] {
+  const fill = (cap: number): I[][] => {
+    const out: I[][] = [];
+    let current: I[] = [];
+    let used = 0;
+    items.forEach((item, at) => {
+      const own = parts[at] ?? 0;
+      if (current.length > 0 && used + own > cap) {
+        out.push(current);
+        current = [];
+        used = 0;
+      }
+      current.push(item);
+      used += own;
+    });
+    if (current.length > 0) out.push(current);
+    return out;
+  };
+  const greedy = fill(bound);
+  if (greedy.length < 2) return greedy;
+  let total = 0;
+  let largest = 0;
+  for (const own of parts) {
+    total += own;
+    if (own > largest) largest = own;
+  }
+  const balanced = fill(Math.max(largest, Math.ceil(total / greedy.length)));
+  return balanced.length <= greedy.length ? balanced : greedy;
+}
+
+/**
+ * How many parts (requests) `read(item, …)` records in its envelope: the
+ * read run once on a counting connection that answers nothing, its
+ * requests counted until it recorded its first (and every request of that
+ * stretch) or settled without one. Nothing is sent.
+ */
+async function partsOfRead<I, R>(
+  context: HandlerContext,
+  item: I,
+  read: (item: I, batch: IAbapConnection) => Promise<R>,
+): Promise<number> {
+  const base = context.connection;
+  let parts = 0;
+  let signal: () => void = () => {};
+  const recorded = new Promise<void>((resolve) => {
+    signal = resolve;
+  });
+  const counting = {
+    connect: async (): Promise<void> => {},
+    getBaseUrl: () => base.getBaseUrl(),
+    getSessionId: () => base.getSessionId(),
+    setSessionType: (_type: Session): void => {},
+    getSessionType: (): Session => 'stateless',
+    makeAdtRequest(_request: IAbapRequestOptions): Promise<IAdtWireResponse> {
+      parts += 1;
+      signal();
+      // Never answered: the count is all this run is for.
+      return new Promise<IAdtWireResponse>(() => {});
+    },
+  } satisfies IAbapConnection & { getSessionType(): Session };
+  const outer = adtCallScope.getStore();
+  const settled = adtCallScope
+    .run({ ...outer, phase: {}, invocation: undefined }, async () =>
+      read(item, withSystemKindOf(counting, base)),
+    )
+    .then(
+      () => undefined,
+      () => undefined,
+    );
+  await Promise.race([recorded, settled]);
+  await new Promise((resolve) => setImmediate(resolve));
+  return parts;
+}
+
+/**
+ * The step's items in the envelopes the consumer's bound allows, counted in
+ * parts: absent, one envelope; given, `packByParts` over each read's parts
+ * (`partsOfRead`). A read needing more parts than the bound is refused
+ * before anything is sent (`oversizedReadWords`).
+ */
+async function envelopesByParts<I, R>(
+  context: HandlerContext,
+  items: readonly I[],
+  read: (item: I, batch: IAbapConnection) => Promise<R>,
+): Promise<I[][]> {
+  const bound = context.partsPerEnvelope;
+  if (items.length === 0) return [];
+  if (bound === undefined) return [[...items]];
+  const parts = await Promise.all(
+    items.map((item) => partsOfRead(context, item, read)),
+  );
+  for (const own of parts) {
+    if (own > bound) throw new Error(oversizedReadWords(own, bound));
+  }
+  return packByParts(items, parts, bound);
 }
 
 /** One item's settlement in a phase. */
@@ -410,7 +524,7 @@ export async function runPhaseOutcome<I, R>(
 ): Promise<PhaseOutcome<R>> {
   const results: PhaseResult<R>[] = [];
   let envelope: PhaseOutcome<R>['envelope'] = { failed: false };
-  for (const chunk of envelopesOf(context, items)) {
+  for (const chunk of await envelopesByParts(context, items, read)) {
     if (envelope.failed) {
       const ended = envelope.error;
       appendAll(

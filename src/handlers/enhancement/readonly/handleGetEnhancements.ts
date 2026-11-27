@@ -501,6 +501,17 @@ function mainProgramOf(uri: string): string | undefined {
 }
 
 /**
+ * The includes a nested read reads: the first `maxIncludes` when the
+ * consumer gave a count, else every one (no count of the server's, #391).
+ */
+export function includesWithin(
+  includes: string[],
+  maxIncludes: number | undefined,
+): string[] {
+  return maxIncludes === undefined ? includes : includes.slice(0, maxIncludes);
+}
+
+/**
  * Internal function to get includes list using SAP ADT API
  * @param objectName - Name of the object
  * @param objectType - Type of the object ('program' | 'include' | 'class')
@@ -931,7 +942,7 @@ export const TOOL_DEFINITION = {
       .int()
       .optional()
       .describe(
-        '[read-only] With include_nested: how many includes are read (default 50)',
+        '[read-only] With include_nested: how many includes are read; absent, every include found',
       ),
     ...ASSEMBLED_DETAIL_SHAPE,
   }),
@@ -1039,7 +1050,7 @@ function carriedFailures(error: unknown): FailureEntry[] | undefined {
  *   - program: Optional manual program context for includes
  *   - include_nested: Optional boolean - if true, also searches enhancements in all nested includes
  *   - detailed: Optional boolean - if false (default), returns minimal info; if true, returns full details including raw XML
- *   - max_includes: Optional maximum number of includes to process (default: 50)
+ *   - max_includes: Optional maximum number of includes to process; absent, every one
  * @returns Response with parsed enhancement data or error
  */
 async function enhancementsOf(
@@ -1060,7 +1071,8 @@ async function enhancementsOf(
     const includeNested = args.include_nested === true; // Optional boolean for recursive include search
     const isDetailed = args.detailed === true; // Optional boolean for detailed output
 
-    const maxIncludes = args.max_includes ? args.max_includes : 50; // Maximum number of includes to process
+    // The consumer's count as given; absent, every include (#391).
+    const maxIncludes = args.max_includes;
 
     logger?.info(`Getting enhancements for object: ${objectName}`, {
       manualProgram: manualProgram || '(not provided)',
@@ -1102,13 +1114,8 @@ async function enhancementsOf(
         includesList,
       );
 
-      // Limit the number of includes to process
-      if (includesList.length > maxIncludes) {
-        logger?.warn(
-          `Too many includes found (${includesList.length}). Limiting to first ${maxIncludes} includes.`,
-        );
-        includesList = includesList.slice(0, maxIncludes);
-      }
+      // The consumer's count, when given.
+      includesList = includesWithin(includesList, maxIncludes);
 
       // An include whose request SAP refused is listed, the method's error as
       // it is with the step and the include's name, beside the others' results.
@@ -1885,7 +1892,8 @@ interface EnhancementOptions {
   manualProgram?: string | undefined;
   includeNested: boolean;
   isDetailed: boolean;
-  maxIncludes: number;
+  /** The consumer's count of includes; absent, every one (#391). */
+  maxIncludes?: number | undefined;
   /** The answer at the level asked, selected by the handler. */
   shown: EnhancementsAnswerOf;
 }
@@ -1899,7 +1907,7 @@ function enhancementOptionsOf(
     manualProgram: args.program,
     includeNested: args.include_nested === true,
     isDetailed: args.detailed === true,
-    maxIncludes: args.max_includes ? args.max_includes : 50,
+    maxIncludes: args.max_includes,
   };
 }
 
@@ -2103,9 +2111,7 @@ async function enhancementsInPhases(
           o.name,
           resolved.path.type,
         );
-        if (list.length > options.maxIncludes) {
-          list = list.slice(0, options.maxIncludes);
-        }
+        list = includesWithin(list, options.maxIncludes);
         includes[i] = list;
         for (const name of list) names.add(name);
       } catch (thrown) {

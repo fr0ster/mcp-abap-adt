@@ -10,6 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it, mock } from 'node:test';
+import { includesWithin } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import {
   handleSearchObject,
   TOOL_DEFINITION as SearchObject,
@@ -68,6 +69,23 @@ describe('SearchObject (#391, item 4): maxResults is the consumer’s or SAP’s
       assert.deepStrictEqual(criteriaOf('search'), [
         { query: 'Z*', maxResults: given },
       ]);
+    });
+  }
+});
+
+describe('GetEnhancements (#391, item 10): max_includes is the consumer’s', () => {
+  const names = Array.from({ length: 60 }, (_, n) => `ZINC_${n}`);
+
+  it('without max_includes every include found is read', () => {
+    assert.deepStrictEqual(includesWithin(names, undefined), names);
+  });
+
+  for (const given of [3, 0]) {
+    it(`max_includes ${given} reads that many`, () => {
+      assert.deepStrictEqual(
+        includesWithin(names, given),
+        names.slice(0, given),
+      );
     });
   }
 });

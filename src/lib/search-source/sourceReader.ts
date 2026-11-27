@@ -14,7 +14,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtCodes } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
-import { isNotSent, type PhaseResult, runPhaseOrAlone } from '../batch/phases';
+import { type PhaseResult, runPhaseOrAlone } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import type { ReadVersion } from '../handlers/readVersion';
@@ -784,17 +784,18 @@ export async function readSourcesInPhase(
   const store = (
     asked: readonly Read[],
     results: readonly PhaseResult<PhaseAnswer>[],
+    unsent?: ReadonlySet<number>,
   ): void => {
     asked.forEach((read, i) => {
       const result = results[i];
       if (result === undefined) return;
       // A read whose envelope was not sent has no answer.
-      if (!result.ok && isNotSent(result.error)) return;
+      if (unsent?.has(i) === true) return;
       keepAnswer(answers, read, result);
     });
   };
   // One read, or the reads of one target (`alone`), go as single requests.
-  const { results, envelope } = await runPhaseOrAlone(
+  const { results, envelope, unsent } = await runPhaseOrAlone(
     ctx,
     reads,
     (read, connection) =>
@@ -814,7 +815,7 @@ export async function readSourcesInPhase(
   // A failed envelope is decided here, once: its parts never reach the
   // per-read classification.
   if (envelope.failed) envelopeFailure(envelope.error);
-  store(reads, results);
+  store(reads, results, unsent);
 }
 
 /** One read's settlement kept in `answers`, under its key. */

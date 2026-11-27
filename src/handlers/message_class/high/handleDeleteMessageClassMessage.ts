@@ -96,6 +96,9 @@ export async function handleDeleteMessageClassMessage(
   return answer(
     { tool: 'DeleteMessageClassMessage', detail: 'terse' },
     () =>
+      // `update`, not this tool's verb: a pair is keyed by the member that
+      // sends it (one member, one endpoint), and the PUT is adt-clients 48's
+      // `update`, the one member for that endpoint.
       withAdtHeaders(context, 'messageClassMessage.update', (headers) =>
         inMessageClassMessageWindow(
           createAdtClient(connection, logger),

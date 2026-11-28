@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The service binding's publication (`UpdateServiceBinding`, `UpdateObjectUnderLock` for a binding) no longer hands the lock handle to the job: adt-clients 48 types the publication lock-free, and the handle was never sent. The lock around it is taken and released as before.
   - In batch mode, a request whose `params` are neither a string, a `URLSearchParams` nor a plain object of string, number or boolean values is refused by adt-clients' batch connection before it is recorded, and takes no number.
 
+- **CI: a newer push to a pull request cancels its older run.** `ci.yml` has a workflow-level `concurrency` group per pull request, and one per run for a push: a push to `main` or `develop` is never cancelled, not even while pending behind another run. No job is renamed: the rulesets still find the required checks by name. `release.yml` is unchanged.
+
 ## [24.2.2] - 2026-11-27
 
 ### Fixed

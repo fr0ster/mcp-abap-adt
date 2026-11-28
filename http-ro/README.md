@@ -8,7 +8,7 @@ It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s
 
 ## The tools
 
-- the **readonly** tools — `Get*`, `List*`, `ReadTransport*`: the read operations of every object type, one `Get<Type>` per type (`part: source | metadata` where the type has a source), the same tools as `mcp-abap-adt`;
+- the **readonly** tools — `Get*`, `List*`, `ReadTransport*`: the read operations of every object type, one `Get<Type>` per type (`part: source | metadata` where the type has a source), the reads of a class's local includes (`GetLocalDefinitions`, `GetLocalTypes`, `GetLocalMacros`, `GetLocalTestClass`), the per-type syntax checks (`Check<Type>`) and version history (`Get<Type>Versions`, `…VersionSource`, `…VersionDiff`), `ListServiceBindingTypes` and `ValidateServiceBinding` — the same tools as `mcp-abap-adt`;
 - the **system** tools — where-used, type and object information, the object outline and
   structure, dumps, profiler traces and their analysis, and the ABAP Test Cockpit
   (`RunATC`, `GetATCRunStatus`, `GetATCFindings`, and the stored results:
@@ -20,7 +20,7 @@ It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s
   ([`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http#held-state-and-the-long-session)).
   Every tool declares the optional `state_handle` argument.
 
-72 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule and the debugger — those are
+131 tools in all (the data tools aside; listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule and the debugger — those are
 `mcp-abap-adt-http`'s ([`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)).
 
 **Nothing here changes the system.** No tool of this binary runs code or changes data: the class

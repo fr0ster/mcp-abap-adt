@@ -324,7 +324,7 @@ one module, `src/lib/adtHeaders/defaultPairs.ts` (`DEFAULT_ADT_HEADERS`).
 
 #### `messageClassMessage`
 
-adt-clients 48 has no message `create` or `delete`: the three message tools send `update`'s pair (the PUT of the class document). The `create` and `delete` rows stay for the exported `AdtOperation`; no call site sends them.
+adt-clients 48 has no message `create` or `delete`: the three message tools send `update`'s pair (the PUT of the class document). The `create` and `delete` rows stay for the exported `AdtOperation`; no call site sends them. **Deprecated:** `messageClassMessage.create` and `messageClassMessage.delete` have no effect since adt-clients 48 and are removed in the next major; their `DEFAULT_ADT_HEADERS` properties carry `@deprecated` (an `AdtOperation` literal itself cannot). Use `messageClassMessage.update`.
 
 | Member | Accept | Content-Type | Source |
 |---|---|---|---|

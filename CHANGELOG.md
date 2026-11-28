@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `SessionClose`'s `held` names the open envelopes (`envelopes`). Every core tool but the envelope tools is registered as a loose object, so its listed schema now carries `additionalProperties`; its handler gets the arguments it got before.
   - Measured on ABAP Cloud (2026-11-28): 13 reads of the shared objects in one envelope, each answer equal to the read outside it, without a bound and with a bound of 2.
 
+### Deprecated
+
+- **`messageClassMessage.create` and `messageClassMessage.delete` of `DEFAULT_ADT_HEADERS` / `AdtOperation` (`@mcp-abap-adt/lib/adt-headers`)** are marked `@deprecated`: they have no effect since adt-clients 48 (the message tools send `messageClassMessage.update`), and they are removed in the next major. They stay in 24.3.0, since removing them would change the exported type in a minor. A type annotation only: nothing reads them at runtime.
+
+### Fixed
+
+- **`GetObjectsList`: one object's refused metadata read no longer ends the whole list** (#398). At `detail` medium and full the second pass reads each object's metadata; every failed metadata read ended the call but one SAP answered `404`, the only refusal kept as the object's answer — so on ABAP cloud one enhancement's `403` ("No authorization to access the resource", its node URI) threw away the whole list. Now any such refusal is that object's, on the batched and the sequential path alike: it stays in the list with SAP's status and message — the exception document's message, else SAP's text body trimmed, none for an empty body; a `404` the same — (`metadata_error` at medium, `METADATA_ERROR` at full, the `# metadata_error` line at terse), and the rest is read and answered. A `401`, a credential refusal, a failure SAP did not answer and a failed envelope still end the call. Every level now counts the objects carrying a refusal: `# refused <n>` at terse, `refused_objects` at medium and full (`0` when none). `docs/user-guide/BATCH_MODE.md`, "`GetObjectsList`".
+
 ### Changed
 
 - **`@mcp-abap-adt/adt-clients` 48, `@mcp-abap-adt/adt-strategies` 0.29, `@mcp-abap-adt/interfaces-adt` 33.** No tool changes for the model: the same tools, arguments and answers.
@@ -25,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The profiler trace readings of adt-strategies 0.29 refuse an answer that lacks a field their type requires (`traces: <field> is missing`) where they read it as absent before; `ITraceProgramRef.name` and `uri` are optional.
   - The service binding's publication (`UpdateServiceBinding`, `UpdateObjectUnderLock` for a binding) no longer hands the lock handle to the job: adt-clients 48 types the publication lock-free, and the handle was never sent. The lock around it is taken and released as before.
   - In batch mode, a request whose `params` are neither a string, a `URLSearchParams` nor a plain object of string, number or boolean values is refused by adt-clients' batch connection before it is recorded, and takes no number.
+
+- **CI: a newer push to a pull request cancels its older run.** `ci.yml` has a workflow-level `concurrency` group per pull request, and one per run for a push: a push to `main` or `develop` is never cancelled, not even while pending behind another run. No job is renamed: the rulesets still find the required checks by name. `release.yml` is unchanged.
 
 ## [24.2.2] - 2026-11-27
 

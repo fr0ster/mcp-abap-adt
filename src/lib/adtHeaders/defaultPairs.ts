@@ -472,10 +472,20 @@ export const DEFAULT_ADT_HEADERS = Object.freeze({
   // adt-clients 48 has no message `create` / `delete`: the three message
   // tools send `update`'s pair. These two keys stay for the exported
   // `AdtOperation` (`./adt-headers`); no call site names them.
+  /**
+   * @deprecated No effect since adt-clients 48: no member sends this pair
+   * (the message tools send `messageClassMessage.update`). Removed in the
+   * next major.
+   */
   'messageClassMessage.create': pair(
     'application/vnd.sap.adt.mc.messageclass+xml',
     'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8',
   ),
+  /**
+   * @deprecated No effect since adt-clients 48: no member sends this pair
+   * (the message tools send `messageClassMessage.update`). Removed in the
+   * next major.
+   */
   'messageClassMessage.delete': pair(
     'application/vnd.sap.adt.mc.messageclass+xml',
     'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8',
@@ -811,7 +821,14 @@ export const DEFAULT_ADT_HEADERS = Object.freeze({
   ),
 });
 
-/** An operation that takes a header pair: `<object>.<member>`. */
+/**
+ * An operation that takes a header pair: `<object>.<member>`.
+ *
+ * `messageClassMessage.create` and `messageClassMessage.delete` are
+ * deprecated (no effect since adt-clients 48, removed in the next major);
+ * a string literal union cannot mark a member, so the mark is on their
+ * `DEFAULT_ADT_HEADERS` properties.
+ */
 export type AdtOperation = keyof typeof DEFAULT_ADT_HEADERS;
 
 /** The object types whose `member` takes a header pair. */

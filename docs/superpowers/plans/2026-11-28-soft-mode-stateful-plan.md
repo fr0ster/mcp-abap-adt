@@ -3,88 +3,154 @@
 Goal: `docs/superpowers/2026-11-28-soft-mode-stateful-goal.md`. Spec:
 `docs/superpowers/specs/2026-11-28-soft-mode-stateful-spec.md` (#394).
 
-Every step is test-first: a failing unit test, the change, the test green,
-and the test proved load-bearing by breaking its rule once and watching it go
-red. Each step is its own commit. Only `src/__tests__/` changes. After every
-step the local gate runs: `npm run lint:check`, `npm run test:check`,
-`npm test`.
+The code that changes is under `src/__tests__/`. The docs that change are
+`src/__tests__/integration/README.md` and `CHANGELOG.md` (step 13).
+
+How each step is done:
+
+- Every behaviour change starts with a unit test that fails on today's
+  harness, then the change, then the test green.
+- The test is proved load-bearing by breaking its rule once and watching it
+  go red.
+- A characterization test pins today's behaviour without changing it. It is
+  marked as such and does not count as a step's failing test.
+- Each step is its own commit.
+- After every step the local gate runs: `npm run lint:check`,
+  `npm run test:check`, `npm test`.
 
 ## Steps
 
-1. **Pin where the outcomes live (spec §1).** Unit tests on the ADT stand-in
-   cover every path a soft-mode step can fail on: a direct throw, a strategy
-   failure entry, the `client_threw` entry, and a `withLock` carrier. For a
-   network error they establish which field carries the network code, and
-   which carries a session verdict. A path that drops them goes to the owner
-   as a finding. It reads as `refused` and is not patched in `src/lib`.
+1. **Pin the answer fields (characterization, spec §1).** On the ADT
+   stand-in, tests pin where the network code and the session verdict sit for
+   each failure path a soft-mode step can take:
+   - a direct throw;
+   - a strategy failure entry;
+   - the `client_threw` entry;
+   - a `withLock` carrier on a failure answer;
+   - a `withLock` carrier on a success answer.
 
-2. **`stepOutcome` (spec §1).** Add the shared helper with its five outcomes,
-   one unit test per row. It reads typed fields only, never words, and reuses
-   `isCredentialRefusal` / `refusalAnswered` for `credential`.
+   A path that drops them goes to the owner as a finding, reads as
+   `unclassified`, and is not patched in `src/lib`.
 
-3. **The failed step names its outcome (spec §2).** `LambdaTester.run`,
-   `HighTester` and each suite's `must` throw with the outcome as a fact. A
-   unit test with a recording connection counts every request of a failing
-   workflow and proves no step is sent twice. `retryOnConflict` stays
-   unchanged, and a test proves a network error never matches it.
+2. **`stepOutcome` (spec §1).** Failing tests first, then the helper:
+   - one test per row;
+   - a success answer carrying a release that failed on the network gives
+     `network`;
+   - a verdict is attributed to the connection that answered it.
 
-4. **`HeldLiveLocks` as the file's registry (spec §3).**
-   - It gets the `unlock-sent` mark, and `released` follows the outcome: it is
-     dropped on `ok` and `session-lost`, and kept on `network` and `refused`.
-   - `releaseAll` sends only the unlocks that were never sent.
-   - Taking in `left_locked` (top level and under `cleanup`).
-   - One instance per test file, beside the tracked connection.
-   - Unit tests for each rule.
+3. **Network failures are never resent (spec §2).** A failing test: a
+   `network` failure whose words contain "already exists" is resent by
+   today's `retryOnConflict`. Then `retryOnConflict` reads `stepOutcome` first
+   and resends only on `refused`. A characterization test keeps the `409`
+   retry on `refused`. The failed step names its outcome in `must`,
+   `LambdaTester.run` and `HighTester.run`.
 
-5. **Move the suites onto the registry (spec §3).** Each file is its own
-   commit:
-   - `IncludeHighHandlers.test.ts` and `TableTypeHighHandlers.test.ts`: the
-     `heldLock` variable is gone, and so is its clearing before the unlock;
-   - `rapFixtures.ts` (`writeViewSource`);
+4. **The registry's states (spec §3).** Failing tests, then the change to
+   `HeldLiveLocks`:
+   - `held`, `unlock-sent` and released;
+   - `left_locked` is recorded as `unlock-sent` and never sent;
+   - `releaseAll` marks each lock before it sends, and sends only for `held`
+     locks;
+   - removal only on `ok` or the connection's own `session-lost`;
+   - one registry per connection, so a verdict from another connection
+     changes nothing.
+
+5. **Locks released before the policy (spec §4).** A failing test: a failed
+   test with the delete withheld leaves a `held` lock unsent today. Then
+   `cleanupAfter` runs `releaseAll` before its early returns
+   (`LambdaTester.ts:416-440`). Further tests cover the policy unchanged for a
+   `network` failure, nothing sent after `credential`, and deletes after
+   `session-lost` only on a connection that reports itself connected.
+
+6. **Creates and deletes (spec §5).** Failing tests, then the shared
+   object-state record:
+   - an object is `unconfirmed` before its create is sent;
+   - a delete marks the object `delete-sent` before it is sent;
+   - a lost create is deleted by cleanup, and its `404` counts as removed;
+   - a `delete-sent` object is never deleted again;
+   - a lost lock answer is reported as possibly held.
+
+7. **Move the suites (spec §3, §5).** Each is its own commit, with a failing
+   test for its path first:
+   - `IncludeHighHandlers.test.ts`: the `heldLock` variable and its early
+     clearing go, `created` uses the object states, and the in-workflow
+     `DeleteInclude` marks `delete-sent`;
+   - `TableTypeHighHandlers.test.ts`: the same;
+   - `rapFixtures.ts`: `writeViewSource`'s lock goes through the registry, and
+     `createView` / `deleteView` use the object states;
    - the direct-call path of `NarrowedCompactTools.test.ts`;
-   - `HighTester` / `LambdaTester`, which take in `left_locked` answers.
+   - `HighTester`: the generic create, the auto-generated delete cleanup, and
+     taking in `left_locked` answers.
 
-   A grep test proves that no soft-mode suite keeps a lock handle outside the
-   registry.
+   A grep test proves that no soft-mode suite keeps a lock handle or a created
+   name outside the two records.
 
-6. **Lost responses (spec §5).** A create is listed `unconfirmed` before it is
-   sent. Cleanup deletes such an entry, and a `404` on it counts as success. A
-   lock whose answer was lost is reported as possibly held. Unit tests cover
-   each case, in both suites and for the package entries.
+8. **Session continuity (spec §9).** On the recording connection over the
+   stand-in, a workflow whose write fails on the network proves:
+   - one connection instance and one `connect()`;
+   - the same identity and cookies through to the logoff;
+   - the cleanup unlock under the original handle;
+   - only LOCK and UNLOCK sent stateful;
+   - no request sent twice;
+   - the package delete the only request on another connection, and
+     stateless.
 
-7. **Cleanup order and policy (spec §4).** The order is `releaseAll` once,
-   then the deletes the YAML policy orders, then the logoff. Unit tests cover:
-   the policy kept for a `network` failure; no delete sent after `credential`;
-   after `session-lost`, the deletes only on a connection that reports itself
-   connected.
+   It fails today at the cleared handle and at the delete that is sent again.
 
-8. **Package delete on its sibling (spec §7).** `force_new_connection: true`
-   stays. A unit test proves that the delete goes through `packageSessions`,
-   runs after the object deletes, is sent once, and is never sent on the run's
-   connection. A sibling that cannot be opened is reported.
+9. **Package delete on its sibling (spec §7).** Tests cover the following;
+   `force_new_connection: true` stays:
+   - the delete goes through `packageSessions`, after the object deletes;
+   - it follows the `delete-sent` rule;
+   - its outcome is read against the sibling;
+   - a sibling that cannot be opened is reported, and the run's connection is
+     never used for the delete.
 
-9. **The file's logoff (spec §6).** The connection leaves `open` only after
-   `disconnect()` returned. A throw fails the file and names the locks still
-   held and the `unconfirmed` objects. A finished logoff is reported as
-   "logoff written". Unit tests cover each case. The `@mcp-abap-adt/connection`
-   follow-up (an answered logoff cannot be told from a lost one) goes into the
-   PR description.
+10. **The file's logoff (spec §6).** Failing tests first:
+    - an explicit `endTestConnection` that throws, followed by the root hook,
+      sends `disconnect()` twice today;
+    - the root hook only warns on a throw.
 
-10. **The cut helper for a live run (spec §8).** The in-process network cut
-    becomes a test-only helper that runs only when the run asks for it. Unit
-    tests cover it against the stand-in. No live run happens without the
-    owner.
+    Then:
+    - the per-connection terminal state, with `logoff-attempted` set before
+      `disconnect()`, so a second call sends nothing;
+    - the reports "logoff failed" and "logoff not confirmed", each naming the
+      locks and objects still owned;
+    - a run connection with something owned fails the file;
+    - a connection without a registry only warns, which keeps hard mode as it
+      is. A test covers the hard-mode helpers' path (`hardMode.ts:909-931`).
 
-11. **Docs.** `src/__tests__/integration/README.md`: how a soft-mode run
-    behaves on a network drop, what the report says about held locks and the
-    logoff, and the package sibling. Then a `CHANGELOG.md` entry under the
-    unreleased 24.3.0, dated the day of the change.
+    The `@mcp-abap-adt/connection` follow-up goes into the PR description.
 
-12. **Live check (owner).** The owner runs one include suite on premise with
-    a 5 s cut in the compact lock chain. Expected result: the test fails with
-    `network`. If the network is back by cleanup, the lock is released with
-    the original handle in the same session; otherwise the report names it as
-    still held and the logoff as written. The result goes into the PR.
+11. **`networkCut` (spec §8).** Failing tests first, then the helper:
+    - it is inactive with neither variable set;
+    - a value that is not valid is refused at file start;
+    - the cut starts at the first `held` lock of the named test;
+    - it ends after the given milliseconds;
+    - the start and end are reported.
 
-13. **Before merge.** The goal, spec and plan are deleted once everything is
+    The tests run against the stand-in.
+
+12. **README.** `src/__tests__/integration/README.md`:
+    - how a soft-mode run behaves on a network drop;
+    - what the report says about held locks, unconfirmed objects and the
+      logoff;
+    - the package sibling;
+    - how to run with `networkCut`.
+
+13. **CHANGELOG.** An entry under the unreleased 24.3.0, dated the day of
+    the change.
+
+14. **Live check (owner).** One include suite on premise, with
+    `MCP_TEST_NETWORK_CUT_MS=5000` and `MCP_TEST_NETWORK_CUT_AT` naming its
+    test. Expected:
+    - the test fails `network`;
+    - the cleanup unlock is sent once, with the original handle, in the same
+      session;
+    - if the network is back by then, the lock is released;
+    - otherwise the report names the lock as still owned and the logoff as
+      not confirmed.
+
+    The result goes into the PR.
+
+15. **Before merge.** The goal, spec and plan are deleted once everything is
     implemented. CI runs green, and Codex reviews.

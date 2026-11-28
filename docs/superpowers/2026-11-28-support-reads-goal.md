@@ -85,18 +85,33 @@ the system.
   - what `medium` and `full` add is set in the spec;
   - every level other than `raw` is a reading in adt-strategies, never trimmed afterwards.
 - **Availability.** Three things decide it, kept apart:
-  1. **System-kind eligibility, decided at development time from measurements.** A tool is
-     listed on a system kind (`available_in`) only after live reads on that kind answered
-     the content it promises: a topic page with its text, not a start page or a "Not found"
-     page. A `200` alone is not enough.
-     - The definition tools and the keyword-documentation tool are listed on `onprem` and
-       `cloud`.
-     - The definition tools are not listed on `legacy`: the recorded 7.40 discovery lists
-       none of their collections.
-     - The keyword documentation on `legacy` is an open question.
-  2. **The runtime gate, from the system's discovery alone.** A call is served only when
-     the discovery of the system reached lists what that form needs. Otherwise it is
-     refused as not served, with no request. Each form needs:
+  1. **Eligibility per system kind and per form, decided at development time from
+     measurements.**
+     - Each form is eligible on a kind only after a live read on that kind met that form's
+       own condition. A `200` alone is not enough.
+     - The conditions:
+       - query form: a keyword with hits answers its hit list or its topic, with text;
+       - topic form: a topic name answers that topic's page, with text;
+       - position form: a position inside a statement answers that statement's topic, not
+         the start page;
+       - each definition read: an existing name answers its document, and an absent name
+         answers `404`.
+     - A tool is listed on a kind (`available_in`) when at least one of its forms is
+       eligible there.
+     - A form not eligible on the kind of the system reached is refused as not served,
+       with no request, whatever discovery says. Which forms are eligible on which kind is
+       a static table in the code, beside its live tests.
+     - As measured:
+       - on `onprem` and `cloud`, the query form, the topic form and the three definition
+         reads are eligible;
+       - the position form is eligible nowhere yet, since the one position tried answered
+         the start page; its live test has to show a statement's topic first;
+       - on `legacy`, no definition read is eligible: the recorded 7.40 discovery lists
+         none of their collections;
+       - the keyword documentation on `legacy` is an open question.
+  2. **The runtime gate, from the system's discovery alone.** An eligible form is served
+     only when the discovery of the system reached lists what that form needs. Otherwise it
+     is refused as not served, with no request. Each form needs:
      - the query form: the collection with its `query` template;
      - the position form: the collection with its `uri` template;
      - the topic form: the collection, since no template announces it;
@@ -183,17 +198,23 @@ The breakdown within each package is the spec's.
      `query` and no `version`. That shows the position form is announced there. It does not
      show that the form works.
    - Nothing is measured there yet, and legacy is RFC.
-   - Recommendation: in the legacy window, measure the position form, and the topic form
-     that its pages link to. Measure content, not status: a topic page for a position inside
-     a statement, not a start page.
-   - List the tool on `legacy` in 24.3.0 only if that read succeeds. The runtime gate then
-     serves there only what discovery announces.
+   - Recommendation: in the legacy window, measure each form against its own condition from
+     "Availability": the position form, and the topic form its pages link to.
+   - Mark eligible on `legacy` only the forms that meet their condition. List the tool there
+     in 24.3.0 only if at least one does.
+   - A form that fails stays refused on `legacy` even where the collection is listed. The
+     runtime gate then serves only what discovery announces there.
 2. **Is the keyword documentation a long read?**
    - Measured on cloud: a first read of a page took up to about 100 s on SAP's side.
-   - The `-ro` binaries carry the background runs of the long reads.
-   - Recommendation: make the keyword-documentation reads long reads, so a caller can run
-     them in the background. The definition reads stay plain reads: each one read took under
-     1 s on SAP's side on both kinds (measured, `sap-perf-fesrec`).
+   - Compact's `HandlerGet` and `HandlerSystem` are already long reads
+     (`src/lib/longTools.ts`). There the new action and the three new types follow their
+     tool as it is, so the compact and compact-ro binaries need no decision and get no
+     exception.
+   - Recommendation for the full binaries (core and core-ro, every transport): add the
+     keyword-documentation tool to the long reads.
+   - The three definition `Get<Type>` tools stay plain reads there, like every other
+     `Get<Type>`: each definition read took under 1 s on SAP's side on both kinds
+     (measured, `sap-perf-fesrec`).
 3. **Tool names.**
    - `GetApplicationLogObject` would be found by a search for "application log" and then
      answer no log entries.

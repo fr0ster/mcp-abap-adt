@@ -144,7 +144,7 @@ How each step is done:
     - it is inactive with neither variable set;
     - a value that is not valid is refused at file start;
     - the cut starts at the first `held` lock of the named test;
-    - it ends after the given milliseconds;
+    - it ends once the given number of connections were refused, with no timer;
     - the start and end are reported.
 
     The tests run against the stand-in.
@@ -160,8 +160,8 @@ How each step is done:
     line.
 
 14. **Live check (owner).** One include suite on premise, with
-    `MCP_TEST_NETWORK_CUT_MS=5000` and `MCP_TEST_NETWORK_CUT_AT` naming its
-    test. Expected:
+    `MCP_TEST_NETWORK_CUT_REQUESTS=1` and `MCP_TEST_NETWORK_CUT_AT` naming its
+    test (the write after the lock is refused, then the network is back). Expected:
     - the test fails `network`;
     - the cleanup unlock is sent once, with the original handle, in the same
       session;

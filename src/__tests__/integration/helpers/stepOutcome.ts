@@ -166,7 +166,10 @@ export class StepFailure extends Error {
   constructor(
     readonly label: string,
     readonly outcome: Exclude<StepOutcome, 'ok'>,
-    detail: string,
+    /** The answer's text (or the throw's words). */
+    readonly detail: string,
+    /** The integer status SAP answered with, if it did. */
+    readonly status?: number | undefined,
   ) {
     super(`${label} failed (${outcome}): ${detail}`);
     this.name = 'StepFailure';

@@ -249,12 +249,14 @@ run and replaces nothing, and the run's session keeps its locks.
 A test-only helper, `networkCut`, in `src/__tests__/integration/helpers/`:
 
 - **Activation.** It is active only when the run sets
-  `MCP_TEST_NETWORK_CUT_MS` (a positive integer) and
-  `MCP_TEST_NETWORK_CUT_AT=<test name>`. With neither set it patches nothing.
-  A set value that is not valid is refused at file start.
+  `MCP_TEST_NETWORK_CUT_REQUESTS` (a positive integer: how many connections
+  the cut refuses) and `MCP_TEST_NETWORK_CUT_AT=<test name>`. With neither set
+  it patches nothing. A set value that is not valid is refused at file start.
 - **Trigger.** In the named test, the cut starts the moment the registry
-  records the first `held` lock of that test's connection. It ends after the
-  given number of milliseconds.
+  records the first `held` lock of that test's connection. It ends once that
+  many connections were refused: a live test pauses nowhere
+  (`noLiveBounds.test.ts`), so the outage is counted in refused connections,
+  not in time.
 - **The cut.** Every open socket of the process is destroyed, and every new
   one is pointed at `127.0.0.1:9`, which gives `ECONNREFUSED` (the deleted
   probe's in-process cut).

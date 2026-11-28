@@ -417,31 +417,28 @@ export class HighTester extends LambdaTester {
     delayMs = 3000,
   ): Promise<void> {
     const connection = this.context?.connection;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      const sent = await send();
-      const text =
-        'answer' in sent
-          ? (sent.answer.content?.[0]?.text ?? '')
-          : thrownWords(sent.thrown);
-      if ('answer' in sent && connection !== undefined) {
-        heldLocksOf(connection).takeInLeftLocked(sent.answer);
-      }
-      if (sent.outcome === 'ok') return;
-      const status =
-        'answer' in sent ? statusOf(text) : thrownStatus(sent.thrown);
-      if (
-        isTransientConflict(sent.outcome, status, text) &&
-        attempt < maxRetries
-      ) {
-        logger?.warn?.(
-          `⚠️ ${label}: transient SAP error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
-        );
-        await delay(delayMs);
-        continue;
-      }
-      throw new StepFailure(label, sent.outcome, text);
-    }
-    throw new Error(`${label}: exceeded max retries`);
+    // The one retry site (`retryOnConflict`): a failed step is thrown as a
+    // `StepFailure`, which it sends again only under `isTransientConflict`.
+    await this.retryOnConflict(
+      async () => {
+        const sent = await send();
+        const text =
+          'answer' in sent
+            ? (sent.answer.content?.[0]?.text ?? '')
+            : thrownWords(sent.thrown);
+        if ('answer' in sent && connection !== undefined) {
+          heldLocksOf(connection).takeInLeftLocked(sent.answer);
+        }
+        if (sent.outcome === 'ok') return;
+        const status =
+          'answer' in sent ? statusOf(text) : thrownStatus(sent.thrown);
+        throw new StepFailure(label, sent.outcome, text, status);
+      },
+      label,
+      logger,
+      maxRetries,
+      delayMs,
+    );
   }
 
   /**
@@ -460,15 +457,30 @@ export class HighTester extends LambdaTester {
       try {
         return await operation();
       } catch (error) {
+        // A soft-mode step's failure (#394): sent again only when SAP
+        // refused it with a transient conflict; nothing else ever is.
+        if (error instanceof StepFailure) {
+          if (
+            isTransientConflict(error.outcome, error.status, error.detail) &&
+            attempt < maxRetries
+          ) {
+            logger?.warn?.(
+              `⚠️ ${label}: transient SAP error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
+            );
+            await delay(delayMs);
+            continue;
+          }
+          throw error;
+        }
         const errorMsg = thrownWords(error);
         const responseData = thrownResponseText(error);
-        const isTransientConflict =
+        const transient =
           thrownStatus(error) === 409 ||
           errorMsg.includes('object directory entry') ||
           errorMsg.includes('already exists') ||
           responseData.includes('SWB_TOOL') ||
           responseData.includes('description is missing');
-        if (isTransientConflict && attempt < maxRetries) {
+        if (transient && attempt < maxRetries) {
           logger?.warn?.(
             `⚠️ ${label}: transient SAP error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
           );

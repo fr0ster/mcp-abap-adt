@@ -152,12 +152,15 @@ a failed step:
 A cleanup that runs while the network is still down cannot reach SAP. Its unlock fails
 once, and the report names the lock as still held.
 
-To cut the network in a live run, set the duration and the test's full name (as node:test
-names it, `suite > case`): the cut starts when that test first holds a lock, destroys every
-open socket, refuses new ones, and ends after the duration. Its start and end go to stderr.
+To cut the network in a live run, set how many connections to refuse and the test's full
+name (as node:test names it, `suite > case`): the cut starts when that test first holds a
+lock, destroys every open socket, refuses new ones, and ends once that many were refused —
+counted, not timed, since a live test pauses nowhere. Its start and end go to stderr. With
+`1`, the step right after the lock fails on the network and the cleanup that follows reaches
+SAP in the same session.
 
 ```bash
-npm run test:integration -- --env MCP_TEST_NETWORK_CUT_MS=5000 \
+npm run test:integration -- --env MCP_TEST_NETWORK_CUT_REQUESTS=1 \
   --env "MCP_TEST_NETWORK_CUT_AT=<suite> > <case>" \
   src/__tests__/integration/high/include/IncludeHighHandlers.test.ts 2>&1 | tee <log>
 ```

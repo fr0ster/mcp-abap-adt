@@ -31,8 +31,11 @@ export interface SocketCut {
 
 type CreateConnection = (...args: unknown[]) => Socket;
 
-/** Patches the agents' `createConnection`; see the module comment. */
-export function installSocketCut(): SocketCut {
+/**
+ * Patches the agents' `createConnection`; see the module comment.
+ * `onRefused` is called each time a socket is pointed nowhere during a cut.
+ */
+export function installSocketCut(onRefused?: () => void): SocketCut {
   const open = new Set<Socket>();
   let isCut = false;
   const prototypes = [http.Agent.prototype, https.Agent.prototype] as const;
@@ -53,6 +56,7 @@ export function installSocketCut(): SocketCut {
             ? { ...options, ...NOWHERE }
             : options;
         const socket = original.call(this, target, ...rest);
+        if (isCut) onRefused?.();
         open.add(socket);
         socket.once('close', () => open.delete(socket));
         return socket;

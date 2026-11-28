@@ -282,3 +282,24 @@ describe('outcomeOf', () => {
     assert.equal(threw.outcome, 'network');
   });
 });
+
+describe('a success whose lock went with a lost session (second review)', () => {
+  it('is session-lost, though its cleanup names no left_locked', () => {
+    assert.equal(
+      answerOutcome(
+        json(
+          {
+            result: 'SUCCESS',
+            cleanup: {
+              object: { type: 'CLAS', name: 'Z' },
+              warning: 'the lock went with its SAP session',
+              failures: [{ session_error: 'ADT_SESSION_REPLACED' }],
+            },
+          },
+          false,
+        ),
+      ),
+      'session-lost',
+    );
+  });
+});

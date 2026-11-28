@@ -113,8 +113,11 @@ export function answerOutcome(answer: ToolResultLike): StepOutcome {
   if (!failed) {
     // A success may carry a release that failed (`withLock`'s cleanup).
     const cleanup = member(payload, 'cleanup');
-    if (member(cleanup, 'left_locked') !== true) return 'ok';
+    // A lock that went with its lost session carries no left_locked, only
+    // the session's verdict: the session is gone all the same.
     const verdict = connectionVerdict(cleanup);
+    if (verdict === 'session-lost') return verdict;
+    if (member(cleanup, 'left_locked') !== true) return 'ok';
     if (verdict !== undefined) return verdict;
     const failures = member(cleanup, 'failures');
     const answered = Array.isArray(failures)

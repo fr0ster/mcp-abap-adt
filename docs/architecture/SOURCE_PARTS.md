@@ -98,11 +98,19 @@ it makes the answer smaller.
 - `HEAD` on a source answers `400` (cloud).
 - A source `GET` carries `etag` and `last-modified` (cloud).
 
-**To be measured onprem.** A probe handed to the owner checks three things on a program: the
-local method's `definitionIdentifier`, the batch envelope, and `HEAD`. Nothing here needs the
-first or the third: a local method is located by its `implementationIdentifier`, and its
-declaration through its local class (§5.2). Whether navigations share an envelope onprem decides
-only how they are sent (§4.4), not what they answer.
+**Onprem, measured on a large program (2026-11-28):**
+
+- A local method's `definitionIdentifier` and `implementationIdentifier` are the same href
+  (`#type=PROG%2FPLM;name=…`); navigating either answers `200` at one `#start`. So onprem the
+  links do not tell a definition from an implementation (cloud refuses the definition link with
+  `400`).
+- A form navigated answers `200` at its `FORM` statement.
+- Three navigations in one batch envelope answered `202`, each part equal to its answer alone.
+- `HEAD` on a source answers `400`.
+
+**Navigation never decides the side.** Where a start comes from navigation, which side it is
+(definition or implementation) is decided by the lexer and the identity check (§5.2) on the text,
+never by which link was navigated.
 
 ## 3. Where each piece sits
 
@@ -214,8 +222,9 @@ Measured on cloud, that is one round trip with each request answered as if sent 
 navigation is still its own member call with one request; the envelope belongs to
 `AdtBatchConnection`, not to the member.
 
-The envelope is used per declared variant where it is measured to answer (cloud today). Anywhere
-else each navigation request is sent alone, on the plain connection. Both give the same starts.
+The envelope is used per declared variant where it is measured to answer (cloud and onprem).
+Anywhere else (legacy) each navigation request is sent alone, on the plain connection. Both give
+the same starts.
 
 
 A part read or a partial update cannot itself be recorded into the server's batch mode
@@ -301,8 +310,11 @@ element.
    function group, the analyzer reads the group's outline for its includes, then the outline of
    one include, which answers the whole group (§2).
 2. **Find the start.** Navigation on the element's link gives its start line. For a local
-   method, the link is the `implementationIdentifier`, which answers on cloud. The method's
+   method, the link is the `implementationIdentifier` (cloud refuses the definition link; onprem
+   both are one href). The start is then checked, not trusted: the identity check must find
+   `METHOD <name>` inside `CLASS <scope> IMPLEMENTATION`, else `start_mismatch`. The method's
    declaration is read as part of its local class's definition.
+
 3. **Find the end.** The block-end scanner finds it from the include's text and the start.
 
 **The lexer and the scanner** are plain string code: character loops, with **no regular

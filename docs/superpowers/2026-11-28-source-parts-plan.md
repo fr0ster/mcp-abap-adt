@@ -126,7 +126,7 @@ Commit: `chore(deps): interfaces-adt <version>`.
 - Files: `src/results/navigation.ts`, `src/index.ts`.
 - Interfaces: `INavigationTarget`, `readNavigationTarget` (spec §1.2), through `sourcePosition`
   and the shared parse helpers; no regular expression.
-- Tests first: `src/__tests__/navigationReadings.test.ts` over the corpus answers of 2.5: form,
+- Tests first: `src/__tests__/navigationReadings.test.ts` over the corpus answers of task 2.4: form,
   module, local class, type, local method; the `400` exception and a reference without `start`
   read as `undefined`; `publicApi.test.ts` names the new export.
 - Commit: `feat(results): readNavigationTarget`.
@@ -146,7 +146,7 @@ and publishes adt-strategies after adt-clients; the post-publication gate for bo
   at exactly the published versions; the task verifies it: `npm ls` shows each sibling at the
   version `npm view` reports, and the sibling's tag is at the checkout's commit. The lockfile's
   `"link": true` is only for these siblings (the repository's standing rule); the
-  post-publication gate after 4.13 proves the package installs from the registry alone.
+  post-publication gate after 4.14 proves the package installs from the registry alone.
 - Tests first: the source scan (`src/__tests__/sources.test.ts`): no `makeAdtRequest`, no ADT path
   literal outside the shape constants, no regular expression literal or `RegExp`, no timer —
   green on the empty package, proven load-bearing by a planted violation.

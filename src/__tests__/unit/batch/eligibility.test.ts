@@ -747,3 +747,49 @@ describe('eligible by set', () => {
     assert.equal(absentReadsAs('GetFunctionModule', 'part'), 'source');
   });
 });
+
+describe('the core entries', () => {
+  const MODULE = {
+    function_module_name: 'FM_A',
+    function_group_name: 'FUGR_A',
+  };
+
+  it('GetFunctionModule is admitted for part metadata, refused for source and for no part', () => {
+    assert.deepStrictEqual(
+      eligible(
+        'GetFunctionModule',
+        { ...MODULE, part: 'metadata' },
+        'http',
+        'core',
+      ),
+      { ok: true },
+    );
+    for (const args of [{ ...MODULE, part: 'source' }, MODULE]) {
+      assert.deepStrictEqual(
+        eligible('GetFunctionModule', args, 'http', 'core'),
+        { ok: false, reason: 'arguments' },
+      );
+    }
+  });
+
+  it('an object read is admitted for every part and version, over HTTP and RFC', () => {
+    for (const args of [
+      { class_name: 'CLAS_A' },
+      { class_name: 'CLAS_A', part: 'metadata' },
+      { class_name: 'CLAS_A', version: 'inactive' },
+    ]) {
+      for (const connection of ['http', 'rfc'] as const) {
+        assert.deepStrictEqual(eligible('GetClass', args, connection, 'core'), {
+          ok: true,
+        });
+      }
+    }
+  });
+
+  it('a core entry admits no compact call', () => {
+    assert.deepStrictEqual(
+      eligible('GetClass', { class_name: 'CLAS_A' }, 'http', 'compact'),
+      { ok: false, reason: 'not-listed' },
+    );
+  });
+});

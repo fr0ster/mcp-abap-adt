@@ -96,6 +96,9 @@ const FULL: BatchEntryCase[] = [
   { tool: 'GetServiceBinding', args: { service_binding_name: 'SRVB_A' } },
   { tool: 'ListServiceBindingTypes', args: {} },
   { tool: 'GetClass', args: { class_name: 'CLAS_A' } },
+  // A version: still the one request (a source range, cut from the answer
+  // locally, is `envelopeProjection.test.ts`'s).
+  { tool: 'GetClass', args: { class_name: 'CLAS_A', version: 'inactive' } },
   { tool: 'GetLocalTestClass', args: { class_name: 'CLAS_A' } },
   { tool: 'GetLocalTypes', args: { class_name: 'CLAS_A' } },
   { tool: 'GetLocalDefinitions', args: { class_name: 'CLAS_A' } },

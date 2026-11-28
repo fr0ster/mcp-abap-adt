@@ -19,7 +19,7 @@ the system.
   - the **topic form** (`object=`): read one topic by the name a link carries;
   - the **position form** (`uri=`): read the topic for a position in a source.
 
-  The language is the caller's. A link on a page carries a topic name and a `version`. The
+  The language is the caller's; without it, SAP's default answers. A link on a page carries a topic name and a `version`. The
   topic form takes both and sends `version` as the link gave it, so the agent can follow a
   link to the page it points to (see "`version` is passed as a link carries it").
 
@@ -107,6 +107,9 @@ the system.
   3. **No runtime probing.** Nothing is sent to find out whether a form works. The
      measurements behind step 1 are made during development, by the live tests.
 
+- **Access restrictions hold.** Each new tool, and each new `HandlerSystem` action and
+  `HandlerGet` type, can be denied through `--deny-actions` like any other.
+
 ## Invariants
 
 - **SAP's answer reaches the model as it is, at every `detail`.**
@@ -127,9 +130,9 @@ the system.
   - The discovery templates list `version`. On the pages read, the topic links carried
     `version=5` on cloud and `version=X` on premise, whether or not the page itself was
     asked with a `version`.
-  - Measured for the three topics read on cloud and for the one read on premise: the page
-    without `version` differed from the page with `5`, and from the one with `X`. So a link
-    is followed only by sending its `version`.
+  - Measured on cloud for three topics and on premise for three topics: the page without
+    `version` differed from the page with `5` and from the one with `X`, and those two
+    differed from each other. So a link is followed only by sending its `version`.
   - Measured on both kinds: `1` and `6` answered `500`, while `2`, `3`, `4`, `5` and `X`
     answered `200`.
   - What each value selects is unverified. The parameter is described as "the `version` a
@@ -185,7 +188,12 @@ The breakdown within each package is the spec's.
      a statement, not a start page.
    - List the tool on `legacy` in 24.3.0 only if that read succeeds. The runtime gate then
      serves there only what discovery announces.
-2. **Tool names.**
+2. **Is the keyword documentation a long read?**
+   - Measured on cloud: a first read of a page took up to about 100 s on SAP's side.
+   - The `-ro` binaries carry the background runs of the long reads.
+   - Recommendation: make the keyword-documentation reads long reads, so a caller can run
+     them in the background. The definition reads answered fast and stay plain reads.
+3. **Tool names.**
    - `GetApplicationLogObject` would be found by a search for "application log" and then
      answer no log entries.
    - Recommendation: `GetApplicationLogDefinition`, `GetApplicationJobCatalog` and

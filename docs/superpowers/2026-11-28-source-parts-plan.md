@@ -10,8 +10,9 @@ logical change per commit; every commit ends with the session's attribution line
 - Work goes in a worktree under each repository's `.worktrees/` (the main checkouts are shared
   and never switched). PRs, by release:
   - mcp-abap-adt-interfaces: one PR (section 1);
-  - mcp-abap-adt-clients, PR A: adt-clients and adt-strategies (sections 2 and 3), published in
-    that order;
+  - mcp-abap-adt-clients, PR A: adt-clients and adt-strategies (sections 2 and 3). Section 3 starts
+    once section 2 is ready to publish, since adt-strategies consumes no adt-clients; PR A merges
+    after section 3, and both are then published from their tags, adt-clients first;
   - mcp-abap-adt-clients, PR B: adt-code-analyzer (section 4), opened only after both releases of
     PR A are on the registry and have passed the post-publication gate;
   - mcp-abap-adt: #401 (section 5).
@@ -99,7 +100,8 @@ logical change per commit; every commit ends with the session's attribution line
   navigations through `AdtBatchConnection('communication')` equal to their answers alone.
 - The answers recorded, sanitised, into `corpus/adt/answers/` (the corpus scrub rules), one per
   kind adt-strategies' tests read (spec §3.3): form, module, local class, type, local method
-  (implementation and definition link), and the `400` exception; on both systems.
+  (implementation and definition link) on both systems; the `400` exception from cloud only (on
+  onprem the definition link answers `200`, the same as the implementation link).
 - Commit: `test(utils): navigation target live, onprem and cloud; corpus answers`.
 
 **Task 2.5 — ready to publish.**
@@ -108,8 +110,8 @@ logical change per commit; every commit ends with the session's attribution line
 - Docs: `docs/usage/ERRATA.md` entries (spec §3.2), `README.md`, `docs/usage/CLIENT_API_REFERENCE.md`,
   `docs/architecture/ARCHITECTURE.md`; CHANGELOG (version asked); `npm install --package-lock-only`
   after the version change.
-- Commit: `docs: navigation target, the ERRATA entries; CHANGELOG`. PR A review; the owner
-  publishes adt-clients; the post-publication gate.
+- Commit: `docs: navigation target, the ERRATA entries; CHANGELOG`. adt-clients is ready to
+  publish; it is published with adt-strategies after PR A merges (task 3.3), not before.
 
 ## 3. `@mcp-abap-adt/adt-strategies` (same repository, `packages/adt-strategies`)
 
@@ -132,8 +134,9 @@ Commit: `chore(deps): interfaces-adt <version>`.
 - Commit: `feat(results): readNavigationTarget`.
 
 **Task 3.3 — ready to publish.** Gate green; the common release gate; README surface list;
-CHANGELOG (version asked). Commit: `docs: readNavigationTarget; CHANGELOG`. The owner merges PR A
-and publishes adt-strategies after adt-clients; the post-publication gate for both before PR B.
+CHANGELOG (version asked). Commit: `docs: readNavigationTarget; CHANGELOG`. PR A, holding both
+sections, is reviewed and merged; then the owner publishes from the tags, adt-clients first and
+adt-strategies second; the post-publication gate for both before PR B.
 
 ## 4. `@mcp-abap-adt/adt-code-analyzer` (same repository, new `packages/adt-code-analyzer`)
 

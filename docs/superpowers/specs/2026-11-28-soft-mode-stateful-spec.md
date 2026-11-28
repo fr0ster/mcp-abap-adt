@@ -50,9 +50,10 @@ appears only when its source holds it:
 
 ## 1. What a step's outcome is
 
-Soft-mode code reads each call's outcome through one shared helper,
-`stepOutcome(answer | thrown, connection)`, in
-`src/__tests__/integration/helpers/`. It reads typed fields only. Words are
+Soft-mode code reads each call's outcome through one shared helper
+(`answerOutcome` / `thrownOutcome`, `src/__tests__/integration/helpers/stepOutcome.ts`). The
+connection a verdict is attributed to is the one whose records the caller applies it to:
+one lock registry and one object record per connection. It reads typed fields only. Words are
 never a verdict: not `LOCK_WENT_WITH_SESSION_WORDS`, not a message, not a
 response body.
 
@@ -71,8 +72,8 @@ response body.
   on success answers too. A release that failed on the network or
   `unclassified` makes the step's outcome `network` / `unclassified`. A
   release SAP refused gives `ok`, and its lock is still taken in (section 3).
-- **Only the answering connection is affected by a verdict.** `stepOutcome`
-  gets the connection the call ran on. A `session-lost` from the package
+- **Only the answering connection is affected by a verdict.** It is applied
+  to the records of the connection the call ran on. A `session-lost` from the package
   delete's sibling (section 7) touches no lock of the run's connection.
 - Which field carries what is pinned first (plan, step 1). Anything not
   pinned reads `unclassified`, the safe side for locks and creates.

@@ -98,7 +98,11 @@ import type {
   OpenBatch,
 } from '../lib/batch/InstanceBatch.js';
 import { partsPerEnvelopeOf } from '../lib/batch/phases.js';
-import { createRecorder, untilSent } from '../lib/batch/recorder.js';
+import {
+  batchTarget,
+  createRecorder,
+  untilSent,
+} from '../lib/batch/recorder.js';
 import {
   OUTSIDE_BATCH_SENTENCE,
   withBatchSentence,
@@ -2765,8 +2769,7 @@ export abstract class BaseMcpServer extends McpServer {
       },
     );
     const recorder = createRecorder(
-      open.connection,
-      owner,
+      batchTarget(open.connection, owner),
       (number) => {
         open.recorded.push({
           number,

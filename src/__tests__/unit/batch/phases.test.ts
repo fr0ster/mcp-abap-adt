@@ -13,16 +13,21 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../../handlers/interfaces';
+import { createBatchAvailability } from '../../../lib/batch/availability';
 import {
   LATE_RECORD_WORDS,
   MORE_ENVELOPES_WORDS,
+  type PhaseRules,
   runPhase,
+  runPhaseOutcome,
 } from '../../../lib/batch/phases';
 import { rejectionOf } from '../../helpers/assertions';
 import {
   envelopeConnection,
+  envelopeResponse,
   partByPart,
   statusError,
 } from '../../helpers/batchEnvelope';
@@ -264,5 +269,131 @@ describe('runPhase', () => {
         );
       }
     });
+  });
+});
+
+/**
+ * The phase policy over several envelopes (the consumer's bound): which
+ * outcomes end a phase whatever `failuresEnd` says, and which only when it
+ * is not `false`. These pin the behaviour `sendPlanned` must keep.
+ */
+describe('runPhaseOutcome: what ends a phase over several envelopes', () => {
+  const FIVE = [0, 1, 2, 3, 4];
+
+  /** A phase of five reads at bound 2 (envelopes of 2, 2, 1); `answer` per envelope, from 1. */
+  const phaseOn = async (
+    answer: (envelope: number) => 'ok' | (() => unknown),
+    readOf: (item: number, c: IAbapConnection) => Promise<string> = async (
+      item,
+      c,
+    ) =>
+      String(
+        (
+          await c.makeAdtRequest({
+            url: `/sap/bc/adt/x/${item}`,
+            method: 'GET',
+            timeout: 0,
+          })
+        ).data,
+      ),
+    rules?: PhaseRules<number, string>,
+  ) => {
+    let count = 0;
+    const fake = envelopeConnection((parts) => {
+      count += 1;
+      const given = answer(count);
+      if (given !== 'ok') throw given();
+      return envelopeResponse(
+        parts.map((p) => ({ status: 200, statusText: 'OK', body: p.url })),
+      );
+    });
+    const context: HandlerContext = {
+      connection: fake.connection,
+      logger: undefined,
+      batchAvailability: createBatchAvailability(),
+      partsPerEnvelope: 2,
+    };
+    const outcome = await withinTurns(
+      runPhaseOutcome(context, FIVE, readOf, rules),
+      2000,
+    );
+    return { fake, outcome };
+  };
+
+  const failingFirst = (envelope: number) =>
+    envelope === 1
+      ? () => statusError(500, 'Internal Server Error')
+      : ('ok' as const);
+
+  it('a failed envelope ends the phase by default: no later envelope', async () => {
+    const { fake, outcome } = await phaseOn(failingFirst);
+    assert.equal(fake.envelopes.length, 1);
+    assert.ok(outcome.results.every((r) => !r.ok));
+  });
+
+  it('with failuresEnd false a failed envelope ends nothing: the later envelopes are sent and answer', async () => {
+    const { fake, outcome } = await phaseOn(failingFirst, undefined, {
+      failuresEnd: false,
+    });
+    assert.equal(fake.envelopes.length, 3);
+    assert.deepStrictEqual(
+      outcome.results.map((r) => r.ok),
+      [false, false, true, true, true],
+    );
+    assert.equal(outcome.envelope.failed, true);
+  });
+
+  it('with failuresEnd false a refused second envelope request still ends the phase', async () => {
+    const { fake, outcome } = await phaseOn(
+      () => 'ok',
+      async (item, c) =>
+        String(
+          (
+            await c.makeAdtRequest(
+              item === 1
+                ? {
+                    url: '/sap/bc/adt/x/1?_action=LOCK',
+                    method: 'POST',
+                    timeout: 0,
+                    headers: { 'X-sap-adt-sessiontype': 'stateful' },
+                  }
+                : { url: `/sap/bc/adt/x/${item}`, method: 'GET', timeout: 0 },
+            )
+          ).data,
+        ),
+      { failuresEnd: false },
+    );
+    assert.equal(fake.envelopes.length, 1);
+    assert.equal(outcome.results.length, 5);
+    for (const result of outcome.results) {
+      assert.equal(result.ok, false);
+      assert.equal(
+        (result as { error: Error }).error.message,
+        MORE_ENVELOPES_WORDS,
+      );
+    }
+  });
+
+  it('with failuresEnd false a settlement the failure reader knows still ends the phase', async () => {
+    const refusal = new AuthRefusedError(
+      authError['credential-refused']({ credential: 'token' }),
+      'request',
+    );
+    const { fake, outcome } = await phaseOn(
+      () => 'ok',
+      async (item, c) => {
+        const answered = await c.makeAdtRequest({
+          url: `/sap/bc/adt/x/${item}`,
+          method: 'GET',
+          timeout: 0,
+        });
+        if (item === 0) throw refusal;
+        return String(answered.data);
+      },
+      { failuresEnd: false },
+    );
+    assert.equal(fake.envelopes.length, 1);
+    const last = outcome.results[4];
+    assert.ok(last !== undefined && !last.ok && last.error === refusal);
   });
 });

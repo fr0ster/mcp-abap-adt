@@ -164,10 +164,11 @@ A composer above the one-endpoint members. It answers two things:
   statement with another (§5.4). The tools cut the element's lines from this, and the write
   merges into it (§7). One read path serves both. The analyzer computes no hash: lib hashes the
   text it is given (§7.2).
-- **`part(object, elements, { version, source })`** with a source given: the same, located in
-  that text instead of a text the analyzer reads. The outline and the navigation are read afresh
-  for the call; nothing comes from a cache. A locked write calls it this way (§7.2), so what is
-  hashed, located and merged is one text.
+- **`part(object, elements, { version, source, outline })`** with a source and an outline given:
+  the same, located in that text instead of a text the analyzer reads, and from that outline
+  instead of one it reads; only the navigation is requested. Nothing comes from a cache. A locked
+  write calls it this way (§7.2) with the one outline it read under the lock, so what is hashed,
+  located and merged is one text, and what is checked is one outline.
 
 It is **not a member** of any object client and builds **no request**: it never calls
 `makeAdtRequest` and writes no ADT address. Every request it causes is a member's, one request
@@ -290,7 +291,7 @@ checked before it is used:
 - the located block must pass the identity check (§5.2) against the address the `ref` carries; a
   stale `ref` is refused `start_mismatch` and the model reads the outline again.
 
-Under the lock a write reads the outline afresh in any case (§7.2); a `ref` there only names the
+Under the lock a write reads its one outline in any case (§7.2); a `ref` there only names the
 element.
 
 ### 5.1 A class or an interface: SAP's positions
@@ -406,7 +407,7 @@ The spec gives the full list of event statements and the test inputs of each rul
 recognise it as an event. A program whose outline lists any `GET` event has all its events
 refused as parts, since an event's end could run over a `GET` event. This holds on every
 addressing path: a part read of an event, by address, short form or `ref`, reads the program's
-outline to decide it, and a locked write decides it on its fresh outline.
+outline to decide it, and a locked write decides it on its one outline read under the lock.
 
 ### 5.3 A function module
 
@@ -513,12 +514,12 @@ The sequence, one snapshot under one lock:
    served with the read, where it served one, and a call that passes `etag` is refused
    `source_changed` too when SAP serves one under the lock and it differs. Where SAP serves none,
    the hash alone decides.
-4. **Check membership, then locate in T.** The include must be a source of the object by the
-   outline read afresh under the lock, for every call (an include-relative diff and an insert
-   into an include included); else the call is refused. Then
-   `part(object, elements, { version: "inactive", source: T })`: the outline and
-   the navigation are read afresh under the lock, and every element is located in T, never in
-   another read. The identity rule (§5.2) and the boundary check (§5.4) run on T: an outline or
+4. **One outline, membership, then locate in T.** The outline is read once under the lock (O).
+   The include must be a source of the object by O, for every call (an include-relative diff and
+   an insert into an include included); else the call is refused. Then
+   `part(object, elements, { version: "inactive", source: T, outline: O })`: the navigation is
+   read under the lock, and every element is located in T and O, never in another read.
+ The identity rule (§5.2) and the boundary check (§5.4) run on T: an outline or
    a navigation answer that does not describe T is refused (`start_mismatch`), not trusted.
 5. **Merge into T**: the edits must not overlap, else a refusal naming both; they are applied
    bottom-up, so earlier ranges stay valid.

@@ -49,11 +49,13 @@ hand-written object, and refuses one missing a member.
   (one member one request, no `analyse ??`) stay green.
 - Integration, onprem and cloud (adt-clients' live suites, objects from the overlay):
   navigation of a form fragment and a local method's `implementationIdentifier` answers `200`
-  with a `#start=` reference; a local method's `definitionIdentifier` answers as SAP answers
-  (cloud: `400`, EU/061), asserted as recorded per system.
-- Integration, cloud: three navigations through `AdtBatchConnection('communication')` answer the
-  same references as alone. Onprem: the same case, run once the onprem probe has measured the
-  envelope; until then it is skipped with that reason.
+  with a `#start=` reference; a local method's `definitionIdentifier` answers as SAP answers,
+  asserted per system as measured: cloud `400` (EU/061); onprem the same href as the
+  implementation link and the same `200` start.
+- Integration, onprem and cloud: three navigations through
+  `AdtBatchConnection('communication')` answer the same references as alone (measured on both:
+  `202`, every part equal).
+- `HEAD` is not used: it answers `400` on both (measured).
 - The answers are recorded into `corpus/adt/answers/` (sanitised) for adt-strategies.
 
 **Docs**
@@ -105,7 +107,9 @@ interfaces-adt by semver range.
 - The function group path (§5.2): the group's outline for its includes, then one include's
   outline for the whole group.
 - Navigation per target; several targets through one `AdtBatchConnection('communication')`
-  envelope on `cloud`, one by one on `onprem` until measured (§4.4).
+  envelope on `cloud` and `onprem` (measured on both), one by one elsewhere (§4.4). The side of a
+  navigated start is never taken from the link: the identity check decides it on the text
+  (onprem gives one href and one start for both sides).
 - The lexer and `BlockEndScanner`: the closed table, the nesting table and the fail-closed rules
   of §5.2, the boundary check of §5.4, the identity check of the whole address, all plain string
   code; no regular expression anywhere in the package.
@@ -127,7 +131,9 @@ interfaces-adt by semver range.
   is open, an event with an `INCLUDE`, a terminator inside a macro body, a start inside a macro,
   `CLASS … DEFINITION DEFERRED`, `LOCAL FRIENDS`).
 - Unit, identity: a stale position on a same-named method of another local class is
-  `start_mismatch`; each address field changed alone is refused.
+  `start_mismatch`; each address field changed alone is refused; a navigated start that lands
+  on a `METHODS` declaration while the implementation side is asked (and the reverse) is
+  `start_mismatch`.
 - Unit, the boundary check: `ENDMETHOD. METHOD b.`, a chained declaration, a trailing comment and
   pragma after the end (accepted).
 - Unit, addresses: duplicate full addresses, the short form with none, one and two matches,
@@ -223,8 +229,8 @@ CHANGELOG; the repository's CLAUDE.md package list is the owner's to change.
 
 **Docs**
 
-- `docs/architecture/SOURCE_PARTS.md` stays the design; its "measured" facts are updated with the
-  onprem probe's results.
+- `docs/architecture/SOURCE_PARTS.md` stays the design, its measured facts as they are now.
+
 - `docs/user-guide/AVAILABLE_TOOLS*.md` (generated), `BATCH_MODE.md` (the eligibility of the new
   tools), `README.md` tool list, `docs/user-guide/HANDLERS_MANAGEMENT.md` if the sets change.
 - `docs/architecture/HANDLER_EXPORTER.md` and `ARCHITECTURE.md` §5 (the `codeAnalyzer` option).

@@ -12,19 +12,17 @@ describe('the debug set', () => {
     );
   });
 
-  it('HandlerExporter leaves it out (its options have no includeDebug)', () => {
+  it('HandlerExporter leaves it out (its options have no includeDebug), the memory snapshot reads of the readonly group aside', () => {
     const names = new HandlerExporter({ systemType: 'onprem' })
       .getHandlerEntries()
       .map((e) => e.toolDefinition.name);
     assert.equal(
       names.some(
-        (n: string) =>
-          n.startsWith('Debug') ||
-          n.startsWith('AmdpDebug') ||
-          n.startsWith('MemorySnapshot'),
+        (n: string) => n.startsWith('Debug') || n.startsWith('AmdpDebug'),
       ),
       false,
     );
+    assert.ok(names.includes('MemorySnapshotList'));
   });
 
   // The binary fixes its set: always in core, never in core-ro.

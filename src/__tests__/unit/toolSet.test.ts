@@ -368,11 +368,13 @@ describe('the leftover-session tools are served on stdio only', () => {
 
 /**
  * What a `-ro` set must not hold: every tool that writes (the high group,
- * the compact modify half) or debugs (the debugger groups). Since 24.0.0
+ * the compact modify half) or works in a debug session (the debugger groups,
+ * the memory snapshot reads aside: they read what the system holds, outside
+ * any session, and core-ro serves them). Since 24.0.0
  * (D24, the owner) it serves the background-run tools: its long reads run
  * in the background, and only reads run there.
  */
-describe('a -ro set holds no write or debugger tool, and the background-run tools; a write set holds its -ro set', () => {
+describe('a -ro set holds no write or debug-session tool, and the background-run tools; a write set holds its -ro set', () => {
   // A high tool the readonly group also defines reads (GetUnitTestResult,
   // the Get<Type> object reads): the high group's copy replaces it in core,
   // and it is no write.
@@ -385,7 +387,9 @@ describe('a -ro set holds no write or debugger tool, and the background-run tool
       ...compactModifyEntries().map((e) => e.toolDefinition.name),
     ],
     debug: [
-      ...namesOf([new DebugHandlersGroup(context)]),
+      ...namesOf([new DebugHandlersGroup(context)]).filter(
+        (n) => !readonlyNames.includes(n),
+      ),
       ...compactDebugEntries().map((e) => e.toolDefinition.name),
     ],
     background: [
@@ -416,6 +420,17 @@ describe('a -ro set holds no write or debugger tool, and the background-run tool
       );
     });
   }
+
+  it('core-ro serves the memory snapshot reads', () => {
+    const names = toolsOf(fullReadOnlyToolSet);
+    for (const name of [
+      'MemorySnapshotList',
+      'MemorySnapshotGet',
+      'MemorySnapshotDelta',
+    ]) {
+      assert.deepEqual([name, names.includes(name)], [name, true]);
+    }
+  });
 
   for (const [kind, set, get] of [
     ['core-ro', fullReadOnlyToolSet, 'GetBackgroundRun'],

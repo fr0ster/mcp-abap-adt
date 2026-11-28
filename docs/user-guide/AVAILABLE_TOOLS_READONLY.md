@@ -5,7 +5,7 @@ Generated from the tool definitions the server builds (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. The read envelopes are served here (`CreateReadEnvelope`, `ExecuteReadEnvelope`, `DiscardReadEnvelope`, `ListReadEnvelopes`, [BATCH_MODE.md](BATCH_MODE.md#envelopes-in-the-core-binaries)); compact batch mode (`HandlerBatch`) is the compact binaries'. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 134
+- Total tools: 137
 
 ## Navigation
 
@@ -81,6 +81,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [CheckDdl](#checkddl-read-only-ddl)
   - [Ddlx](#read-only-ddlx)
     - [CheckMetadataExtension](#checkmetadataextension-read-only-ddlx)
+  - [Debugger](#read-only-debugger)
+    - [MemorySnapshotList](#memorysnapshotlist-read-only-debugger)
+    - [MemorySnapshotGet](#memorysnapshotget-read-only-debugger)
+    - [MemorySnapshotDelta](#memorysnapshotdelta-read-only-debugger)
   - [Domain](#read-only-domain)
     - [GetDomain](#getdomain-read-only-domain)
     - [CheckDomain](#checkdomain-read-only-domain)
@@ -1008,6 +1012,52 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `name` (string, required) - Metadata extension name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`) - Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back to whichever exists.
+
+---
+
+<a id="read-only-debugger"></a>
+### Read-Only / Debugger
+
+<a id="memorysnapshotlist-read-only-debugger"></a>
+#### MemorySnapshotList (Read-Only / Debugger)
+**Description:** [read-only] Lists the memory snapshots the system holds, of one user when asked.
+
+**Source:** `src/handlers/debugger/debug/handleMemorySnapshotList.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `user` (string, optional) - Only the snapshots of this SAP user.
+
+---
+
+<a id="memorysnapshotget-read-only-debugger"></a>
+#### MemorySnapshotGet (Read-Only / Debugger)
+**Description:** [read-only] Reads one memory snapshot in a view: its header, memory by kind, largest objects, an object's children or its referrers.
+
+**Source:** `src/handlers/debugger/debug/handleMemorySnapshotGet.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `key` (string, optional) - Object key, for children and references.
+- `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
+- `snapshot_id` (string, required) - Snapshot id.
+- `view` (string, optional (default: overview), one of: `header`, `overview`, `ranking`, `children`, `references`) - header: the snapshot; overview: memory by kind; ranking: the largest objects; children: what an object holds; references: what holds an object.
+
+---
+
+<a id="memorysnapshotdelta-read-only-debugger"></a>
+#### MemorySnapshotDelta (Read-Only / Debugger)
+**Description:** [read-only] Compares two memory snapshots in a view: memory by kind, largest objects, an object's children or its referrers.
+
+**Source:** `src/handlers/debugger/debug/handleMemorySnapshotDelta.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `from_id` (string, required) - Snapshot id to compare from.
+- `key` (string, optional) - Object key, for children and references.
+- `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
+- `to_id` (string, required) - Snapshot id to compare to.
+- `view` (string, optional (default: overview), one of: `overview`, `ranking`, `children`, `references`) - overview: memory by kind; ranking: the largest objects; children: what an object holds; references: what holds an object.
 
 ---
 

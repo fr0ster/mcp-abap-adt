@@ -8,7 +8,7 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 
 ## The tools
 
-- the **readonly** tools — `Get*`, `List*`, `ReadTransport*`: the read operations of every object type, one `Get<Type>` per type (`part: source | metadata` where the type has a source), the reads of a class's local includes (`GetLocalDefinitions`, `GetLocalTypes`, `GetLocalMacros`, `GetLocalTestClass`), the per-type syntax checks (`Check<Type>`) and version history (`Get<Type>Versions`, `…VersionSource`, `…VersionDiff`), `ListServiceBindingTypes` and `ValidateServiceBinding` — the same tools as `mcp-abap-adt`;
+- the **readonly** tools — `Get*`, `List*`, `ReadTransport*`: the read operations of every object type, one `Get<Type>` per type (`part: source | metadata` where the type has a source), the reads of a class's local includes (`GetLocalDefinitions`, `GetLocalTypes`, `GetLocalMacros`, `GetLocalTestClass`), the per-type syntax checks (`Check<Type>`) and version history (`Get<Type>Versions`, `…VersionSource`, `…VersionDiff`), `ListServiceBindingTypes`, `ValidateServiceBinding` and the memory snapshot reads (`MemorySnapshotList`, `…Get`, `…Delta`) — the same tools as `mcp-abap-adt`;
 - the **system** tools — where-used, type and object information, the object outline and
   structure, dumps, profiler traces and their analysis, and the ABAP Test Cockpit
   (`RunATC`, `GetATCRunStatus`, `GetATCFindings`, and the stored results:
@@ -21,7 +21,7 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 
 Batch mode is the compact binaries' (`HandlerBatch`, in `mcp-abap-adt-compact-ro`): none is served here.
 
-130 tools in all (the data tools aside): the tools, their enums and the object types each argument accepts are those of `--system-type`'s ADT type table ([MIGRATION-22.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-22.0.md)). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule, the debugger and the leftover-session logoff — those are
+133 tools in all (the data tools aside): the tools, their enums and the object types each argument accepts are those of `--system-type`'s ADT type table ([MIGRATION-22.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-22.0.md)). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule, the debugger and the leftover-session logoff — those are
 `mcp-abap-adt`'s ([`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)).
 
 **Nothing here changes the system.** No tool of this binary runs code or changes data: the class

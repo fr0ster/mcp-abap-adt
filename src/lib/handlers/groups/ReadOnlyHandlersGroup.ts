@@ -72,6 +72,18 @@ import {
   handleCheckMetadataExtension,
 } from '../../../handlers/ddlx/high/handleCheckMetadataExtension';
 import {
+  handleMemorySnapshotDelta,
+  TOOL_DEFINITION as MemorySnapshotDelta_Tool,
+} from '../../../handlers/debugger/debug/handleMemorySnapshotDelta';
+import {
+  handleMemorySnapshotGet,
+  TOOL_DEFINITION as MemorySnapshotGet_Tool,
+} from '../../../handlers/debugger/debug/handleMemorySnapshotGet';
+import {
+  handleMemorySnapshotList,
+  TOOL_DEFINITION as MemorySnapshotList_Tool,
+} from '../../../handlers/debugger/debug/handleMemorySnapshotList';
+import {
   TOOL_DEFINITION as CheckDomain_Tool,
   handleCheckDomain,
 } from '../../../handlers/domain/high/handleCheckDomain';
@@ -258,10 +270,10 @@ import {
  * Handler group for all readonly (read-only) handlers.
  * Contains handlers that only read data without modifying the ABAP system.
  *
- * Some tools are a COPY of a high-level tool under the same name,
+ * Some tools are a COPY of a high-level or debug tool under the same name,
  * handler and schema (the object reads `Get<Type>`, the local includes of a
  * class, the per-type checks and version tools, the service binding types and
- * validation, GetUnitTestResult — purely reads, so
+ * validation, GetUnitTestResult, the memory snapshot reads — purely reads, so
  * a read-only caller may use them too). Two tools cannot share one name on one server, so a readonly
  * entry whose exact name another exposed group contributes is always
  * withheld, whatever the strategy: a caller granted both groups gets the tool
@@ -377,6 +389,11 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       ...buildObjectVersionTools().map((entry) =>
         defineTool(entry.toolDefinition, entry.handler),
       ),
+      // The memory snapshots the system holds (copies of the debug tools):
+      // reads on the instance's connection, outside any debug session.
+      defineTool(MemorySnapshotList_Tool, handleMemorySnapshotList),
+      defineTool(MemorySnapshotGet_Tool, handleMemorySnapshotGet),
+      defineTool(MemorySnapshotDelta_Tool, handleMemorySnapshotDelta),
     ];
   }
 }

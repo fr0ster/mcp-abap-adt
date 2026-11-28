@@ -125,7 +125,9 @@ import { defineTool, type HandlerEntry } from '../interfaces.js';
  * The debugger tools — served by the full write binaries (`fullToolSet`),
  * never by a `-ro` one: a breakpoint catches every request of the request
  * user. Their state lives in the server
- * instance (`HandlerContext.debugger`).
+ * instance (`HandlerContext.debugger`). The memory snapshot reads
+ * (`MemorySnapshotList`, `…Get`, `…Delta`) work outside any debug session,
+ * so the readonly group serves them too, and the `-ro` sets with it.
  */
 export class DebugHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'DebugHandlers';

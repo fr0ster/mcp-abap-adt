@@ -7,9 +7,7 @@
  *
  * - a debug session's reads and waits: they take the `state_handle` a
  *   debugger start answers, and no read-only set starts a debugger;
- * - the debugger batch: its calls replay the steps of a stopped debuggee;
- * - the memory snapshot reads (`MemorySnapshotList`, `…Get`, `…Delta`): the
- *   debugger's, and the debugger is served by the write sets alone.
+ * - the debugger batch: its calls replay the steps of a stopped debuggee.
  *
  * And the other way round: every tool core-ro serves carries `[read-only]`.
  *
@@ -32,18 +30,9 @@ const DEBUGGER_BATCH: ReadonlySet<string> = new Set([
   'DebugBatchAnswers',
 ]);
 
-/** The memory snapshot reads: the debugger's. */
-const SNAPSHOT_READS: ReadonlySet<string> = new Set([
-  'MemorySnapshotList',
-  'MemorySnapshotGet',
-  'MemorySnapshotDelta',
-]);
-
-/** Whether `tool` is the debugger's: a debug session's, or a memory snapshot's. */
+/** Whether `tool` works only inside a debug session a write tool opened. */
 function insideDebugSession(tool: ServedTool): boolean {
-  if (DEBUGGER_BATCH.has(tool.name) || SNAPSHOT_READS.has(tool.name)) {
-    return true;
-  }
+  if (DEBUGGER_BATCH.has(tool.name)) return true;
   return (
     (tool.name.startsWith('Debug') || tool.name.startsWith('AmdpDebug')) &&
     tool.parameters.includes('state_handle')
@@ -80,7 +69,7 @@ describe('every read is in the read-only set', () => {
     }
   }
 
-  it('the local includes of a class are read on core-ro', async () => {
+  it('the local includes of a class and the memory snapshots are read on core-ro', async () => {
     const ro = new Set(
       (await servedCatalog(setOf('core-ro'))).map((tool) => tool.name),
     );
@@ -89,6 +78,9 @@ describe('every read is in the read-only set', () => {
       'GetLocalDefinitions',
       'GetLocalMacros',
       'GetLocalTestClass',
+      'MemorySnapshotList',
+      'MemorySnapshotGet',
+      'MemorySnapshotDelta',
     ]) {
       assert.deepEqual([name, ro.has(name)], [name, true]);
     }

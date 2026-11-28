@@ -992,9 +992,9 @@ for (const transportName of [
         // The abapGit reads on premise, always listed: five more.
         // The four reads of a class's local includes: four more.
         // The other reads of core (24.3.0): the 14 checks, the
-        // service binding types and validation and the 28 per-type version
-        // tools, 44 more.
-        assert.equal(fullRo.tools.length, onStdio ? 130 : onHttp ? 131 : 129);
+        // service binding types and validation, the 28 per-type version
+        // tools and the 3 memory snapshot reads, 47 more.
+        assert.equal(fullRo.tools.length, onStdio ? 133 : onHttp ? 134 : 132);
         for (const name of [
           'GetBackgroundRun',
           'ListBackgroundRuns',

@@ -598,7 +598,9 @@ describe('the MCP tool surface', () => {
    * core served outside it: the per-type checks (`Check<Type>`, 14),
    * `ListServiceBindingTypes`, `ValidateServiceBinding`, the per-type
    * version tools (`Get<Type>Versions`, `…VersionSource`, `…VersionDiff`,
-   * 28). Every other row was checked unchanged.
+   * 28) and the memory snapshot reads (`MemorySnapshotList`, `…Get`,
+   * `…Delta`, copies of the debug tools). Every other row was checked
+   * unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

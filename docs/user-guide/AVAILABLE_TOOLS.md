@@ -4,8 +4,8 @@ Generated from the tool definitions the server builds (not from docs).
 
 ## Summary
 
-- Total tools: 358
-- Read-only tools: 127
+- Total tools: 361
+- Read-only tools: 130
 - High-level tools: 196
 - Debug tools: 33
 - Session tools: 2
@@ -90,6 +90,10 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetDdl](#getddl-read-only-ddl)
   - [Ddlx](#read-only-ddlx)
     - [CheckMetadataExtension](#checkmetadataextension-read-only-ddlx)
+  - [Debugger](#read-only-debugger)
+    - [MemorySnapshotDelta](#memorysnapshotdelta-read-only-debugger)
+    - [MemorySnapshotGet](#memorysnapshotget-read-only-debugger)
+    - [MemorySnapshotList](#memorysnapshotlist-read-only-debugger)
   - [Domain](#read-only-domain)
     - [CheckDomain](#checkdomain-read-only-domain)
     - [GetDomain](#getdomain-read-only-domain)
@@ -1206,6 +1210,52 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `name` (string, required) - Metadata extension name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`) - Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back to whichever exists.
+
+---
+
+<a id="read-only-debugger"></a>
+### Read-Only / Debugger
+
+<a id="memorysnapshotdelta-read-only-debugger"></a>
+#### MemorySnapshotDelta (Read-Only / Debugger)
+**Description:** [read-only] Compares two memory snapshots in a view: memory by kind, largest objects, an object's children or its referrers.
+
+**Source:** `src/handlers/debugger/debug/handleMemorySnapshotDelta.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `from_id` (string, required) - Snapshot id to compare from.
+- `key` (string, optional) - Object key, for children and references.
+- `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
+- `to_id` (string, required) - Snapshot id to compare to.
+- `view` (string, optional (default: overview), one of: `overview`, `ranking`, `children`, `references`) - overview: memory by kind; ranking: the largest objects; children: what an object holds; references: what holds an object.
+
+---
+
+<a id="memorysnapshotget-read-only-debugger"></a>
+#### MemorySnapshotGet (Read-Only / Debugger)
+**Description:** [read-only] Reads one memory snapshot in a view: its header, memory by kind, largest objects, an object's children or its referrers.
+
+**Source:** `src/handlers/debugger/debug/handleMemorySnapshotGet.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `key` (string, optional) - Object key, for children and references.
+- `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
+- `snapshot_id` (string, required) - Snapshot id.
+- `view` (string, optional (default: overview), one of: `header`, `overview`, `ranking`, `children`, `references`) - header: the snapshot; overview: memory by kind; ranking: the largest objects; children: what an object holds; references: what holds an object.
+
+---
+
+<a id="memorysnapshotlist-read-only-debugger"></a>
+#### MemorySnapshotList (Read-Only / Debugger)
+**Description:** [read-only] Lists the memory snapshots the system holds, of one user when asked.
+
+**Source:** `src/handlers/debugger/debug/handleMemorySnapshotList.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `user` (string, optional) - Only the snapshots of this SAP user.
 
 ---
 

@@ -2074,5 +2074,23 @@
     "name": "GetTableTypeVersions",
     "inputs": "table_type_name*",
     "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "MemorySnapshotList",
+    "inputs": "user, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "MemorySnapshotGet",
+    "inputs": "snapshot_id*, view, key, max_objects, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "MemorySnapshotDelta",
+    "inputs": "from_id*, to_id*, view, key, max_objects, detail",
+    "available_in": "cloud, onprem"
   }
 ]

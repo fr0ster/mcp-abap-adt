@@ -15,6 +15,7 @@
  * `refused`. One record per run connection (`ownedObjectsOf`).
  */
 import type { ToolResultLike } from '../../../lib/toolResult';
+import { registerOwnedReporter } from './openConnections';
 import { answerOutcome, type StepOutcome, thrownOutcome } from './stepOutcome';
 
 export type ObjectState = 'unconfirmed' | 'exists' | 'delete-sent';
@@ -162,3 +163,11 @@ export function ownedObjectsIfAny(
 ): OwnedObjects | undefined {
   return records.get(connection);
 }
+
+// The file's close names the objects whose create or delete is unconfirmed
+// (spec §6); an object kept by the cleanup policy (`exists`) is not one.
+registerOwnedReporter((connection) =>
+  (records.get(connection)?.stillOwned ?? [])
+    .filter((owned) => owned.state !== 'exists')
+    .map((owned) => `${owned.kind} ${owned.name} (${owned.state})`),
+);

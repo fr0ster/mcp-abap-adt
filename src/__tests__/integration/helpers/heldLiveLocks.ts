@@ -20,6 +20,7 @@
  * tested alone.
  */
 import type { ToolResultLike } from '../../../lib/toolResult';
+import { registerOwnedReporter } from './openConnections';
 import { answerOutcome, type StepOutcome, thrownOutcome } from './stepOutcome';
 
 /** A lock a case holds. */
@@ -219,3 +220,11 @@ export function heldLocksOf(connection: object): HeldLiveLocks {
 export function heldLocksIfAny(connection: object): HeldLiveLocks | undefined {
   return registries.get(connection);
 }
+
+// The file's close names the locks a connection still owns (spec §6).
+registerOwnedReporter((connection) =>
+  (registries.get(connection)?.stillOwned ?? []).map(
+    ({ lock, state }) =>
+      `lock ${lock.object_type} ${lock.object_name} (${state})`,
+  ),
+);

@@ -23,8 +23,11 @@ element, or a diff relative to the element it read, and the server writes the wh
    - **A report or program**: its global objects by scope first (variables, type definitions,
      local class definitions), plus the list of its events and subroutines. Then one event, local
      class or subroutine on request.
-   - **The pieces** are found by parsing the source (abaplint or our own parser), or taken where
-     SAP serves them by itself (a class's method include, `CMxxx`).
+   - **The pieces** are located by SAP where it states them: a class's and an interface's
+     outline gives each block's position. A program's, an include's and a function group's
+     outline names each element, SAP's navigation gives its start, and our own scanner, plain
+     string code with no regular expression, finds its end. No abaplint, and no method include
+     (`CMxxx`).
 
 ## Invariants
 
@@ -33,7 +36,12 @@ element, or a diff relative to the element it read, and the server writes the wh
 - An outline names every piece it lists in the way the part read takes it, so the model can ask
   for any of them.
 - The model can tell an object's size before reading it whole, so it can decide between the whole
-  read and the outline.
+  read and the outline: the existing source reads answer it as a part of their own, from the same
+  one read.
+- A part read can take the outline's own link for an element, so the outline need not be read
+  again.
+- A part of a declaration leaves out the documentation comment lines above it, as SAP's own
+  blocks do.
 - A partial update is resolved at the MCP level only: the server merges it into the whole
   source, and adt-clients' CRUD writes that whole source (lock, update, unlock). adt-clients gets
   no partial-update member.
@@ -42,7 +50,8 @@ element, or a diff relative to the element it read, and the server writes the wh
   otherwise it is refused, naming the hunk; nothing fuzzy and nothing partial. An element name
   that is not found is refused, never guessed.
 - The source the model edited must be the source now in SAP: the hash of the source it read is
-  checked under the lock, before the write.
+  checked under the lock, before the write. SAP's own entity tag is checked beside it where SAP
+  serves one; the hash is the primary check.
 - One write per call. Activation stays a separate call.
 - No limit of the server's own: what a read answers is what the model asked for (the owner's rule
   on limits).
@@ -60,3 +69,5 @@ not the server's time.
 
 - Groups 1 and 2: their answers stay as they are.
 - A partial update inside adt-clients: it always takes the whole source.
+- SAP_BASIS 7.40: the reads in parts, the size and the partial update stay off there until they
+  are measured on 7.40.

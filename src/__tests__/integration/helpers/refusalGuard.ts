@@ -141,7 +141,11 @@ export interface WireObserver {
   answered(
     connection: GuardedConnection,
     options: IAbapRequestOptions,
-    response: { readonly data?: unknown; readonly sessionLost?: unknown },
+    response: {
+      readonly data?: unknown;
+      readonly headers?: unknown;
+      readonly sessionLost?: unknown;
+    },
   ): void;
   threw(
     connection: GuardedConnection,

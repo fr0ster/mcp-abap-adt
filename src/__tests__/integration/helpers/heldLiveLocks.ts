@@ -337,6 +337,27 @@ function queryParameter(url: string, name: string): string | undefined {
   return undefined;
 }
 
+/**
+ * The handle a LOCK answered, where adt-clients' `lockHandleOf` reads it:
+ * the `sap-adt-lm-handle` header first (a function group's), else the
+ * document's LOCK_HANDLE.
+ */
+function lockHandleOfAnswer(response: {
+  readonly data?: unknown;
+  readonly headers?: unknown;
+}): string | undefined {
+  const headers = response.headers;
+  const header =
+    typeof headers === 'object' && headers !== null
+      ? Reflect.get(headers, 'sap-adt-lm-handle')
+      : undefined;
+  const fromHeader = Array.isArray(header) ? header[0] : header;
+  if (typeof fromHeader === 'string' && fromHeader.trim() !== '') {
+    return fromHeader.trim();
+  }
+  return lockHandleIn(response.data);
+}
+
 /** The handle a LOCK answer's document carries, between its LOCK_HANDLE tags. */
 function lockHandleIn(data: unknown): string | undefined {
   if (typeof data !== 'string') return undefined;
@@ -394,7 +415,7 @@ observeWire({
       return;
     }
     if (isLockRequest(options.url)) {
-      const handle = lockHandleIn(response.data);
+      const handle = lockHandleOfAnswer(response);
       const object = pathOf(options.url);
       if (handle === undefined) return;
       registry.heldOnTheWire(

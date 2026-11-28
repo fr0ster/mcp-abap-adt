@@ -155,3 +155,31 @@ describe('the registry sees the wire', () => {
     assert.equal(heldLocksIfAny(connection), undefined);
   });
 });
+
+describe('a lock handle in the sap-adt-lm-handle header (third review)', () => {
+  it('a function-group LOCK whose handle comes in the header is held', async () => {
+    const { connection } = await runConnection();
+    stand.respond(
+      (request) => request.url.includes('_action=LOCK'),
+      () => ({
+        status: 200,
+        headers: { 'sap-adt-lm-handle': 'HDR-HANDLE' },
+        text: '',
+      }),
+    );
+    connection.setSessionType('stateful');
+    await connection.makeAdtRequest({
+      url: '/sap/bc/adt/functions/groups/zfg_wire?_action=LOCK&accessMode=MODIFY',
+      method: 'POST',
+      timeout: 0,
+    });
+    connection.setSessionType('stateless');
+    assert.deepEqual(
+      heldLocksOf(connection).stillOwned.map((owned) => [
+        owned.lock.lock_handle,
+        owned.state,
+      ]),
+      [['HDR-HANDLE', 'held']],
+    );
+  });
+});

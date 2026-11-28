@@ -58,9 +58,12 @@ describe('no request of a batch entry waits for another answer', () => {
 
   for (const [_name, c] of cases) {
     it(format('%s: the table admits it', _name), () => {
-      assert.deepStrictEqual(eligible(c.tool, c.args, c.connection ?? 'http'), {
-        ok: true,
-      });
+      assert.deepStrictEqual(
+        eligible(c.tool, c.args, c.connection ?? 'http', 'compact'),
+        {
+          ok: true,
+        },
+      );
     });
   }
 

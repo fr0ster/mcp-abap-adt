@@ -2724,7 +2724,7 @@ export abstract class BaseMcpServer extends McpServer {
     }
     const connection = call.context.connection;
     const kind = isRfcConnection(connection) ? 'rfc' : 'http';
-    if (!eligible(call.tool, call.args, kind).ok) {
+    if (!eligible(call.tool, call.args, kind, 'compact').ok) {
       throw new ServerRefusal(
         'batch_not_recordable',
         batchNotRecordableWords(call.tool),

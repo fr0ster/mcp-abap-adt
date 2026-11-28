@@ -5,7 +5,7 @@
  * theirs), in name order. `batchModePage.test.ts` checks the page holds exactly
  * this between its markers; run it with `WRITE_BATCH_MODE_PAGE=1` to write it.
  */
-import { batchEntries } from '../../lib/batch/eligibility';
+import { BATCH_SETS, batchEntries } from '../../lib/batch/eligibility';
 import { entryWords } from '../../lib/batch/sentence';
 
 export const PAGE_START = '<!-- batch-handlers:start -->';
@@ -14,6 +14,7 @@ export const PAGE_END = '<!-- batch-handlers:end -->';
 const SET_TITLES = {
   compact:
     'Compact sets (`mcp-abap-adt-compact`, `-compact-http`, `-compact-sse`, and their `-ro` binaries for the reads)',
+  core: 'Core sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries): envelopes',
 } as const;
 
 const cell = (text: string) => text.replace(/\|/g, '\\|');
@@ -25,10 +26,12 @@ export function renderEligibility(): string {
     `${entries.length} entries, rendered from \`tools/batch-handlers.json\`. A tool that is not listed is refused in batch mode. A \`-ro\` binary serves an entry when it serves the tool.`,
     '',
   ];
-  for (const set of ['compact'] as const) {
+  for (const set of BATCH_SETS) {
     const rows = entries
       .filter((entry) => entry.set === set)
       .sort((a, b) => a.tool.localeCompare(b.tool));
+    // A set with no entry yet has no section.
+    if (rows.length === 0) continue;
     lines.push(`### ${SET_TITLES[set]}`, '');
     lines.push('| Tool | Recorded | Sends |', '|---|---|---|');
     for (const entry of rows) {

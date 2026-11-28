@@ -1,5 +1,5 @@
 /**
- * `eligible(tool, args, connection)`: what `tools/batch-handlers.json` admits
+ * `eligible(tool, args, connection, 'compact')`: what `tools/batch-handlers.json` admits
  * into a communication batch — a tool must be listed, an entry's `when` must
  * hold for the arguments, and its `connection` (when it names one) must be
  * the call's. Arguments are compared as the handlers read them: upper-cased,
@@ -13,15 +13,25 @@ import {
   COMPACT_ACTIVATE,
   PROJECTION_VARIANTS,
 } from '../../../lib/adtProjections';
-import { eligible, whenHolds } from '../../../lib/batch/eligibility';
+import {
+  absentReadsAs,
+  admits,
+  type BatchEntry,
+  batchEntryOf,
+  eligible,
+  whenHolds,
+} from '../../../lib/batch/eligibility';
 
 const LOCK = 'LOCK_HANDLE_PLACEHOLDER';
 
 describe('eligible', () => {
   it('a listed tool with no when is eligible', () => {
-    assert.deepStrictEqual(eligible('HandlerProfileList', {}, 'rfc'), {
-      ok: true,
-    });
+    assert.deepStrictEqual(
+      eligible('HandlerProfileList', {}, 'rfc', 'compact'),
+      {
+        ok: true,
+      },
+    );
   });
 
   it("a full-set tool is not listed: batch mode is the compact sets'", () => {
@@ -38,7 +48,7 @@ describe('eligible', () => {
       'GetFunctionModule',
     ]) {
       assert.deepStrictEqual(
-        { tool, eligible: eligible(tool, {}, 'http') },
+        { tool, eligible: eligible(tool, {}, 'http', 'compact') },
         {
           tool,
           eligible: { ok: false, reason: 'not-listed' },
@@ -54,11 +64,17 @@ describe('eligible', () => {
         'HandlerUpdate',
         { object_type: 'CLASS', ...write, lock_handle: LOCK },
         'http',
+        'compact',
       ),
       { ok: true },
     );
     assert.deepStrictEqual(
-      eligible('HandlerUpdate', { object_type: 'CLASS', ...write }, 'http'),
+      eligible(
+        'HandlerUpdate',
+        { object_type: 'CLASS', ...write },
+        'http',
+        'compact',
+      ),
       { ok: false, reason: 'arguments' },
     );
     // The metadata document is written as given: one PUT, no read first.
@@ -69,6 +85,7 @@ describe('eligible', () => {
             'HandlerUpdate',
             { object_type, source_code: '<doc/>', lock_handle: LOCK },
             connection,
+            'compact',
           ),
           { ok: true },
         );
@@ -80,10 +97,10 @@ describe('eligible', () => {
       source_code: '<doc/>',
       lock_handle: LOCK,
     };
-    assert.deepStrictEqual(eligible('HandlerUpdate', pkg, 'http'), {
+    assert.deepStrictEqual(eligible('HandlerUpdate', pkg, 'http', 'compact'), {
       ok: true,
     });
-    assert.deepStrictEqual(eligible('HandlerUpdate', pkg, 'rfc'), {
+    assert.deepStrictEqual(eligible('HandlerUpdate', pkg, 'rfc', 'compact'), {
       ok: false,
       reason: 'connection',
     });
@@ -97,16 +114,22 @@ describe('eligible', () => {
 
   it('HandlerCreate is eligible per type, with no flag', () => {
     const domain = { object_type: 'DOMAIN', domain_name: 'DOM_A' };
-    assert.deepStrictEqual(eligible('HandlerCreate', domain, 'http'), {
-      ok: true,
-    });
-    assert.deepStrictEqual(eligible('HandlerCreate', domain, 'rfc'), {
-      ok: true,
-    });
+    assert.deepStrictEqual(
+      eligible('HandlerCreate', domain, 'http', 'compact'),
+      {
+        ok: true,
+      },
+    );
+    assert.deepStrictEqual(
+      eligible('HandlerCreate', domain, 'rfc', 'compact'),
+      {
+        ok: true,
+      },
+    );
     // A type whose create is a chain is refused by the tool and not listed.
     for (const object_type of ['UNIT_TEST', 'CDS_UNIT_TEST']) {
       assert.deepStrictEqual(
-        eligible('HandlerCreate', { object_type }, 'http'),
+        eligible('HandlerCreate', { object_type }, 'http', 'compact'),
         {
           ok: false,
           reason: 'arguments',
@@ -115,15 +138,20 @@ describe('eligible', () => {
     }
     // A transport request's task is typed from the create's answer.
     assert.deepStrictEqual(
-      eligible('HandlerCreate', { object_type: 'TRANSPORT' }, 'http'),
+      eligible(
+        'HandlerCreate',
+        { object_type: 'TRANSPORT' },
+        'http',
+        'compact',
+      ),
       { ok: false, reason: 'arguments' },
     );
     // A package over RFC is created in an ABAP session of its own.
     const pkg = { object_type: 'PACKAGE' };
-    assert.deepStrictEqual(eligible('HandlerCreate', pkg, 'http'), {
+    assert.deepStrictEqual(eligible('HandlerCreate', pkg, 'http', 'compact'), {
       ok: true,
     });
-    assert.deepStrictEqual(eligible('HandlerCreate', pkg, 'rfc'), {
+    assert.deepStrictEqual(eligible('HandlerCreate', pkg, 'rfc', 'compact'), {
       ok: false,
       reason: 'connection',
     });
@@ -131,54 +159,68 @@ describe('eligible', () => {
 
   it('HandlerGet part contents is not eligible, UNIT_TEST/CDS_UNIT_TEST with run_id are; absent part reads as source', () => {
     const cls = { object_type: 'CLASS', class_name: 'CLAS_A' };
-    assert.deepStrictEqual(eligible('HandlerGet', cls, 'http'), { ok: true });
+    assert.deepStrictEqual(eligible('HandlerGet', cls, 'http', 'compact'), {
+      ok: true,
+    });
     assert.deepStrictEqual(
-      eligible('HandlerGet', { ...cls, part: 'source' }, 'http'),
+      eligible('HandlerGet', { ...cls, part: 'source' }, 'http', 'compact'),
       {
         ok: true,
       },
     );
     const pkg = { object_type: 'PACKAGE', package_name: 'PKG_A' };
     assert.deepStrictEqual(
-      eligible('HandlerGet', { ...pkg, part: 'metadata' }, 'http'),
+      eligible('HandlerGet', { ...pkg, part: 'metadata' }, 'http', 'compact'),
       { ok: true },
     );
     // A package has no source: the call is refused and sends nothing, so
     // nothing admits it — absent part included, read as source.
     for (const args of [pkg, { ...pkg, part: 'source' }]) {
-      assert.deepStrictEqual(eligible('HandlerGet', args, 'http'), {
+      assert.deepStrictEqual(eligible('HandlerGet', args, 'http', 'compact'), {
         ok: false,
         reason: 'arguments',
       });
     }
     assert.deepStrictEqual(
-      eligible('HandlerGet', { ...pkg, part: 'contents' }, 'http'),
+      eligible('HandlerGet', { ...pkg, part: 'contents' }, 'http', 'compact'),
       { ok: false, reason: 'arguments' },
     );
     // A unit-test run's result: one request, with its run_id.
     for (const object_type of ['UNIT_TEST', 'CDS_UNIT_TEST']) {
       assert.deepStrictEqual(
-        eligible('HandlerGet', { object_type, run_id: 'RUN_A' }, 'http'),
+        eligible(
+          'HandlerGet',
+          { object_type, run_id: 'RUN_A' },
+          'http',
+          'compact',
+        ),
         { ok: true },
       );
-      assert.deepStrictEqual(eligible('HandlerGet', { object_type }, 'http'), {
-        ok: false,
-        reason: 'arguments',
-      });
+      assert.deepStrictEqual(
+        eligible('HandlerGet', { object_type }, 'http', 'compact'),
+        {
+          ok: false,
+          reason: 'arguments',
+        },
+      );
       assert.deepStrictEqual(
         eligible(
           'HandlerGet',
           { object_type, part: 'metadata', run_id: 'RUN_A' },
           'http',
+          'compact',
         ),
         { ok: false, reason: 'arguments' },
       );
     }
     for (const tool of ['HandlerUnitTestResult', 'HandlerCdsUnitTestResult']) {
-      assert.deepStrictEqual(eligible(tool, { run_id: 'RUN_A' }, 'http'), {
-        ok: true,
-      });
-      assert.deepStrictEqual(eligible(tool, {}, 'http'), {
+      assert.deepStrictEqual(
+        eligible(tool, { run_id: 'RUN_A' }, 'http', 'compact'),
+        {
+          ok: true,
+        },
+      );
+      assert.deepStrictEqual(eligible(tool, {}, 'http', 'compact'), {
         ok: false,
         reason: 'arguments',
       });
@@ -190,6 +232,7 @@ describe('eligible', () => {
           'HandlerGet',
           { object_type: 'CLASS', part, class_name: 'CLAS_A' },
           'http',
+          'compact',
         ),
         { ok: true },
       );
@@ -207,6 +250,7 @@ describe('eligible', () => {
           function_group_name: 'FUGR_A',
         },
         'http',
+        'compact',
       );
     assert.deepStrictEqual(
       [module('source'), module('metadata')],
@@ -218,6 +262,7 @@ describe('eligible', () => {
         'HandlerGet',
         { part: 'node_structure', object_adt_type: 'devc/k', object_name: 'P' },
         'http',
+        'compact',
       ),
       { ok: true },
     );
@@ -230,6 +275,7 @@ describe('eligible', () => {
           object_name: 'C',
         },
         'http',
+        'compact',
       ),
       { ok: true },
     );
@@ -241,8 +287,10 @@ describe('eligible', () => {
       object_name: 'PKG_A',
       super_package: 'PKG_SUPER',
     };
-    assert.deepStrictEqual(eligible('HandlerLock', pkg, 'http'), { ok: true });
-    assert.deepStrictEqual(eligible('HandlerLock', pkg, 'rfc'), {
+    assert.deepStrictEqual(eligible('HandlerLock', pkg, 'http', 'compact'), {
+      ok: true,
+    });
+    assert.deepStrictEqual(eligible('HandlerLock', pkg, 'rfc', 'compact'), {
       ok: false,
       reason: 'connection',
     });
@@ -256,6 +304,7 @@ describe('eligible', () => {
           lock_handle: LOCK,
         },
         'rfc',
+        'compact',
       ),
       { ok: false, reason: 'connection' },
     );
@@ -264,6 +313,7 @@ describe('eligible', () => {
         'HandlerLock',
         { object_type: 'CLASS', object_name: 'CLAS_A' },
         'rfc',
+        'compact',
       ),
       { ok: true },
     );
@@ -272,7 +322,12 @@ describe('eligible', () => {
   it("object_type 'domain' and 'DOMAIN' read the same", () => {
     for (const object_type of ['domain', 'DOMAIN', 'Domain']) {
       assert.deepStrictEqual(
-        eligible('HandlerLock', { object_type, object_name: 'DOM_A' }, 'http'),
+        eligible(
+          'HandlerLock',
+          { object_type, object_name: 'DOM_A' },
+          'http',
+          'compact',
+        ),
         { ok: true },
       );
       assert.deepStrictEqual(
@@ -280,13 +335,19 @@ describe('eligible', () => {
           'HandlerUpdate',
           { object_type, source_code: '<doc/>', lock_handle: LOCK },
           'http',
+          'compact',
         ),
         { ok: true },
       );
     }
     for (const object_type of ['unit_test', 'UNIT_TEST']) {
       assert.deepStrictEqual(
-        eligible('HandlerGet', { object_type, run_id: 'RUN_A' }, 'http'),
+        eligible(
+          'HandlerGet',
+          { object_type, run_id: 'RUN_A' },
+          'http',
+          'compact',
+        ),
         { ok: true },
       );
     }
@@ -299,7 +360,7 @@ describe('eligible', () => {
       'CreateTransportTask',
     ]) {
       assert.deepStrictEqual(
-        { tool, eligible: eligible(tool, {}, 'http') },
+        { tool, eligible: eligible(tool, {}, 'http', 'compact') },
         {
           tool,
           eligible: { ok: false, reason: 'not-listed' },
@@ -310,7 +371,7 @@ describe('eligible', () => {
 
   it('an unlisted tool is not eligible', () => {
     for (const tool of ['SearchSource', 'RunATC', 'DebugStep', 'Nope']) {
-      assert.deepStrictEqual(eligible(tool, {}, 'http'), {
+      assert.deepStrictEqual(eligible(tool, {}, 'http', 'compact'), {
         ok: false,
         reason: 'not-listed',
       });
@@ -341,6 +402,7 @@ describe('eligible', () => {
               'HandlerActivate',
               { object_type: member, object_name },
               'http',
+              'compact',
             ),
           },
           { variant, member, eligible: recorded },
@@ -356,6 +418,7 @@ describe('eligible', () => {
         'HandlerActivate',
         { object_type: 'CLASS', object_name: 'C' },
         'http',
+        'compact',
       ),
       { ok: true },
     );
@@ -366,25 +429,32 @@ describe('eligible', () => {
       { object_type: 'CLASS', object_name: 'C', object_adt_type: 'CLAS/OC' },
       { object_type: 'PACKAGE', object_name: 'P' },
     ]) {
-      assert.deepStrictEqual(eligible('HandlerActivate', args, 'http'), {
-        ok: true,
-      });
-    }
-    // The activation run's reads, by run_id.
-    for (const part of ['activation_status', 'activation_results']) {
       assert.deepStrictEqual(
-        eligible('HandlerGet', { part, run_id: 'R' }, 'http'),
+        eligible('HandlerActivate', args, 'http', 'compact'),
         {
           ok: true,
         },
       );
-      assert.deepStrictEqual(eligible('HandlerGet', { part }, 'http'), no);
+    }
+    // The activation run's reads, by run_id.
+    for (const part of ['activation_status', 'activation_results']) {
+      assert.deepStrictEqual(
+        eligible('HandlerGet', { part, run_id: 'R' }, 'http', 'compact'),
+        {
+          ok: true,
+        },
+      );
+      assert.deepStrictEqual(
+        eligible('HandlerGet', { part }, 'http', 'compact'),
+        no,
+      );
     }
     assert.deepStrictEqual(
       eligible(
         'HandlerProfileRun',
         { target_type: 'CLASS', class_name: 'C', profiler_id: 'P' },
         'http',
+        'compact',
       ),
       { ok: true },
     );
@@ -393,18 +463,23 @@ describe('eligible', () => {
         'HandlerProfileRun',
         { target_type: 'CLASS', class_name: 'C' },
         'http',
+        'compact',
       ),
       { ok: true },
     );
-    assert.deepStrictEqual(eligible('HandlerProfileSchedule', {}, 'http'), {
-      ok: true,
-    });
+    assert.deepStrictEqual(
+      eligible('HandlerProfileSchedule', {}, 'http', 'compact'),
+      {
+        ok: true,
+      },
+    );
     // A package create over RFC opens an ABAP session of its own.
     assert.deepStrictEqual(
       eligible(
         'HandlerCreate',
         { object_type: 'PACKAGE', package_name: 'P', super_package: 'S' },
         'rfc',
+        'compact',
       ),
       { ok: false, reason: 'connection' },
     );
@@ -413,6 +488,7 @@ describe('eligible', () => {
         'HandlerGet',
         { part: 'node_structure', object_name: 'C' },
         'http',
+        'compact',
       ),
       no,
     );
@@ -430,6 +506,7 @@ describe('eligible', () => {
           ],
         },
         'http',
+        'compact',
       );
     assert.deepStrictEqual(
       {
@@ -441,6 +518,7 @@ describe('eligible', () => {
           'HandlerActivate',
           { object_name: 'FM_A', object_adt_type: 'FUGR/FF', parentName: 'G' },
           'http',
+          'compact',
         ),
         'HandlerSystem where_used functionmodule': eligible(
           'HandlerSystem',
@@ -450,16 +528,19 @@ describe('eligible', () => {
             object_type: 'functionmodule',
           },
           'http',
+          'compact',
         ),
         'HandlerCheckRun FUNCTION_MODULE': eligible(
           'HandlerCheckRun',
           { object_name: 'G|M', object_type: 'FUNCTION_MODULE' },
           'http',
+          'compact',
         ),
         'HandlerDeletionCheck FUNCTION_MODULE': eligible(
           'HandlerDeletionCheck',
           { object_name: 'G|M', object_type: 'FUNCTION_MODULE' },
           'http',
+          'compact',
         ),
       },
       {
@@ -478,7 +559,7 @@ describe('eligible', () => {
   it('HandlerSystem is eligible by its action: the reads whose requests do not chain', () => {
     const no = { ok: false, reason: 'arguments' };
     const system = (args: Record<string, unknown>) =>
-      eligible('HandlerSystem', args, 'http');
+      eligible('HandlerSystem', args, 'http', 'compact');
     assert.deepStrictEqual(
       {
         search_object: system({ action: 'search_object', object_name: 'Z*' }),
@@ -574,6 +655,7 @@ describe('eligible', () => {
             'HandlerSystem',
             { action: 'where_used', object_name: 'G|M', object_type },
             'http',
+            'compact',
           ),
           { ok: false, reason: 'arguments' },
         );
@@ -589,6 +671,7 @@ describe('eligible', () => {
           'HandlerActivate',
           { objects: [], object_type: 'FUNCTION_MODULE', object_name: 'G|M' },
           'http',
+          'compact',
         ),
         code: eligible(
           'HandlerActivate',
@@ -599,14 +682,68 @@ describe('eligible', () => {
             parentName: 'G',
           },
           'http',
+          'compact',
         ),
         class: eligible(
           'HandlerActivate',
           { objects: [], object_type: 'CLASS', object_name: 'ZCL_A' },
           'http',
+          'compact',
         ),
       },
       { single: no, code: no, class: { ok: true } },
     );
+  });
+});
+
+describe('eligible by set', () => {
+  it('a compact entry admits no core call', () => {
+    assert.deepStrictEqual(eligible('HandlerProfileList', {}, 'rfc', 'core'), {
+      ok: false,
+      reason: 'not-listed',
+    });
+    assert.deepStrictEqual(
+      eligible(
+        'HandlerGet',
+        { object_type: 'CLASS', object_name: 'CLAS_A' },
+        'http',
+        'core',
+      ),
+      { ok: false, reason: 'not-listed' },
+    );
+  });
+
+  it('a core entry admits no compact call, and a compact one no core call', () => {
+    const core: BatchEntry = {
+      tool: 'GetClass',
+      set: 'core',
+      handler: 'src/handlers/class/high/handleGetClass.ts#handleGetClass',
+      sends: 'one request: GET the part asked',
+    };
+    assert.deepStrictEqual(admits([core], 'GetClass', {}, 'http'), {
+      ok: true,
+    });
+    assert.deepStrictEqual(admits([], 'GetClass', {}, 'http'), {
+      ok: false,
+      reason: 'not-listed',
+    });
+  });
+
+  it('the loader reads a core row and refuses any other set', () => {
+    const row = {
+      tool: 'GetClass',
+      handler: 'src/handlers/class/high/handleGetClass.ts#handleGetClass',
+      sends: 'one request: GET the part asked',
+    };
+    assert.equal(batchEntryOf({ ...row, set: 'core' }, 0).set, 'core');
+    assert.equal(batchEntryOf({ ...row, set: 'compact' }, 0).set, 'compact');
+    assert.throws(
+      () => batchEntryOf({ ...row, set: 'full' }, 3),
+      /row 3 is malformed/,
+    );
+  });
+
+  it('an absent part of GetFunctionModule reads as source', () => {
+    assert.equal(absentReadsAs('GetFunctionModule', 'part'), 'source');
   });
 });

@@ -34,11 +34,20 @@ export type WhenRule = {
   present?: boolean;
 }[];
 
+/**
+ * The set an entry admits calls of: `compact` for compact batch mode
+ * (`HandlerBatch`), `core` for the envelopes of the core and core-ro sets.
+ */
+export type BatchSet = 'compact' | 'core';
+
+/** The sets an entry may name, in the order the page lists them. */
+export const BATCH_SETS: readonly BatchSet[] = ['compact', 'core'];
+
 /** One row of `tools/batch-handlers.json`. */
 export interface BatchEntry {
   tool: string;
-  /** Batch mode is the compact sets' (`HandlerBatch`): every entry is theirs. */
-  set: 'compact';
+  /** The set whose calls of `tool` the entry admits. */
+  set: BatchSet;
   /** `path#function`, from the repository root. */
   handler: string;
   /** The requests the call sends, in words. */
@@ -67,7 +76,7 @@ export const BATCH_HANDLERS_FILE = path.join(
   'batch-handlers.json',
 );
 
-let table: ReadonlyMap<string, readonly BatchEntry[]> | undefined;
+let table: readonly BatchEntry[] | undefined;
 
 /** A list of strings, or `undefined` when `value` is not one. */
 function stringsOf(value: JsonValue): string[] | undefined {
@@ -105,7 +114,7 @@ function whenRuleOf(value: JsonValue): WhenRule[number] | undefined {
  * Row `at` of the table, read: the file is data, read as it is written —
  * a row this reading does not recognise stops the load with its index.
  */
-function batchEntryOf(value: JsonValue, at: number): BatchEntry {
+export function batchEntryOf(value: JsonValue, at: number): BatchEntry {
   const malformed = () =>
     new Error(`tools/batch-handlers.json: row ${at} is malformed`);
   const tool = jsonAt(value, 'tool');
@@ -114,7 +123,7 @@ function batchEntryOf(value: JsonValue, at: number): BatchEntry {
   const sends = jsonAt(value, 'sends');
   if (
     typeof tool !== 'string' ||
-    set !== 'compact' ||
+    (set !== 'compact' && set !== 'core') ||
     typeof handler !== 'string' ||
     typeof sends !== 'string'
   ) {
@@ -140,8 +149,8 @@ function batchEntryOf(value: JsonValue, at: number): BatchEntry {
   return entry;
 }
 
-/** The entries, by tool — loaded at the first use, then kept. */
-function entriesByTool(): ReadonlyMap<string, readonly BatchEntry[]> {
+/** The entries, in file order — loaded at the first use, then kept. */
+function loadedEntries(): readonly BatchEntry[] {
   if (table === undefined) {
     // `BATCH_HANDLERS_FILE`, as a literal a bundler inlines.
     // The table, checked once as JSON: typed from here on.
@@ -149,21 +158,27 @@ function entriesByTool(): ReadonlyMap<string, readonly BatchEntry[]> {
     if (!Array.isArray(file)) {
       throw new Error('tools/batch-handlers.json: the table is not a list');
     }
-    const entries = file.map(batchEntryOf);
-    const byTool = new Map<string, BatchEntry[]>();
-    for (const entry of entries) {
-      const listed = byTool.get(entry.tool) ?? [];
-      listed.push(entry);
-      byTool.set(entry.tool, listed);
-    }
-    table = byTool;
+    table = file.map(batchEntryOf);
   }
   return table;
 }
 
+/** The entries of `set` naming `tool`, in file order. */
+function entriesOf(tool: string, set: BatchSet): BatchEntry[] {
+  return loadedEntries().filter(
+    (entry) => entry.tool === tool && entry.set === set,
+  );
+}
+
 /** Every entry of the table, in file order within each tool. */
 export function batchEntries(): BatchEntry[] {
-  return [...entriesByTool().values()].flat();
+  const byTool = new Map<string, BatchEntry[]>();
+  for (const entry of loadedEntries()) {
+    const listed = byTool.get(entry.tool) ?? [];
+    listed.push(entry);
+    byTool.set(entry.tool, listed);
+  }
+  return [...byTool.values()].flat();
 }
 
 /**
@@ -173,6 +188,7 @@ export function batchEntries(): BatchEntry[] {
  */
 const ABSENT_READS_AS: Readonly<Record<string, Record<string, string>>> = {
   HandlerGet: { part: 'source' },
+  GetFunctionModule: { part: 'source' },
   HandlerLock: { action: 'lock' },
   HandlerUnitTestRun: { runner: 'async' },
   RunUnitTest: { runner: 'async' },
@@ -260,16 +276,31 @@ export function whenHolds(
 }
 
 /**
- * Whether a call of `tool` with `args` over `connection` may be recorded:
- * some entry of the tool admits the arguments and the connection.
+ * Whether a call of `tool` of `set` with `args` over `connection` may be
+ * recorded: some entry of that set naming the tool admits the arguments
+ * and the connection. An entry of the other set admits nothing here.
  */
 export function eligible(
   tool: string,
   args: ToolArgs,
   connection: 'http' | 'rfc',
+  set: BatchSet,
 ): Eligibility {
-  const entries = entriesByTool().get(tool);
-  if (entries === undefined) return { ok: false, reason: 'not-listed' };
+  return admits(entriesOf(tool, set), tool, args, connection);
+}
+
+/**
+ * Whether one of `entries` — the entries of one set naming `tool` — admits
+ * a call with `args` over `connection` (`eligible`'s reading, for a given
+ * list of entries).
+ */
+export function admits(
+  entries: readonly BatchEntry[],
+  tool: string,
+  args: ToolArgs,
+  connection: 'http' | 'rfc',
+): Eligibility {
+  if (entries.length === 0) return { ok: false, reason: 'not-listed' };
   const admitted = entries.filter((e) => whenHolds(tool, e.when, args));
   if (admitted.length === 0) return { ok: false, reason: 'arguments' };
   if (

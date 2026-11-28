@@ -281,7 +281,9 @@ opaque string that holds its address and the SAP link it was located by (the blo
 class or an interface, the navigation fragment of a program element). `GetSourcePart` and
 `UpdateSourcePart` take `ref` in place of an address, and then read no outline for a part read:
 the analyzer navigates the link (programs) or takes the position (classes), and reads the
-include. The model reads nothing inside it. A `ref` is checked before it is used:
+include. **The one exception is an event (`PE`):** a `ref` read of an event reads the program's
+outline too, for the `GET`-event rule (§5.2). The model reads nothing inside a `ref`. A `ref` is
+checked before it is used:
 
 - it must decode, and its include must lie under the object's own ADT address (a plain prefix
   check), else `ref_invalid`;

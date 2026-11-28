@@ -398,15 +398,18 @@ The refusal follows compact's `batch_other_kind` rule:
 `ExecuteReadEnvelope` holds the flow, and the dispatch takes the instance's connection for the
 whole call, as for `HandlerBatch` `end`. The steps run in this order:
 
-1. **The owner and the session key** (§4), before anything else: `envelopes_unavailable` or
-   `envelope_unavailable`, through `find`. The dispatch runs this check for the four envelope
+1. **The owner, the session key and the reservation** (§4), before anything else:
+   `envelopes_unavailable` or `envelope_unavailable`. The execute reserves the envelope as it
+   arrives (`reserve`): from then on every other call naming the handle — a record, a discard,
+   a second execute — answers `envelope_unavailable`, in arrival order. An execute that ends
+   before its claim gives the envelope back unchanged (`release`). The dispatch runs this check for the four envelope
    tools ahead of connection acquisition (`ENVELOPE_TOOLS`), so a refused execute sends nothing,
    not even a logon. Create, discard and list need no connection at all and never acquire one.
 2. **The connection.** Only then does the dispatch acquire it (`getConnection`). If that fails,
    the call answers that failure as any call does, before the claim. The envelope stays open,
    with its record unchanged, and a later execute can still send it.
-3. **The claim** (`claim`, which repeats the session check; the main flow guarantees that
-   nothing between steps 1 and 3 could have ended the envelope). Before it, nothing of the envelope has changed. After it, the
+3. **The claim** (`claim`, which repeats the session check): the reserved envelope leaves the
+   owner. Before it, nothing of the envelope has changed. After it, the
    envelope is ended, and every outcome below is answered under the numbers.
 4. **An empty envelope** answers `[]`. Nothing is planned or sent.
 5. **The plan.** The pending parts are planned by the consumer's `partsPerEnvelope`:

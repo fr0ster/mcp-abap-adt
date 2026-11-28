@@ -20,42 +20,45 @@ The compact sets get neither the group nor the `envelope_handle` argument.
 
 ## 2. The tools
 
-The names follow the core set's noun-then-verb style (`SessionOpen`, `DebugBatchBegin`). Every
+Each name opens with its action, and each purpose opens with that action's verb, as the
+repository's description rules require (`purpose.test.ts`, whose `VERBS` table gains
+`Execute: ['Executes']`). A purpose is one sentence of at most 160 characters, with no word of
+form or mechanism (`FORM_MARKERS`: "envelope", "batch", "request", "answers", …) and no negation.
+Every
 answer is compact JSON (`JSON.stringify`, no spacing) in one text content. Over Streamable HTTP
 every tool also takes `state_handle`, which the host declares on every tool
 (`stateHandleArgument.ts`); nothing here changes that.
 
 ### 2.1 Schemas, answers and descriptions
 
-**`ReadEnvelopeCreate`** takes no arguments.
+**`CreateReadEnvelope`** takes no arguments.
 
 - Answer: `{"envelope_handle":"…"}`, plus `"state_handle":"…"` where the instance has one, as
   `HandlerBatch` `begin` answers it.
-- Description: "Creates an envelope that collects read calls to send together. Answers its
-  envelope_handle; a read called with that handle is recorded into the envelope under the next
-  number, and every answer comes back when the envelope is executed."
+- Purpose: "Creates a collection of read calls under a handle that each of those calls names,
+  sent to SAP together when the collection is executed."
 
-**`ReadEnvelopeExecute`** takes `envelope_handle`, a required string of at least one character.
+**`ExecuteReadEnvelope`** takes `envelope_handle`, a required string of at least one character.
 
 - Answer: the list of answers (§6.4).
-- Description: "Sends every read recorded into the envelope and answers each one under its
-  number, in recording order. Ends the envelope: its envelope_handle is invalid afterwards."
+- Purpose: "Executes a collection of recorded read calls, sending them to SAP together and
+  giving each call's result under its number, in recording order."
 
-**`ReadEnvelopeDiscard`** takes `envelope_handle`, a required string of at least one character.
+**`DiscardReadEnvelope`** takes `envelope_handle`, a required string of at least one character.
 
 - Answer: `{"envelope_handle":"…","discarded":<recorded calls>}`.
-- Description: "Ends the envelope without sending anything; answers how many recorded calls it
-  held."
+- Purpose: "Discards a collection of recorded read calls and ends its handle, giving how many
+  calls it held."
 
-**`ReadEnvelopeList`** takes no arguments.
+**`ListReadEnvelopes`** takes no arguments.
 
 - Answer: `[{"envelope_handle":"…","recorded":<calls>}, …]` — the session's open envelopes, in
   creation order, or `[]` when there are none.
-- Description: "Lists this session's open envelopes, each with its envelope_handle and how many
-  calls it has recorded."
+- Purpose: "Lists this session's open collections of read calls, each with its handle and how
+  many calls it has recorded."
 
-The parameter description of `envelope_handle` on execute and discard: "The handle
-ReadEnvelopeCreate answered."
+The parameter description of `envelope_handle` on execute and discard: "The handle of the
+collection, as its creation gave it."
 
 ### 2.2 How the four tools behave
 
@@ -178,8 +181,8 @@ launchers) and handed to each `InstanceEnvelopes`.
 
 An envelope is part of the instance's held state. These end it:
 
-- `ReadEnvelopeExecute`, from its claim (§6.1);
-- `ReadEnvelopeDiscard`;
+- `ExecuteReadEnvelope`, from its claim (§6.1);
+- `DiscardReadEnvelope`;
 - the instance's close: the client closing stdin, the SSE connection ending, the pool letting
   the instance go, `SessionClose`, the process's shutdown;
 - the held state's idle bound, over Streamable HTTP and SSE.
@@ -208,11 +211,11 @@ what it ends.
 
 An envelope handle is valid only in the long session that created it. The caller is that
 session with its SAP credentials. Nothing is read from SAP to establish it: the username is
-never resolved, and `ReadEnvelopeCreate` sends nothing and acquires no connection.
+never resolved, and `CreateReadEnvelope` sends nothing and acquires no connection.
 
 ### 4.1 The session key
 
-`ReadEnvelopeCreate` records a session key on the envelope. What the key holds depends on the
+`CreateReadEnvelope` records a session key on the envelope. What the key holds depends on the
 transport.
 
 **stdio and SSE: the instance and its connection context.**
@@ -269,14 +272,15 @@ check except `envelope_unavailable`.
 
 Every admitted core read (§8) gains an optional `envelope_handle`: a string of at least one
 character. It is added at registration, as `state_handle` is (`withStateHandle`), so no handler
-file carries it. Its parameter description: "The handle of an open envelope: the call is recorded
-into it and answered at its execution."
+file carries it. Its parameter description: "The handle of an open collection of read calls: the
+call is recorded into it and its result comes back when the collection is executed."
 
 The tool's description gains one sentence:
 
-- for a tool admitted for every call, `ENVELOPE_SENTENCE`: "With envelope_handle, the call is
-  recorded into that envelope under the next number, and its answer comes back when the envelope
-  is executed.";
+- for a tool admitted for every call, `ENVELOPE_SENTENCE`, a note: "With envelope_handle, the
+  call is recorded under the next number and sent with the other calls of that handle; its
+  result comes back then." (`envelope_handle` is one word to the marker check: the underscore
+  joins it.)
 - for a tool admitted only for some arguments, the same sentence after "When <arguments>,", the
   arguments rendered from its entries by `entryWords` (`sentence.ts`).
 
@@ -391,7 +395,7 @@ The refusal follows compact's `batch_other_kind` rule:
 
 ### 6.1 The order
 
-`ReadEnvelopeExecute` holds the flow, and the dispatch takes the instance's connection for the
+`ExecuteReadEnvelope` holds the flow, and the dispatch takes the instance's connection for the
 whole call, as for `HandlerBatch` `end`. The steps run in this order:
 
 1. **The owner and the session key** (§4), before anything else: `envelopes_unavailable` or
@@ -722,7 +726,7 @@ A list by another session does not show the envelope.
 and execute, on the same connection context, leaves the envelope valid.
 
 **Create sends nothing.** On a cold instance — no connection built, no system parameters known —
-`ReadEnvelopeCreate`, `ReadEnvelopeList` and `ReadEnvelopeDiscard` make no request and no logon.
+`CreateReadEnvelope`, `ListReadEnvelopes` and `DiscardReadEnvelope` make no request and no logon.
 The connection factory is never called, and neither the system-parameter read
 (`requireSystem`, `callerUserOf`) nor `getConnection` runs.
 

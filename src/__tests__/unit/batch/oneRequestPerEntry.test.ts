@@ -25,7 +25,11 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { format } from 'node:util';
-import { eligible } from '../../../lib/batch/eligibility';
+import {
+  type BatchSet,
+  batchEntries,
+  eligible,
+} from '../../../lib/batch/eligibility';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { BATCH_ENTRY_CASES } from '../../helpers/batchEntryCases';
@@ -36,6 +40,10 @@ import { setSystemContext } from '../../helpers/processSystemContext';
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
+
+/** The set whose entries name `tool`: a tool is served by one set alone. */
+const setOf = (tool: string): BatchSet =>
+  batchEntries().find((entry) => entry.tool === tool)?.set ?? 'compact';
 
 describe('no request of a batch entry waits for another answer', () => {
   const context = {
@@ -59,7 +67,7 @@ describe('no request of a batch entry waits for another answer', () => {
   for (const [_name, c] of cases) {
     it(format('%s: the table admits it', _name), () => {
       assert.deepStrictEqual(
-        eligible(c.tool, c.args, c.connection ?? 'http', 'compact'),
+        eligible(c.tool, c.args, c.connection ?? 'http', setOf(c.tool)),
         {
           ok: true,
         },

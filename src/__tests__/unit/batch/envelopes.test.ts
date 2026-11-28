@@ -219,4 +219,29 @@ describe('InstanceEnvelopes', () => {
       mock.timers.reset();
     }
   });
+
+  it('an arriving execution reserves its envelope: every other call meets envelope_unavailable; released, the envelope is as it was', () => {
+    const owner = new InstanceEnvelopes({ keepRawParts: false });
+    const envelope = owner.create(keyOf(contextA));
+    envelope.nextNumber();
+    const reserved = owner.reserve(envelope.handle, envelope.key);
+    assert.equal(reserved, envelope);
+    for (const act of ['find', 'discard', 'reserve'] as const) {
+      assert.equal(
+        refusalOf(() => owner[act](envelope.handle, envelope.key)).code,
+        'envelope_unavailable',
+        act,
+      );
+    }
+    owner.release(envelope);
+    assert.equal(owner.find(envelope.handle, envelope.key), envelope);
+    assert.equal(envelope.recorded(), 1);
+    owner.reserve(envelope.handle, envelope.key);
+    assert.equal(owner.claim(envelope.handle, envelope.key), envelope);
+    owner.release(envelope);
+    assert.equal(
+      refusalOf(() => owner.find(envelope.handle, envelope.key)).code,
+      'envelope_unavailable',
+    );
+  });
 });

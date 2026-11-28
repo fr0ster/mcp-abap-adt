@@ -96,6 +96,8 @@ export class Envelope {
   private readonly controller = new AbortController();
   private counter = 0;
   private open = true;
+  /** Taken by an execution that arrived and is waiting for its connection (spec §6.1). */
+  reserved = false;
 
   constructor(
     readonly handle: string,
@@ -188,6 +190,34 @@ export class InstanceEnvelopes implements StatePart {
    * and another session's are refused alike, `envelope_unavailable`.
    */
   find(handle: string, key: SessionKey): Envelope {
+    const envelope = this.lookUp(handle, key);
+    if (envelope.reserved) throw new ServerRefusal('envelope_unavailable');
+    return envelope;
+  }
+
+  /**
+   * An execution arrived for `handle` (spec §6.1): the envelope is taken for
+   * it at once, in arrival order — from here on every other call naming the
+   * handle answers `envelope_unavailable`, as after the claim — while the
+   * execution waits for its connection. `release` gives it back when the
+   * execution ends before its claim.
+   */
+  reserve(handle: string, key: SessionKey): Envelope {
+    const envelope = this.find(handle, key);
+    envelope.reserved = true;
+    this.changed();
+    return envelope;
+  }
+
+  /** An execution that ended before its claim gives its envelope back, unchanged. */
+  release(envelope: Envelope): void {
+    if (!envelope.isOpen() || !envelope.reserved) return;
+    envelope.reserved = false;
+    this.changed();
+  }
+
+  /** The open envelope `handle` names in the session `key`, reserved or not. */
+  private lookUp(handle: string, key: SessionKey): Envelope {
     const envelope = this.open.get(handle);
     if (envelope === undefined || !sameSession(envelope.key, key)) {
       throw new ServerRefusal('envelope_unavailable');
@@ -201,7 +231,8 @@ export class InstanceEnvelopes implements StatePart {
    * aborted: its execution answers them.
    */
   claim(handle: string, key: SessionKey): Envelope {
-    const envelope = this.find(handle, key);
+    // The execution that reserved it claims it.
+    const envelope = this.lookUp(handle, key);
     this.open.delete(handle);
     envelope.close();
     this.changed();
@@ -210,6 +241,7 @@ export class InstanceEnvelopes implements StatePart {
 
   /** As `claim`, then the envelope and every call are let go: nothing is sent. */
   discard(handle: string, key: SessionKey): Envelope {
+    this.find(handle, key);
     const envelope = this.claim(handle, key);
     envelope.letGo();
     return envelope;

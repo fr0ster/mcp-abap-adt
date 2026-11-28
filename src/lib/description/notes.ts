@@ -3,7 +3,7 @@
  * the words of `withLongToolAdvice` and `withBatchSentence`, unchanged.
  */
 
-import { batchSentence } from '../batch/sentence';
+import { batchSentence, envelopeSentence } from '../batch/sentence';
 import { LONG_TOOL_ADVICE } from '../longTools';
 
 /** Only this module mints a note. */
@@ -52,4 +52,10 @@ export const stateHandleAnswered: Note = new Note(
 /** Whether and how `tool` runs in batch mode. */
 export function batchable(tool: string): Note {
   return new Note(minted, batchSentence(tool));
+}
+
+/** Whether and how `tool` is recorded into a read envelope: its note, or none for a tool no core entry admits. */
+export function envelopable(tool: string): Note | undefined {
+  const sentence = envelopeSentence(tool);
+  return sentence === undefined ? undefined : new Note(minted, sentence);
 }

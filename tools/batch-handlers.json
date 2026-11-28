@@ -798,5 +798,11 @@
         "equals": ["atc_result"]
       }
     ]
+  },
+  {
+    "tool": "GetClass",
+    "set": "core",
+    "handler": "src/handlers/class/high/handleGetClass.ts#handleGetClass",
+    "sends": "one request: GET the class source, or with part metadata its metadata document, at the version asked"
   }
 ]

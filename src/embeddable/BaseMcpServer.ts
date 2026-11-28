@@ -60,6 +60,7 @@ import {
   BACKGROUND_RUNS_NO_SYSTEM_WORDS,
   batchNotRecordableWords,
   batchNotServedWords,
+  envelopeNotRecordableWords,
   ServerRefusal,
 } from '../lib/auth/serverRefusal.js';
 import { answerBackgroundStarted } from '../lib/backgroundRuns/answers.js';
@@ -89,9 +90,21 @@ import {
   type BatchAvailability,
   createBatchAvailability,
 } from '../lib/batch/availability.js';
-import { endsBatch, runsBesideBatch } from '../lib/batch/batchTools.js';
+import {
+  endsBatch,
+  isEnvelopeTool,
+  runsBesideBatch,
+} from '../lib/batch/batchTools.js';
 import { eligible } from '../lib/batch/eligibility.js';
-import { envelopeRefusal } from '../lib/batch/envelopeTools.js';
+import {
+  type EnvelopeArgs,
+  type EnvelopeCall,
+  envelopeArgsOf,
+  envelopeRefusal,
+  envelopeSchemaOf,
+  envelopeTarget,
+  recordOf,
+} from '../lib/batch/envelopeTools.js';
 import { batchRefusal, endWithFailure } from '../lib/batch/execute.js';
 import type {
   BatchAnswer,
@@ -99,6 +112,7 @@ import type {
   OpenBatch,
 } from '../lib/batch/InstanceBatch.js';
 import {
+  type Envelope,
   type InstanceEnvelopes,
   sessionKeyOf,
 } from '../lib/batch/InstanceEnvelopes.js';
@@ -109,6 +123,7 @@ import {
   untilSent,
 } from '../lib/batch/recorder.js';
 import {
+  envelopeSentence,
   OUTSIDE_BATCH_SENTENCE,
   withBatchSentence,
 } from '../lib/batch/sentence.js';
@@ -131,6 +146,7 @@ import {
 } from '../lib/debugger/ownConnectionTools.js';
 import {
   batchable,
+  envelopable,
   partsOfDescription,
   toolDescription,
 } from '../lib/description';
@@ -2111,6 +2127,15 @@ export abstract class BaseMcpServer extends McpServer {
       );
       const sentenced =
         this.batch !== undefined && this.servesCommunicationBatch;
+      // A set with the read envelopes' tools (the core sets): its reads are
+      // recorded by `envelope_handle` (spec §5).
+      const servesEnvelopes = groups.some((group) =>
+        group
+          .getHandlers()
+          .some((entry: HandlerEntry) =>
+            isEnvelopeTool(entry.toolDefinition.name),
+          ),
+      );
       // A listed long tool offers `background` only where its run can be
       // read: this instance holds a strategy and serves the tool that reads
       // its runs. Elsewhere it is listed without the parameter and answers
@@ -2170,7 +2195,39 @@ export abstract class BaseMcpServer extends McpServer {
             this.readOnlyTools === undefined
               ? undefined
               : checkedArgumentsOf(entry.toolDefinition, this.readOnlyTools);
-          const runCall = async (args: ToolArgs, signal: AbortSignal) => {
+          const runCall = async (
+            args: ToolArgs,
+            signal: AbortSignal,
+            envelope?: EnvelopeArgs,
+          ) => {
+            // A call that names an envelope (spec §5.2): refused unless an
+            // envelope admits the tool, and refused for an envelope not of
+            // this session — before anything else, a connection included.
+            if (envelope?.present === true) {
+              const name = entry.toolDefinition.name;
+              if (envelopeSentence(name) === undefined) {
+                return this.refusalAnswer(
+                  new ServerRefusal(
+                    'envelope_not_recordable',
+                    envelopeNotRecordableWords(name),
+                  ),
+                );
+              }
+              const refused = envelopeRefusal(
+                this.envelopeContext(),
+                typeof envelope.handle === 'string' ? envelope.handle : '',
+              );
+              if (refused !== undefined) return this.refusalAnswer(refused);
+              if (envelope.background) {
+                return this.refusalAnswer(
+                  new ServerRefusal('batch_no_background'),
+                );
+              }
+            }
+            const recordInto =
+              envelope?.present === true && typeof envelope.handle === 'string'
+                ? envelope.handle
+                : undefined;
             // A tool that works on no connection (the leftover-session
             // tools): called without one being built or connected first.
             if (
@@ -2189,17 +2246,6 @@ export abstract class BaseMcpServer extends McpServer {
                 );
               }
               return this.runConnectionless(entry.call, args, signal);
-            }
-            // An envelope execute names its envelope: the owner and the
-            // session are checked before a connection is taken (spec §6.1
-            // step 1), so a refused execute sends nothing, not even a logon.
-            if (entry.toolDefinition.name === 'ExecuteReadEnvelope') {
-              const handle = args.envelope_handle;
-              const refused = envelopeRefusal(
-                this.envelopeContext(),
-                typeof handle === 'string' ? handle : '',
-              );
-              if (refused !== undefined) return this.refusalAnswer(refused);
             }
             let inUse: IAbapConnection | undefined;
             let leaveFlow: (() => void) | undefined;
@@ -2238,12 +2284,18 @@ export abstract class BaseMcpServer extends McpServer {
               // before any connection — and never handed to the handler. A
               // listed long read's is too: `true` by default, in the call
               // when the host gave no strategy or a batch is open.
-              const runsInBackground = isBackgroundTool(
-                entry.toolDefinition.name,
-              )
-                ? this.backgroundRequested(args)
-                : longRead &&
-                  this.longReadInBackground(entry.toolDefinition.name, args);
+              // A call recorded into an envelope never runs in the
+              // background: it is recorded, in the main flow.
+              const runsInBackground =
+                recordInto !== undefined
+                  ? false
+                  : isBackgroundTool(entry.toolDefinition.name)
+                    ? this.backgroundRequested(args)
+                    : longRead &&
+                      this.longReadInBackground(
+                        entry.toolDefinition.name,
+                        args,
+                      );
               const handlerArgs =
                 isBackgroundTool(entry.toolDefinition.name) || longTool
                   ? withoutBackground(args)
@@ -2271,6 +2323,7 @@ export abstract class BaseMcpServer extends McpServer {
                 // tools': they keep working outside the flow, their numbers
                 // in record order (spec §7).
                 const ownConnection =
+                  recordInto === undefined &&
                   (!this.batchOpenFor(entry.toolDefinition.name) ||
                     this.inDebuggerBatch(entry.toolDefinition.name)) &&
                   worksOnOwnConnection(
@@ -2433,6 +2486,20 @@ export abstract class BaseMcpServer extends McpServer {
                     ),
                   ),
                 );
+              // An envelope (read inside the call's turn): the call is
+              // recorded into it, before any open batch is looked at.
+              if (recordInto !== undefined) {
+                return await this.recordIntoEnvelope({
+                  tool: entry.toolDefinition.name,
+                  call: entry.call,
+                  context,
+                  args: handlerArgs,
+                  holdsFlow,
+                  runsInBackground,
+                  system,
+                  handle: recordInto,
+                });
+              }
               // Batch mode (read inside the call's turn): an eligible call is
               // recorded, every other refused — before any handler is chosen.
               if (this.batchOpenFor(entry.toolDefinition.name)) {
@@ -2553,15 +2620,63 @@ export abstract class BaseMcpServer extends McpServer {
             ? withStateHandle(listed.inputSchema)
             : listed.inputSchema;
           const declared = withHandle !== listed.inputSchema;
-          const inputSchema = withHandle;
-          promptTools.push({ definition, inputSchema });
+          // The core sets' tools beside the read envelopes (spec §5.2): an
+          // admitted read declares `envelope_handle`; every other tool but
+          // the envelope tools' own is loose, so a stray `envelope_handle`
+          // reaches the dispatch and is refused, never dropped unseen.
+          const enveloping =
+            servesEnvelopes && !isEnvelopeTool(entry.toolDefinition.name)
+              ? {
+                  declared: new Set(Object.keys(withHandle.shape)),
+                  admitted:
+                    envelopeSentence(entry.toolDefinition.name) !== undefined,
+                }
+              : undefined;
+          const inputSchema =
+            enveloping === undefined
+              ? withHandle
+              : envelopeSchemaOf(withHandle, enveloping.admitted);
+          // The prompts read the tool's own schema: an envelope's
+          // `envelope_handle` and looseness are the dispatch's.
+          promptTools.push({ definition, inputSchema: withHandle });
 
           // Tracked from its entry, with its own request signal (`trackCall`).
           const toolName = entry.toolDefinition.name;
           const wrappedHandler = (args: ToolArgs) =>
-            this.trackCall(toolName, (signal) =>
-              runCall(declared ? withoutStateHandle(args) : args, signal),
-            );
+            this.trackCall(toolName, async (signal) => {
+              // An envelope execute takes its envelope as it arrives (spec
+              // §6.1 step 1): the owner and the session checked before a
+              // connection is taken — a refused execute sends nothing, not
+              // even a logon —, the envelope reserved in arrival order, and
+              // given back when the execution ends before its claim.
+              if (toolName === 'ExecuteReadEnvelope') {
+                const reserved = this.reserveEnvelope(args.envelope_handle);
+                if ('refused' in reserved) {
+                  return this.refusalAnswer(reserved.refused);
+                }
+                try {
+                  return await runCall(
+                    declared ? withoutStateHandle(args) : args,
+                    signal,
+                  );
+                } finally {
+                  this.envelopes?.release(reserved.envelope);
+                }
+              }
+              // A core tool's loose schema keeps every key the call gave:
+              // `envelope_handle` and `background` are read, then every key
+              // its own schema does not declare is dropped (spec §5.2).
+              const envelope =
+                enveloping === undefined
+                  ? undefined
+                  : envelopeArgsOf(args, enveloping.declared);
+              const given = envelope?.args ?? args;
+              return runCall(
+                declared ? withoutStateHandle(given) : given,
+                signal,
+                envelope,
+              );
+            });
           if (isAbapGitTool(entry.toolDefinition.name)) {
             this.abapGitTools.add(entry.toolDefinition.name);
             this.abapGitSchemas.set(
@@ -2582,10 +2697,14 @@ export abstract class BaseMcpServer extends McpServer {
           this.registerTool(
             entry.toolDefinition.name,
             {
-              description: servedDescription(
-                listed.description,
+              description: envelopedDescription(
+                servedDescription(
+                  listed.description,
+                  entry.toolDefinition.name,
+                  sentenced && !runsBesideBatch(entry.toolDefinition.name),
+                ),
                 entry.toolDefinition.name,
-                sentenced && !runsBesideBatch(entry.toolDefinition.name),
+                enveloping?.admitted === true,
               ),
               inputSchema,
               ...listed.search,
@@ -2884,6 +3003,125 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
+   * A call recorded into its envelope (spec §5.2, §5.3), in its turn. The
+   * tool is admitted for the core set with these arguments over this
+   * connection kind, the call holds the flow, runs in no background and is
+   * no debugger tool — else `envelope_not_recordable`, nothing recorded. Its
+   * handler runs on a recorder over the envelope, its waits racing the
+   * call's own signal; the call answers `{ envelope_handle, number }` once
+   * it recorded, its own answer when it settled without recording, the
+   * refusal when the envelope refused a part (another session kind, a
+   * second node structure).
+   */
+  private async recordIntoEnvelope(call: {
+    tool: string;
+    call: HandlerEntry['call'];
+    context: HandlerContext;
+    args: ToolArgs;
+    holdsFlow: boolean;
+    runsInBackground: boolean;
+    system: ResolvedSystemContext | undefined;
+    handle: string;
+  }): Promise<{
+    content: { type: 'text'; text: string }[];
+    isError?: true;
+  }> {
+    const owner = this.envelopes;
+    const key = this.envelopeContext().envelopeKey?.();
+    if (owner === undefined || key === undefined) {
+      throw new ServerRefusal('envelopes_unavailable');
+    }
+    const envelope = owner.find(call.handle, key);
+    const connection = call.context.connection;
+    const kind = isRfcConnection(connection) ? 'rfc' : 'http';
+    if (
+      !call.holdsFlow ||
+      call.runsInBackground ||
+      isDebuggerOwnConnectionTool(call.tool) ||
+      !eligible(call.tool, call.args, kind, 'core').ok
+    ) {
+      throw new ServerRefusal(
+        'envelope_not_recordable',
+        envelopeNotRecordableWords(call.tool),
+      );
+    }
+    const controller = envelope.callSignal();
+    let started: (started: { handler: Promise<ToolResultLike> }) => void =
+      () => {};
+    const handlerStarted = new Promise<{ handler: Promise<ToolResultLike> }>(
+      (resolve) => {
+        started = resolve;
+      },
+    );
+    const recorder = createRecorder(
+      envelopeTarget(envelope, controller.signal, owner.keepRawParts),
+      (number) => {
+        const recorded: EnvelopeCall = {
+          number,
+          resume: () =>
+            handlerStarted.then(({ handler }) => {
+              recorder.release();
+              return this.recordedAnswer(
+                number,
+                handler,
+                owner,
+                () => recorder.rawParts(),
+                () => recorder.otherKind(),
+              );
+            }),
+          letGo: () => controller.abort(),
+          refusal: () => recorder.otherKind(),
+        };
+        recordOf(envelope).calls.push(recorded);
+      },
+      call.tool,
+    );
+    const recordedContext: HandlerContext = {
+      ...call.context,
+      ...this.searchStrategies(),
+      connection: withSystemKindOf(recorder, connection),
+    };
+    let handler: Promise<ToolResultLike>;
+    try {
+      handler = Promise.resolve(
+        this.inHeldFlow(call.holdsFlow, connection, () =>
+          runWithRequestSignal(controller.signal, () =>
+            withDestinationSystemContext(this.statedContextOf(connection), () =>
+              withKnownSystemContext(call.system, () =>
+                asRecordedCall(() =>
+                  callHandler(call.call, recordedContext, call.args),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      handler = Promise.reject(error);
+    }
+    handler.catch(() => undefined);
+    started({ handler });
+    await untilSent(handler, recorder);
+    const refused = recorder.otherKind();
+    if (refused !== undefined) throw refused;
+    const number = recorder.number();
+    if (number !== undefined) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ envelope_handle: call.handle, number }),
+          },
+        ],
+      };
+    }
+    // Settled without recording: nothing went into the envelope.
+    const result = await handler;
+    const content = normalizeToolContent(result);
+    return isErrorResult(result) ? { content, isError: true } : { content };
+  }
+
+  /**
    * A recorded call's answer under its number, built when the number is
    * first read: the tool's answer its handler, resumed then, built from all
    * its parts, as this wrapper answers a tool — its
@@ -2895,7 +3133,7 @@ export abstract class BaseMcpServer extends McpServer {
   private async recordedAnswer(
     number: number,
     handler: Promise<ToolResultLike>,
-    owner: InstanceBatch,
+    owner: { readonly keepRawParts: boolean },
     rawParts: () => BatchAnswer['raw'],
     otherKind: () => ServerRefusal | undefined,
   ): Promise<BatchAnswer> {
@@ -2914,6 +3152,24 @@ export abstract class BaseMcpServer extends McpServer {
       ...answer,
       ...(owner.keepRawParts ? { raw: rawParts() } : {}),
     };
+  }
+
+  /** An arriving execute's envelope, reserved for it; or its refusal (spec §6.1 step 1). */
+  private reserveEnvelope(
+    handle: unknown,
+  ): { envelope: Envelope } | { refused: unknown } {
+    const owner = this.envelopes;
+    const key = this.envelopeContext().envelopeKey?.();
+    if (owner === undefined || key === undefined) {
+      return { refused: new ServerRefusal('envelopes_unavailable') };
+    }
+    try {
+      return {
+        envelope: owner.reserve(typeof handle === 'string' ? handle : '', key),
+      };
+    } catch (error) {
+      return { refused: error };
+    }
   }
 
   /**
@@ -3797,6 +4053,25 @@ function destinationContextOf(
  * assembled text (plan step 10.1); one not yet assembled has it appended,
  * as before (until its group of step 10.7 moves it).
  */
+/**
+ * `description` with its envelope note appended (spec §5.1) when the tool is
+ * admitted into an envelope: a note, so the served text stays an assembled
+ * description. Unchanged otherwise.
+ */
+export function envelopedDescription(
+  description: string,
+  tool: string,
+  admitted: boolean,
+): string {
+  if (!admitted) return description;
+  const note = envelopable(tool);
+  if (note === undefined) return description;
+  const parts = partsOfDescription(description);
+  return parts === undefined
+    ? `${description.trimEnd()} ${note.text}`
+    : toolDescription({ ...parts, notes: [...(parts.notes ?? []), note] });
+}
+
 export function servedDescription(
   description: string,
   tool: string,

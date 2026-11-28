@@ -23,6 +23,7 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import type { HandlerContext } from '../../handlers/interfaces';
 import type { McpResult } from '../answer';
 import { failureOf } from '../auth/failures';
@@ -31,6 +32,7 @@ import {
   envelopeNodeStructureWords,
   ServerRefusal,
 } from '../auth/serverRefusal';
+import type { ToolArgs } from '../handlers/interfaces';
 import { return_error } from '../utils';
 import { failureAnswer } from './execute';
 import type { BatchAnswer } from './InstanceBatch';
@@ -435,4 +437,70 @@ export async function executeEnvelopeTool(
   const { owner, key } = ownerOf(context);
   const envelope = owner.claim(handle, key);
   return json(await executeEnvelope(context, envelope));
+}
+
+/** The parameter description of `envelope_handle` on an admitted read (spec §5.1). */
+export const ENVELOPE_HANDLE_WORDS =
+  'The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.';
+
+/** What a core tool's call carries for the envelopes, read before its own schema's keys are kept. */
+export interface EnvelopeArgs {
+  /** Whether the call gave `envelope_handle`, whatever its value. */
+  readonly present: boolean;
+  /** Its value, as given. */
+  readonly handle: unknown;
+  /** Whether the call stated `background: true`. */
+  readonly background: boolean;
+  /** The call's arguments its own schema declares: every other key dropped. */
+  readonly args: ToolArgs;
+}
+
+/**
+ * The envelope reading of a call of a loose core tool (spec §5.2):
+ * `envelope_handle` and `background` as the call gave them, and the
+ * arguments the tool's own schema declares — what its handler gets, as a
+ * plain object schema would have stripped them.
+ */
+export function envelopeArgsOf(
+  args: ToolArgs,
+  declared: ReadonlySet<string>,
+): EnvelopeArgs {
+  const kept: ToolArgs = Object.fromEntries(
+    Object.entries(args).filter(([name]) => declared.has(name)),
+  );
+  return {
+    present: Object.hasOwn(args, 'envelope_handle'),
+    handle: args.envelope_handle,
+    background: args.background === true,
+    args: kept,
+  };
+}
+
+/** Whether `schema` refuses an undeclared key (a create tool's strict arguments). */
+function isStrict(schema: z.ZodObject): boolean {
+  const catchall = schema._zod.def.catchall;
+  return catchall !== undefined && catchall._zod.def.type === 'never';
+}
+
+/**
+ * A core tool's served schema (spec §5.2): loose, so a key it does not
+ * declare reaches the dispatch; an admitted read's with the optional
+ * `envelope_handle` declared. A strict schema (a create tool's) stays as it
+ * is: it refuses an undeclared key, `envelope_handle` included, itself.
+ */
+export function envelopeSchemaOf(
+  schema: z.ZodObject,
+  admitted: boolean,
+): z.ZodObject {
+  if (isStrict(schema)) return schema;
+  const loose = schema.loose();
+  return admitted
+    ? loose.extend({
+        envelope_handle: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(ENVELOPE_HANDLE_WORDS),
+      })
+    : loose;
 }

@@ -80,7 +80,7 @@ import {
 import { getTestDestination } from './authHelpers';
 import { configuredSystemKind } from './configHelpers';
 import { NO_KIND_STATED } from './configuredSystemKind';
-import { heldLocksOf } from './heldLiveLocks';
+import { heldLocksOf, leavesALock } from './heldLiveLocks';
 import { closeEvery } from './launchedServers';
 import { endTestConnection, trackConnection } from './openConnections';
 import { primeSystemContext } from './primeSystemContext';
@@ -693,7 +693,9 @@ async function send(tool: string, args: ToolArgs): Promise<LiveAnswer> {
  */
 function judgedInSoftMode(tool: string, answer: LiveAnswer): LiveAnswer {
   if (isHardModeEnabled()) return answer;
-  heldLocksOf(current().connection()).takeInLeftLocked(answer);
+  if (leavesALock(answer)) {
+    heldLocksOf(current().connection()).takeInLeftLocked(answer);
+  }
   if (answer.isError) return answer;
   const outcome = answerOutcome(answer);
   if (outcome !== 'ok') throw new StepFailure(tool, outcome, answer.text);

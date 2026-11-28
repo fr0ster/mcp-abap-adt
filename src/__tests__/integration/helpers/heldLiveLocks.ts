@@ -236,6 +236,19 @@ export class HeldLiveLocks {
 /** Called on every `hold`: the live network cut's trigger (`networkCut`). */
 const heldListeners: Array<() => void> = [];
 
+/** Whether a handler's answer carries a lock it left behind (a `left_locked` carrier). */
+export function leavesALock(answer: ToolResultLike): boolean {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(answer.content?.[0]?.text ?? '');
+  } catch {
+    return false;
+  }
+  return [payload, member(payload, 'cleanup')].some(
+    (carrier) => member(carrier, 'left_locked') === true,
+  );
+}
+
 const registries = new WeakMap<object, HeldLiveLocks>();
 
 /** Every registry of this file's process, for the per-test check. */

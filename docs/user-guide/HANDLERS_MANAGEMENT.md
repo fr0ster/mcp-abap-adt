@@ -8,8 +8,8 @@ HTTP and SSE, each `-ro` binary a package of its own:
 
 | Kind | stdio | Streamable HTTP | SSE | Tools |
 |---|---|---|---|---|
-| core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs, batch mode, the debugger batch; on stdio the leftover-session list and logoff |
-| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), the background runs of the long reads, batch mode; on stdio the leftover-session list. Nothing that changes the system: no run, trace schedule or logoff |
+| core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs, the read envelopes, the debugger batch; on stdio the leftover-session list and logoff |
+| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), the background runs of the long reads, the read envelopes; on stdio the leftover-session list. Nothing that changes the system: no run, trace schedule or logoff |
 | compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger and its batch (`HandlerDebugBatch`), background runs, `HandlerBatch`; on stdio the leftover-session list and logoff |
 | compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing, the background runs of the long reads, `HandlerBatch`; on stdio the leftover-session list |
 
@@ -28,13 +28,20 @@ batch mode: recordable, recordable for the arguments it names, or
 run outside batch mode — see
 [Batch Mode](BATCH_MODE.md).
 
+The core binaries (`-ro` ones included, every transport) serve the read envelopes in the
+`EnvelopeHandlersGroup`: `CreateReadEnvelope`, `ExecuteReadEnvelope`, `DiscardReadEnvelope`,
+`ListReadEnvelopes`. Each read an envelope admits declares the optional `envelope_handle` and its
+description ends with one sentence about it — see
+[Envelopes in the core binaries](BATCH_MODE.md#envelopes-in-the-core-binaries).
+
 Tool counts (the tool sets as registered, by the tests and `fullToolSet` / `fullReadOnlyToolSet`),
-on premise, stdio / Streamable HTTP / SSE: core 281 / 281 / 279 (with the debugger batch's 3);
-core-ro 78 / 79 / 77 (each with the 3 background-run tools); compact 39 / 38 / 37 (28 of the 29 +
+on premise, stdio / Streamable HTTP / SSE: core 285 / 285 / 283 (with the debugger batch's 3 and
+the read envelopes' 4); core-ro 82 / 83 / 81 (each with the 3 background-run tools and the read
+envelopes' 4); compact 39 / 38 / 37 (28 of the 29 +
 4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 21 / 21 / 20
-(16 of the 17 + 3 background-run + `HandlerBatch`). On cloud, stdio: core 269 (the include writes and the program writes are on
+(16 of the 17 + 3 background-run + `HandlerBatch`). On cloud, stdio: core 273 (the include writes and the program writes are on
 premise only; `GetAbapGitBranchInfo`, `GetAbapGitModifiedObjects` and `GetAbapGitErrorLog` on the cloud only,
-`SwitchAbapGitBranch` on premise only), core-ro 78, compact 39, compact-ro 21. Each count is without the data tools:
+`SwitchAbapGitBranch` on premise only), core-ro 82, compact 39, compact-ro 21. Each count is without the data tools:
 `--enable-data-tools` adds `GetSqlQuery` and `GetTableContents` to core and core-ro, and
 `HandlerGetData` (the 29th, the 17th) to compact and compact-ro. stdio adds the leftover-session tools — list and logoff in the full sets, the
 list alone in the read-only ones; Streamable HTTP

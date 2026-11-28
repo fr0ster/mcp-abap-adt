@@ -241,7 +241,8 @@ action leaves the tool's `action` enum and its description; a denied action give
 
 ## Refusals
 
-A refused call runs no handler, sends nothing of its own and takes no batch number. The model
+A refused call runs no handler, sends nothing of its own and takes no batch number — nor a
+number of a read envelope: a read given an `envelope_handle` is checked when it is recorded. The model
 gets an error answer with a code:
 
 | Code | Words |

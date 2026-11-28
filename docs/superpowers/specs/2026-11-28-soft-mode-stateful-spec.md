@@ -6,6 +6,18 @@ changes is test code under `src/__tests__/`. The docs that change are
 `src/__tests__/integration/README.md` and `CHANGELOG.md`. Nothing changes in
 `src/lib`, `src/handlers`, the server packages or the dependencies.
 
+## Decisions
+
+- A step that fails on the network ends the test, and nothing is resent,
+  cleanup included (goal).
+- A high-level step whose own unlock failed on the network ends the test as a
+  `network` failure, even though its answer is a success. Its lock counts as
+  still held (`unlock-sent`, section 3).
+- In soft mode, a run connection that still holds something at its logoff
+  fails the test file, and the failure lists what is left (section 6). Hard
+  mode keeps its warning.
+- The package delete keeps its own lock-free sibling session (section 7).
+
 ## 1. What a step's outcome is
 
 Soft-mode code reads each call's outcome through one shared helper,
@@ -168,7 +180,9 @@ Both reports name the locks still owned (`held` / `unlock-sent`) and the
 received it, otherwise with SAP's timeout.
 
 - **A soft-mode run connection with something still owned fails the file** on
-  either report. A run connection with nothing owned reports and passes.
+  either report, and the failure lists what is left: the locks by object and
+  state, and the objects by name and state. A run connection with nothing
+  owned reports and passes.
 - **Hard mode is unchanged.** A connection without a registry, such as the
   hard-mode helpers' (`hardMode.ts:909-931`), keeps today's report: a warning,
   never a file failure. Only the exactly-once state applies to it, and that

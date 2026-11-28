@@ -35,7 +35,8 @@ How each step is done:
 2. **`stepOutcome` (spec §1).** Failing tests first, then the helper:
    - one test per row;
    - a success answer carrying a release that failed on the network gives
-     `network`;
+     `network` and ends the test, its lock recorded `unlock-sent` (spec
+     "Decisions");
    - a verdict is attributed to the connection that answered it.
 
 3. **Network failures are never resent (spec §2).** A failing test: a
@@ -115,7 +116,8 @@ How each step is done:
       `disconnect()`, so a second call sends nothing;
     - the reports "logoff failed" and "logoff not confirmed", each naming the
       locks and objects still owned;
-    - a run connection with something owned fails the file;
+    - a soft-mode run connection with something owned fails the file and lists
+      what is left (spec "Decisions");
     - a connection without a registry only warns, which keeps hard mode as it
       is. A test covers the hard-mode helpers' path (`hardMode.ts:909-931`).
 

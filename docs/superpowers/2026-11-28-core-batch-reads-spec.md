@@ -322,8 +322,12 @@ The dispatch then acquires the connection as for any call, and the remaining che
 4. The raw arguments do not state `background: true`, else `batch_no_background`. The check
    reads the key kept by the loose schema, so a read that does not declare `background` is
    refused just the same.
-5. The call holds the flow, does not run in the background and is no debugger tool, else
-   `envelope_not_recordable`, as compact's `recordCall` checks.
+5. The call holds the flow and is no debugger tool, else `envelope_not_recordable`, as
+   compact's `recordCall` checks.
+
+   A listed long read (`tools/long-handlers.json`) never runs in the background on this path,
+   whatever the host's background strategy. Without `background` it is recorded, as a long read
+   is in compact batch mode; with `background: true` it was already refused by check 4.
 6. The access restrictions admit it, else their own refusal, checked at the same point as in
    compact batch mode. A package-tree read the check makes goes out at once on the instance's
    connection and is not recorded.
@@ -415,10 +419,16 @@ The part of `runPhaseOutcome` that sends planned envelopes is extracted into one
     absence;
   - `unauthorizedPart`, when some part SAP answered `401`.
 - **What ends the sending.**
-  - The sender itself ends it only on the conditions that end every phase today, whatever the
-    caller says: a credential refusal, an oversized correction envelope, and the
-    batch-availability absence verdict (`runPhaseOutcome`, the `oversized` and `absent`
-    branches, and the credential rethrow of `runPhase`).
+  - The sender itself ends it, whatever the caller says, on the conditions that end every phase
+    today, all of which `runPhaseOutcome` checks ahead of `failuresEnd` (`phases.ts`, the loop
+    around line 680):
+    - an oversized correction envelope (`sent.oversized`);
+    - the batch-availability absence verdict (`sent.absent`);
+    - a refused second envelope request (`sent.refused`, `MORE_ENVELOPES_WORDS`). Nothing of
+      that run is kept, and every item of it fails with those words;
+    - a credential refusal on the wire;
+    - when the caller hands the run's item settlements (the phases do), a settlement whose error
+      `failureOf` recognises (`refusal`, `phases.ts:689`).
   - Every other outcome — a `failed` run, an `unauthorizedPart` run — ends the sending only when
     the caller's `endsOn(outcome)` answers `true`. After each run the sender calls `endsOn` and
     honours its answer.
@@ -526,7 +536,7 @@ tables.
 
 ### 8.2 The core entries
 
-Every row here is justified by the handler's code, cited, and is proved again by its own
+There are 45 rows: 19 in group A and 26 in group B. Every row here is justified by the handler's code, cited, and is proved again by its own
 `oneRequestPerEntry.test.ts` case. The case runs the call held open, answered, and answered
 `404`, and expects exactly the requests listed. Every row has `"set": "core"` and no
 `connection`, since every request is a stateless `GET` over HTTP and RFC alike.
@@ -558,6 +568,49 @@ Each row's `handler` is `src/handlers/<path>#handle<Tool>`, the file named.
 A source range (`SOURCE_RANGE_SHAPE`) is cut from the one answer locally (`answerSourceRead`),
 so it adds no request. Each case checks one range call too.
 
+**Group B: the other single-call reads.** Each row is traced from its handler through the
+adt-clients member it calls; each member is one endpoint. Every row has no `when` unless one is
+given.
+
+| Tool | Handler file | Sends | Ground in the code |
+|---|---|---|---|
+| `GetObjectStructure` | `system/readonly/handleGetObjectStructure.ts` | `GET /sap/bc/adt/repository/objectstructure` | one `getUtils(…).getObjectStructure` |
+| `GetObjectVersions` | `common/readonly/handleGetObjectVersions.ts` | `GET` the object's version feed | one `resolved.getVersions` (`readVersions`, `resolveVersionedObject.ts:192`) |
+| `GetObjectVersionSource` | `common/readonly/handleGetObjectVersionSource.ts` | `GET` the `content_uri` given | one `resolved.getVersionSource` (`readVersionSource`, `resolveVersionedObject.ts:203`) |
+| `GetObjectVersionDiff` | `common/readonly/handleGetObjectVersionDiff.ts` | two independent `GET`s, the two `content_uri`s, under one number | `both` (`sequence.ts:193`) sends both before reading either |
+| `GetObjectDraft` | `common/readonly/handleGetObjectDraft.ts` | for each part of the object, its three version reads, all at once, under one number | `readDraftEtags` (`readDraftEtags.ts:238`), `Promise.all` over the parts and versions; the compact draft read is the same set |
+| `GetObjectOutline` | `system/readonly/handleGetObjectOutline.ts` | `GET` the object's outline at the version asked | one `getObjectOutline` |
+| `GetInactiveObjects` | `system/readonly/handleGetInactiveObjects.ts` | `GET /sap/bc/adt/activation/inactiveobjects` | one `getInactiveObjects` |
+| `GetAdtTypes` | `system/readonly/handleGetAllTypes.ts` | `GET` the object type list | one `getAllTypes` |
+| `GetTransaction` | `system/readonly/handleGetTransaction.ts` | `GET` the transaction's object properties | one `getObjectProperties` |
+| `GetMessageClass` | `message_class/high/handleGetMessageClass.ts` | `GET` the message class's metadata document | one `readMessageClassMetadata` |
+| `GetMessageClassMessage` | `message_class/high/handleGetMessageClassMessage.ts` | `GET` the message class document, the message read from it locally | one `getMessageClassMessage(…).read` |
+| `GetTableSettings` | `table/readonly/handleGetTableSettings.ts` | `GET` the table's technical settings document | one `readMetadata`, on either variant |
+| `GetMainPrograms` | `include/readonly/handleGetMainPrograms.ts` | `GET` the include's main programs | one `readMainPrograms` |
+| `SearchObject` | `search/readonly/handleSearchObject.ts` | `GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch…` | one `search` (`searchOn`, either variant) |
+| `GetObjectsByType` | `search/readonly/handleGetObjectsByType.ts` | `POST /sap/bc/adt/repository/nodestructure` for the one node; at most one per envelope (§5.4) | one `fetchNodeStructure` |
+| `GetATCFindings` | `atc/high/handleGetATCFindings.ts` | `GET /sap/bc/adt/atc/worklists/{id}` | one `getFindings` |
+| `GetATCResult` | `atc/high/handleGetATCResult.ts` | `GET /sap/bc/adt/atc/results/{displayId}` | one `getResult` |
+| `ListATCResults` | `atc/high/handleListATCResults.ts` | `GET /sap/bc/adt/atc/results?createdBy=…` | one `listResults`, `created_by` from the arguments |
+| `RuntimeGetDumpById` | `system/readonly/handleRuntimeGetDumpById.ts` | `GET /sap/bc/adt/runtime/dump/{id}` in the view asked | one `getById` |
+| `RuntimeListSystemMessages` | `system/readonly/handleRuntimeListSystemMessages.ts` | `GET /sap/bc/adt/runtime/systemmessages` | one `systemMessages` |
+| `RuntimeGetGatewayErrorLog` | `system/readonly/handleRuntimeGetGatewayErrorLog.ts` | `GET /sap/bc/adt/gw/errorlog`, or one entry's detail | one `gatewayErrors`, or one `gatewayErrorDetail` |
+| `RuntimeListProfilerTraceFiles` | `system/readonly/handleRuntimeListProfilerTraceFiles.ts` | `GET /sap/bc/adt/runtime/traces/abaptraces` | one `profiler.list` |
+| `RuntimeGetProfilerTraceData` | `system/readonly/handleRuntimeGetProfilerTraceData.ts` | `GET` the trace's view asked (hit list, statements or DB accesses) | one `profiler.read` per view branch |
+| `ListServiceBindingTypes` | `service_binding/high/handleListServiceBindingTypes.ts` | `GET /sap/bc/adt/businessservices/bindings/bindingtypes` | one `getServiceBindingTypes`; served by the core set only |
+| `GetSqlQuery` | `system/readonly/handleGetSqlQuery.ts` | `POST /sap/bc/adt/datapreview/freestyle` with the query | one `getSqlQuery` |
+| `GetTableContents` | `table/readonly/handleGetTableContents.ts` | `POST /sap/bc/adt/datapreview/freestyle` with `SELECT * FROM` the table | one `getSqlQuery` |
+
+**The data tools.** `GetSqlQuery` and `GetTableContents` are registered only with
+`--enable-data-tools` (`DataHandlersGroup`). Their rows admit them only where they are served:
+without the setting the tools do not exist, and a call naming them is the SDK's unknown-tool
+answer, as today. A test proves both: with data tools on, each is recorded; with them off,
+neither is listed.
+
+**Several of these are listed long reads:** `SearchObject`, `GetSqlQuery`, `GetTableContents`,
+`GetATCFindings`, `GetATCResult`, `ListATCResults` and `RuntimeGetProfilerTraceData`. With a
+handle they are recorded and never run in the background (§5.2, check 5).
+
 **Excluded variants, and why:**
 
 - `GetFunctionModule` with `part` `source` (or absent): `inCheckedGroupOn` reads the metadata
@@ -574,19 +627,22 @@ so it adds no request. Each case checks one range call too.
   `RuntimeListFeeds` (each runs its own phases, `runPhase`).
 - **`GetEnhancements` and `GetTypeInfo`:** a request waits for another's answer (a metadata read
   first; a `404` fallback).
-- **Every other single-call read** (`GetObjectStructure`, `GetObjectVersions`,
-  `GetObjectVersionSource`, `GetObjectVersionDiff`, `GetObjectDraft`, `GetInactiveObjects`,
-  `GetAdtTypes`, `GetMessageClass`, `GetMessageClassMessage`, `GetTextElements`,
-  `GetTableSettings`, `GetMainPrograms`, `GetTransaction`, `GetObjectOutline`, `SearchObject`,
-  `GetObjectsByType`, `ListFunctionModules`, `ListFunctionGroupIncludes`, `GetUnitTestResult`,
-  the ATC reads, the runtime reads, `ListServiceBindingTypes`, `GetSqlQuery`,
-  `GetTableContents`). Their handlers hand the work to shared modules this spec has not read
-  through. A row is added only with the same grounds as §8.2: its chain read to the wire, its
-  `when`, its requests and its test.
+- **`GetTextElements`:** it reads the parts one after another and stops at the first failure
+  (`text_elements/readonly/handleGetTextElements.ts:182`). Each part's read waits for the one
+  before it.
+- **`ListFunctionModules` and `ListFunctionGroupIncludes`:** the node-structure read follows the
+  metadata read in a `sequence`
+  (`function_include/readonly/handleListFunctionModules.ts:102`,
+  `handleListFunctionGroupIncludes.ts:97`).
+- **`GetUnitTestResult`:** it reads the run's status first and the result only after it
+  (`readGivenRun`, `unit_test/high/handleGetUnitTestResult.ts:84`).
 - **Every tool that changes the system or runs code**, `RunATC` included.
 
-A pinning test asserts that no tool of this section has a core entry, and that no core entry's
-`sends` names `/cts/` or `nodestructure`.
+A pinning test asserts:
+
+- no tool of this section has a core entry;
+- no core entry's `sends` names `/cts/`;
+- `GetObjectsByType` is the only core entry whose `sends` names `nodestructure`.
 
 ## 9. Tests
 
@@ -732,6 +788,10 @@ New file: `envelopeExecute.test.ts`, at a counting connection.
 ### 9.6 The shared sender
 
 - `phases.test.ts`, the package-walk suites and every existing phase suite pass unchanged.
+- A refused second envelope request (`sent.refused`) ends a phase with `failuresEnd: false`, every
+  item of that run failing with `MORE_ENVELOPES_WORDS`, as today.
+- An item settlement whose error `failureOf` recognises ends a phase with `failuresEnd: false`,
+  as today.
 - A phase with `failuresEnd: false` keeps sending after a failed envelope through `sendPlanned`,
   as today, and one with the default stops.
 - An envelope stops at its first failed run.
@@ -808,5 +868,4 @@ One live case for the release, in soft and hard mode:
 The goal's out of scope stands. In addition, this task leaves as they are:
 
 - the compact sets' `HandlerGet` `TRANSPORT` and `node_structure` entries, because the compact
-  sets are out of scope;
-- the single-call reads of §8.3 that this spec did not ground.
+  sets are out of scope.

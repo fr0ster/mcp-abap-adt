@@ -157,6 +157,7 @@ const GROUP_LEVELS = {
   AbapGitHandlersGroup: 'high',
   DebugHandlersGroup: 'debug',
   DebugBatchHandlersGroup: 'debug',
+  EnvelopeHandlersGroup: 'readonly',
   LeftoverSessionHandlersGroup: 'session',
   LeftoverSessionListHandlersGroup: 'session',
 };

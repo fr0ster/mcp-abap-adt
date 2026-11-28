@@ -35,7 +35,7 @@ describe('the envelope sentence', () => {
   it('entries with a when: the When form, in the words of the table', () => {
     assert.equal(
       envelopeSentenceOf([row([{ argument: 'part', equals: ['metadata'] }])]),
-      'When part is metadata, with envelope_handle, the call is recorded into that envelope under the next number, and its answer comes back when the envelope is executed.',
+      'When part is metadata, with envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.',
     );
   });
 

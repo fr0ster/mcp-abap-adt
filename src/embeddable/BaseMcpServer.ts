@@ -91,13 +91,17 @@ import {
 } from '../lib/batch/availability.js';
 import { endsBatch, runsBesideBatch } from '../lib/batch/batchTools.js';
 import { eligible } from '../lib/batch/eligibility.js';
+import { envelopeRefusal } from '../lib/batch/envelopeTools.js';
 import { batchRefusal, endWithFailure } from '../lib/batch/execute.js';
 import type {
   BatchAnswer,
   InstanceBatch,
   OpenBatch,
 } from '../lib/batch/InstanceBatch.js';
-import type { InstanceEnvelopes } from '../lib/batch/InstanceEnvelopes.js';
+import {
+  type InstanceEnvelopes,
+  sessionKeyOf,
+} from '../lib/batch/InstanceEnvelopes.js';
 import { partsPerEnvelopeOf } from '../lib/batch/phases.js';
 import {
   batchTarget,
@@ -2186,6 +2190,17 @@ export abstract class BaseMcpServer extends McpServer {
               }
               return this.runConnectionless(entry.call, args, signal);
             }
+            // An envelope execute names its envelope: the owner and the
+            // session are checked before a connection is taken (spec §6.1
+            // step 1), so a refused execute sends nothing, not even a logon.
+            if (entry.toolDefinition.name === 'ExecuteReadEnvelope') {
+              const handle = args.envelope_handle;
+              const refused = envelopeRefusal(
+                this.envelopeContext(),
+                typeof handle === 'string' ? handle : '',
+              );
+              if (refused !== undefined) return this.refusalAnswer(refused);
+            }
             let inUse: IAbapConnection | undefined;
             let leaveFlow: (() => void) | undefined;
             // The batch an end call (`HandlerBatch` end, `DebugBatchEnd`) ends: the one
@@ -2369,6 +2384,7 @@ export abstract class BaseMcpServer extends McpServer {
                 debugger: () => this.takeDebugger(),
                 onMainConnection: (send) => this.onMainConnection(signal, send),
                 ...(this.batch !== undefined ? { batch: this.batch } : {}),
+                ...this.envelopeContext(),
                 ...(batchAvailability !== undefined
                   ? { batchAvailability }
                   : {}),
@@ -2901,6 +2917,28 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
+   * The read envelopes of a call's context: the owner, and the call's
+   * session key (spec §4.1) — built from the instance and the request
+   * alone: over Streamable HTTP the instance, its state handle and the
+   * headers' digest; on stdio and SSE the connection context. Nothing
+   * without an owner.
+   */
+  private envelopeContext(): Pick<HandlerContext, 'envelopes' | 'envelopeKey'> {
+    const owner = this.envelopes;
+    if (owner === undefined) return {};
+    return {
+      envelopes: owner,
+      envelopeKey: () =>
+        sessionKeyOf({
+          transport: this.stateHandleArgument ? 'http' : 'other',
+          instance: this,
+          stateHandle: this.state.handle,
+          context: this.connectionContext,
+        }),
+    };
+  }
+
+  /**
    * A tool that works on no connection of the instance (`connectionless`):
    * the call's context has none, and the leftover-session port when the host
    * gave an owner. Answered like any tool: its failure through the failure
@@ -2922,6 +2960,7 @@ export abstract class BaseMcpServer extends McpServer {
         state: this.state,
         debugger: () => this.takeDebugger(),
         ...(this.batch !== undefined ? { batch: this.batch } : {}),
+        ...this.envelopeContext(),
         ...this.searchStrategies(),
         heldLocks: this.heldLocks,
         ...(this.longSessionPort !== undefined

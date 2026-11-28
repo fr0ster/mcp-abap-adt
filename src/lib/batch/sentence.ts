@@ -114,11 +114,11 @@ export function withBatchSentence(description: string, tool: string): string {
  * (spec §5.1): with `envelope_handle`, the call is recorded, not sent.
  */
 export const ENVELOPE_SENTENCE =
-  'With envelope_handle, the call is recorded into that envelope under the next number, and its answer comes back when the envelope is executed.';
+  'With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.';
 
 /** The envelope sentence of a core tool recorded only for some arguments, `when` in words. */
 export function envelopeWhenSentence(when: string): string {
-  return `When ${when}, with envelope_handle, the call is recorded into that envelope under the next number, and its answer comes back when the envelope is executed.`;
+  return `When ${when}, with envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.`;
 }
 
 /**

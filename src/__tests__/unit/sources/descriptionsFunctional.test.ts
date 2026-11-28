@@ -185,8 +185,15 @@ function startsWithWord(name: string, word: string): boolean {
   return next === '' || next === next.toUpperCase();
 }
 
+/**
+ * The tools named by a changing verb that change nothing in the system: a
+ * read envelope is created in the server instance, never in SAP (#392).
+ */
+const READ_ONLY_BY_NAME: ReadonlySet<string> = new Set(['CreateReadEnvelope']);
+
 /** Whether the tool named `name` changes a repository object. */
 function changesRepositoryObject(name: string): boolean {
+  if (READ_ONLY_BY_NAME.has(name)) return false;
   return (
     CHANGING_BY_NAME.has(name) ||
     CHANGING_VERBS.some((verb) => startsWithWord(name, verb))

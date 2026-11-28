@@ -968,7 +968,8 @@ for (const transportName of [
         // batch reads its answers with DebugBatchAnswers, one more.
         // A table's technical settings and the text elements: four more.
         // abapGit on premise, always listed: ten more.
-        assert.equal(full.tools.length, onStdio ? 281 : onHttp ? 281 : 279);
+        // The read envelopes' four tools (#392): four more.
+        assert.equal(full.tools.length, onStdio ? 285 : onHttp ? 285 : 283);
         {
           const actual = full.tools;
           for (const expected of [
@@ -989,7 +990,7 @@ for (const transportName of [
         // write, run, debugger, logoff, resume or batch mode.
         // A table's technical settings and the text elements: two more.
         // The abapGit reads on premise, always listed: five more.
-        assert.equal(fullRo.tools.length, onStdio ? 78 : onHttp ? 79 : 77);
+        assert.equal(fullRo.tools.length, onStdio ? 82 : onHttp ? 83 : 81);
         for (const name of [
           'GetBackgroundRun',
           'ListBackgroundRuns',

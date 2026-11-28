@@ -39,6 +39,7 @@ import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import type { ConnectionSource } from '../../embeddable/ConnectionContext';
 import type { AnswerEntry } from '../../lib/batch/answers';
 import { InstanceBatch } from '../../lib/batch/InstanceBatch';
+import type { InstanceEnvelopes } from '../../lib/batch/InstanceEnvelopes';
 import { communicationBatch } from '../../lib/batch/tools';
 import { CompactBatchHandlersGroup } from '../../lib/compact/batch/group';
 import * as connectionFactory from '../../lib/connectionFactory';
@@ -50,6 +51,7 @@ import {
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../../lib/handlers/groups';
+import { EnvelopeHandlersGroup } from '../../lib/handlers/groups/EnvelopeHandlersGroup';
 import type {
   HandlerContext,
   IHandlerGroup,
@@ -171,6 +173,8 @@ class StandServer extends BaseMcpServer {
     owner: InstanceBatch,
     source: ConnectionSource,
     heldLocks?: HeldLocks,
+    envelopes?: InstanceEnvelopes,
+    stateHandleArgument?: boolean,
   ) {
     super({
       name: 'batch-stand',
@@ -179,9 +183,18 @@ class StandServer extends BaseMcpServer {
       systemType: 'onprem',
       batch: owner,
       ...(heldLocks !== undefined ? { heldLocks } : {}),
+      ...(envelopes !== undefined ? { envelopes } : {}),
+      ...(stateHandleArgument === true ? { stateHandleArgument: true } : {}),
     });
     this.registerHandlers(new CompositeHandlersRegistry(groups));
     this.setConnectionContext({ kind: 'built', source });
+  }
+
+  /** A request's own context, as the Streamable HTTP host sets it on every request. */
+  useContext(
+    context: Parameters<BaseMcpServer['setConnectionContext']>[0],
+  ): void {
+    this.setConnectionContext(context);
   }
 }
 
@@ -201,6 +214,12 @@ export interface Stand {
   loseSession(): void;
   /** The source's next `resolve` fails with `error`. */
   failResolve(error: unknown): void;
+  /** How many times the source was resolved (a connection asked for). */
+  resolves(): number;
+  /** Sets the instance's connection context, as a Streamable HTTP request does. */
+  useContext(
+    context: Parameters<BaseMcpServer['setConnectionContext']>[0],
+  ): void;
   call(name: string, args?: Record<string, unknown>): Promise<Answer>;
   /** HandlerBatch end's answer, parsed. */
   end(): Promise<{ answer: Answer; summary: Record<string, unknown> }>;
@@ -222,6 +241,10 @@ export interface StandOptions {
   groups?: IHandlerGroup[];
   /** Writes down when the shipped tools' handlers return or throw. */
   ledger?: HandlerLedger;
+  /** The read envelopes: the instance's owner, and the four tools served. */
+  envelopes?: InstanceEnvelopes;
+  /** As the Streamable HTTP host: every tool declares `state_handle`. */
+  stateHandleArgument?: boolean;
 }
 
 /**
@@ -243,8 +266,10 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
   });
   const current = credential();
   let failure: { error: unknown } | undefined;
+  let resolved = 0;
   const source: ConnectionSource = {
     resolve: async () => {
+      resolved += 1;
       const failing = failure;
       failure = undefined;
       if (failing !== undefined) throw failing.error;
@@ -261,10 +286,15 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
       ),
       ...(options.groups ?? []),
       new CompactBatchHandlersGroup({ connection: undefined as never }),
+      ...(options.envelopes !== undefined
+        ? [new EnvelopeHandlersGroup({ connection: undefined as never })]
+        : []),
     ],
     owner,
     source,
     options.heldLocks,
+    options.envelopes,
+    options.stateHandleArgument,
   );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'batch-stand', version: '1.0.0' });
@@ -304,6 +334,8 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
     failResolve: (error) => {
       failure = { error };
     },
+    resolves: () => resolved,
+    useContext: (context) => server.useContext(context),
     call,
     end: async () => {
       const answer = await call('HandlerBatch', { action: 'end' });

@@ -1099,7 +1099,7 @@ export const BATCH_OPEN_ENVELOPES_ROW: Parameter = {
   parse: parseOpenEnvelopes,
   valueHint: '=<envelopes>',
   section: 'BATCH MODE',
-  help: 'The most envelopes one server instance holds open at once (the core and core-ro binaries: ReadEnvelopeCreate collects read calls under an envelope_handle, sent together by ReadEnvelopeExecute). A create at the bound is refused, and nothing is evicted: execute or discard one first. A positive whole number. Default (not given or blank): no bound.',
+  help: 'The most envelopes one server instance holds open at once (the core and core-ro binaries: CreateReadEnvelope collects read calls under an envelope_handle, sent together by ExecuteReadEnvelope). A create at the bound is refused, and nothing is evicted: execute or discard one first. A positive whole number. Default (not given or blank): no bound.',
 };
 
 export const ENABLE_DATA_TOOLS_CLI = '--enable-data-tools';

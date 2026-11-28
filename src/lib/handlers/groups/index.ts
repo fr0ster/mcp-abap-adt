@@ -21,6 +21,10 @@ export {
   debugBatchToolEntries,
 } from './DebugBatchHandlersGroup.js';
 export { DebugHandlersGroup } from './DebugHandlersGroup.js';
+export {
+  EnvelopeHandlersGroup,
+  envelopeToolEntries,
+} from './EnvelopeHandlersGroup.js';
 export { HighLevelHandlersGroup } from './HighLevelHandlersGroup.js';
 export {
   LeftoverSessionHandlersGroup,

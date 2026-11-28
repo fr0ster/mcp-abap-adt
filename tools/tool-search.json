@@ -4859,5 +4859,44 @@
       "branch info"
     ],
     "semantic": "Change abapGit repositories: link and unlink, pull from and push to the remote, and switch branches."
+  },
+  "CreateReadEnvelope": {
+    "keywords": [
+      "read envelope",
+      "collect reads",
+      "group reads",
+      "read many objects",
+      "one round trip",
+      "envelope handle"
+    ],
+    "semantic": "Start a collection of read calls to send to SAP together, one round trip for many reads."
+  },
+  "ExecuteReadEnvelope": {
+    "keywords": [
+      "send reads",
+      "execute envelope",
+      "read envelope",
+      "read results",
+      "one round trip"
+    ],
+    "semantic": "Send every read call collected under an envelope handle to SAP together and get each result by its number."
+  },
+  "DiscardReadEnvelope": {
+    "keywords": [
+      "discard envelope",
+      "drop reads",
+      "read envelope",
+      "cancel collected reads"
+    ],
+    "semantic": "Drop a collection of read calls, sending none of them."
+  },
+  "ListReadEnvelopes": {
+    "keywords": [
+      "list envelopes",
+      "open envelopes",
+      "read envelope",
+      "envelope handle"
+    ],
+    "semantic": "List the open collections of read calls of this session, with their handles."
   }
 }

@@ -4,8 +4,8 @@ Generated from the tool definitions the server builds (not from docs).
 
 ## Summary
 
-- Total tools: 306
-- Read-only tools: 75
+- Total tools: 310
+- Read-only tools: 79
 - High-level tools: 196
 - Debug tools: 33
 - Session tools: 2
@@ -82,6 +82,11 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetPackageContents](#getpackagecontents-read-only-package)
   - [Program](#read-only-program)
     - [GetProgram](#getprogram-read-only-program)
+  - [Read Envelope](#read-only-read-envelope)
+    - [CreateReadEnvelope](#createreadenvelope-read-only-read-envelope)
+    - [DiscardReadEnvelope](#discardreadenvelope-read-only-read-envelope)
+    - [ExecuteReadEnvelope](#executereadenvelope-read-only-read-envelope)
+    - [ListReadEnvelopes](#listreadenvelopes-read-only-read-envelope)
   - [Search](#read-only-search)
     - [GetObjectsByType](#getobjectsbytype-read-only-search)
     - [GetObjectsList](#getobjectslist-read-only-search)
@@ -996,6 +1001,53 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `program_name` (string, required) - Program name.
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="read-only-read-envelope"></a>
+### Read-Only / Read Envelope
+
+<a id="createreadenvelope-read-only-read-envelope"></a>
+#### CreateReadEnvelope (Read-Only / Read Envelope)
+**Description:** [read-only] Creates a collection of read calls under a handle that each of those calls names, sent to SAP together when the collection is executed.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="discardreadenvelope-read-only-read-envelope"></a>
+#### DiscardReadEnvelope (Read-Only / Read Envelope)
+**Description:** [read-only] Discards a collection of recorded read calls and ends its handle, giving how many calls it held.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- `envelope_handle` (string, required) - The handle of the collection, as its creation gave it.
+
+---
+
+<a id="executereadenvelope-read-only-read-envelope"></a>
+#### ExecuteReadEnvelope (Read-Only / Read Envelope)
+**Description:** [read-only] Executes a collection of recorded read calls, sending them to SAP together and giving each call's result under its number, in recording order.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- `envelope_handle` (string, required) - The handle of the collection, as its creation gave it.
+
+---
+
+<a id="listreadenvelopes-read-only-read-envelope"></a>
+#### ListReadEnvelopes (Read-Only / Read Envelope)
+**Description:** [read-only] Lists this session's open collections of read calls, each with its handle and how many calls it has recorded.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- None
 
 ---
 
@@ -5331,4 +5383,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-27*
+*Last updated: 2026-11-28*

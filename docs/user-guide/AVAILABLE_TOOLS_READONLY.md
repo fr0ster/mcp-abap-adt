@@ -5,7 +5,7 @@ Generated from the tool definitions the server builds (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. Batch mode is the compact binaries' (`HandlerBatch`, [BATCH_MODE.md](BATCH_MODE.md)): none is served here. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 82
+- Total tools: 86
 
 ## Navigation
 
@@ -75,6 +75,11 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetPackage](#getpackage-read-only-package)
   - [Program](#read-only-program)
     - [GetProgram](#getprogram-read-only-program)
+  - [Read Envelope](#read-only-read-envelope)
+    - [CreateReadEnvelope](#createreadenvelope-read-only-read-envelope)
+    - [ExecuteReadEnvelope](#executereadenvelope-read-only-read-envelope)
+    - [DiscardReadEnvelope](#discardreadenvelope-read-only-read-envelope)
+    - [ListReadEnvelopes](#listreadenvelopes-read-only-read-envelope)
   - [Search](#read-only-search)
     - [SearchObject](#searchobject-read-only-search)
     - [GetObjectsList](#getobjectslist-read-only-search)
@@ -812,6 +817,53 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
+<a id="read-only-read-envelope"></a>
+### Read-Only / Read Envelope
+
+<a id="createreadenvelope-read-only-read-envelope"></a>
+#### CreateReadEnvelope (Read-Only / Read Envelope)
+**Description:** [read-only] Creates a collection of read calls under a handle that each of those calls names, sent to SAP together when the collection is executed.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="executereadenvelope-read-only-read-envelope"></a>
+#### ExecuteReadEnvelope (Read-Only / Read Envelope)
+**Description:** [read-only] Executes a collection of recorded read calls, sending them to SAP together and giving each call's result under its number, in recording order.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- `envelope_handle` (string, required) - The handle of the collection, as its creation gave it.
+
+---
+
+<a id="discardreadenvelope-read-only-read-envelope"></a>
+#### DiscardReadEnvelope (Read-Only / Read Envelope)
+**Description:** [read-only] Discards a collection of recorded read calls and ends its handle, giving how many calls it held.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- `envelope_handle` (string, required) - The handle of the collection, as its creation gave it.
+
+---
+
+<a id="listreadenvelopes-read-only-read-envelope"></a>
+#### ListReadEnvelopes (Read-Only / Read Envelope)
+**Description:** [read-only] Lists this session's open collections of read calls, each with its handle and how many calls it has recorded.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- None
+
+---
+
 <a id="read-only-search"></a>
 ### Read-Only / Search
 
@@ -1470,4 +1522,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-27*
+*Last updated: 2026-11-28*

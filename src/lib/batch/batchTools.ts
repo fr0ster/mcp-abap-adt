@@ -22,6 +22,24 @@ export function isBatchTool(tool: string): boolean {
 }
 
 /**
+ * The read envelopes' tools (#392, spec §2): served beside an open batch,
+ * at once, never recorded — their `envelope_handle` is their own argument.
+ */
+export const ENVELOPE_TOOLS: readonly string[] = [
+  'CreateReadEnvelope',
+  'ExecuteReadEnvelope',
+  'DiscardReadEnvelope',
+  'ListReadEnvelopes',
+];
+
+const ENVELOPE_LISTED = new Set(ENVELOPE_TOOLS);
+
+/** Whether `tool` is one of the read envelopes' tools. */
+export function isEnvelopeTool(tool: string): boolean {
+  return ENVELOPE_LISTED.has(tool);
+}
+
+/**
  * The long-session tools (Streamable HTTP, #308 spec §2): served while a
  * batch is open, at once, never recorded — as the batch tools — and the
  * batch stays open.
@@ -40,7 +58,9 @@ const SESSION_LISTED = new Set(LONG_SESSION_TOOLS);
  * long-session tool.
  */
 export function runsBesideBatch(tool: string): boolean {
-  return LISTED.has(tool) || SESSION_LISTED.has(tool);
+  return (
+    LISTED.has(tool) || SESSION_LISTED.has(tool) || ENVELOPE_LISTED.has(tool)
+  );
 }
 
 /** What a batch tool's parsed arguments say of the numbers asked. */

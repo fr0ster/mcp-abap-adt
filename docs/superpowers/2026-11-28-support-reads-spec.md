@@ -554,12 +554,17 @@ When `bluesMetadata` answers `undefined`, every level answers the document as se
   SAP's status and SAP's message, whatever `detail` was asked for.
 - For an ADT exception document, the message is its `message`.
 - For an HTML body with no exception document (the measured `500`s of a 21-character APLO
-  name and of `version=1`), the message is the body's text read without markup, as
-  `docuPage` reads `text`.
-  - That reading is added to the failure path as an adt-strategies refusal reading, if the
-    path does not keep an HTML body's text today.
-  - Either way, a unit test pins the message on both captured pages: "Application Server
-    Error … Data was lost while copying a value".
+  name and of `version=1`), the path as it is keeps SAP's answer whole. Read in the code:
+  - `analyseException` finds no `exc:exception`, so it keeps the library's verdict: the
+    message "Request failed with status code 500" and the wire answer as `response`;
+  - `failurePayload` (`src/lib/answer.ts`) puts the body as `raw_body` on every non-`2xx`
+    failure, whatever `detail` says.
+
+  So the model gets status `500`, that message, and the HTML page whole, SAP's own text
+  ("Application Server Error … Data was lost while copying a value") inside it. No reading
+  is added and nothing in the failure path changes.
+- A unit test pins this on both captured pages: the status, the message, and `raw_body`
+  byte-equal to the body.
 - No level turns a failure into a success or a success into a failure.
 
 ### 4.5 Availability
@@ -674,7 +679,7 @@ The requests each refusal sends:
   - `406`;
   - the `version=1` `500`;
   - the 21-character APLO `500`. This one is asserted with the name sent unchanged (its
-    `seg()` form), exactly one object or source request, status `500`, the message of §4.4,
+    `seg()` form), exactly one object or source request, status `500`, the message and the whole `raw_body` of §4.4,
     and no local refusal.
 - **No server limits.**
   - The largest captured page (184 KB, on premise) is answered whole at every level:

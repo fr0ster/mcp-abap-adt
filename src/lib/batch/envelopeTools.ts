@@ -29,6 +29,7 @@ import type { McpResult } from '../answer';
 import { failureOf } from '../auth/failures';
 import {
   batchPartsMismatchWords,
+  envelopeDependentWords,
   envelopeNodeStructureWords,
   ServerRefusal,
 } from '../auth/serverRefusal';
@@ -38,6 +39,8 @@ import { failureAnswer } from './execute';
 import type { BatchAnswer } from './InstanceBatch';
 import type {
   Envelope,
+  EnvelopeCall,
+  EnvelopeRecord,
   InstanceEnvelopes,
   SessionKey,
 } from './InstanceEnvelopes';
@@ -64,29 +67,6 @@ export function isNodeStructure(request: IAbapRequestOptions): boolean {
   );
 }
 
-/** One recorded call of an envelope, as execution answers it. */
-export interface EnvelopeCall {
-  readonly number: number;
-  /** Resumes the call's handler with its parts: the number's answer. Never rejects. */
-  resume(): Promise<BatchAnswer>;
-  /** Lets the call go: its own signal aborted, its handler ends its wait. */
-  letGo(): void;
-  /** The refusal that is the call's answer whatever its run came to (a node structure refused), if any. */
-  refusal(): ServerRefusal | undefined;
-}
-
-/** What an envelope keeps of its recorded calls: their pending parts and their calls, by number. */
-export interface EnvelopeRecord {
-  readonly parts: Pending[];
-  readonly calls: EnvelopeCall[];
-  /** Whether a node-structure request was recorded. */
-  nodeStructure: boolean;
-  /** Validates a request's shape as an ADT batch envelope takes it, recording nothing that is sent. */
-  readonly validator: AdtBatchConnection;
-}
-
-const records = new WeakMap<Envelope, EnvelopeRecord>();
-
 /** A connection that never sends: the validator's, which is never executed. */
 const NEVER_SENT: IAbapConnection = {
   connect: async () => undefined,
@@ -98,21 +78,17 @@ const NEVER_SENT: IAbapConnection = {
   },
 };
 
-/** The record of `envelope`'s calls, made at its first use. */
+/** The record of `envelope`'s calls: held by the envelope itself. */
 export function recordOf(envelope: Envelope): EnvelopeRecord {
-  let record = records.get(envelope);
-  if (record === undefined) {
-    record = {
-      parts: [],
-      calls: [],
-      nodeStructure: false,
-      validator: new AdtBatchConnection(NEVER_SENT, {
-        endpoint: 'communication',
-      }),
-    };
-    records.set(envelope, record);
-  }
-  return record;
+  return envelope.record;
+}
+
+/** The record's request-shape check, made at its first use. */
+function validatorOf(record: EnvelopeRecord): AdtBatchConnection {
+  record.validator ??= new AdtBatchConnection(NEVER_SENT, {
+    endpoint: 'communication',
+  });
+  return record.validator;
 }
 
 /**
@@ -132,6 +108,7 @@ export function envelopeTarget(
     request: IAbapRequestOptions,
     number: number | undefined,
   ): ServerRefusal | undefined;
+  endedRefusal(tool: string): ServerRefusal;
 } {
   const record = recordOf(envelope);
   let number: number | undefined;
@@ -147,6 +124,10 @@ export function envelopeTarget(
       number = envelope.nextNumber();
       return number;
     },
+    // A request once the envelope's execution claimed it is one built from
+    // another's answer: the read is no envelope's.
+    endedRefusal: (tool) =>
+      new ServerRefusal('batch_not_recordable', envelopeDependentWords(tool)),
     admit: (request, taken) => {
       if (!isNodeStructure(request)) return undefined;
       if (!record.nodeStructure) return undefined;
@@ -158,7 +139,9 @@ export function envelopeTarget(
     record: (request) => {
       // The request's shape as an envelope takes it, checked now: a shape
       // the envelope refuses throws here and the call takes no number.
-      void record.validator.makeAdtRequest(request).catch(() => undefined);
+      void validatorOf(record)
+        .makeAdtRequest(request)
+        .catch(() => undefined);
       if (isNodeStructure(request)) record.nodeStructure = true;
       // The call's item: its number less one — the number is taken right
       // after its first request is recorded.
@@ -504,3 +487,5 @@ export function envelopeSchemaOf(
       })
     : loose;
 }
+
+export type { EnvelopeCall, EnvelopeRecord } from './InstanceEnvelopes';

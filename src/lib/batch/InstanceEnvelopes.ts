@@ -18,9 +18,12 @@
  * key: at the bound a create is refused and nothing is evicted.
  */
 import { randomBytes, timingSafeEqual } from 'node:crypto';
+import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import { envelopeLimitWords, ServerRefusal } from '../auth/serverRefusal';
 import { openEnvelopesOf } from '../config/authParameters';
 import type { StatePart } from '../state/InstanceState';
+import type { BatchAnswer } from './InstanceBatch';
+import type { Pending } from './phases';
 
 /**
  * Who may name an envelope (spec §4): the session that created it — the
@@ -84,6 +87,27 @@ function newHandle(taken: (handle: string) => boolean): string {
   }
 }
 
+/** One recorded call of an envelope, as execution answers it. */
+export interface EnvelopeCall {
+  readonly number: number;
+  /** Resumes the call's handler with its parts: the number's answer. Never rejects. */
+  resume(): Promise<BatchAnswer>;
+  /** Lets the call go: its own signal aborted, its handler ends its wait. */
+  letGo(): void;
+  /** The refusal that is the call's answer whatever its run came to (a node structure refused), if any. */
+  refusal(): ServerRefusal | undefined;
+}
+
+/** What an envelope keeps of its recorded calls: their pending parts and their calls, by number. */
+export interface EnvelopeRecord {
+  readonly parts: Pending[];
+  readonly calls: EnvelopeCall[];
+  /** Whether a node-structure request was recorded. */
+  nodeStructure: boolean;
+  /** Checks a request's shape as an ADT batch envelope takes it; made at the first recording. */
+  validator: AdtBatchConnection | undefined;
+}
+
 /**
  * One open envelope: its handle and session key, its numbering, and the
  * signals its recorded calls race. Each call gets a signal of its own
@@ -98,6 +122,16 @@ export class Envelope {
   private open = true;
   /** Taken by an execution that arrived and is waiting for its connection (spec §6.1). */
   reserved = false;
+  /**
+   * What the envelope recorded — its calls and their pending parts — held
+   * here, in the instance's held state with the envelope, and let go with it.
+   */
+  readonly record: EnvelopeRecord = {
+    parts: [],
+    calls: [],
+    nodeStructure: false,
+    validator: undefined,
+  };
 
   constructor(
     readonly handle: string,

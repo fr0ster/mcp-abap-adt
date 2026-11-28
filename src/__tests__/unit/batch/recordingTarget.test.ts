@@ -14,6 +14,8 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ServerRefusal } from '../../../lib/auth/serverRefusal';
+import { envelopeTarget, recordOf } from '../../../lib/batch/envelopeTools';
+import { InstanceEnvelopes } from '../../../lib/batch/InstanceEnvelopes';
 import {
   createRecorder,
   type RecordingTarget,
@@ -121,5 +123,11 @@ describe('the recorder over a RecordingTarget', () => {
       ['/a'],
     );
     assert.deepStrictEqual(numbers, [1]);
+  });
+
+  it("an envelope's record lives on the envelope itself, not beside it", () => {
+    const owner = new InstanceEnvelopes({ keepRawParts: false });
+    const envelope = owner.create({ context: {} });
+    assert.equal(recordOf(envelope), envelope.record);
   });
 });

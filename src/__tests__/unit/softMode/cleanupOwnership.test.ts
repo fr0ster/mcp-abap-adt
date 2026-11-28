@@ -83,25 +83,26 @@ describe('softSteps keeps what its cleanup and its steps say', () => {
     );
   });
 
-  it("a step that reports a lost session clears the connection's locks", async () => {
+  it("an answer's lost session clears nothing: the wire attributes it to its own connection", async () => {
     const connection = {};
     const steps = softSteps(connection, () => {});
     heldLocksOf(connection).hold(lock('H'));
     await assert.rejects(steps.must('write', async () => lost()));
-    assert.equal(heldLocksOf(connection).stillHeld.length, 0);
+    assert.equal(heldLocksOf(connection).stillHeld.length, 1);
   });
 });
 
 describe('HighTester applies a step outcome to its connection', () => {
-  it('a lost session clears the locks; a left_locked answer is taken in', () => {
+  it("a sibling's lost session clears nothing of the run's; a left_locked answer is taken in", () => {
     const connection = {} as IAbapConnection;
     heldLocksOf(connection).hold(lock('H'));
+    // The package delete's sibling answered it: the run's lock stays.
     softOutcomeApplied(connection, 'session-lost', lost());
-    assert.equal(heldLocksOf(connection).stillHeld.length, 0);
+    assert.equal(heldLocksOf(connection).stillHeld.length, 1);
     softOutcomeApplied(connection, 'ok', leftBehind('DEL'));
     assert.deepEqual(
       heldLocksOf(connection).stillOwned.map((o) => o.lock.lock_handle),
-      ['DEL'],
+      ['H', 'DEL'],
     );
   });
 });
@@ -130,7 +131,7 @@ describe("rapFixtures' write", () => {
     assert.equal(heldLocksOf(connection).stillOwned[0]?.state, 'unlock-sent');
   });
 
-  it('a lost session clears the locks and is a failure', () => {
+  it('a lost session is a failure; the wire, not the answer, clears the locks', () => {
     const connection = {};
     heldLocksOf(connection).hold(lock('V'));
     const failure = writeAnswered(connection, {
@@ -147,7 +148,7 @@ describe("rapFixtures' write", () => {
       ],
     });
     assert.match(failure ?? '', /session-lost/);
-    assert.equal(heldLocksOf(connection).stillHeld.length, 0);
+    assert.equal(heldLocksOf(connection).stillHeld.length, 1);
   });
 
   it('an ok write is no failure', () => {

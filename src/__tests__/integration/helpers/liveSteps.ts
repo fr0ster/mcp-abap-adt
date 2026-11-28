@@ -3,9 +3,9 @@
  * suite's locks are the run connection's registry's (`heldLocksOf`), so the
  * file's close sees what is left; a step's answer is read by its outcome
  * (`answerOutcome`), so a success whose own unlock failed on the network
- * ends the step with its lock held, and a lost session clears the
- * connection's locks. Hard mode keeps its own registry and its `isError`
- * check, as before.
+ * ends the step with its lock held. A lost session is attributed by the
+ * wire (`heldLiveLocks.ts`, `observeWire`) to the connection it happened
+ * on. Hard mode keeps its own registry and its `isError` check, as before.
  */
 import { HeldLiveLocks, heldLocksOf } from './heldLiveLocks';
 import { type LiveAnswer, liveConnection } from './live';
@@ -22,8 +22,7 @@ export function liveLocks(): HeldLiveLocks {
 
 /**
  * The answer, or the step ends: in soft mode by its outcome (a lock its
- * answer left behind taken in, a lost session clearing the connection's
- * locks), in hard mode by `isError`. `words` is what the failure quotes.
+ * answer left behind taken in), in hard mode by `isError`. `words` is what the failure quotes.
  */
 export function liveSucceeded(
   step: string,
@@ -37,7 +36,6 @@ export function liveSucceeded(
   const locks = liveLocks();
   locks.takeInLeftLocked(answer);
   const outcome = answerOutcome(answer);
-  if (outcome === 'session-lost') locks.sessionLost();
   if (outcome !== 'ok') throw new StepFailure(step, outcome, words);
   return answer;
 }

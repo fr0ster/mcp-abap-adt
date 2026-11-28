@@ -20,6 +20,7 @@ import {
   loadTestConfig,
   loadTestEnv,
 } from './configHelpers';
+import { heldLocksOf } from './heldLiveLocks';
 import { createTestLogger } from './loggerHelpers';
 import { trackConnection } from './openConnections';
 import { primeSystemContext } from './primeSystemContext';
@@ -154,6 +155,15 @@ export async function createTestConnectionAndSession(): Promise<{
       );
       connectionSource = 'env';
     }
+
+    // A soft-mode run connection (#394): its registry sees its wire from
+    // the first request on, whoever sends a LOCK or an UNLOCK on it. Hard
+    // mode's helper connection has none, as on main.
+    const testConfig = loadTestConfig();
+    const hardMode =
+      testConfig?.environment?.integration_hard_mode?.enabled === true ||
+      testConfig?.integration_hard_mode?.enabled === true;
+    if (!hardMode) heldLocksOf(connection);
 
     // Connect once (same as adt-clients tests - no double connect)
     await connection.connect();

@@ -17,6 +17,7 @@ import { after, before, describe, it } from 'node:test';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { type AdtStandIn, adtStandIn } from '../helpers/adtStandIn';
 import { stateSystemKind } from '../helpers/systemKind';
+import { heldLocksIfAny } from '../integration/helpers/heldLiveLocks';
 import { closeTrackedConnections } from '../integration/helpers/openConnections';
 import { createTestConnectionAndSession } from '../integration/helpers/sessionHelpers';
 
@@ -87,5 +88,10 @@ describe('createTestConnectionAndSession', () => {
     assert.notEqual(connection.getSessionId(), null);
     // Presence only: the cookies are a secret and never printed.
     assert.equal(session.session_state.cookies.length > 0, true);
+  });
+
+  it('a soft-mode connection has its lock registry from the start, so its wire is tracked (#394)', async () => {
+    const { connection } = await createTestConnectionAndSession();
+    assert.notEqual(heldLocksIfAny(connection), undefined);
   });
 });

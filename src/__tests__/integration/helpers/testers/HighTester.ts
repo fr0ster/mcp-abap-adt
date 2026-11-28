@@ -154,16 +154,19 @@ export function isTransientConflict(
   );
 }
 
-/** A soft step's outcome applied to its connection's locks. */
+/**
+ * A soft step's answer applied to its connection's locks: a lock it left
+ * behind taken in. A lost session is the wire's to attribute, to the
+ * connection it happened on (`observeWire`) — never the run connection's
+ * for a sibling's answer.
+ */
 export function softOutcomeApplied(
   connection: object,
-  outcome: StepOutcome,
+  _outcome: StepOutcome,
   answer: { content?: { text?: string }[] } | undefined,
 ): void {
   const locks = heldLocksOf(connection);
   if (answer !== undefined) locks.takeInLeftLocked(answer);
-  // A lost session ended every lock of it (SAP released them).
-  if (outcome === 'session-lost') locks.sessionLost();
 }
 
 /** A failed answer's integer `status`, if its payload states one. */
@@ -305,6 +308,7 @@ export class HighTester extends LambdaTester {
       await this.runInHardMode();
       return;
     }
+    this.locksAtStart();
 
     const connection = this.context.connection;
     const handlerContext = createHandlerContext({

@@ -411,6 +411,36 @@ export class LambdaTester {
     }
   }
 
+  /** The handles the run connection owned when the test began. */
+  private ownedAtStart = new Set<string>();
+
+  /** The locks the run connection owned when the test began. */
+  protected locksAtStart(): void {
+    const connection = this.context?.connection;
+    const locks =
+      connection === undefined ? undefined : heldLocksIfAny(connection);
+    this.ownedAtStart = new Set(
+      (locks?.stillHeld ?? []).map((lock) => lock.lock_handle),
+    );
+  }
+
+  /**
+   * The locks this test left owned after its cleanup's release: a step it
+   * passed over (a success whose own unlock failed on the network) ends the
+   * test as failed (#394), naming them.
+   */
+  private locksLeftByThisTest(): readonly string[] {
+    const connection = this.context?.connection;
+    const locks =
+      connection === undefined ? undefined : heldLocksIfAny(connection);
+    return (locks?.stillOwned ?? [])
+      .filter(({ lock }) => !this.ownedAtStart.has(lock.lock_handle))
+      .map(
+        ({ lock, state }) =>
+          `${lock.object_type} ${lock.object_name} (${state})`,
+      );
+  }
+
   /**
    * Declares that the suite deletes what it created in its own `after`,
    * whatever the outcome (a live suite on a shared system leaves nothing
@@ -454,6 +484,19 @@ export class LambdaTester {
     // Locks first, unconditionally (#394, spec §4): whatever the YAML
     // policy says about deleting, every lock still `held` is released, once.
     await this.releaseOwnedLocks();
+    const left = this.locksLeftByThisTest();
+    await this.cleanupAfterPolicy();
+    // The deletes ran as the policy says; a lock the test left still owned
+    // fails it now.
+    if (left.length > 0) {
+      throw new CleanupFailure(
+        `the test left a lock its release did not reach SAP for: ${left.join('; ')}`,
+      );
+    }
+  }
+
+  /** The YAML policy's part of the cleanup: the deletes. */
+  private async cleanupAfterPolicy(): Promise<void> {
     if (!this.context || !this.testCase) {
       this.context?.logger?.warn?.(
         '⚠️ Cleanup skipped: context or testCase not available',
@@ -651,6 +694,7 @@ export class LambdaTester {
 
     this.testFailed = false;
     this.testSkipped = false;
+    this.locksAtStart();
     try {
       // Execute test function (lambda) with context
       // Lambda decides what messages to log and whether to pass logger to handlers

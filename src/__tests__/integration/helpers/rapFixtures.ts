@@ -174,8 +174,6 @@ export function writeAnswered(
   const locks = heldLocksOf(connection);
   locks.takeInLeftLocked(written);
   const outcome = answerOutcome(written);
-  // A lost session ended every lock of it (SAP released them).
-  if (outcome === 'session-lost') locks.sessionLost();
   return outcome === 'ok'
     ? undefined
     : `write failed (${outcome}): ${extractErrorMessage(written)}`;

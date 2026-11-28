@@ -59,6 +59,14 @@ const logger = {
 /** A tester whose test failed, on `connection`, with a cleanup that deletes. */
 class FailedTester extends LambdaTester {
   deleted = 0;
+  /** As if the test body passed. */
+  markPassed(): void {
+    this.testFailed = false;
+  }
+  /** What `run` does before the body: the locks owned at the start. */
+  async startTest(): Promise<void> {
+    this.locksAtStart();
+  }
   constructor(connection: IAbapConnection) {
     super('create_class', 'probe', 'probe');
     this.testCase = { name: 'probe', params: {} };
@@ -112,7 +120,8 @@ describe('LambdaTester releases locks before the delete policy', () => {
     });
     heldLocksOf(run).unlockSent('B');
     lines.length = 0;
-    await new FailedTester(run).afterEach();
+    // Still owned after the release: the test fails naming it.
+    await assert.rejects(new FailedTester(run).afterEach(), /ZCL_B/);
     assert.equal(sent, 0);
     assert.match(lines.join('\n'), /ZCL_B/);
   });
@@ -126,7 +135,7 @@ describe('LambdaTester releases locks before the delete policy', () => {
     });
     markCredentialRefused();
     lines.length = 0;
-    await new FailedTester(run).afterEach();
+    await assert.rejects(new FailedTester(run).afterEach(), /ZCL_C/);
     assert.equal(sent, 0);
     assert.match(lines.join('\n'), /credential refusal.*ZCL_C/);
   });
@@ -155,5 +164,28 @@ describe("a failed test's warning says what happens to its objects", () => {
     lines.length = 0;
     await tester.afterEach();
     assert.match(lines.join('\n'), /kept for analysis/);
+  });
+});
+
+describe('a test that leaves a lock behind fails (second review)', () => {
+  it("a lock the test's step left unreleased fails it in afterEach", async () => {
+    const run = connection();
+    const tester = new FailedTester(run);
+    tester.markPassed();
+    await tester.startTest();
+    // A step the test passed over left its lock: its unlock failed on the network.
+    heldLocksOf(run).hold(lock('LEFT'));
+    heldLocksOf(run).unlockSent('LEFT');
+    await assert.rejects(tester.afterEach(), /ZCL_LEFT/);
+  });
+
+  it('a lock owned before the test began is not its failure', async () => {
+    const run = connection();
+    heldLocksOf(run).hold(lock('OLD'));
+    heldLocksOf(run).unlockSent('OLD');
+    const tester = new FailedTester(run);
+    tester.markPassed();
+    await tester.startTest();
+    await tester.afterEach();
   });
 });

@@ -328,6 +328,10 @@ The dispatch then acquires the connection as for any call, and the remaining che
    A listed long read (`tools/long-handlers.json`) never runs in the background on this path,
    whatever the host's background strategy. Without `background` it is recorded, as a long read
    is in compact batch mode; with `background: true` it was already refused by check 4.
+
+   The dispatch decides this before the connection is taken. For a call with `envelope_handle`,
+   `longReadInBackground` answers `false`, and `worksOnOwnConnection` keeps the call in the main
+   flow, exactly as both do while a compact batch is open (`batchOpenFor`).
 6. The access restrictions admit it, else their own refusal, checked at the same point as in
    compact batch mode. A package-tree read the check makes goes out at once on the instance's
    connection and is not recorded.
@@ -536,7 +540,7 @@ tables.
 
 ### 8.2 The core entries
 
-There are 45 rows: 19 in group A and 26 in group B. Every row here is justified by the handler's code, cited, and is proved again by its own
+There are 46 rows: 19 in group A and 27 in group B. Every row here is justified by the handler's code, cited, and is proved again by its own
 `oneRequestPerEntry.test.ts` case. The case runs the call held open, answered, and answered
 `404`, and expects exactly the requests listed. Every row has `"set": "core"` and no
 `connection`, since every request is a stateless `GET` over HTTP and RFC alike.
@@ -597,6 +601,7 @@ given.
 | `RuntimeGetGatewayErrorLog` | `system/readonly/handleRuntimeGetGatewayErrorLog.ts` | `GET /sap/bc/adt/gw/errorlog`, or one entry's detail | one `gatewayErrors`, or one `gatewayErrorDetail` |
 | `RuntimeListProfilerTraceFiles` | `system/readonly/handleRuntimeListProfilerTraceFiles.ts` | `GET /sap/bc/adt/runtime/traces/abaptraces` | one `profiler.list` |
 | `RuntimeGetProfilerTraceData` | `system/readonly/handleRuntimeGetProfilerTraceData.ts` | `GET` the trace's view asked (hit list, statements or DB accesses) | one `profiler.read` per view branch |
+| `RuntimeAnalyzeProfilerTrace` | `system/readonly/handleRuntimeAnalyzeProfilerTrace.ts` | `GET` the trace's view asked (`hitlist` by default), summarised locally | one `profiler.read` per view branch (line 199 on) |
 | `ListServiceBindingTypes` | `service_binding/high/handleListServiceBindingTypes.ts` | `GET /sap/bc/adt/businessservices/bindings/bindingtypes` | one `getServiceBindingTypes`; served by the core set only |
 | `GetSqlQuery` | `system/readonly/handleGetSqlQuery.ts` | `POST /sap/bc/adt/datapreview/freestyle` with the query | one `getSqlQuery` |
 | `GetTableContents` | `table/readonly/handleGetTableContents.ts` | `POST /sap/bc/adt/datapreview/freestyle` with `SELECT * FROM` the table | one `getSqlQuery` |
@@ -608,7 +613,8 @@ answer, as today. A test proves both: with data tools on, each is recorded; with
 neither is listed.
 
 **Several of these are listed long reads:** `SearchObject`, `GetSqlQuery`, `GetTableContents`,
-`GetATCFindings`, `GetATCResult`, `ListATCResults` and `RuntimeGetProfilerTraceData`. With a
+`GetATCFindings`, `GetATCResult`, `ListATCResults`, `RuntimeGetProfilerTraceData` and
+`RuntimeAnalyzeProfilerTrace`. With a
 handle they are recorded and never run in the background (§5.2, check 5).
 
 **Excluded variants, and why:**
@@ -721,6 +727,10 @@ New file: `envelopeRecording.test.ts`.
     the values `"x"`, `""`, `null` and `42`.
   - An admitted read given `""`, `null` or `42` gets the schema refusal.
   - The four envelope tools are never routed to recording.
+  - With a background strategy configured, a listed long read (`SearchObject`, say) given a
+    handle and no `background` is recorded into the envelope. It answers its number, takes the
+    main flow, gets no connection of its own (`worksOnOwnConnection` does not route it out),
+    creates no background run, and sends nothing until execution.
   - `background: true` is refused `batch_no_background` on a read that declares `background` and
     on one that does not (`GetClass`). Without a handle, an undeclared `background` is dropped
     before the handler, as today.

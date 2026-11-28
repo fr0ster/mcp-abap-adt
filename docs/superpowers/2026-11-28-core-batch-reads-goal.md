@@ -33,9 +33,12 @@ Each invariant is observable and proved by a test.
    lives in the instance's long session. Over Streamable HTTP the model also sends `state_handle`,
    which routes the call to that instance.
 4. **Possession of a handle is not authorization.** Every call naming a handle checks the pair
-   (handle, caller). The caller is the instance's destination plus its SAP user. An unknown
-   handle and another caller's handle get the same answer: not available. The `state_handle`
-   no-owner exception does not cover envelope handles.
+   (handle, caller). An envelope handle is valid only in the long session where it was created.
+   That means the same instance, destination and connection, and over Streamable HTTP the same
+   `state_handle`. The caller is that session with its SAP credentials. The SAP username is never
+   resolved, and creating an envelope sends nothing. An unknown handle and another session's
+   handle get the same answer: not available. The `state_handle` no-owner exception does not
+   cover envelope handles.
 5. **No clock of its own.** An envelope has no TTL. It ends by execution, a discard, the host,
    the backend, or the process's shutdown. It also ends with the instance that holds it:
    - over Streamable HTTP, with the long session;

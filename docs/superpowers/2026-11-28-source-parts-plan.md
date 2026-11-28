@@ -20,9 +20,16 @@ logical change per commit; every commit ends with the session's attribution line
 - **The rule:** a package is published, visible on the registry and through the post-publication
   gate before any package that depends on it builds against it; the dependent's first task moves
   its dependency to that version. Each section ends with its package ready to publish: gate
-  green, CHANGELOG written, the owner asked for the version. Sections 2 and 3 share PR A because
+  green, the change written under `[Unreleased]` in its CHANGELOG. Sections 2 and 3 share PR A because
   adt-strategies does not depend on adt-clients; every other section waits for the publication
   of the packages it depends on.
+- **Releases are the controller's.** No PR of this plan bumps a version or publishes. Each PR
+  merges on its own; interfaces-adt is released once for every open task, and one adt-clients
+  release (49.0.0) is cut after the open clients tasks have merged, with adt-strategies beside it.
+  A dependent's section starts when that release is on the registry.
+- **Before interfaces-adt is released**, adt-clients' member is written to the atom's shape and
+  tested on its own; the `implements` clause and the conformance typecheck against the atom are
+  the dependency task of PR A, done once the atom is published, before PR A merges.
 - **The post-publication gate**, after every publish and before its consumer starts: in an empty
   directory outside every repository, `npm install <package>@<version> --ignore-scripts` from the
   registry, then load its entry (`node -e "require('<package>')"`); a failure stops the sequence.
@@ -60,10 +67,10 @@ logical change per commit; every commit ends with the session's attribution line
 
 **Task 1.4 — ready to publish.**
 - The "types and constants only" check and the export surface green; `test:check`, `build`, lint.
-- README atom list, CHANGELOG entry (version asked of the owner).
+- README atom list, CHANGELOG entry under `[Unreleased]`.
 - The common release gate.
-- Commit: `docs: the outline and navigation atoms; CHANGELOG`. Push, PR, review; the owner
-  publishes; the post-publication gate.
+- Commit: `docs: the outline and navigation atoms; CHANGELOG`. Push, its own PR in that
+  repository, review, merge; the release is the controller's; the post-publication gate.
 
 ## 2. `@mcp-abap-adt/adt-clients` (repository mcp-abap-adt-clients, `packages/adt-clients`)
 
@@ -111,10 +118,10 @@ logical change per commit; every commit ends with the session's attribution line
 - Root gate (`npm run check`), unit suites green; the live run of 2.4 green on both systems; the
   common release gate.
 - Docs: `docs/usage/ERRATA.md` entries (spec §3.2), `README.md`, `docs/usage/CLIENT_API_REFERENCE.md`,
-  `docs/architecture/ARCHITECTURE.md`; CHANGELOG (version asked); `npm install --package-lock-only`
-  after the version change.
+  `docs/architecture/ARCHITECTURE.md`; CHANGELOG under `[Unreleased]`; no version change.
 - Commit: `docs: navigation target, the ERRATA entries; CHANGELOG`. adt-clients is ready to
-  publish; it is published with adt-strategies after PR A merges (task 3.3), not before.
+  release; it is released with adt-strategies after PR A merges (task 3.3), in the controller's
+  49.0.0, not before.
 
 ## 3. `@mcp-abap-adt/adt-strategies` (same repository, `packages/adt-strategies`)
 
@@ -137,9 +144,10 @@ Commit: `chore(deps): interfaces-adt <version>`.
 - Commit: `feat(results): readNavigationTarget`.
 
 **Task 3.3 — ready to publish.** Gate green; the common release gate; README surface list;
-CHANGELOG (version asked). Commit: `docs: readNavigationTarget; CHANGELOG`. PR A, holding both
-sections, is reviewed and merged; then the owner publishes from the tags, adt-clients first and
+CHANGELOG under `[Unreleased]`. Commit: `docs: readNavigationTarget; CHANGELOG`. PR A, holding both
+sections, is reviewed and merged; then the controller's release publishes adt-clients first and
 adt-strategies second; the post-publication gate for both before PR B.
+
 
 ## 4. `@mcp-abap-adt/adt-code-analyzer` (same repository, new `packages/adt-code-analyzer`)
 

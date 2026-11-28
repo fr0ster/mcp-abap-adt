@@ -131,7 +131,7 @@ one HTTP exchange of `AdtBatchConnection` that carries several requests.
 |---|---|---|
 | Connection | `@mcp-abap-adt/connection` | nothing |
 | Navigation member | `@mcp-abap-adt/adt-clients` | `AdtUtils.getNavigationTarget(uri, options)`: one `POST /sap/bc/adt/navigation/target`; its address in `endpoints/objects.ts` |
-| Navigation atom | `@mcp-abap-adt/interfaces-adt` | the atom that declares `getNavigationTarget` (`factoryReturnsCoverClass` refuses an `AdtUtils` member that no atom declares) |
+| Navigation and outline atoms | `@mcp-abap-adt/interfaces-adt` | the atoms that declare `getNavigationTarget` and `getObjectOutline` (`factoryReturnsCoverClass` refuses an `AdtUtils` member that no atom declares; `getObjectOutline` waits there for its atom today) |
 | Navigation reading | `@mcp-abap-adt/adt-strategies` | `readNavigationTarget`: the reference's include and its `start` |
 | Analyzer | `@mcp-abap-adt/adt-code-analyzer` (new, `packages/adt-code-analyzer` in the mcp-abap-adt-clients repository) | `AdtCodeAnalyzer`, the lexer, the block-end scanner |
 | Tools, merge, write | mcp-abap-adt `lib` | §8 |
@@ -264,6 +264,21 @@ address, all of them are marked informational with `duplicate_address`, listed w
 address, and refused as parts naming the address; the short form never resolves to them. Their
 lines are still reachable as a line range of the include, read by the include's own tool.
 
+**The outline's link (`ref`).** In the `parts` view each readable element also carries `ref`: an
+opaque string that holds its address and the SAP link it was located by (the block position of a
+class or an interface, the navigation fragment of a program element). `GetSourcePart` and
+`UpdateSourcePart` take `ref` in place of an address, and then read no outline for a part read:
+the analyzer navigates the link (programs) or takes the position (classes), and reads the
+include. The model reads nothing inside it. A `ref` is checked before it is used:
+
+- it must decode, and its include must lie under the object's own ADT address (a plain prefix
+  check), else `ref_invalid`;
+- the located block must pass the identity check (§5.2) against the address the `ref` carries; a
+  stale `ref` is refused `start_mismatch` and the model reads the outline again.
+
+Under the lock a write reads the outline afresh in any case (§7.2); a `ref` there only names the
+element.
+
 ### 5.1 A class or an interface: SAP's positions
 
 - A part is the block the outline names:
@@ -276,6 +291,9 @@ lines are still reachable as a line range of the include, read by the include's 
   for the boundary check of §5.4.
 - A method has two sides, `implementation` and `definition`; an interface's method has only
   `definition`. For the class itself, `definition` is the "definitions first" read.
+- **ABAP Doc stays outside.** The `"!` lines above a declaration are not part of its part, as
+  SAP's blocks leave them out (§2). A `replace` of the element leaves them as they are; a change
+  to them goes as a `relative_to: "include"` diff.
 
 ### 5.2 A program, an include, a function group: navigation plus the scanner
 
@@ -462,7 +480,11 @@ The sequence, one snapshot under one lock:
    one the write replaces. Call that text **T**.
 3. **Drift check.** `hash(T)` must equal `source_hash`. Otherwise the call is refused,
    `source_changed`, with the current hash, and nothing is written. A model that read the active
-   version while an inactive one differs gets this refusal too, and reads again.
+   version while an inactive one differs gets this refusal too, and reads again. The hash is the
+   primary check. SAP's `etag` sits beside it: every size and part answer carries the `etag` SAP
+   served with the read, where it served one, and a call that passes `etag` is refused
+   `source_changed` too when SAP serves one under the lock and it differs. Where SAP serves none,
+   the hash alone decides.
 4. **Locate in T.** `part(object, elements, { version: "inactive", source: T })`: the outline and
    the navigation are read afresh under the lock, and every element is located in T, never in
    another read. The identity rule (§5.2) and the boundary check (§5.4) run on T: an outline or
@@ -621,7 +643,7 @@ by each of its includes and modules. The answer names that source (its ADT addre
 
 Every dependency is consumed from the registry, published first and in this order:
 
-1. `@mcp-abap-adt/interfaces-adt`: the navigation atom.
+1. `@mcp-abap-adt/interfaces-adt`: the navigation and outline atoms.
 2. `@mcp-abap-adt/adt-clients`: `getNavigationTarget`.
 3. `@mcp-abap-adt/adt-strategies`: `readNavigationTarget`.
 4. `@mcp-abap-adt/adt-code-analyzer`: first release.
@@ -639,7 +661,8 @@ Nothing of this design is measured on 7.40. What is known:
   302 and 348, in mcp-abap-adt-clients).
 - The legacy system is reachable only at times.
 
-So on 7.40 the new reads and the partial update are off: the legacy sets do not list them, and
-nothing is sent. Navigations would go one by one there in any case (§4.4: the envelope only where
-measured). Turning them on is a measurement of the outline per object, navigation and the
-positions on 7.40 first, then a change of `available_in`.
+**Decided: on 7.40 the new tools, `part: "size"` and the outline views are off** until a 7.40
+measurement run. The legacy sets do not list them, and nothing is sent. Navigations would go one
+by one there in any case (§4.4: the envelope only where measured). Turning them on is that run
+(the outline per object, navigation and the positions on 7.40), then a change of `available_in`.
+

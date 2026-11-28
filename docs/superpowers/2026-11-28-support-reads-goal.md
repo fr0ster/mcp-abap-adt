@@ -51,7 +51,6 @@ the system.
   Measured on cloud and on premise, one object of each type per kind:
   - the source and the metadata document both answered `200`, namespaced names included
     (on premise);
-  - an absent template name answered `404` (object document only, on both kinds);
   - the source was a JSON document: a header, plus the subobjects (APLO), the class (SAJC)
     or the catalog name (SAJT);
   - the metadata document was an ADT object document with a description, language and
@@ -60,13 +59,13 @@ the system.
   The fields of other objects of these types are unverified.
 
   An absent name, both the object document and the source:
-  - Measured on cloud, with a 7-character name: `404` for all three types.
+  - Measured on cloud and on premise, with a 7-character name: `404` for all three types.
   - Measured on cloud, with a 21-character name: `404` for SAJC and SAJT. APLO answered
     `500` "Application Server Error", "Data was lost while copying a value". That a name
     longer than the type's name field causes it is inferred, not verified. The answer
     reaches the model as SAP's failure, like any other.
-  - On premise only the template object document is measured. The APLO and SAJC reads, and
-    the template source, are unverified.
+  - The 21-character name on premise is measured for the template object document only:
+    `404`.
 
   Finding these objects needs no new tool. The interfaces-adt search tables list `APLO`,
   `SAJC` and `SAJT` on both variants, and `SearchObject` checks its type against those
@@ -74,15 +73,25 @@ the system.
   with hits.
 - **Tool sets.**
   - Full sets (core, core-ro, on stdio, HTTP and SSE):
-    - one keyword-documentation tool;
-    - one `Get<Type>` per definition type, with `part` set to `source` (the default) or
-      `metadata`, as other `Get<Type>` tools take it.
-  - Compact sets (compact, compact-ro):
-    - the three definition types become `HandlerGet` object types, with the same two parts;
-    - the keyword documentation is one more `HandlerSystem` action.
+    - `GetAbapKeywordDocumentation`, a long read (it may run in the background, as the
+      listed long reads do): measured on cloud, a first read of a page took up to about
+      100 s on SAP's side;
+    - `GetApplicationLogDefinition`, `GetApplicationJobCatalog` and
+      `GetApplicationJobTemplate`, each with `part` set to `source` (the default) or
+      `metadata`, as other `Get<Type>` tools take it. They are plain reads, like every other
+      `Get<Type>`: each definition read took under 1 s on SAP's side on both kinds
+      (measured, `sap-perf-fesrec`).
 
-    So the compact tool count does not grow. The batch-mode sentence of each tool is decided
-    in the spec.
+    The name `GetApplicationLogDefinition` says that it reads a definition, so a search for
+    application logs does not take it for SLG1 data.
+  - Compact sets (compact, compact-ro):
+    - `HandlerGet` object types `APPLICATION_LOG_DEFINITION`, `APPLICATION_JOB_CATALOG`
+      and `APPLICATION_JOB_TEMPLATE`, with the same two parts;
+    - `HandlerSystem` action `keyword_documentation`.
+
+    `HandlerGet` and `HandlerSystem` are long reads already, and the new types and action
+    follow their tool as it is. So the compact tool count does not grow. The batch-mode
+    sentence of each tool is decided in the spec.
   - All of these are reads, so every `-ro` binary carries them. None is a data tool: the
     keyword documentation is SAP's product text, and a definition is a repository object.
 - **Answer forms.** Each tool takes `detail` like the other reads:
@@ -113,15 +122,13 @@ the system.
        a static table in the code, beside its live tests.
      - As measured:
        - on `onprem` and `cloud`, the query form and the topic form are eligible;
-       - on `cloud`, the three definition reads are eligible;
-       - on `onprem`, no definition read is eligible yet: only the template object document
-         is measured absent there. Each type becomes eligible once both its absent-name reads
-         answer `404`;
+       - on `onprem` and `cloud`, the three definition reads are eligible;
        - the position form is eligible nowhere yet, since the one position tried answered
          the start page; its live test has to show a statement's topic first;
        - on `legacy`, no definition read is eligible: the recorded 7.40 discovery lists
          none of their collections;
-       - the keyword documentation on `legacy` is an open question.
+       - the keyword documentation is off on `legacy` in 24.3.0: no form of it is measured
+         there.
   2. **The runtime gate, from the system's discovery alone.** An eligible form is served
      only when the discovery of the system reached lists what that form needs. Otherwise it
      is refused as not served, with no request. Each form needs:
@@ -203,36 +210,5 @@ The breakdown within each package is the spec's.
 - SM50 work processes. Measured: `403` on cloud, `405` on premise.
 - SE61 general texts (DOCT).
 - Writing, creating, locking or deleting any APLO, SAJC or SAJT object.
-
-## Open questions
-
-1. **The keyword documentation on legacy (7.40).**
-   - The recorded 7.40 discovery lists the collection with the `uri` template only: no
-     `query` and no `version`. That shows the position form is announced there. It does not
-     show that the form works.
-   - Nothing is measured there yet, and legacy is RFC.
-   - Recommendation: in the legacy window, measure each form against its own condition from
-     "Availability": the position form, and the topic form its pages link to.
-   - Mark eligible on `legacy` only the forms that meet their condition. List the tool there
-     in 24.3.0 only if at least one does.
-   - A form that fails stays refused on `legacy` even where the collection is listed. The
-     runtime gate then serves only what discovery announces there.
-2. **Is the keyword documentation a long read?**
-   - Measured on cloud: a first read of a page took up to about 100 s on SAP's side.
-   - Compact's `HandlerGet` and `HandlerSystem` are already long reads
-     (`src/lib/longTools.ts`). There the new action and the three new types follow their
-     tool as it is, so the compact and compact-ro binaries need no decision and get no
-     exception.
-   - Recommendation for the full binaries (core and core-ro, every transport): add the
-     keyword-documentation tool to the long reads.
-   - The three definition `Get<Type>` tools stay plain reads there, like every other
-     `Get<Type>`: each definition read took under 1 s on SAP's side on both kinds
-     (measured, `sap-perf-fesrec`).
-3. **Tool names.**
-   - `GetApplicationLogObject` would be found by a search for "application log" and then
-     answer no log entries.
-   - Recommendation: `GetApplicationLogDefinition`, `GetApplicationJobCatalog` and
-     `GetApplicationJobTemplate`, with `HandlerGet` types `APPLICATION_LOG_DEFINITION`,
-     `APPLICATION_JOB_CATALOG` and `APPLICATION_JOB_TEMPLATE`. Catalog and template are
-     definitions by name already. The keyword tool would be `GetAbapKeywordDocumentation`,
-     and the `HandlerSystem` action `keyword_documentation`.
+- The keyword documentation on `legacy`: it belongs to the legacy live-coverage task. That
+  task measures each form against its condition from "Availability".

@@ -12,6 +12,7 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { heldLocksOf } from '../../integration/helpers/heldLiveLocks';
 import { markCredentialRefused } from '../../integration/helpers/refusalGuard';
+import { StepFailure } from '../../integration/helpers/stepOutcome';
 import { LambdaTester } from '../../integration/helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../integration/helpers/testers/types';
 
@@ -187,5 +188,61 @@ describe('a test that leaves a lock behind fails (second review)', () => {
     tester.markPassed();
     await tester.startTest();
     await tester.afterEach();
+  });
+});
+
+describe('a soft-mode handler call is judged by its outcome (third review)', () => {
+  it('invokeToolOrHandler: a success whose own unlock lost the session ends the step', async () => {
+    const tester = new FailedTester(connection());
+    const unlockLost = {
+      isError: false,
+      content: [
+        {
+          type: 'text' as const,
+          text: JSON.stringify({
+            result: 'SUCCESS',
+            cleanup: {
+              object: { type: 'CLAS', name: 'ZCL_X' },
+              failures: [{ session_error: 'ADT_SESSION_REPLACED' }],
+            },
+          }),
+        },
+      ],
+    };
+    await assert.rejects(
+      tester.invokeToolOrHandler(
+        'UpdateLocalTestClass',
+        {},
+        async () => unlockLost,
+      ),
+      (error: unknown) =>
+        error instanceof StepFailure && error.outcome === 'session-lost',
+    );
+  });
+
+  it('invokeToolOrHandler: an ok answer and a failure answer are returned as they are', async () => {
+    const tester = new FailedTester(connection());
+    const ok = {
+      isError: false,
+      content: [{ type: 'text' as const, text: 'SUCCESS' }],
+    };
+    const refused = {
+      isError: true,
+      content: [
+        {
+          type: 'text' as const,
+          text: JSON.stringify({
+            message: 'x',
+            origin: 'refusal',
+            status: 400,
+          }),
+        },
+      ],
+    };
+    assert.equal(await tester.invokeToolOrHandler('X', {}, async () => ok), ok);
+    assert.equal(
+      await tester.invokeToolOrHandler('X', {}, async () => refused),
+      refused,
+    );
   });
 });

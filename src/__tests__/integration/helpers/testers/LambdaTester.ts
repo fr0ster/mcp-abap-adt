@@ -10,6 +10,7 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ToolResultLike } from '../../../../lib/toolResult';
 import {
   getCleanupAfter,
   getCleanupAfterRun,
@@ -26,7 +27,7 @@ import {
   configuredSystemKindOf,
   NO_KIND_STATED,
 } from '../configuredSystemKind';
-import { heldLocksIfAny, heldLocksOf } from '../heldLiveLocks';
+import { heldLocksIfAny, heldLocksOf, leavesALock } from '../heldLiveLocks';
 import { createTestLogger, type LoggerWithExtras } from '../loggerHelpers';
 import { PackageGuardRefusal } from '../packageGuard';
 import { primeSystemContext } from '../primeSystemContext';
@@ -36,6 +37,7 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../sessionHelpers';
+import { answerOutcome, StepFailure } from '../stepOutcome';
 import type { CaseParams, TestCase } from '../testConfigSchema';
 import { thrownWords } from '../thrownValue';
 import {
@@ -88,6 +90,16 @@ function reportedAuthType(connection: object): string | undefined {
 }
 
 export type TLambda = (context: LambdaTesterContext) => Promise<void>;
+
+/** Whether a direct call's answer is a tool answer (the handlers' `ToolResultLike`). */
+function isToolResult(value: unknown): value is ToolResultLike {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'content' in value &&
+    Array.isArray(value.content)
+  );
+}
 type HandlerLikeResponse = {
   isError: boolean;
   content: Array<{ type: 'text'; text: string }>;
@@ -733,7 +745,28 @@ export class LambdaTester {
     directCall: () => Promise<T>,
   ): Promise<T | HandlerLikeResponse> {
     if (!this.isHardMode()) {
-      return directCall();
+      // Soft mode (#394): judged as `send`/`liveCall` judge a live step — a
+      // lock the answer left taken in, a success that is not `ok` by its
+      // outcome (its own unlock failed, or its lock went with a lost session)
+      // ends the step. A failure answer is the suite's to judge.
+      const answer = await directCall();
+      if (isToolResult(answer)) {
+        const connection = this.context?.connection;
+        if (connection !== undefined && leavesALock(answer)) {
+          heldLocksOf(connection).takeInLeftLocked(answer);
+        }
+        if (answer.isError !== true) {
+          const outcome = answerOutcome(answer);
+          if (outcome !== 'ok') {
+            throw new StepFailure(
+              toolName,
+              outcome,
+              answer.content?.[0]?.text ?? '',
+            );
+          }
+        }
+      }
+      return answer;
     }
 
     const mcp = await this.getHardModeClient();

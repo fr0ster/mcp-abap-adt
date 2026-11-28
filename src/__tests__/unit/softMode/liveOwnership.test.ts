@@ -21,6 +21,7 @@ import {
   deleteRecorded,
   type LiveAnswer,
   type LiveRunner,
+  livePrepare,
   recordCreated,
   useLiveRunner,
 } from '../../integration/helpers/live';
@@ -116,14 +117,17 @@ describe('the live suites own their locks on the run connection', () => {
       ]);
     });
 
-    it(`${name} succeeded: a lost session clears the connection's locks`, () => {
+    it(`${name} succeeded: a lost session ends the step; the wire, not the answer, clears the locks`, () => {
       holdLock({
         object_type: 'CLASS',
         object_name: 'ZCL_B',
         lock_handle: 'B',
       });
       assert.throws(() => succeeded('HandlerUpdate CLASS', sessionLost));
-      assert.equal(heldLocksOf(connection).stillHeld.length, 0);
+      assert.equal(
+        heldLocksOf(connection).stillHeld.some((l) => l.lock_handle === 'B'),
+        true,
+      );
     });
   }
 });
@@ -170,5 +174,24 @@ describe('deleteRecorded sends each delete once', () => {
       ]),
       [['DEL', 'unlock-sent']],
     );
+  });
+});
+
+describe('every live step is read by its outcome (second review)', () => {
+  it('livePrepare: a success whose own unlock failed on the network ends the step', async () => {
+    answers.push(unlockCut);
+    await assert.rejects(
+      livePrepare('UpdateClass', { class_name: 'ZCL_LEFT' }),
+      (error: unknown) =>
+        error instanceof StepFailure && error.outcome === 'network',
+    );
+    assert.equal(heldLocksOf(connection).stillOwned[0]?.state, 'unlock-sent');
+  });
+
+  it('a recorded delete whose success carries a failed unlock is not counted as done', async () => {
+    recordCreated('DeleteClass', { class_name: 'ZCL_F' });
+    answers.push(unlockCut);
+    await assert.rejects(deleteRecorded(), /DeleteClass/);
+    assert.deepEqual(calls, ['DeleteClass']);
   });
 });

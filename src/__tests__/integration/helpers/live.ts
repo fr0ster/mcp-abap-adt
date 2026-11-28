@@ -92,7 +92,7 @@ import {
   refusalAnswered,
   refuseAfterMarker,
 } from './refusalGuard';
-import { answerOutcome } from './stepOutcome';
+import { answerOutcome, StepFailure } from './stepOutcome';
 import { testConfigPathFromEnv } from './testConfigPath';
 import {
   createHardModeClient,
@@ -400,8 +400,13 @@ async function liveRunner(system: SystemKind): Promise<LiveRunner> {
     return connection;
   };
   if (isHardModeEnabled()) return hardRunner(system, user, await logOn());
-  // Soft mode: one run connection per file (#394), every suite's.
-  const connection = await fileRunConnection(system, logOn);
+  // Soft mode: one run connection per file (#394), every suite's; its
+  // registry sees its wire from the first request on.
+  const connection = await fileRunConnection(system, async () => {
+    const opened = await logOn();
+    heldLocksOf(opened);
+    return opened;
+  });
   // The in-process server uses the guarded connection as given; its fresh
   // connections are guarded siblings.
   return softRunner({
@@ -676,6 +681,22 @@ async function send(tool: string, args: ToolArgs): Promise<LiveAnswer> {
   refuseAfterStop(tool);
   const answer = await current().call(tool, args);
   if (isCredentialRefusal(answer)) markCredentialRefused();
+  return judgedInSoftMode(tool, answer);
+}
+
+/**
+ * Soft mode (#394): a lock the answer left behind is taken into the run
+ * connection's registry, and a success that is not `ok` by its outcome — its
+ * own unlock failed on the network, or its lock went with a lost session —
+ * ends the step, whatever the suite checks of the answer. A failure answer
+ * is the suite's to judge, as before. Hard mode: the answer as it came.
+ */
+function judgedInSoftMode(tool: string, answer: LiveAnswer): LiveAnswer {
+  if (isHardModeEnabled()) return answer;
+  heldLocksOf(current().connection()).takeInLeftLocked(answer);
+  if (answer.isError) return answer;
+  const outcome = answerOutcome(answer);
+  if (outcome !== 'ok') throw new StepFailure(tool, outcome, answer.text);
   return answer;
 }
 
@@ -702,7 +723,7 @@ export async function liveCall(
   });
   const answer = await run.call(tool, args);
   if (isCredentialRefusal(answer)) markCredentialRefused();
-  return answer;
+  return judgedInSoftMode(tool, answer);
 }
 
 /**
@@ -774,9 +795,8 @@ export function recordCreated(deleteTool: string, args: ToolArgs): void {
  * leftovers report, and the cleanup fails.
  */
 export async function deleteRecorded(): Promise<void> {
+  if (isHardModeEnabled()) return deleteRecordedInHardMode();
   const failures: string[] = [];
-  const kept: Array<{ tool: string; args: ToolArgs }> = [];
-  const soft = !isHardModeEnabled();
   try {
     for (let at = created.length - 1; at >= 0; at -= 1) {
       const record = created[at];
@@ -785,18 +805,53 @@ export async function deleteRecorded(): Promise<void> {
       // stays, not sent.
       refuseAfterMarker(record.tool);
       refuseAfterStop(record.tool);
-      // Sent once (#394): in soft mode a delete is recorded as sent before
-      // it is sent, and one not answered ok is never sent again.
+      // Sent once (#394): recorded as sent before it is sent; one not
+      // answered ok is never sent again, and is reported.
       created.splice(at, 1);
-      if (soft) deleteSent.push(record);
-      const answer = await send(record.tool, record.args);
-      if (soft) {
-        // A lock the delete's own handler left behind is still owned; a
-        // lost session ended every lock of it.
-        const locks = heldLocksOf(current().connection());
-        locks.takeInLeftLocked(answer);
-        if (answerOutcome(answer) === 'session-lost') locks.sessionLost();
+      deleteSent.push(record);
+      const names = Object.values(record.args).filter(
+        (value): value is string => typeof value === 'string',
+      );
+      let answer: LiveAnswer;
+      try {
+        answer = await send(record.tool, record.args);
+      } catch (error) {
+        failures.push(
+          `${record.tool} ${JSON.stringify(record.args)}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        continue;
       }
+      // Judged by its outcome: a success whose own unlock failed is not
+      // done (send() ends it above); an absent object is.
+      const done =
+        answerOutcome(answer) === 'ok' ||
+        isNotFound(answer) ||
+        isGoneOnDelete(answer, names);
+      if (done) {
+        deleteSent.splice(deleteSent.indexOf(record), 1);
+      } else {
+        failures.push(
+          `${record.tool} ${JSON.stringify(record.args)}: ${answer.text}`,
+        );
+      }
+    }
+  } finally {
+    if (created.length > 0 || deleteSent.length > 0) reportRemaining();
+  }
+  if (failures.length > 0) {
+    throw new Error(`cleanup failed:\n${failures.join('\n')}`);
+  }
+}
+
+/** Hard mode's cleanup, as on main: a failed delete keeps its record. */
+async function deleteRecordedInHardMode(): Promise<void> {
+  const failures: string[] = [];
+  const kept: Array<{ tool: string; args: ToolArgs }> = [];
+  try {
+    for (let at = created.length - 1; at >= 0; at -= 1) {
+      const record = created[at];
+      if (record === undefined) continue;
+      const answer = await send(record.tool, record.args);
       const names = Object.values(record.args).filter(
         (value): value is string => typeof value === 'string',
       );
@@ -805,17 +860,16 @@ export async function deleteRecorded(): Promise<void> {
         !isNotFound(answer) &&
         !isGoneOnDelete(answer, names)
       ) {
-        if (!soft) kept.unshift(record);
+        kept.unshift(record);
         failures.push(
           `${record.tool} ${JSON.stringify(record.args)}: ${answer.text}`,
         );
-      } else if (soft) {
-        deleteSent.splice(deleteSent.indexOf(record), 1);
       }
+      created.splice(at, 1);
     }
   } finally {
     created.push(...kept);
-    if (created.length > 0 || deleteSent.length > 0) reportRemaining();
+    if (created.length > 0) reportRemaining();
   }
   if (failures.length > 0) {
     throw new Error(`cleanup failed:\n${failures.join('\n')}`);

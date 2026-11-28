@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Soft-mode integration tests keep their SAP session through a network drop** (#394). The session already survived: the connection keeps its cookies, and the same session, its locks with it, goes on once the network is back (measured on ABAP cloud and on premise). The harness used to lose it. A failed step ended the test, cleanup dropped a lock's handle before its unlock had reached SAP, and the file's single logoff could fail with nothing reported. Now:
+  - every step's outcome is read from the answer's typed fields, any outcome but `ok` ends the test, and nothing is sent twice;
+  - locks and created objects are owned by the connection until SAP answered their release or delete;
+  - cleanup releases every held lock before the YAML policy decides about deletes;
+  - the package delete keeps its own lock-free sibling session (PAK/058);
+  - a soft-mode connection that still owns a lock, or an object whose create or delete is unconfirmed, fails the file at its logoff and names what is left.
+
+  A soft-mode `HighTester` step that SAP refused now fails its test, as in hard mode; before, a soft run passed over an error answer. A live run can cut the network in process with `MCP_TEST_NETWORK_CUT_MS` and `MCP_TEST_NETWORK_CUT_AT`. `src/__tests__/integration/README.md`, "A network drop in soft mode".
 - **`@mcp-abap-adt/adt-clients` 48, `@mcp-abap-adt/adt-strategies` 0.29, `@mcp-abap-adt/interfaces-adt` 33.** No tool changes for the model: the same tools, arguments and answers.
   - The server's client contract (`src/lib/adtClientContract.ts`) names the identity keys of every atom, as interfaces-adt 32/33 type them (the object's name, its parent's where it has one; a program's and an include's validation also the package; an enhancement's metadata read its type), and the generic answers are `E | IAdtError`.
   - `CreateMessageClassMessage`, `UpdateMessageClassMessage` and `DeleteMessageClassMessage` compose the message's lock window themselves (`src/lib/messageClassMessageWrite.ts`), from adt-clients 48's one-request members, as the library's MIGRATION-48 gives the chain its `create`, `update` and `delete` ran: the class document read at the working area, `LOCK_MSG` (a `403` goes on with the class's handle), the class lock for the message (a `403` takes the plain class lock), the PUT (a removal with `removeMessage: true`), the class `UNLOCK`, then `UNLOCK_ALL` — the same requests in the same order, the locks stateful and the PUT stateless, every lock given up on every way out and the first error thrown the one answered. Two answers differ as the library's note says: a class read SAP refused is answered as a failure rather than thrown, and a removal is read by the `deleted` reading.

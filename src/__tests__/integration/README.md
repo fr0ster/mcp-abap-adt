@@ -110,9 +110,57 @@ and no section nothing reads.
    objects deletes each of them.
 2. **Errors.** Check `result.isError` before parsing an answer.
 3. **Locks.** A lock a test takes is released by the test, and a refused release fails it
-   (`helpers/rapFixtures.ts` shows the pattern).
+   (`helpers/rapFixtures.ts` shows the pattern); every lock goes through the connection's
+   registry (see "A network drop in soft mode").
 4. **Shared objects** are created once with `npm run shared:setup` and checked with
    `npm run shared:check`.
+
+## A network drop in soft mode
+
+A soft-mode file runs on one connection, and a network drop does not end its SAP session:
+the connection keeps its cookies, and once the network is back the same session goes on,
+its locks still held (measured on ABAP cloud and on premise). What the harness does with
+a failed step:
+
+- **A step that fails ends the test, and nothing is sent twice.** Every call's outcome is
+  read from the answer's typed fields (`helpers/stepOutcome.ts`): `ok`, `network`
+  (`connection_cause`), `session-lost` (`session_error`, `session_lost`), `credential`,
+  `refused` (SAP answered), `unclassified`. Any outcome but `ok` ends the test, as in hard
+  mode. A high-level step whose own unlock failed on the network ends the test too, even
+  though its answer is a success, and its lock counts as still held. `HighTester` resends
+  only a step SAP refused with a transient conflict (`409`, `SWB_TOOL`).
+- **Locks** are owned by the connection's registry (`helpers/heldLiveLocks.ts`) until SAP
+  answered their release: `held` from the lock's answer, `unlock-sent` once an unlock was
+  sent (by the test, its cleanup, or a handler's own `withLock`, a `left_locked` answer).
+  An unlock is sent once; one that failed is not sent again, and the lock is reported.
+  Cleanup releases every `held` lock before the YAML policy decides about deletes.
+- **Objects** are owned by the connection's record (`helpers/ownedObjects.ts`):
+  `unconfirmed` before their create is sent (a create whose answer was lost is still
+  deleted; its `404` counts as gone), `delete-sent` once a delete was sent (never sent
+  again: "deletion unconfirmed"). The YAML policy still decides whether a failed test's
+  objects are deleted.
+- **The package delete** runs in its own lock-free sibling session
+  (`force_new_connection: true`): a session that created a package cannot delete it
+  (PAK/058). It is the one request of a file on another connection.
+- **The file's logoff** is sent once, after a credential refusal never. It is reported as
+  "logoff failed", "logoff not confirmed" (the connection cannot tell an answered logoff
+  from a lost one) or "logoff not sent: a credential was refused". A soft-mode connection
+  that still owns a lock, or an object whose create or delete is unconfirmed, fails the
+  file and names what is left: it ends with that logoff if SAP received it, else with
+  SAP's own timeout. Hard mode's connections only warn, as before.
+
+A cleanup that runs while the network is still down cannot reach SAP. Its unlock fails
+once, and the report names the lock as still held.
+
+To cut the network in a live run, set the duration and the test's full name (as node:test
+names it, `suite > case`): the cut starts when that test first holds a lock, destroys every
+open socket, refuses new ones, and ends after the duration. Its start and end go to stderr.
+
+```bash
+npm run test:integration -- --env MCP_TEST_NETWORK_CUT_MS=5000 \
+  --env "MCP_TEST_NETWORK_CUT_AT=<suite> > <case>" \
+  src/__tests__/integration/high/include/IncludeHighHandlers.test.ts 2>&1 | tee <log>
+```
 
 ## Interrupting a run
 

@@ -96,7 +96,13 @@ and the debugger batch suites pass unchanged.
 - `src/lib/batch/sentence.ts`: `batchSentence` reads compact entries only; a new
   `envelopeSentence` and `ENVELOPE_SENTENCE`;
 - the compact batch mode's call site in `BaseMcpServer.recordCall`, which passes `'compact'`;
-- the renderer and test of the `BATCH_MODE.md` table, rendered per set.
+- the renderer and test of the `BATCH_MODE.md` table, rendered per set;
+- every existing consumer of `eligible` and of the entry shape, migrated in the same commit so
+  that the gate stays green:
+  - `src/__tests__/unit/batch/eligibility.test.ts`, `oneRequestPerEntry.test.ts`,
+    `whereUsedAndFeeds.test.ts` and `recording.test.ts`, each passing `'compact'`;
+  - `src/__tests__/unit/sources/batchHandlers.test.ts`, whose "every entry is compact" assertion
+    becomes "every entry is `compact` or `core`, and each set's entries name tools of that set".
 
 **Tests first**, in `eligibility.test.ts`:
 
@@ -108,7 +114,11 @@ In `sentence` tests:
 - the compact sentences are unchanged;
 - `envelopeSentence` renders the always form and the "When …" form.
 
-**Commit.** "feat(batch): eligibility by set; the envelope sentence".
+**Gate.** Every file above, `sentence` and the `BATCH_MODE.md` table test, the compact surface
+test (`surface.test.ts`, compact descriptions unchanged).
+
+**Commit.** "feat(batch): eligibility by set; the envelope sentence", with the consumer migrations
+in the same commit.
 
 ## Task 4. The refusal codes (§7)
 
@@ -203,15 +213,21 @@ The answer form is the dispatch's `answerFailure`.
   `InstanceBatch`;
 - `src/lib/state/longSession.ts`: `SessionHolding.envelopes`.
 
-**Tests first.**
+**Tests first** — owner attachment and lifecycle only. No public envelope tool exists yet, so
+each test opens an envelope at owner level, on the owner the host handed the instance:
 
-- Two instances get distinct owners.
-- An instance without an owner answers `envelopes_unavailable`.
+- Two instances get distinct owners, each attached to its own state.
+- An instance built without an owner has none attached; the public `envelopes_unavailable`
+  answers are tested in tasks 9 and 10.
+- The embedder's `openEnvelopes`:
+  - a valid value is handed to the owner;
+  - `0`, `-1`, `1.5` and `x` refuse with `openEnvelopesRefusal("openEnvelopes")`;
+  - omitted, there is no bound.
 - Over HTTP an open envelope keeps the instance in the pool, and the idle bound ends it.
 - Over SSE the disconnect and the idle bound end it.
 - `SessionClose` names the count and ends it.
 - The host's shutdown disposes it.
-- stdio has no idle bound.
+- stdio has no idle bound: the fake clock advanced by days leaves it open.
 
 **Commit.** "feat(envelopes): the hosts create the owner".
 
@@ -244,11 +260,29 @@ envelope directly, since the dispatch comes in task 10:
 - no `406`/`415` resend;
 - `keepRawParts` adds `raw`;
 - the empty envelope answers `[]`;
-- a connection failure before the claim leaves the envelope open;
-- a foreign handle on a cold instance makes no request;
+- every number of a call over the bound answers the oversized words, not only that call's;
+- a resumed handler that tries another request after its parts answers `batch_ended` under its
+  number;
+- execute answers `isError: false` after the claim, also when every number is an error;
+- a failure in the second of three runs, with a first-run handler that settles slowly: that
+  handler's projection is built and kept before any failed-run signal is aborted;
 - a second execute, a discard after execute and a record after execute each answer
   `envelope_unavailable`, with one send;
 - execution while a lock is held still goes stateless.
+
+**Tool tests**, through a real SDK `Client` over `InMemoryTransport`:
+
+- An instance without an owner answers `envelopes_unavailable` on each of the four tools.
+- On a cold instance, create, list and discard make no request, call no connection factory and
+  call no `getConnection`. An execute with a foreign or unknown handle does the same.
+- A connection acquisition that fails before the claim leaves the envelope open with its record.
+  The next execute, with the connection back, sends it once and answers every number.
+- Over Streamable HTTP, two requests with different credential headers on the same pooled
+  instance each create an envelope. A third create by either is refused `envelope_limit`, and
+  nothing is evicted.
+- For execute, discard and list, an unknown handle and another session's handle get
+  byte-identical answers. The other session differs in one way at a time: instance,
+  `state_handle`, each credential header, and the connection context.
 
 **Surface tests**, in `surface.test.ts`:
 
@@ -256,7 +290,12 @@ envelope directly, since the dispatch comes in task 10:
 - their descriptions;
 - `toolDescriptionsCarryNoLiterals`.
 
-**Commit.** Two commits: "feat(envelopes): the four tools" and "feat(envelopes): execution".
+**Commits.** Two, each buildable on its own:
+
+1. "feat(envelopes): create, discard and list". It holds the group, `ENVELOPE_TOOLS`, the
+   pre-acquisition check, the surface tests, and the tool tests that need no execution.
+2. "feat(envelopes): execution". It holds execute, `envelopeExecute.test.ts`, and the execute
+   tool tests.
 
 ## Task 10. The dispatch and the interception point (§5.2, §5.3, §5.4)
 
@@ -275,7 +314,11 @@ envelope directly, since the dispatch comes in task 10:
   - the handle is stripped.
 - `src/lib/batch/recorder.ts`: the node-structure rule and its partial-call answer.
 - `tools/batch-handlers.json`: the first core row, `GetClass`, with its `oneRequestPerEntry`
-  case, so that the dispatch has a real admitted read to drive.
+  case, so that the dispatch has a real admitted read to drive. Every test of this task runs on
+  `GetClass`, or on the recorder directly. A test that needs a row from task 11 or 12 is listed
+  there.
+- `src/__tests__/unit/surface/envelopeSurface.test.ts`, new and table-driven: it reads the core
+  entries of `tools/batch-handlers.json`, so it grows by itself as tasks 11 and 12 add rows.
 
 **Tests first** — `envelopeRecording.test.ts`, new, through a real SDK `Client` over
 `InMemoryTransport`:
@@ -286,23 +329,45 @@ envelope directly, since the dispatch comes in task 10:
 - a non-admitted tool given `"x"`, `""`, `null` or `42` is refused `envelope_not_recordable`;
 - an admitted read given `""`, `null` or `42` gets the schema refusal;
 - the four tools are never routed to recording;
-- `background: true` is refused on a read that declares it and on `GetClass`, which does not;
+- `background: true` is refused on `GetClass`, which does not declare it;
 - an undeclared `background` without a handle is dropped as today;
-- with a background strategy configured, a long read with a handle and no `background` is
-  recorded, takes the main flow and creates no run;
+- an instance without an owner answers `envelopes_unavailable` on `GetClass` with a handle;
 - an access-restricted call is refused before taking a number, and its package-tree read goes
   out at once;
-- a second node structure is refused, with the partial-call case keeping its number and its
-  earlier part;
-- a call with several independent requests shares one number;
 - a read with a handle reaches its envelope while a debugger batch is open, and the debugger
   batch is unchanged;
-- the session check of §9.2, for each of record, execute, discard and list: byte-identical
-  answers, nothing recorded or sent;
+- the session check of §9.2 for record: byte-identical answers, nothing recorded or sent; the
+  other session differs in one way at a time, as in task 9;
+- execute, record and discard sent at once over one transport: one send, and the later calls
+  answer `envelope_unavailable`;
+- a SAP session lost between record and execute, and a replaced SAP connection under the same
+  connection context: the envelope stays valid, and execute sends on the current connection;
+- on stdio, the destination's token refreshed between record and execute: execute sends with
+  the current credential;
+- the instance's close with recorded `GetClass` calls pending: every recorded handler settles,
+  and the connection counts no send;
 - the listed schemas of the loose tools equal today's apart from `additionalProperties`.
 
-**Commit.** Two commits: "feat(envelopes): the schemas carry envelope_handle" and
-"feat(envelopes): recording by handle".
+**Recorder tests**, with fake requests, needing no row:
+
+- a second node-structure request is refused;
+- the partial-call case keeps its number and its earlier part, and answers the refusal;
+- a node-structure refusal under a number answers that refusal even when its run fails.
+
+**Surface tests**, in `envelopeSurface.test.ts`:
+
+- every core entry's tool declares `envelope_handle` with its parameter description and ends
+  with its sentence (always form or "When …");
+- no other core tool declares it or carries the sentence;
+- every compact tool's schema and description equal today's.
+
+**Commits.** Two, each buildable on its own:
+
+1. "feat(envelopes): the schemas carry envelope_handle". It holds the registration forms, the
+   surface test and the loose-schema listing test. A call with a handle is still refused
+   `envelope_not_recordable` here, including on `GetClass`, and a test says so.
+2. "feat(envelopes): recording by handle". It holds the recording path, the node-structure rule,
+   the `GetClass` row and its case, and the rest of the tests.
 
 ## Task 11. The group A rows (§8.2)
 
@@ -343,7 +408,13 @@ The pinning test asserts:
 - the projection equality per row;
 - with data tools on, `GetSqlQuery` and `GetTableContents` are recorded; with them off, neither
   is listed;
-- each listed long read among the rows records with a background strategy configured.
+- with a background strategy configured, each listed long read among the rows (`SearchObject`,
+  say), given a handle and no `background`, is recorded, takes the main flow and creates no run;
+- `background: true` is refused on a row that declares `background` (`SearchObject`);
+- `GetObjectsByType` end to end: one per envelope, and a second call refused
+  `envelope_node_structure`;
+- `GetObjectVersionDiff` and `GetObjectDraft` end to end: their independent requests share one
+  number, and each answer equals the answer outside an envelope.
 
 If a case shows a row sending other requests than §8.2 states, that row is not added. The
 finding is reported in #402 with the request seen, and the spec is corrected there before going
@@ -372,17 +443,33 @@ saved.
 - the architecture: `ARCHITECTURE.md`, `STATEFUL_SESSION_GUIDE.md`, `REQUEST_HEADERS.md`,
   `HANDLER_EXPORTER.md`;
 - `http/README.md`, `SECURITY.md`, `README.md`, `docs/README.md`;
-- the generated listings and the tool-search index, rewritten by their writers
-  (`npm run docs:tools` and the listing writers);
+- the generator first, `tools/generate-tools-docs.js`. Its hard-coded words say batch mode is
+  compact's alone and the full binaries serve none: the binaries line (line 722) and
+  `READ_ONLY_PAGE_INTRO` (line 931). Both are rewritten to name the envelope tools of the core
+  and core-ro binaries;
+- then the generated listings and the tool-search index, rewritten by their writers
+  (`npm run docs:tools` and the listing writers). Their output is checked: the core pages list
+  the four envelope tools, the admitted reads' `envelope_handle` and sentence, and no line saying
+  the core binaries serve no batching;
 - the dated 24.3.0 entry in `CHANGELOG.md`.
 
 CLAUDE.md's "The state handle" section is not edited here. The PR names the change for the
 controller.
 
-**Tests.** The table and listing tests pass against the rewritten files.
+**Tests.**
 
-**Commit.** One commit per document group: user guide, architecture, security and READMEs,
-generated listings, changelog.
+- The table and listing tests pass against the rewritten files.
+- A grep of `docs/`, `README.md`, `http/README.md` and the generator finds no sentence left
+  saying batching is compact's alone.
+
+**Commits**, one per document group, in this order:
+
+1. the generator;
+2. the generated listings;
+3. the user guide;
+4. the architecture docs;
+5. security and the READMEs;
+6. the changelog.
 
 ## Task 15. Before the release
 

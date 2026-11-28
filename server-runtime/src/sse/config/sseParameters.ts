@@ -10,6 +10,7 @@
 import {
   ACCESS_RESTRICTION_ROWS,
   BATCH_KEEP_RAW_PARTS_ROW,
+  BATCH_OPEN_ENVELOPES_ROW,
   BATCH_PARTS_PER_ENVELOPE_ROW,
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
@@ -132,6 +133,7 @@ export function sseParameters(
       STATE_IDLE_ROW,
       BATCH_KEEP_RAW_PARTS_ROW,
       BATCH_PARTS_PER_ENVELOPE_ROW,
+      BATCH_OPEN_ENVELOPES_ROW,
       ENABLE_DATA_TOOLS_ROW,
       SESSION_KEEP_ALIVE_ROW,
       SHUTDOWN_TIMEOUT_ROW,
@@ -209,6 +211,7 @@ export function readSseConfig(
     stateIdleMinutes: numberValue(values.stateIdleMinutes),
     batchKeepRawParts: values.batchKeepRawParts === true,
     batchPartsPerEnvelope: numberValue(values.batchPartsPerEnvelope),
+    batchOpenEnvelopes: numberValue(values.batchOpenEnvelopes),
     enableDataTools: values.enableDataTools === true,
     sessionKeepAliveMinutes: numberValue(values.sessionKeepAliveMinutes),
     accessRestrictions: readAccessRestrictions(argv, env, yaml),

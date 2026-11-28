@@ -90,6 +90,13 @@ export interface IServerConfig {
   batchPartsPerEnvelope?: number | undefined;
 
   /**
+   * The consumer's bound on the envelopes one owner holds open
+   * (`--batch-open-envelopes`, `MCP_BATCH_OPEN_ENVELOPES`,
+   * `batch.openEnvelopes`): a positive whole number. Absent: no bound.
+   */
+  batchOpenEnvelopes?: number | undefined;
+
+  /**
    * Whether the binary serves the data tools (`--enable-data-tools`,
    * `MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`). Default `false`.
    */

@@ -1043,6 +1043,65 @@ export const BATCH_PARTS_PER_ENVELOPE_ROW: Parameter = {
   help: `The most parts (requests) one ADT batch envelope carries when a single tool call reads several objects at once (GetEnhancements, SearchSource, package listings and walks, function module group checks, …): the reads go in consecutive envelopes of balanced size, a read's requests always together in one envelope; a read that needs more parts than this is answered an error naming both numbers, and nothing is sent. A positive whole number. Default (not given or blank): no bound — all independent reads of a step go in one envelope, and an envelope SAP refuses or fails is answered as SAP answered it.`,
 };
 
+export const BATCH_OPEN_ENVELOPES_CLI = '--batch-open-envelopes';
+export const BATCH_OPEN_ENVELOPES_ENV = 'MCP_BATCH_OPEN_ENVELOPES';
+export const BATCH_OPEN_ENVELOPES_YAML = 'batch.openEnvelopes';
+
+/** The refusal of an open-envelopes bound, in fixed words: the value is never echoed. */
+export function openEnvelopesRefusal(name: string): string {
+  return `Invalid ${name}: must be a positive whole number of envelopes`;
+}
+
+/**
+ * `--batch-open-envelopes`'s value: a whole number from 1, read by plain
+ * code — ASCII digits as a string, or a YAML integer; a list, a mapping, a
+ * boolean or a fraction is refused.
+ */
+export function parseOpenEnvelopes(raw: JsonValue, name: string): number {
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  const value =
+    typeof raw === 'number'
+      ? raw
+      : isDigits(text)
+        ? Number.parseInt(text, 10)
+        : Number.NaN;
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new ParameterRefusal(openEnvelopesRefusal(name));
+  }
+  return value;
+}
+
+/**
+ * `value` when it is a bound an owner can keep — a whole number from 1 —,
+ * else a throw naming `name`. For the bound an embedder states in its
+ * options (`openEnvelopes`); the configured one is read by
+ * `BATCH_OPEN_ENVELOPES_ROW`.
+ */
+export function openEnvelopesOf(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error(openEnvelopesRefusal(name));
+  }
+  return value;
+}
+
+/**
+ * `--batch-open-envelopes` / `MCP_BATCH_OPEN_ENVELOPES` / YAML
+ * `batch.openEnvelopes`: the consumer's bound on the envelopes one owner
+ * holds open (the core and core-ro binaries' read envelopes). No default:
+ * not given (or blank), the server sets no bound. In every binary's table.
+ */
+export const BATCH_OPEN_ENVELOPES_ROW: Parameter = {
+  key: 'batchOpenEnvelopes',
+  cli: BATCH_OPEN_ENVELOPES_CLI,
+  env: BATCH_OPEN_ENVELOPES_ENV,
+  yaml: BATCH_OPEN_ENVELOPES_YAML,
+  kind: 'custom',
+  parse: parseOpenEnvelopes,
+  valueHint: '=<envelopes>',
+  section: 'BATCH MODE',
+  help: 'The most envelopes one server instance holds open at once (the core and core-ro binaries: ReadEnvelopeCreate collects read calls under an envelope_handle, sent together by ReadEnvelopeExecute). A create at the bound is refused, and nothing is evicted: execute or discard one first. A positive whole number. Default (not given or blank): no bound.',
+};
+
 export const ENABLE_DATA_TOOLS_CLI = '--enable-data-tools';
 export const ENABLE_DATA_TOOLS_ENV = 'MCP_ENABLE_DATA_TOOLS';
 export const ENABLE_DATA_TOOLS_YAML = 'enable-data-tools';

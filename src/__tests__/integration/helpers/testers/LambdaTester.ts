@@ -42,6 +42,7 @@ import type { CaseParams, TestCase } from '../testConfigSchema';
 import { thrownWords } from '../thrownValue';
 import {
   createHardModeClient,
+  getHardModeConfig,
   type HardModeClient,
   isHardModeEnabled,
   parseToolText,
@@ -220,9 +221,9 @@ export class LambdaTester {
         throw new Error(stated.skip);
       }
       isCloudSystem = stated.isCloudSystem;
-      const hardModeEnabled =
-        config?.environment?.integration_hard_mode?.enabled === true ||
-        config?.integration_hard_mode?.enabled === true;
+      // One source for hard or soft mode (#394): the same reading the
+      // calls take (`isHardMode`).
+      const hardModeEnabled = getHardModeConfig(config).enabled;
 
       // Load environment variables only for in-process mode
       if (!hardModeEnabled) {

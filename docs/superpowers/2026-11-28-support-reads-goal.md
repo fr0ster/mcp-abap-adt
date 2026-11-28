@@ -192,7 +192,8 @@ The breakdown within each package is the spec's.
    - Measured on cloud: a first read of a page took up to about 100 s on SAP's side.
    - The `-ro` binaries carry the background runs of the long reads.
    - Recommendation: make the keyword-documentation reads long reads, so a caller can run
-     them in the background. The definition reads answered fast and stay plain reads.
+     them in the background. The definition reads stay plain reads: each one read took under
+     1 s on SAP's side on both kinds (measured, `sap-perf-fesrec`).
 3. **Tool names.**
    - `GetApplicationLogObject` would be found by a search for "application log" and then
      answer no log entries.

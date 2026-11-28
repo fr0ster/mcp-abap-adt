@@ -187,10 +187,13 @@ The answer form is the dispatch's `answerFailure`.
 
 **Files.**
 
-- `src/embeddable/BaseMcpServer.ts`: a private `envelopeKey()`. It reads `connectionContext`
-  and, over Streamable HTTP, the call's `state_handle` and the request headers from the request
-  context, and computes the SHA-256 digest of `x-sap-url`, `x-sap-client`, `x-sap-jwt-token`,
-  `x-sap-login` and `x-sap-password`. Matches are compared with `timingSafeEqual`.
+- `src/lib/httpTransport/headerSource.ts`: `headerContext` computes the SHA-256 digest of
+  `x-sap-url`, `x-sap-client`, `x-sap-jwt-token`, `x-sap-login` and `x-sap-password` and carries
+  it on the context it returns (`sessionDigest`, `ConnectionContext`).
+- `src/embeddable/BaseMcpServer.ts`: a private `envelopeKey()`:
+  - on stdio and SSE, `connectionContext` by identity;
+  - over Streamable HTTP, the instance, the instance state's handle and the context's
+    `sessionDigest`, matched with `timingSafeEqual` (spec §4.1).
 
 **Tests first.**
 
@@ -198,6 +201,9 @@ The answer form is the dispatch's `answerFailure`.
   `requireSystem` and no `callerUserOf`.
 - Over HTTP, each credential header changed alone gives another key, and so does another or a
   missing `state_handle`.
+- On each transport a fresh `headerContext` per request with the same headers still matches:
+  - over HTTP, two contexts built from the same headers on one instance;
+  - over SSE, the connection's one context.
 - The digest appears in no log line or answer.
 
 **Commit.** "feat(envelopes): the session key, built without a request".

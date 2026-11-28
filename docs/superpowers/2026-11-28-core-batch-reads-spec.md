@@ -212,26 +212,37 @@ never resolved, and `ReadEnvelopeCreate` sends nothing and acquires no connectio
 
 ### 4.1 The session key
 
-`ReadEnvelopeCreate` records a session key on the envelope. It has three parts.
+`ReadEnvelopeCreate` records a session key on the envelope. What the key holds depends on the
+transport.
 
-- **The instance.** The owner is the instance's own (§3.2), so a handle is only ever looked up
-  in the instance that created it.
-- **The destination and the connection.** The instance's `connectionContext`, compared by object
-  identity: the destination and credential source the instance was given (`built`), or the
-  host's connection itself (`injected`). An instance never changes it after
-  `setConnectionContext`, so on stdio and SSE every call of the instance carries the same one.
+**stdio and SSE: the instance and its connection context.**
 
-  A SAP session spent and replaced under the same context (`getConnection`, `retire`) is still
+- The owner is the instance's own (§3.2), so a handle is only ever looked up in the instance that
+  created it.
+- The instance's `connectionContext` is compared by object identity: the destination and
+  credential source the instance was given (`built`), or the host's connection itself
+  (`injected`).
+- stdio sets the context once for the instance's life. SSE sets it once per connection
+  (`SseServer.ts`, at the stream's opening `GET`).
+- A SAP session spent and replaced under the same context (`getConnection`, `retire`) is still
   the same connection context. The envelope stays valid (§3.4).
-- **Over Streamable HTTP, the request's `state_handle` and its SAP credentials.** The pooled
-  instance's held connection takes each request's credential (`headerSource`,
-  `CurrentCredential`). So the key also holds:
-  - the instance state's handle the create call ran under (`context.state.handle`);
+
+**Streamable HTTP: the instance, the `state_handle`, and a digest of the request's headers.**
+
+- The pooled instance gets a fresh `headerContext(req.headers)` on every request, a routed one
+  included (`StreamableHttpServer.ts`, `useConnectionContext`), and its held connection takes
+  each request's credential (`headerSource`, `CurrentCredential`). So the context's identity is
+  not part of the key: it would differ on every request.
+- The key holds:
+  - the instance, as the owner is the instance's own;
+  - the instance state's handle, the one the request's `state_handle` routed it to
+    (`context.state.handle`);
   - a SHA-256 digest of the request's destination and credential headers, as
     `credentialFromHeaders` reads them: `x-sap-url`, `x-sap-client`, `x-sap-jwt-token`,
     `x-sap-login` and `x-sap-password`, each name with its value, absent ones marked absent.
-
-  The digest stays in memory only. It is never logged, never answered and never persisted.
+- `headerContext` computes the digest from the headers and carries it on the context it returns
+  (`sessionDigest`). The instance reads it from the context in force for the call.
+- The digest stays in memory only. It is never logged, never answered and never persisted.
 
 ### 4.2 The check
 
@@ -239,10 +250,9 @@ Every other envelope tool, and every read given an `envelope_handle`, builds the
 its own call. It passes the key to `find`, `claim`, `discard` or `list`. The call is the caller
 when:
 
-- its connection context is the same object;
-- over Streamable HTTP, it ran under the same `state_handle`;
-- over Streamable HTTP, its digest matches the recorded one in constant time
-  (`crypto.timingSafeEqual`).
+- on stdio and SSE, its connection context is the same object;
+- over Streamable HTTP, it ran under the same `state_handle`, and its digest matches the recorded
+  one in constant time (`crypto.timingSafeEqual`).
 
 Any mismatch is `envelope_unavailable`, the same answer and words as an unknown handle.
 
@@ -700,7 +710,11 @@ The other session differs in one way at a time, each its own case:
 - over Streamable HTTP, another `state_handle`, and no `state_handle`;
 - over Streamable HTTP, the same `state_handle` with another `x-sap-password`, another
   `x-sap-login`, another `x-sap-jwt-token`, another `x-sap-url`, and another `x-sap-client`;
-- an injected connection context replaced by another object.
+- an injected connection context replaced by another object (stdio).
+
+On each transport, a fresh `headerContext` per request with the same headers still matches:
+over Streamable HTTP two requests routed by one `state_handle`, each with its own context object
+and the same five headers, name the same envelope; over SSE the connection's one context does.
 
 A list by another session does not show the envelope.
 

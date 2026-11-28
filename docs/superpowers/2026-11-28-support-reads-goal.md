@@ -58,14 +58,17 @@ the system.
 
   The fields of other objects of these types are unverified.
 
-  An absent name, both the object document and the source:
-  - Measured on cloud and on premise, with a 7-character name: `404` for all three types.
-  - Measured on cloud, with a 21-character name: `404` for SAJC and SAJT. APLO answered
-    `500` "Application Server Error", "Data was lost while copying a value". That a name
-    longer than the type's name field causes it is inferred, not verified. The answer
-    reaches the model as SAP's failure, like any other.
-  - The 21-character name on premise is measured for the template object document only:
-    `404`.
+  An absent name:
+  - Measured on cloud and on premise, with a 7-character name: `404` for all three types,
+    for both the object document and the source.
+  - Measured with a 21-character name:
+    - on cloud, for both reads: `404` for SAJC and SAJT;
+    - on cloud, APLO answered `500` "Application Server Error", "Data was lost while
+      copying a value". That a name longer than the type's name field causes it is
+      inferred, not verified. The answer reaches the model as SAP's failure, like any
+      other;
+    - on premise, for the SAJT object document only: `404`. The other 21-character reads
+      on premise are unverified.
 
   Finding these objects needs no new tool. The interfaces-adt search tables list `APLO`,
   `SAJC` and `SAJT` on both variants, and `SearchObject` checks its type against those

@@ -97,6 +97,7 @@ import type {
   InstanceBatch,
   OpenBatch,
 } from '../lib/batch/InstanceBatch.js';
+import type { InstanceEnvelopes } from '../lib/batch/InstanceEnvelopes.js';
 import { partsPerEnvelopeOf } from '../lib/batch/phases.js';
 import {
   batchTarget,
@@ -497,6 +498,12 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readonly batch: InstanceBatch | undefined;
   /**
+   * The owner of this instance's read envelopes (`envelopes` option), given
+   * by the host, one per instance; attached to the state. Absent: the
+   * envelope tools answer `envelopes_unavailable`.
+   */
+  protected readonly envelopes: InstanceEnvelopes | undefined;
+  /**
    * Whether the groups registered last serve the communication batch
    * (an entry marked `communicationBatch`): a set without it has no batch
    * mode, and no description names one.
@@ -639,6 +646,13 @@ export abstract class BaseMcpServer extends McpServer {
      */
     batch?: InstanceBatch | undefined;
     /**
+     * The owner of this instance's read envelopes (spec §3), created by the
+     * host for this instance alone (never shared between instances): held
+     * state while an envelope is open. Absent: the envelope tools, and every
+     * read given an `envelope_handle`, answer `envelopes_unavailable`.
+     */
+    envelopes?: InstanceEnvelopes | undefined;
+    /**
      * The locks this instance holds between requests, created by the host
      * for this instance alone (every transport: the Streamable HTTP pool's
      * instances, each SSE connection's, stdio's one): held state, ended by
@@ -772,6 +786,8 @@ export abstract class BaseMcpServer extends McpServer {
     });
     this.batch = options.batch;
     if (this.batch !== undefined) this.state.attach(this.batch);
+    this.envelopes = options.envelopes;
+    if (this.envelopes !== undefined) this.state.attach(this.envelopes);
     this.heldLocks = options.heldLocks ?? new HeldLocks();
     this.state.attach(this.heldLocks);
     this.longSession = options.longSession;
@@ -869,6 +885,7 @@ export abstract class BaseMcpServer extends McpServer {
         const holding = {
           locks: this.heldLocks.count(),
           batch: this.batch?.holdsState() === true,
+          envelopes: this.envelopes?.size() ?? 0,
           debug_session: this.takenDebugger?.holdsState() === true,
         };
         session.askClose();
@@ -1068,6 +1085,9 @@ export abstract class BaseMcpServer extends McpServer {
    */
   dropBatch(): void {
     this.batch?.drop();
+    // The open envelopes go with it: nothing recorded is sent, and every
+    // recorded call's wait ends.
+    void this.envelopes?.dispose();
   }
 
   /** Dispose, settle, once more, settle — what a host awaits before letting the instance go; answers what is left. */

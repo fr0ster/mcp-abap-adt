@@ -19,6 +19,7 @@
  */
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { envelopeLimitWords, ServerRefusal } from '../auth/serverRefusal';
+import { openEnvelopesOf } from '../config/authParameters';
 import type { StatePart } from '../state/InstanceState';
 
 /**
@@ -157,7 +158,10 @@ export class InstanceEnvelopes implements StatePart {
     openEnvelopes?: number | undefined;
   }) {
     this.keepRawParts = options.keepRawParts === true;
-    this.openEnvelopes = options.openEnvelopes;
+    this.openEnvelopes =
+      options.openEnvelopes === undefined
+        ? undefined
+        : openEnvelopesOf(options.openEnvelopes, 'openEnvelopes');
   }
 
   /**

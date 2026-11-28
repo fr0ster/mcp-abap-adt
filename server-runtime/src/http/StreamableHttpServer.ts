@@ -18,6 +18,7 @@ import {
   closeInstance,
   type IBackgroundRuns,
   InstanceBatch,
+  InstanceEnvelopes,
   type LineMatchStrategy,
   type SapAnswerStrategy,
   sessionKeepAliveMsOf,
@@ -95,7 +96,7 @@ export interface StreamableHttpServerOptions {
    * launcher's). Absent: no instance has one, and the batch tools answer
    * `batch_mode_unavailable`.
    */
-  batch?: { keepRawParts: boolean };
+  batch?: { keepRawParts: boolean; openEnvelopes?: number | undefined };
   /**
    * Host to bind to (refused beside an external app)
    * @default "127.0.0.1"
@@ -271,7 +272,9 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
   private readonly partsPerEnvelope: number | undefined;
-  private readonly batchSettings: { keepRawParts: boolean } | undefined;
+  private readonly batchSettings:
+    | { keepRawParts: boolean; openEnvelopes?: number | undefined }
+    | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -309,7 +312,10 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.batchSettings =
       opts?.batch === undefined
         ? undefined
-        : { keepRawParts: opts.batch.keepRawParts === true };
+        : {
+            keepRawParts: opts.batch.keepRawParts === true,
+            openEnvelopes: opts.batch.openEnvelopes,
+          };
     this.version = opts?.version ?? RUNTIME_VERSION;
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3000;
@@ -653,6 +659,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           lineMatchStrategy?: LineMatchStrategy;
           partsPerEnvelope?: number;
           batch?: InstanceBatch;
+          envelopes?: InstanceEnvelopes;
           heldLocks?: HeldLocks;
           longSession?: LongSession;
           adtHeaderPairs?: AdtHeaderPairs;
@@ -739,6 +746,8 @@ export class StreamableHttpServer extends BaseMcpServer {
         // Batch mode: this pooled instance's own, never shared with another.
         ...(this.batchSettings !== undefined && {
           batch: new InstanceBatch(this.batchSettings),
+          // The read envelopes: this instance's own, never shared.
+          envelopes: new InstanceEnvelopes(this.batchSettings),
         }),
         // An instance lasts one request unless it holds state: a lock taken
         // here is kept as state, so the write and the unlock under it reach

@@ -63,6 +63,10 @@ export {
   type RawPart,
   type RecordedCall,
 } from '../lib/batch/InstanceBatch.js';
+export {
+  InstanceEnvelopes,
+  type SessionKey,
+} from '../lib/batch/InstanceEnvelopes.js';
 /**
  * Closing an embedder's own instance when its client closed: the latch of that instance, its connections logged off at once and
  * its calls interrupted in the same tick — no running tool awaited —, its

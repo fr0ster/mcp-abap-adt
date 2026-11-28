@@ -416,7 +416,7 @@ describe('close on an instance', () => {
     assert.equal(answer.isError, false);
     assert.deepStrictEqual(JSON.parse(answer.text), {
       closed: true,
-      held: { locks: 0, batch: false, debug_session: true },
+      held: { locks: 0, batch: false, envelopes: 0, debug_session: true },
     });
     assert.equal(server.closeAsked(), true);
   });
@@ -454,7 +454,7 @@ describe('close on an instance', () => {
         assert.equal(answer.isError, false);
         assert.deepStrictEqual(JSON.parse(answer.text), {
           closed: true,
-          held: { locks: 0, batch: true, debug_session: false },
+          held: { locks: 0, batch: true, envelopes: 0, debug_session: false },
         });
         // Run at once, not recorded: the batch is still open, its first number unused.
         assert.equal(batch.mode(), 'debugger');

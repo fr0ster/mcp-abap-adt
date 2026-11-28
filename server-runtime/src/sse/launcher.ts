@@ -190,7 +190,11 @@ export async function launch(
         ? undefined
         : config.sessionKeepAliveMinutes * 60_000,
     // Batch mode: one InstanceBatch per SSE connection's instance.
-    batch: { keepRawParts: config.batchKeepRawParts === true },
+    batch: {
+      keepRawParts: config.batchKeepRawParts === true,
+      // --batch-open-envelopes: the consumer's bound; absent, none.
+      openEnvelopes: config.batchOpenEnvelopes,
+    },
     // The state's lines go to stderr whatever the transport logger says.
     stateLogger: stderrStateLogger,
     host: config.host,

@@ -27,6 +27,8 @@ export interface SessionHolding {
   locks: number;
   /** Whether a batch was open, or its answers kept. */
   batch: boolean;
+  /** How many read envelopes were open. */
+  envelopes: number;
   /** Whether a debug session (ABAP or AMDP) was held. */
   debug_session: boolean;
 }

@@ -13,8 +13,9 @@ import {
   resolvePackageName,
   resolveTransportRequest,
 } from '../helpers/configHelpers';
-import { HeldLiveLocks, type HeldLock } from '../helpers/heldLiveLocks';
+import type { HeldLock } from '../helpers/heldLiveLocks';
 import { type LiveAnswer, livePrepare } from '../helpers/live';
+import { liveLocks, liveSucceeded } from '../helpers/liveSteps';
 import { CREATION_PACKAGES } from '../helpers/packageGuard';
 import { isHardModeEnabled } from '../helpers/testers/hardMode';
 
@@ -53,10 +54,12 @@ export function onRequest(): { transport_request?: string } {
   return given === undefined ? {} : { transport_request: given };
 }
 
-/** The answer, or the case fails naming the step and what was answered. */
+/**
+ * The answer, or the case fails naming the step and what was answered — in
+ * soft mode by the answer's outcome (`liveSucceeded`, #394).
+ */
 export function succeeded(step: string, answer: LiveAnswer): LiveAnswer {
-  if (answer.isError) throw new Error(`${step}: ${answer.text}`);
-  return answer;
+  return liveSucceeded(step, answer);
 }
 
 /** A member of a JSON value, read by shape. */
@@ -71,8 +74,22 @@ export function payloadOf(answer: LiveAnswer): unknown {
   return JSON.parse(answer.text);
 }
 
-/** The compact locks the suites' cases hold until SAP answers their unlock. */
-const heldLocks = new HeldLiveLocks();
+/**
+ * The compact locks the suites' cases hold until SAP answers their unlock:
+ * the run connection's registry in soft mode (#394), so the file's close
+ * sees them.
+ */
+const heldLocks = {
+  hold: (lock: HeldLock) => liveLocks().hold(lock),
+  released: (handle: string) => liveLocks().released(handle),
+  unlockSent: (handle: string) => liveLocks().unlockSent(handle),
+  releaseAll: (
+    ...args: Parameters<ReturnType<typeof liveLocks>['releaseAll']>
+  ) => liveLocks().releaseAll(...args),
+  get stillOwned() {
+    return liveLocks().stillOwned;
+  },
+};
 
 /** Records a lock handle the case now holds. */
 export function holdLock(lock: HeldLock): void {

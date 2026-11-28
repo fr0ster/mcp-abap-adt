@@ -80,16 +80,19 @@ import {
 import { getTestDestination } from './authHelpers';
 import { configuredSystemKind } from './configHelpers';
 import { NO_KIND_STATED } from './configuredSystemKind';
+import { heldLocksOf } from './heldLiveLocks';
 import { closeEvery } from './launchedServers';
 import { endTestConnection, trackConnection } from './openConnections';
 import { primeSystemContext } from './primeSystemContext';
 import {
   credentialRefused,
+  type GuardedConnection,
   guardedTestConnection,
   markCredentialRefused,
   refusalAnswered,
   refuseAfterMarker,
 } from './refusalGuard';
+import { answerOutcome } from './stepOutcome';
 import { testConfigPathFromEnv } from './testConfigPath';
 import {
   createHardModeClient,
@@ -358,6 +361,25 @@ export function hasTestConfig(): boolean {
   );
 }
 
+const fileConnections = new Map<SystemKind, Promise<GuardedConnection>>();
+
+/**
+ * The file's run connection of `kind` (#394): opened and logged on once,
+ * every suite of the file takes it, and the file's close logs it off (it is
+ * tracked). A failed open is not kept: the next suite opens again.
+ */
+export function fileRunConnection(
+  kind: SystemKind,
+  open: () => Promise<GuardedConnection>,
+): Promise<GuardedConnection> {
+  const known = fileConnections.get(kind);
+  if (known !== undefined) return known;
+  const opened = open();
+  fileConnections.set(kind, opened);
+  opened.catch(() => fileConnections.delete(kind));
+  return opened;
+}
+
 /** The runner of a live run on the configured destination. */
 async function liveRunner(system: SystemKind): Promise<LiveRunner> {
   const destination = await getTestDestination();
@@ -368,13 +390,18 @@ async function liveRunner(system: SystemKind): Promise<LiveRunner> {
     guardedTestConnection(destination.settings, destination.credential, {
       kind: system,
     });
-  const connection = trackConnection(open());
-  await connection.connect();
-  // The responsible person and master system a change is made for, as the
-  // integration testers state them.
-  await primeSystemContext(connection);
   const user = destination.settings.username ?? '';
-  if (isHardModeEnabled()) return hardRunner(system, user, connection);
+  const logOn = async () => {
+    const connection = trackConnection(open());
+    await connection.connect();
+    // The responsible person and master system a change is made for, as
+    // the integration testers state them.
+    await primeSystemContext(connection);
+    return connection;
+  };
+  if (isHardModeEnabled()) return hardRunner(system, user, await logOn());
+  // Soft mode: one run connection per file (#394), every suite's.
+  const connection = await fileRunConnection(system, logOn);
   // The in-process server uses the guarded connection as given; its fresh
   // connections are guarded siblings.
   return softRunner({
@@ -430,7 +457,9 @@ export function liveSuite(
     () => liveRunner(kind),
     async (ending) => {
       await ending.close();
-      await endTestConnection(ending.connection());
+      // Soft mode: the file's one run connection is logged off by the
+      // file's close (it is tracked), after every suite of the file.
+      if (isHardModeEnabled()) await endTestConnection(ending.connection());
     },
     body,
   );
@@ -728,6 +757,8 @@ export async function expectNameFree(read: LiveRead): Promise<void> {
 
 /** What the test created, each with the delete that removes it, in creation order. */
 const created: Array<{ tool: string; args: ToolArgs }> = [];
+/** Soft mode: deletes sent and not answered ok — never sent again (#394). */
+const deleteSent: Array<{ tool: string; args: ToolArgs }> = [];
 
 /** Records an object the test created, with the call that deletes it. */
 export function recordCreated(deleteTool: string, args: ToolArgs): void {
@@ -745,11 +776,23 @@ export function recordCreated(deleteTool: string, args: ToolArgs): void {
 export async function deleteRecorded(): Promise<void> {
   const failures: string[] = [];
   const kept: Array<{ tool: string; args: ToolArgs }> = [];
+  const soft = !isHardModeEnabled();
   try {
     for (let at = created.length - 1; at >= 0; at -= 1) {
       const record = created[at];
       if (record === undefined) continue;
+      // Sent once (#394): in soft mode a delete is recorded as sent before
+      // it is sent, and one not answered ok is never sent again.
+      created.splice(at, 1);
+      if (soft) deleteSent.push(record);
       const answer = await send(record.tool, record.args);
+      if (soft) {
+        // A lock the delete's own handler left behind is still owned; a
+        // lost session ended every lock of it.
+        const locks = heldLocksOf(current().connection());
+        locks.takeInLeftLocked(answer);
+        if (answerOutcome(answer) === 'session-lost') locks.sessionLost();
+      }
       const names = Object.values(record.args).filter(
         (value): value is string => typeof value === 'string',
       );
@@ -758,16 +801,17 @@ export async function deleteRecorded(): Promise<void> {
         !isNotFound(answer) &&
         !isGoneOnDelete(answer, names)
       ) {
-        kept.unshift(record);
+        if (!soft) kept.unshift(record);
         failures.push(
           `${record.tool} ${JSON.stringify(record.args)}: ${answer.text}`,
         );
+      } else if (soft) {
+        deleteSent.splice(deleteSent.indexOf(record), 1);
       }
-      created.splice(at, 1);
     }
   } finally {
     created.push(...kept);
-    if (created.length > 0) reportRemaining();
+    if (created.length > 0 || deleteSent.length > 0) reportRemaining();
   }
   if (failures.length > 0) {
     throw new Error(`cleanup failed:\n${failures.join('\n')}`);
@@ -833,6 +877,11 @@ export function recordTransportEntry(entry: {
 function reportRemaining(): void {
   for (const record of created) {
     reportLeftover(`object ${record.tool} ${JSON.stringify(record.args)}`);
+  }
+  for (const record of deleteSent) {
+    reportLeftover(
+      `object ${record.tool} ${JSON.stringify(record.args)} (deletion unconfirmed: sent once, not answered ok)`,
+    );
   }
   for (const transportNumber of createdRequests) {
     reportLeftover(`request ${transportNumber}`);

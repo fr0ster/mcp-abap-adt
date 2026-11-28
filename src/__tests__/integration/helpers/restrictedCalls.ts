@@ -13,11 +13,13 @@ import {
   livePrepare,
   type ToolArgs,
 } from './live';
+import { liveSucceeded } from './liveSteps';
 
 /** The answer, or the case fails naming the step and what SAP answered. */
 export function succeeded(step: string, answer: LiveAnswer): LiveAnswer {
-  if (answer.isError) throw new Error(`${step}: ${answer.text.slice(0, 800)}`);
-  return answer;
+  // In soft mode by the answer's outcome (#394): a success whose own unlock
+  // failed on the network ends the step, its lock held.
+  return liveSucceeded(step, answer, answer.text.slice(0, 800));
 }
 
 /** A member of the answer's JSON payload; `undefined` when there is none. */

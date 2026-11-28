@@ -49,6 +49,12 @@ export const stateHandleAnswered: Note = new Note(
   'Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).',
 );
 
+/** GetClass: the local includes of a class have reads of their own. */
+export const classLocalIncludes: Note = new Note(
+  minted,
+  'The local definitions, local types and implementations, local macros and local test classes of the class have read tools of their own.',
+);
+
 /** Whether and how `tool` runs in batch mode. */
 export function batchable(tool: string): Note {
   return new Note(minted, batchSentence(tool));

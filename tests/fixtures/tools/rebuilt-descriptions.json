@@ -2,27 +2,41 @@
   "HandlerBatch": {
     "description": "[read-only] Begins recording the calls of the tools that allow it, ends the recording and sends the recorded calls to SAP together, reads each recorded call's answer by its number. Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).",
     "inputSchema.action.description": "begin: switch into batch mode; end: send the recorded calls and leave batch mode; answers: read the last batch's answers by number (with number or numbers).",
-    "inputSchema.action.enum": ["begin", "end", "answers"],
+    "inputSchema.action.enum": [
+      "begin",
+      "end",
+      "answers"
+    ],
     "inputSchema.number.description": "answers only: one batch number to read (an integer of at least 1); give this or numbers, not both.",
     "inputSchema.numbers.description": "answers only: several batch numbers to read, answered in the order given; give this or number, not both."
   },
   "HandlerDebugBatch": {
     "description": "[debug] Begins recording the debugger calls at a stopped debuggee, ends the recording and sends the recorded debugger calls together, reads each recorded debugger call's outcome by its number. Over Streamable HTTP the state_handle it gives goes with every later call: send it as the state_handle argument of every call (or in the x-mcp-state-handle header).",
     "inputSchema.action.description": "begin starts the debugger batch on the stopped ABAP debuggee or at the AMDP break; end sends the recorded calls and ends it; answers reads the last batch's answers by number, with number or numbers.",
-    "inputSchema.action.enum": ["begin", "end", "answers"],
+    "inputSchema.action.enum": [
+      "begin",
+      "end",
+      "answers"
+    ],
     "inputSchema.number.description": "answers: one batch number to read, at least 1.",
     "inputSchema.numbers.description": "answers: several batch numbers to read, each at least 1, answered in the order given."
   },
   "HandlerSession": {
     "description": "[read-only] Opens a long session on this server, closes a long session.",
     "inputSchema.action.description": "open: open a long session and answer its state_handle. close: close the long session the state_handle names.",
-    "inputSchema.action.enum": ["open", "close"]
+    "inputSchema.action.enum": [
+      "open",
+      "close"
+    ]
   },
   "HandlerDebugSession": {
     "description": "[debug] Checks whether another debugger holds this identity's debugging, listens for an ABAP debuggee, stops the ABAP listener, attaches an ABAP debuggee, detaches the debugger from the debuggee, terminates the ABAP debuggee, terminates the debugger, sets the debugger settings, starts an AMDP debug session, gets the AMDP session's events, stops the AMDP debug session, deletes an AMDP debuggee, ends the debug state.",
     "inputSchema.state_handle.description": "The handle of this server's debug state. abap checkListener, listen, stopListener and attach, and amdp start, open the debug state when it is omitted and answer its handle; every other operation takes it.",
     "inputSchema.kind.description": "abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.",
-    "inputSchema.kind.enum": ["abap", "amdp"],
+    "inputSchema.kind.enum": [
+      "abap",
+      "amdp"
+    ],
     "inputSchema.operation.description": "The one request: abap checkListener, listen, stopListener, attach, detachDebugger, terminateDebuggee, terminateDebugger or setDebuggerSettings; amdp start, getEvents, stop or deleteDebuggee. end, for either kind, logs off the debug state.",
     "inputSchema.operation.enum": [
       "checkListener",
@@ -51,15 +65,26 @@
     "inputSchema.settings.shared_object_debugging.description": "Debugs shared objects.",
     "inputSchema.request_user.description": "abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.",
     "inputSchema.debugging_mode.description": "abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.",
-    "inputSchema.debugging_mode.enum": ["user", "terminal"],
+    "inputSchema.debugging_mode.enum": [
+      "user",
+      "terminal"
+    ],
     "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default) what a next call needs: the identifiers and a short description; \"medium\" every item the tool read, with its main properties; \"full\" the tool's whole answer; \"raw\" what SAP sent.",
-    "inputSchema.detail.enum": ["terse", "medium", "full", "raw"]
+    "inputSchema.detail.enum": [
+      "terse",
+      "medium",
+      "full",
+      "raw"
+    ]
   },
   "HandlerDebugStep": {
     "description": "[debug] Steps into the call where the debuggee stands, steps over a statement, steps out of the current call, continues to the next stop, runs to a source position, jumps to a source position, sets the stack frame whose variables are read.",
     "inputSchema.state_handle.description": "Opaque handle identifying the server-held state this operation works on.",
     "inputSchema.kind.description": "abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.",
-    "inputSchema.kind.enum": ["abap", "amdp"],
+    "inputSchema.kind.enum": [
+      "abap",
+      "amdp"
+    ],
     "inputSchema.operation.description": "The one request: abap stepInto, stepOver, stepReturn, stepContinue, stepRunToLine, stepJumpToLine or setStackPosition; amdp stepOver or stepContinue.",
     "inputSchema.operation.enum": [
       "stepInto",
@@ -78,13 +103,21 @@
     "inputSchema.position.description": "abap setStackPosition: the frame's position in the stack.",
     "inputSchema.debuggee_id.description": "amdp: the debuggee id of the break event.",
     "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default) what a next call needs: the identifiers and a short description; \"medium\" every item the tool read, with its main properties; \"full\" the tool's whole answer; \"raw\" what SAP sent.",
-    "inputSchema.detail.enum": ["terse", "medium", "full", "raw"]
+    "inputSchema.detail.enum": [
+      "terse",
+      "medium",
+      "full",
+      "raw"
+    ]
   },
   "HandlerDebugBreakpoints": {
     "description": "[debug] Sets the ABAP breakpoints of this debugging identity, syncs the ABAP or AMDP breakpoints, deletes an ABAP breakpoint, creates a watchpoint on a variable, lists the watchpoints, deletes a watchpoint.",
     "inputSchema.state_handle.description": "The handle of this server's debug state. abap setBreakpoints and syncBreakpoints open the debug state when it is omitted and answer its handle; every other operation takes it.",
     "inputSchema.kind.description": "abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.",
-    "inputSchema.kind.enum": ["abap", "amdp"],
+    "inputSchema.kind.enum": [
+      "abap",
+      "amdp"
+    ],
     "inputSchema.operation.description": "The one request: abap setBreakpoints, syncBreakpoints, deleteBreakpoint, createWatchpoint, listWatchpoints or deleteWatchpoint; amdp syncBreakpoints.",
     "inputSchema.operation.enum": [
       "setBreakpoints",
@@ -105,7 +138,10 @@
     "inputSchema.breakpoints[].message.description": "Stops where this message is sent: message class, number, type.",
     "inputSchema.breakpoints[].condition.description": "A line breakpoint only: stops only when this ABAP condition holds.",
     "inputSchema.sync_scope.description": "abap syncBreakpoints: full replaces every breakpoint of the set; partial replaces those of the objects in sync_objects and takes line breakpoints.",
-    "inputSchema.sync_scope.enum": ["full", "partial"],
+    "inputSchema.sync_scope.enum": [
+      "full",
+      "partial"
+    ],
     "inputSchema.sync_objects.description": "abap syncBreakpoints with sync_scope partial: the ADT URIs of the objects whose breakpoints are replaced.",
     "inputSchema.breakpoint_id.description": "abap deleteBreakpoint: the id SAP gave the breakpoint.",
     "inputSchema.variable_name.description": "abap createWatchpoint: the variable watched.",
@@ -113,15 +149,26 @@
     "inputSchema.watchpoint_id.description": "abap deleteWatchpoint: the id SAP gave the watchpoint.",
     "inputSchema.request_user.description": "abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.",
     "inputSchema.debugging_mode.description": "abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.",
-    "inputSchema.debugging_mode.enum": ["user", "terminal"],
+    "inputSchema.debugging_mode.enum": [
+      "user",
+      "terminal"
+    ],
     "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default) what a next call needs: the identifiers and a short description; \"medium\" every item the tool read, with its main properties; \"full\" the tool's whole answer; \"raw\" what SAP sent.",
-    "inputSchema.detail.enum": ["terse", "medium", "full", "raw"]
+    "inputSchema.detail.enum": [
+      "terse",
+      "medium",
+      "full",
+      "raw"
+    ]
   },
   "HandlerDebugMaintain": {
     "description": "[debug] Gets the debuggee's call stack, gets variables by name, gets a variable's members, gets the debuggee's memory sizes, creates a memory snapshot, sets a variable's value, gets an AMDP table variable's records.",
     "inputSchema.state_handle.description": "Opaque handle identifying the server-held state this operation works on.",
     "inputSchema.kind.description": "abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.",
-    "inputSchema.kind.enum": ["abap", "amdp"],
+    "inputSchema.kind.enum": [
+      "abap",
+      "amdp"
+    ],
     "inputSchema.operation.description": "What the call does: abap getStack (the stack), getVariables (variables by name), getChildVariables (child variables), getMemorySizes (memory sizes), createMemorySnapshot (a snapshot) or setVariableValue (set a value); amdp getDataPreview (the data preview of a table variable).",
     "inputSchema.operation.enum": [
       "getStack",
@@ -140,7 +187,12 @@
     "inputSchema.query.description": "amdp getDataPreview: a SELECT over the table variable; every column when omitted.",
     "inputSchema.row_number.description": "amdp getDataPreview: how many rows SAP answers; SAP's own count when omitted.",
     "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default) what a next call needs: the identifiers and a short description; \"medium\" every item the tool read, with its main properties; \"full\" the tool's whole answer; \"raw\" what SAP sent.",
-    "inputSchema.detail.enum": ["terse", "medium", "full", "raw"]
+    "inputSchema.detail.enum": [
+      "terse",
+      "medium",
+      "full",
+      "raw"
+    ]
   },
   "HandlerGetData": {
     "description": "[read-only] Reads the data of an ABAP database table (TABL) or CDS view (DDLS), or the data an ABAP SQL SELECT selects, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.",
@@ -149,7 +201,12 @@
     "inputSchema.sql_query.description": "ABAP SQL SELECT naming the columns, conditions and order to read.",
     "inputSchema.max_rows.description": "Maximum number of rows returned.",
     "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default) what a next call needs: the identifiers and a short description; \"medium\" every item the tool read, with its main properties; \"full\" the tool's whole answer; \"raw\" what SAP sent.",
-    "inputSchema.detail.enum": ["terse", "medium", "full", "raw"]
+    "inputSchema.detail.enum": [
+      "terse",
+      "medium",
+      "full",
+      "raw"
+    ]
   },
   "HandlerSystem": {
     "description": "[read-only] Searches the source code of packages (DEVC) for text, finds repository objects by name, finds where a repository object is used, reads a package (DEVC) with its subpackages and their objects, reads a user's transports, reads an ATC run's findings, reads the stored ATC results, reads one stored ATC result with its findings. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.",
@@ -186,21 +243,40 @@
     "inputSchema.max_hits_per_object.description": "search_source: the most hits answered per object; absent, every hit.",
     "inputSchema.max_hits.description": "search_source: the most hits of the whole answer; reached, the scan stops reading the next objects. Absent, no limit: every object is read and every hit answered.",
     "inputSchema.answer.description": "search_source: what each hit is answered as: lines (the default at detail terse), snippets (the default at medium and full) or objects.",
-    "inputSchema.answer.enum": ["objects", "lines", "snippets"],
+    "inputSchema.answer.enum": [
+      "objects",
+      "lines",
+      "snippets"
+    ],
     "inputSchema.version.description": "search_source: the version every source is read at (default active).",
-    "inputSchema.version.enum": ["active", "inactive", "workingArea"],
+    "inputSchema.version.enum": [
+      "active",
+      "inactive",
+      "workingArea"
+    ],
     "inputSchema.object_name.description": "search_object: object name or mask (e.g. 'MARA*'). where_used: name of the object (with object_type), a function module as 'GROUP|FM_NAME'.",
     "inputSchema.object_type.description": "search_object: Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class). where_used: Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): CLAS/OC (class), INTF/OI (interface), PROG/P (program), PROG/I (include), FUGR/F (functiongroup), FUGR/FF (function, functionmodule, function_module, func), DEVC/K (package), DDLS/DF (view), VIEW/DV (dbview), TABL/DT (table), TABL/DS (structure, stru), TTYP/DA, DOMA/DD (domain), DTEL/DE (dataelement), DCLS/DL, BDEF/BDO, DDLX/EX, SRVD/SRV, SRVB/SVB, DSFD/SCF, DSFI/SFI, XSLT/VT, MSAG/N, FTG2/FT, AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB, PROG/PX. A function module is named as object_name says. PROG/PX is a program's or a function group's text elements; container says which. A name is written in lower case: view is a CDS view (DDLS/DF). A value in upper case is a code, a main type or a search name of the system's object types list first, so VIEW is the dictionary views (VIEW/DV); it is a name only when it is none of these (CLASS is class). A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).",
     "inputSchema.container.description": "where_used: with object_type PROG/PX, required: whose text elements they are, program or function_group; taken by PROG/PX alone.",
-    "inputSchema.container.enum": ["program", "function_group"],
+    "inputSchema.container.enum": [
+      "program",
+      "function_group"
+    ],
     "inputSchema.maxResults.description": "search_object: maximum number of results to return (default 100).",
     "inputSchema.detail.description": "search_source, search_object, where_used, package_tree, transports, atc_findings, atc_results, atc_result: How much of the answer to return: \"terse\" (default) what a next call needs: the identifiers and a short description; \"medium\" every item the tool read, with its main properties; \"full\" the tool's whole answer; \"raw\" what SAP sent.",
-    "inputSchema.detail.enum": ["terse", "medium", "full", "raw"],
+    "inputSchema.detail.enum": [
+      "terse",
+      "medium",
+      "full",
+      "raw"
+    ],
     "inputSchema.objects.description": "where_used: several objects, read together (give this or object_name and object_type); the type filters apply to every object.",
     "inputSchema.objects[].object_name.description": "Name of the ABAP object; a function module as 'GROUP|FM_NAME'",
     "inputSchema.objects[].object_type.description": "Type of the ABAP object, as object_type takes it",
     "inputSchema.objects[].container.description": "With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.",
-    "inputSchema.objects[].container.enum": ["program", "function_group"],
+    "inputSchema.objects[].container.enum": [
+      "program",
+      "function_group"
+    ],
     "inputSchema.enable_all_types.description": "where_used: true selects every object type of the where-used scope (default false, the SAP default scope).",
     "inputSchema.enable_only_types.description": "where_used: the only ADT object types searched, codes of the object's where-used scope (e.g. 'CLAS/OC', 'DDLS/DF').",
     "inputSchema.disable_types.description": "where_used: ADT object types removed from the scope (e.g. ['CLAS/OC']).",

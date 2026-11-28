@@ -3,7 +3,11 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { sourceReader, toolDescription } from '../../../lib/description';
+import {
+  classLocalIncludes,
+  sourceReader,
+  toolDescription,
+} from '../../../lib/description';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { READ_PART_FIELD, readPartOf } from '../../../lib/handlers/readPart';
@@ -26,6 +30,7 @@ export const TOOL_DEFINITION = {
     sourceReader({
       object: 'an ABAP class',
       metadata: true,
+      notes: [classLocalIncludes],
     }),
   ),
   inputSchema: z.object({

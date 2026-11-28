@@ -659,7 +659,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclass-read-only-class"></a>
 #### GetClass (Read-Only / Class)
-**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
+**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata. The local definitions, local types and implementations, local macros and local test classes of the class have read tools of their own. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -2870,7 +2870,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclass-high-level-class"></a>
 #### GetClass (High-Level / Class)
-**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
+**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata. The local definitions, local types and implementations, local macros and local test classes of the class have read tools of their own. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 

@@ -93,4 +93,18 @@ describe('every read is in the read-only set', () => {
       assert.deepEqual([name, ro.has(name)], [name, true]);
     }
   });
+
+  it('GetClass points at the reads of the local includes, on core and core-ro', async () => {
+    for (const kind of ['core', 'core-ro'] as const) {
+      const getClass = (await servedCatalog(setOf(kind))).find(
+        (tool) => tool.name === 'GetClass',
+      );
+      assert.ok(
+        getClass?.description.includes(
+          'The local definitions, local types and implementations, local macros and local test classes of the class have read tools of their own.',
+        ),
+        `${kind}: ${getClass?.description}`,
+      );
+    }
+  });
 });

@@ -9,6 +9,10 @@ its spec section.
 - **TDD.** First the failing test the spec names, then the change that makes it pass, then
   the repository's own gates: build, `lint:check`, `test:check` and the unit tests. Every
   step ends green; no test is committed red.
+- **Generated docs with each tool.** A step that adds or changes a tool, a compact type or an
+  action regenerates the generated docs in the same commit, so their drift check stays
+  green: the pages of `tools/generate-tools-docs.js`, the compact page, tool search and the
+  prompt listings.
 - **Small commits.** One logical change per commit, in English, each message ending with the
   attribution lines.
 - **Worktrees.** Work happens in a worktree under the repository's `.worktrees/`. A main
@@ -284,8 +288,8 @@ registry.
     follows on the owner's go. Each file then gets one hard-mode run.
 20. **Docs** (§4.8):
     - `README.md`;
-    - the generated pages (`tools/generate-tools-docs.js`, the compact page, tool search, the
-      prompt listings);
+    - the generated pages: regenerated in each step that changed a tool (steps 8 to 15), so
+      this step only checks that they are current;
     - `HANDLERS_MANAGEMENT.md`, `ACCESS_RESTRICTIONS.md` and `BATCH_MODE.md`;
     - the 24.3.0 `CHANGELOG.md` entry, dated on each edit;
     - the docs audit.

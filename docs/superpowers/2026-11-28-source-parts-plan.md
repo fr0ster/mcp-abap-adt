@@ -14,7 +14,8 @@ logical change per commit; every commit ends with the session's attribution line
     once section 2 is ready to publish, since adt-strategies consumes no adt-clients; PR A merges
     after section 3, and both are then published from their tags, adt-clients first;
   - mcp-abap-adt-clients, PR B: adt-code-analyzer (section 4), opened only after both releases of
-    PR A are on the registry and have passed the post-publication gate;
+    PR A are on the registry and have passed the post-publication gate. Two PRs in sequence in
+    this repository are decided for this task, an exception to one PR per task;
   - mcp-abap-adt: #401 (section 5).
 - **The rule:** a package is published, visible on the registry and through the post-publication
   gate before any package that depends on it builds against it; the dependent's first task moves

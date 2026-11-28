@@ -78,6 +78,8 @@ describe('an admitted core read answers in an envelope as outside one', () => {
           tools: [c.tool],
           part: answer(c.body),
           envelopes: new InstanceEnvelopes({ keepRawParts: false }),
+          // A long read in the call reads on a connection of its own.
+          freshConnections: true,
         });
         const outside = await s.call(c.tool, c.args);
         const handle = payloadOf(await s.call('CreateReadEnvelope'))

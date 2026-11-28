@@ -37,6 +37,8 @@ import {
 } from '../../../compact-readonly-entries/src/group';
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import type { ConnectionSource } from '../../embeddable/ConnectionContext';
+import type { IAccessChecks } from '../../lib/access/accessChecks';
+import type { IBackgroundRuns } from '../../lib/backgroundRuns/contract';
 import type { AnswerEntry } from '../../lib/batch/answers';
 import { InstanceBatch } from '../../lib/batch/InstanceBatch';
 import type { InstanceEnvelopes } from '../../lib/batch/InstanceEnvelopes';
@@ -57,6 +59,7 @@ import type {
   IHandlerGroup,
 } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
+import { registerFreshConnectionFactory } from '../../lib/packageSessions';
 import type { HeldLocks } from '../../lib/state/heldLocks';
 import {
   type EnvelopeAnswer,
@@ -175,6 +178,10 @@ class StandServer extends BaseMcpServer {
     heldLocks?: HeldLocks,
     envelopes?: InstanceEnvelopes,
     stateHandleArgument?: boolean,
+    extra: {
+      backgroundRuns?: IBackgroundRuns;
+      accessChecks?: IAccessChecks;
+    } = {},
   ) {
     super({
       name: 'batch-stand',
@@ -185,6 +192,12 @@ class StandServer extends BaseMcpServer {
       ...(heldLocks !== undefined ? { heldLocks } : {}),
       ...(envelopes !== undefined ? { envelopes } : {}),
       ...(stateHandleArgument === true ? { stateHandleArgument: true } : {}),
+      ...(extra.backgroundRuns !== undefined
+        ? { backgroundRuns: extra.backgroundRuns }
+        : {}),
+      ...(extra.accessChecks !== undefined
+        ? { accessChecks: extra.accessChecks }
+        : {}),
     });
     this.registerHandlers(new CompositeHandlersRegistry(groups));
     this.setConnectionContext({ kind: 'built', source });
@@ -245,6 +258,12 @@ export interface StandOptions {
   envelopes?: InstanceEnvelopes;
   /** As the Streamable HTTP host: every tool declares `state_handle`. */
   stateHandleArgument?: boolean;
+  /** Each built connection gives a connection of its own on asking (a long read in the call). */
+  freshConnections?: boolean;
+  /** A background-run strategy: a listed long read runs in the background by default. */
+  backgroundRuns?: IBackgroundRuns;
+  /** The host's access checks. */
+  accessChecks?: IAccessChecks;
 }
 
 /**
@@ -256,14 +275,20 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
     keepRawParts: options.keepRawParts ?? false,
   });
   const built: Fake[] = [];
-  mock.method(connectionFactory, 'createAbapConnection', () => {
+  const fakeConnection = () => {
     const fake = envelopeConnection(
       options.envelope ?? partByPart(options.part),
       directBy(options.part),
     );
     built.push(fake);
+    if (options.freshConnections === true) {
+      registerFreshConnectionFactory(fake.connection, async () =>
+        fakeConnection(),
+      );
+    }
     return fake.connection;
-  });
+  };
+  mock.method(connectionFactory, 'createAbapConnection', fakeConnection);
   const current = credential();
   let failure: { error: unknown } | undefined;
   let resolved = 0;
@@ -295,6 +320,14 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
     options.heldLocks,
     options.envelopes,
     options.stateHandleArgument,
+    {
+      ...(options.backgroundRuns !== undefined
+        ? { backgroundRuns: options.backgroundRuns }
+        : {}),
+      ...(options.accessChecks !== undefined
+        ? { accessChecks: options.accessChecks }
+        : {}),
+    },
   );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'batch-stand', version: '1.0.0' });

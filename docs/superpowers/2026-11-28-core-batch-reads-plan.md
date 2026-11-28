@@ -304,7 +304,10 @@ envelope directly, since the dispatch comes in task 10:
 - `src/embeddable/BaseMcpServer.ts`, in the registration loop:
   - every core tool's schema in its form — an admitted read loose plus the declared
     `envelope_handle`, an envelope tool as declared, any other core tool loose;
-  - the parameter description and the sentence appended at registration.
+  - the parameter description and the sentence appended at registration, both built by one
+    exported builder, `envelopeSurfaceOf(tool, schema, description)` (`src/lib/batch/sentence.ts`).
+    It answers the served schema and description of a core tool, and registration calls it.
+    Task 14's generator calls the same builder, so the docs and the served tools cannot drift.
 - `src/embeddable/BaseMcpServer.ts`, in `runCall`:
   - the undeclared keys are read and then dropped before any handler;
   - the recording path runs before the open-batch check, with its six checks in order;
@@ -338,6 +341,8 @@ envelope directly, since the dispatch comes in task 10:
   batch is unchanged;
 - the session check of §9.2 for record: byte-identical answers, nothing recorded or sent; the
   other session differs in one way at a time, as in task 9;
+- on a cold instance, a `GetClass` call with a foreign or unknown handle never calls the
+  connection factory or `getConnection`, and makes no request and no logon (§9.4);
 - execute, record and discard sent at once over one transport: one send, and the later calls
   answer `envelope_unavailable`;
 - a SAP session lost between record and execute, and a replaced SAP connection under the same
@@ -446,7 +451,11 @@ saved.
 - the generator first, `tools/generate-tools-docs.js`. Its hard-coded words say batch mode is
   compact's alone and the full binaries serve none: the binaries line (line 722) and
   `READ_ONLY_PAGE_INTRO` (line 931). Both are rewritten to name the envelope tools of the core
-  and core-ro binaries;
+  and core-ro binaries. The generator also stops reading the core tools' handler definitions as
+  they are. It takes each core tool's schema and description from `envelopeSurfaceOf` (task 10),
+  the builder registration uses, so every admitted read's `envelope_handle` and sentence appear in
+  the listings exactly as they are served. A test compares, for every core tool, the generator's
+  schema and description with the registered ones from an SDK `Client`'s `listTools`;
 - then the generated listings and the tool-search index, rewritten by their writers
   (`npm run docs:tools` and the listing writers). Their output is checked: the core pages list
   the four envelope tools, the admitted reads' `envelope_handle` and sentence, and no line saying

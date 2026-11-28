@@ -25,6 +25,7 @@ import { setSystemContext } from '../../helpers/processSystemContext';
 import { installSocketCut, type SocketCut } from '../../helpers/socketCut';
 import { stateSystemKind } from '../../helpers/systemKind';
 import { heldLocksOf } from '../../integration/helpers/heldLiveLocks';
+import { endTestConnection } from '../../integration/helpers/openConnections';
 import { ownedObjectsOf } from '../../integration/helpers/ownedObjects';
 import { guardedTestConnection } from '../../integration/helpers/refusalGuard';
 import { softSteps } from '../../integration/helpers/softSteps';
@@ -181,6 +182,18 @@ describe('a soft-mode workflow keeps its session through a cut', () => {
       .map((request) => `${request.method} ${request.url} ${request.body}`);
     assert.deepEqual(writes, [...new Set(writes)]);
     assert.equal(heldLocksOf(run.connection).stillHeld.length, 0);
+
+    // The file's logoff goes out on the run connection, in the run's own
+    // session, once.
+    await endTestConnection(run.connection);
+    await endTestConnection(run.connection);
+    const logoffs = stand.requests.filter(isLogoff);
+    assert.equal(
+      logoffs.filter((request) => request.session === runSession).length,
+      1,
+      JSON.stringify(logoffs.map((r) => r.session)),
+    );
+    assert.ok(stand.loggedOff().includes(runSession ?? ''));
   });
 
   it('a cleanup while the network is still cut sends its unlock once and keeps the lock owned', async () => {

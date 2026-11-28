@@ -57,7 +57,8 @@ not into `ADT_TYPES_BASIS_740`.
 | `applicationJobTemplate` | `/sap/bc/adt/applicationjob/templates` | `SAJT` | 40 | `source`, `readMetadata` | same |
 
 The name lengths are the `OBJNAME_MAXLENGTH` values that the recorded typestructure of
-both releases lists. The recorded 7.40 typestructure lists none of the three codes.
+both releases lists. The entry shape requires them. They are the library's declaration, and
+the server reads nothing from them. The recorded 7.40 typestructure lists none of the three codes.
 
 The keyword documentation is no ADT object type, so it has no row.
 
@@ -214,9 +215,9 @@ More on these members:
     - the first quick-search hit of the type: `getObject` and `getSource` answer `200`,
       with a `blue:blueSource` root and a JSON body;
     - on premise, a namespaced hit where the search returns one: the same;
-    - an absent name that fits `nameMaxLength` (generated at run time, checked absent by
-      quick search first): `404` for both reads;
-    - APLO with a name one character over 20: the answer is recorded, its status asserted
+    - an absent name of 7 characters (generated at run time, checked absent by quick search
+      first): `404` for both reads;
+    - APLO with a name of 21 characters: the answer is recorded, its status asserted
       as `500` on cloud. On premise this is unverified, and the test records what it gets.
   - **Keyword documentation:**
     - `query` with the configured keyword (test-config key, default `SELECT`): `200`, a
@@ -331,10 +332,9 @@ How they are registered:
 `GetApplicationLogDefinition` (`application_log_name`), `GetApplicationJobCatalog`
 (`job_catalog_name`) and `GetApplicationJobTemplate` (`job_template_name`):
 
-- The name is a string, min 1 and max the table's `nameMaxLength`: 20, 40 and 40. A longer
-  name is refused by the schema before anything is sent. The max is the declared table
-  value and no guess, and it keeps a call from reaching the `500` measured on cloud for an
-  over-long APLO name.
+- The name is a string (min 1), sent to SAP exactly as given. The server checks no length
+  and keeps no table of field lengths. An over-long name gets SAP's own answer: the
+  measured case is an APLO name of 21 characters, `500` on cloud (§4.4).
 - `part`: `source` (default) or `metadata`. Its own words: "source" the definition (JSON),
   "metadata" the ADT object document.
 - `version`: `READ_VERSION_FIELD`, as the other `Get<Type>` tools take it (`readVersion.ts`).
@@ -406,6 +406,8 @@ document, the same whatever `detail` was asked for. The measured failure cases a
 
 - `404` for an absent name;
 - `406`;
+- `500` for an APLO name of 21 characters, measured on cloud ("Data was lost while copying
+  a value"). It is SAP's own answer to the name as given and reaches the model as such;
 - `500` for an unknown `version`, which comes as an HTML page with no exception document.
   Its message is whatever the existing failure path makes of a non-XML body. A unit test
   on the captured page pins it: that path is not changed here.
@@ -467,7 +469,7 @@ the read's own session, as the long read's first request.
 
 ### 4.6 Refusals
 
-- **Schema refusals:** a name that is missing, empty or over its length; both or neither of
+- **Schema refusals:** a name that is missing or empty; both or neither of
   `query` and `topic`; `version` without `topic`; an unknown `part` or `detail`.
 - **`support_read_not_eligible`**, and **`support_read_not_served`**: new `ServerRefusal`
   codes in `src/lib/auth/serverRefusal.ts`, each with fixed words.
@@ -478,7 +480,8 @@ the read's own session, as the long read's first request.
 ### 4.7 Tests
 
 - **Unit tests:**
-  - the schemas: the refinements, the name maxima, and that the position argument is
+  - the schemas: the refinements, a name of any length passed through unchanged, and that the
+    position argument is
     absent;
   - the eligibility table against `available_in` and the compact enums;
   - `served.ts`: kept, shared, reset, and failing closed on an unreadable discovery, with a
@@ -506,7 +509,8 @@ the read's own session, as the long read's first request.
   `test-config.yaml.template` entries stating `available_in: [onprem, cloud]`. They are
   soft-mode tests, and one hard-mode run of each file before the release:
   - definitions: the first search hit of each type, both parts, every `detail`; an absent
-    name answers the `404` failure;
+    name answers the `404` failure; an APLO name of 21 characters answers SAP's failure as
+    it is (status asserted `500` on cloud, recorded on premise);
   - documentation: a query (hits), a topic followed from that answer's first topic link
     with its `version` (its title is the link's label), and a no-hit query ("Not found",
     a success). It runs once in the call (`background: false`) and once in the background

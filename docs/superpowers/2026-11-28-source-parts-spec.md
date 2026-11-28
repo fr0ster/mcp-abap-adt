@@ -390,7 +390,8 @@ cloud (both measured), one by one on any other variant.
     call, stateless; slot and `analyse` applied; the regression checks stay green.
   - Live, onprem and cloud: a form fragment and a local method's `implementationIdentifier`
     answer `200` with a `#start=` reference; a local method's `definitionIdentifier` as measured
-    per system (cloud `400` EU/061; onprem the same href and start as the implementation link);
+    per system (cloud `400` EU/061; onprem a start); each start in an include of the same
+    object, not necessarily the link's include (onprem, a function group's local method);
     three navigations through `AdtBatchConnection('communication')` equal their answers alone.
   - The answers recorded, sanitised, into `corpus/adt/answers/`.
 - **Docs**: `docs/usage/ERRATA.md` (the `end` column before the period; a function group include's

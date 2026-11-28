@@ -261,9 +261,9 @@ adt-strategies second; the post-publication gate for both before PR B.
 
 **Task 4.14 — ready to publish.**
 - Gate green; the common release gate; the package README (spec §4.3, a custom `BlockEndScanner`
-  example), CHANGELOG (0.1.0 asked of the owner); `npm pack` installed into an empty directory and
+  example), CHANGELOG under `[Unreleased]` (its first release, 0.1.0, is the controller's); `npm pack` installed into an empty directory and
   its entry loads (before publishing).
-- Commit: `docs(analyzer): README; CHANGELOG`. The owner publishes; the post-publication gate.
+- Commit: `docs(analyzer): README; CHANGELOG`. The controller releases it; the post-publication gate.
 
 ## 5. mcp-abap-adt 24.3.0 (this repository, #401)
 

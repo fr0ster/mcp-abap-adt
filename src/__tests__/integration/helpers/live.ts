@@ -781,6 +781,10 @@ export async function deleteRecorded(): Promise<void> {
     for (let at = created.length - 1; at >= 0; at -= 1) {
       const record = created[at];
       if (record === undefined) continue;
+      // Refused before anything is sent (the marker, the stop): the record
+      // stays, not sent.
+      refuseAfterMarker(record.tool);
+      refuseAfterStop(record.tool);
       // Sent once (#394): in soft mode a delete is recorded as sent before
       // it is sent, and one not answered ok is never sent again.
       created.splice(at, 1);
@@ -1245,6 +1249,7 @@ export function leftovers(): string[] {
 /** Forgets every record of this module: for the live helpers' own tests, between cases. */
 export function resetLiveRecords(): void {
   created.length = 0;
+  deleteSent.length = 0;
   createdRequests.length = 0;
   journal.length = 0;
   configured.clear();

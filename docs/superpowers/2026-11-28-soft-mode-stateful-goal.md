@@ -16,37 +16,12 @@ not only `LambdaTester` and the include suite. Among them are the table-type
 suite, `rapFixtures`, the direct-call path of the narrowed compact tools, and
 `heldLiveLocks`.
 
-## Open question for the owner: the step that failed on the network
+## Decision: a step that fails on the network ends the test
 
-The step that failed on the network is not resent by default: a failed
-request is its own error. Neither form of hard mode resends a tool call that
-failed during an outage either:
-
-- The in-repo hard mode throws on the failed answer
-  (`src/__tests__/integration/helpers/testers/hardMode.ts:1015-1017`).
-  `HighTester.runInHardMode` then rethrows into cleanup
-  (`HighTester.ts:333-343`); its `retryOnConflict` resends only `409`s and
-  SAP's transient conflicts, never a network error (`HighTester.ts:365-371`).
-- mcp-test's recovery bench records the call made during the outage as its
-  own answer and moves on to the next call without resending it
-  (`mcp-test/bench/session-recovery.mjs:77`, verdicts at `:84-89`). The
-  server process, and with it the session, stays alive.
-
-There are two options:
-
-1. **The failed step ends the test** (recommended). Its cleanup then unlocks
-   with the original handle and logs off in the same session. This needs no
-   resend of the step, matches hard mode and the no-retries rule, and is
-   what was measured.
-2. **The failed step is resent once.** This is a named exception to the
-   no-retries rule, which only the owner grants. It must handle a lost
-   response: no mutation is applied twice, and no object it created is
-   abandoned.
-
-Either way, cleanup's own unlock and logoff must reach SAP after the network
-is back. How they do so, without a timer of the harness's own, is for the
-spec to settle. If that needs another send of an unlock or a logoff, that
-send is also the owner's to grant.
+A step that fails on the network ends its test, as it does in hard mode.
+Its cleanup then unlocks with the original handle and logs off in the same
+session, and the handle is never dropped. Nothing is resent: not the failed
+step, and not a cleanup step.
 
 ## Invariants
 
@@ -65,9 +40,10 @@ send is also the owner's to grant.
     session held. SAP released it, and nothing is sent for it again;
   - a credential refusal follows the existing refusal-marker policy: the
     whole run stops and nothing more is sent, a logoff included.
-- **A lock is owned until its release has reached SAP.** Its handle is not
+- **A lock is owned until its release has reached SAP.** Its handle is never
   dropped before the unlock was answered, the session's logoff was answered,
-  or SAP declared the session lost.
+  or SAP declared the session lost. A lock still owned when the run ends is
+  reported by name.
 - **A lost response is not taken as nothing done.** When a mutating step's
   answer was lost, the object or lock it may have made is treated as possibly
   existing or held. It is never assumed absent, and cleanup does not abandon

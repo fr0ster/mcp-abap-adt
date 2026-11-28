@@ -42,6 +42,7 @@ import type {
   IBackgroundRuns,
 } from '../../lib/backgroundRuns/contract';
 import { InstanceBatch } from '../../lib/batch/InstanceBatch';
+import { InstanceEnvelopes } from '../../lib/batch/InstanceEnvelopes';
 import type { ToolArgs } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
 import { noConnectionContext } from '../../lib/handlers/registry/expositionRegistry';
@@ -271,6 +272,7 @@ export async function inProcessServer(
     systemType: variant,
     systemContextResolver: defaultSystemContextResolver,
     batch: new InstanceBatch({ keepRawParts: false }),
+    envelopes: new InstanceEnvelopes({ keepRawParts: false }),
     backgroundRuns: runs,
     leftoverSessions,
     longSession: new LongSession(),

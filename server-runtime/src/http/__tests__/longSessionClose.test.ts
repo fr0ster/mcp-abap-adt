@@ -108,7 +108,7 @@ it('SessionClose answers that the session is closed and names what it held; the 
   assert.equal(closed.isError, false);
   assert.deepStrictEqual(JSON.parse(closed.text), {
     closed: true,
-    held: { locks: 1, batch: false, debug_session: false },
+    held: { locks: 1, batch: false, envelopes: 0, debug_session: false },
   });
 
   await until(() => poolSize() === 0);
@@ -158,7 +158,7 @@ it('the compact HandlerSession close closes the session as SessionClose does', a
   assert.equal(closed.isError, false);
   assert.deepStrictEqual(JSON.parse(closed.text), {
     closed: true,
-    held: { locks: 0, batch: false, debug_session: false },
+    held: { locks: 0, batch: false, envelopes: 0, debug_session: false },
   });
   await until(() => s.standIn.logoffs() === 1);
   assert.equal(poolSize(), 0);
@@ -211,7 +211,7 @@ it('close runs at once while a batch is open: the batch and its recorded call ar
   assert.equal(closed.isError, false);
   assert.deepStrictEqual(JSON.parse(closed.text), {
     closed: true,
-    held: { locks: 0, batch: true, debug_session: false },
+    held: { locks: 0, batch: true, envelopes: 0, debug_session: false },
   });
   await until(() => s.standIn.logoffs() === 1);
   await turns(20);
@@ -322,7 +322,7 @@ it('close ends any held state: a lock taken without SessionOpen, closed by its h
   assert.equal(closed.isError, false);
   assert.deepStrictEqual(JSON.parse(closed.text), {
     closed: true,
-    held: { locks: 1, batch: false, debug_session: false },
+    held: { locks: 1, batch: false, envelopes: 0, debug_session: false },
   });
   await until(() => s.standIn.logoffs() === 1);
   const lockSession = s.standIn.requests.find((r) =>
@@ -352,7 +352,7 @@ it('a close whose batch was the only thing held: the state empties, and the pool
   const closed = await s.call('SessionClose', { state_handle: handle });
   assert.deepStrictEqual(JSON.parse(closed.text), {
     closed: true,
-    held: { locks: 0, batch: true, debug_session: false },
+    held: { locks: 0, batch: true, envelopes: 0, debug_session: false },
   });
   await until(() => poolSize() === 0);
   await turns(20);

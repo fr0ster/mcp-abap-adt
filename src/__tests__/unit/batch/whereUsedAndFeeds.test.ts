@@ -1240,7 +1240,7 @@ describe('batch mode records the one-request calls only', () => {
     ['RuntimeListFeeds', { feed_type: 'variants' }, false],
   ] satisfies ReadonlyArray<[string, Record<string, unknown>, boolean]>) {
     it(format('%s %j: recorded %s', tool, args, recorded), () => {
-      assert.equal(eligible(tool, args, 'http').ok, recorded);
+      assert.equal(eligible(tool, args, 'http', 'compact').ok, recorded);
     });
   }
 });

@@ -11,6 +11,14 @@ A **destination** is a name for one SAP system and how to log on to it. Two kind
 
 `mcp-abap-adt` (stdio) supports three authentications for a destination: basic, SNC, JWT with browser login; a JWT you hold goes in the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse`. See [Authentication & Destinations](AUTHENTICATION.md).
 
+## Envelope, ADT envelope
+
+An **ADT envelope** is one `multipart/mixed` request to SAP's batch endpoint carrying several
+inner requests. A **read envelope** (an *envelope*, in the core binaries) is the model's
+collection of read calls, created by `CreateReadEnvelope` and named by its `envelope_handle`; its
+execution sends one ADT envelope, or several under `--batch-parts-per-envelope`. See
+[Envelopes in the core binaries](BATCH_MODE.md#envelopes-in-the-core-binaries).
+
 ## Service Key
 
 A JSON file downloaded from SAP BTP. The file name becomes the destination name. Two shapes are read: an **ABAP service key** (it carries the system's URL and a `uaa` object) and an **XSUAA key** (`url`, `clientid`, `clientsecret` at the root: the UAA, not the system). An XSUAA key needs `XSUAA_MCP_URL` in `sessions/<destination>.env` to say where the ABAP system is.

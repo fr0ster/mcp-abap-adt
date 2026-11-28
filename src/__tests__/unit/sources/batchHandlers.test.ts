@@ -230,7 +230,7 @@ describe('tools/batch-handlers.json', () => {
           extra: [],
         },
       );
-      assert.equal(entry.set, 'compact');
+      assert.ok(entry.set === 'compact' || entry.set === 'core', entry.tool);
       if (entry.connection !== undefined)
         assert.equal(entry.connection, 'http');
       for (const rule of entry.when ?? []) {
@@ -250,7 +250,9 @@ describe('tools/batch-handlers.json', () => {
       assert.deepStrictEqual(
         {
           tool: entry.tool,
-          served: served[entry.set].has(entry.tool),
+          served: served[entry.set === 'core' ? 'full' : 'compact'].has(
+            entry.tool,
+          ),
         },
         { tool: entry.tool, served: true },
       );

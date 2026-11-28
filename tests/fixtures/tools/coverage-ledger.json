@@ -126,6 +126,13 @@
       "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
     }
   },
+  "CreateReadEnvelope": {
+    "unit": "src/__tests__/unit/pins/readEnvelopes.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/readEnvelopes.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/readEnvelopes.live.test.ts"
+    }
+  },
   "DebugBatchAnswers": {
     "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
     "live": {
@@ -222,6 +229,20 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "DiscardReadEnvelope": {
+    "unit": "src/__tests__/unit/pins/readEnvelopes.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/readEnvelopes.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/readEnvelopes.live.test.ts"
+    }
+  },
+  "ExecuteReadEnvelope": {
+    "unit": "src/__tests__/unit/pins/readEnvelopes.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/readEnvelopes.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/readEnvelopes.live.test.ts"
     }
   },
   "GetAbapGitBranchInfo": {
@@ -1312,6 +1333,13 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
+  "ListReadEnvelopes": {
+    "unit": "src/__tests__/unit/pins/readEnvelopes.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/readEnvelopes.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/readEnvelopes.live.test.ts"
     }
   },
   "ListServiceBindingTypes": {

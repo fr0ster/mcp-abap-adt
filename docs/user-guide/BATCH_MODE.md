@@ -6,15 +6,15 @@ requests do not depend on each other: reading twenty objects, locking ten, writi
 under the locks already held, unlocking them — each of these a batch of its own. One envelope
 round trip replaces many.
 
-The compact binaries serve it, on stdio, Streamable HTTP and SSE:
+Two forms serve it, on stdio, Streamable HTTP and SSE:
 
-| Binaries | Tool |
+| Binaries | Tools |
 |---|---|
-| `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse`, and their `-ro` binaries | `HandlerBatch` with `action: 'begin' \| 'end' \| 'answers'` |
+| `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse`, and their `-ro` binaries | `HandlerBatch` with `action: 'begin' \| 'end' \| 'answers'` — batch mode, below |
+| `mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries | `CreateReadEnvelope`, `ExecuteReadEnvelope`, `DiscardReadEnvelope`, `ListReadEnvelopes` — read envelopes, [Envelopes in the core binaries](#envelopes-in-the-core-binaries) |
 
-`number` / `numbers` go with `answers` alone. The full binaries (`mcp-abap-adt`, `-http`, `-sse`
-and their `-ro` binaries) serve no batch mode, and their tools' descriptions carry no batch
-sentence.
+`number` / `numbers` go with `HandlerBatch` `answers` alone. The core binaries' tools carry no
+batch-mode sentence; the reads an envelope admits carry the envelope sentence instead.
 
 The debugger has a batch of its own — `DebugBatchBegin` / `DebugBatchEnd` / `DebugBatchAnswers`
 in the full binaries, compact `HandlerDebugBatch` — at an ABAP stop or an AMDP break; its answers
@@ -78,6 +78,77 @@ stream), the HTTP pool lets the instance go, a long session's `SessionClose`, th
 held state, the open batch is dropped: nothing recorded is sent, and the last batch's map goes
 with it. A `HandlerBatch` `end` after the idle bound is refused `batch_mode_off`, and `HandlerBatch` `answers` answers
 "no answer with that number".
+
+## Envelopes in the core binaries
+
+The core binaries (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries) batch reads by an
+explicit handle instead of a mode. Nothing switches into recording: a read is recorded only when
+the call names an envelope.
+
+1. **`CreateReadEnvelope`** sends nothing and answers `{ "envelope_handle": "…" }` — 32
+   upper-case hex characters, 128 random bits — plus the instance's `state_handle` where it has
+   one.
+2. **Recording.** A read that an envelope admits takes the optional argument `envelope_handle`.
+   Called with it, the read sends nothing and answers `{ "envelope_handle": "…", "number": n }`,
+   numbered in recording order from 1. A call whose requests are independent of each other (a
+   version diff, a draft read) records them all under its one number. Called without it, the read
+   runs as before, also while an envelope is open.
+3. **`ExecuteReadEnvelope`** sends every recorded read stateless and answers every number at
+   once, in recording order: `[{ "number": 1, "content": […] }, { "number": 2, "content": […],
+   "isError": true }, …]`, with `raw` when `--batch-keep-raw-parts` is on. An empty envelope
+   answers `[]` and sends nothing. Execution ends the envelope: its handle is not available
+   afterwards.
+4. **`DiscardReadEnvelope`** ends an envelope without sending anything. **`ListReadEnvelopes`**
+   lists the session's open envelopes, each with how many calls it recorded.
+
+Several envelopes may be open at once, each with its own numbering, and an envelope may be open
+beside a debugger batch.
+
+**What is recorded.** The reads of `tools/batch-handlers.json` whose set is `core` (the table
+below): every request of such a read is independent of the others' answers. Any other tool given
+`envelope_handle` — with any value — is refused `envelope_not_recordable` and sends nothing; an
+admitted read given an empty or non-string handle gets the schema's refusal. `background: true`
+with a handle is refused `batch_no_background`, and a listed long read given a handle runs in no
+background: it is recorded. Access restrictions are checked when a read is recorded, before it
+takes a number. One node-structure read per envelope: a second is refused
+`envelope_node_structure`. Transport reads, and reads that batch their own requests
+(`GetObjectsList`, `GetPackageContents`, `GetObjectInfo`, `SearchSource`), are not recorded.
+
+**Answers.** A number's answer is what the read answers outside an envelope for the same SAP
+answer, with no further request: a part's `404` answers that number only. A recorded read that would send a
+request built from another's answer answers `batch_not_recordable` under its number: an envelope
+records only independent reads, and every read goes stateless. No `406`/`415`
+correction is resent. A failed ADT envelope (SAP's refusal, a transport error, a credential
+refusal, parts that do not match, an answer that cannot be split) answers every number it carried
+with that failure, as it came.
+
+**The bound.** No bound of the server's own: by default all recorded reads go in one ADT
+envelope. With `--batch-parts-per-envelope=<parts>` they go in consecutive ADT envelopes of at
+most that many parts, in recording order, each call's parts together; a call that needs more
+parts than the bound is answered an error naming both numbers, and nothing is sent. The first
+failed ADT envelope (or a part answered `401`) ends the sending: the earlier envelopes' answers are
+kept, and the reads not sent answer that failure. `--batch-open-envelopes=<n>`
+(`MCP_BATCH_OPEN_ENVELOPES`, YAML `batch.openEnvelopes`, an embedder's `openEnvelopes`) bounds how
+many envelopes one server instance holds open; at the bound a create is refused
+`envelope_limit`, and nothing is evicted. Without it there is no bound.
+
+**Whose envelope.** A handle is valid only in the session that created it: the same server
+instance and connection context, and over Streamable HTTP the same `state_handle` and the same
+destination and credential headers (`x-sap-url`, `x-sap-client`, `x-sap-jwt-token`, `x-sap-login`,
+`x-sap-password`, kept as a digest). Nothing is read from SAP to decide it: creating an envelope
+sends nothing. An unknown handle and another session's handle get the same answer:
+`envelope_unavailable`, "envelope is not available". An execute takes its envelope as it arrives:
+a record, a discard or a second execute that comes after it answers `envelope_unavailable`, and an
+execute whose connection fails before it sends gives the envelope back unchanged.
+
+**Lifetime.** What an envelope recorded is held with the envelope, in its instance's held state
+(the long session over Streamable HTTP), never anywhere else. No clock of its own. An envelope ends by its execution, a discard, the instance's
+close (stdin closed, the SSE connection ended, the pool letting the instance go, `SessionClose`,
+the process's shutdown), and over Streamable HTTP and SSE the held state's idle bound
+(`stateIdleMinutes`). An open envelope is held state: over Streamable HTTP it keeps the instance
+in the pool, and every call of the envelope sends its `state_handle`. A SAP session lost and
+replaced under the same connection context leaves the envelope valid; execution sends on the
+connection in force then.
 
 ## Phases
 
@@ -539,7 +610,7 @@ one envelope cannot hold a request built from another's answer. Each is refused
 
 <!-- batch-handlers:start -->
 
-48 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+94 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Compact sets (`mcp-abap-adt-compact`, `-compact-http`, `-compact-sse`, and their `-ro` binaries for the reads)
 
@@ -593,5 +664,56 @@ one envelope cannot hold a request built from another's answer. Each is refused
 | `HandlerUpdate` | when lock_handle is given and object_type is one of DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST, PROGRAM, INTERFACE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, INCLUDE, TABLE_TYPE, CLASS_TEXT_ELEMENTS | one request under the lock_handle given: PUT of the source, the class include or the metadata document as given ({object uri}…?lockHandle=…[&corrNr=…]); for SERVICE_BINDING its publication request |
 | `HandlerUpdate` | when lock_handle is given and object_type is PACKAGE and the connection is HTTP | PUT /sap/bc/adt/packages/{name}?lockHandle=…[&corrNr=…], the metadata document as given; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerValidate` | every call | POST the type's validation endpoint (…/validation?objname=…, /cts/transportchecks for a service binding) |
+
+### Core sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries): envelopes
+
+| Tool | Recorded | Sends |
+|---|---|---|
+| `GetAdtTypes` | every call | one request: GET the object type list |
+| `GetATCFindings` | every call | one request: GET /sap/bc/adt/atc/worklists/{id} |
+| `GetATCResult` | every call | one request: GET /sap/bc/adt/atc/results/{displayId} |
+| `GetBehaviorDefinition` | every call | one request: GET the behavior definition's source, or with part metadata its metadata document, at the version asked |
+| `GetBehaviorImplementation` | every call | one request: GET the behavior pool's source, or with part metadata its metadata document, at the version asked |
+| `GetClass` | every call | one request: GET the class source, or with part metadata its metadata document, at the version asked |
+| `GetDataElement` | every call | one request: GET the data element's metadata document at the version asked |
+| `GetDdl` | every call | one request: GET the DDL source's source, or with part metadata its metadata document, at the version asked |
+| `GetDomain` | every call | one request: GET the domain's metadata document at the version asked |
+| `GetFunctionGroup` | every call | one request: GET the function group's metadata document at the version asked |
+| `GetFunctionInclude` | every call | one request: GET the function group's include's source, or with part metadata its metadata document, at the version asked |
+| `GetFunctionModule` | when part is metadata | one request: GET the function module's metadata document at the group given, checked against that group locally |
+| `GetInactiveObjects` | every call | one request: GET /sap/bc/adt/activation/inactiveobjects |
+| `GetInclude` | every call | one request: GET the include's source, or with part metadata its metadata document, at the version asked |
+| `GetInterface` | every call | one request: GET the interface's source, or with part metadata its metadata document, at the version asked |
+| `GetMainPrograms` | every call | one request: GET the include's main programs |
+| `GetMessageClass` | every call | one request: GET the message class's metadata document |
+| `GetMessageClassMessage` | every call | one request: GET the message class document, the message read from it locally |
+| `GetMetadataExtension` | every call | one request: GET the metadata extension's source, or with part metadata its metadata document, at the version asked |
+| `GetObjectDraft` | every call | for each part of the object, GET its source or metadata ?version=active, ?version=inactive and ?version=workingArea, all sent together under one number |
+| `GetObjectOutline` | every call | one request: GET the object's outline at the version asked |
+| `GetObjectsByType` | every call | one request: POST /sap/bc/adt/repository/nodestructure for the one node asked; at most one per envelope |
+| `GetObjectStructure` | every call | one request: GET /sap/bc/adt/repository/objectstructure for the object |
+| `GetObjectVersionDiff` | every call | two independent requests under one number: GET each of the two content_uri given, compared locally |
+| `GetObjectVersions` | every call | one request: GET the object's version feed |
+| `GetObjectVersionSource` | every call | one request: GET the content_uri given |
+| `GetPackage` | every call | one request: GET the package's metadata document at the version asked |
+| `GetProgram` | every call | one request: GET the program's source, or with part metadata its metadata document, at the version asked |
+| `GetServiceBinding` | every call | one request: GET the active service binding, or with part metadata its metadata document |
+| `GetServiceDefinition` | every call | one request: GET the service definition's source, or with part metadata its metadata document, at the version asked |
+| `GetSqlQuery` | every call | one request: POST /sap/bc/adt/datapreview/freestyle with the query |
+| `GetStructure` | every call | one request: GET the structure's source, or with part metadata its metadata document, at the version asked |
+| `GetTable` | every call | one request: GET the table's source, or with part metadata its metadata document, at the version asked |
+| `GetTableContents` | every call | one request: POST /sap/bc/adt/datapreview/freestyle with SELECT * FROM the table |
+| `GetTableSettings` | every call | one request: GET the table's technical settings document |
+| `GetTableType` | every call | one request: GET the table type's metadata document at the version asked |
+| `GetTransaction` | every call | one request: GET the transaction's object properties |
+| `ListATCResults` | every call | one request: GET /sap/bc/adt/atc/results?createdBy=… with the filters given |
+| `ListServiceBindingTypes` | every call | one request: GET /sap/bc/adt/businessservices/bindings/bindingtypes |
+| `RuntimeAnalyzeProfilerTrace` | every call | one request: GET the trace's view asked, summarised locally |
+| `RuntimeGetDumpById` | every call | one request: GET /sap/bc/adt/runtime/dump/{id} in the view asked |
+| `RuntimeGetGatewayErrorLog` | every call | one request: GET /sap/bc/adt/gw/errorlog, or one entry's detail |
+| `RuntimeGetProfilerTraceData` | every call | one request: GET the trace's view asked (hit list, statements or DB accesses) |
+| `RuntimeListProfilerTraceFiles` | every call | one request: GET /sap/bc/adt/runtime/traces/abaptraces |
+| `RuntimeListSystemMessages` | every call | one request: GET /sap/bc/adt/runtime/systemmessages |
+| `SearchObject` | every call | one request: GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch with the query |
 
 <!-- batch-handlers:end -->

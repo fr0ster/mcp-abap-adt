@@ -26,6 +26,7 @@ import {
 } from '@mcp-abap-adt/lib/config';
 import {
   InstanceBatch,
+  InstanceEnvelopes,
   LeftoverSessions,
   runtimeDirectory,
   sapAnswerOf,
@@ -1014,6 +1015,12 @@ async function launchStdio(
       // Batch mode: the one instance's batch state, owned here.
       batch: new InstanceBatch({
         keepRawParts: config.batchKeepRawParts === true,
+      }),
+      // The read envelopes: the one instance's, owned here.
+      envelopes: new InstanceEnvelopes({
+        keepRawParts: config.batchKeepRawParts === true,
+        // --batch-open-envelopes: the consumer's bound; absent, none.
+        openEnvelopes: config.batchOpenEnvelopes,
       }),
       stateLogger: stateLoggerForTransport,
       logger: loggerForTransport,

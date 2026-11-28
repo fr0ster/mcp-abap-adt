@@ -41,6 +41,11 @@ reach into the connection's session.
 
 ## Across tool calls
 
+- **Read envelopes** (the core binaries) hold no SAP session: recording sends nothing, and
+  execution sends every recorded read stateless, whatever the connection's session type. An open
+  envelope is held state of its instance (`InstanceEnvelopes`, a `StatePart`): the instance's
+  close, the pool letting it go and the idle bound let it go, nothing sent.
+
 - **One main flow per instance**: the calls of one MCP session that work on its
   connection run one after another, whatever the client sends at once — the server
   enforces it, so no call is sent inside another call's window. Every send on the

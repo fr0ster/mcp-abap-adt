@@ -123,6 +123,14 @@ http:            # or sse:
     transcripts and logs. Protect it like a session cookie: HTTPS for anything
     beyond `127.0.0.1`, callers isolated from one another, and no wire trace
     on a shared machine.
+- **Envelope handles** (`CreateReadEnvelope`, the core binaries) are checked
+  against the session that created them, unlike `state_handle`: the same
+  server instance and connection context, and over Streamable HTTP the same
+  `state_handle` and the same destination and credential headers
+  (`x-sap-url`, `x-sap-client`, `x-sap-jwt-token`, `x-sap-login`,
+  `x-sap-password`, kept in memory as a SHA-256 digest only — never logged,
+  answered or persisted). An unknown handle and another session's answer the
+  same. Nothing is read from SAP to decide it.
 
 ## Logs
 

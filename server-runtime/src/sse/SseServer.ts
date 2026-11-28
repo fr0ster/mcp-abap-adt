@@ -20,6 +20,7 @@ import {
   BaseMcpServer,
   closeInstance,
   InstanceBatch,
+  InstanceEnvelopes,
   sessionKeepAliveMsOf,
 } from '@mcp-abap-adt/lib/embeddable';
 import {
@@ -86,7 +87,7 @@ export interface SseServerOptions {
    * its own, created with these settings (the launcher's). Absent: no
    * instance has one, and the batch tools answer `batch_mode_unavailable`.
    */
-  batch?: { keepRawParts: boolean };
+  batch?: { keepRawParts: boolean; openEnvelopes?: number | undefined };
   /**
    * Host to bind to (refused beside an external app)
    * @default "127.0.0.1"
@@ -229,7 +230,9 @@ export class SseServer {
   private readonly systemType: SapEnvironment | undefined;
   /** The running background runs' owner: this server's, shared by every stream's instance. */
   private readonly runOwner = new BackgroundRunOwner();
-  private readonly batchSettings: { keepRawParts: boolean } | undefined;
+  private readonly batchSettings:
+    | { keepRawParts: boolean; openEnvelopes?: number | undefined }
+    | undefined;
   /** The corrected header pairs: the process's, shared by every stream's instance. */
   private readonly adtHeaderPairs = new AdtHeaderPairs();
 
@@ -277,7 +280,10 @@ export class SseServer {
     this.batchSettings =
       opts?.batch === undefined
         ? undefined
-        : { keepRawParts: opts.batch.keepRawParts === true };
+        : {
+            keepRawParts: opts.batch.keepRawParts === true,
+            openEnvelopes: opts.batch.openEnvelopes,
+          };
   }
 
   /**
@@ -476,6 +482,7 @@ export class SseServer {
           lineMatchStrategy?: LineMatchStrategy;
           partsPerEnvelope?: number;
           batch?: InstanceBatch;
+          envelopes?: InstanceEnvelopes;
           heldLocks: HeldLocks;
           adtHeaderPairs?: AdtHeaderPairs;
         },
@@ -535,6 +542,8 @@ export class SseServer {
         // Batch mode: this connection's own, never shared with another.
         ...(this.batchSettings !== undefined && {
           batch: new InstanceBatch(this.batchSettings),
+          // The read envelopes: this instance's own, never shared.
+          envelopes: new InstanceEnvelopes(this.batchSettings),
         }),
         // The locks this connection's instance took: a write, a delete or
         // an unlock under a lock_handle is sent only under one it holds.

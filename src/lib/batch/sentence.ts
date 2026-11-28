@@ -89,7 +89,9 @@ export function entryWords(entry: BatchEntry): string {
  * for a tool the eligibility table does not list — run outside batch mode.
  */
 export function batchSentence(tool: string): string {
-  const entries = batchEntries().filter((entry) => entry.tool === tool);
+  const entries = batchEntries().filter(
+    (entry) => entry.tool === tool && entry.set === 'compact',
+  );
   if (entries.length === 0) return OUTSIDE_BATCH_SENTENCE;
   const always = entries.some(
     (entry) =>
@@ -105,4 +107,43 @@ export function withBatchSentence(description: string, tool: string): string {
   const sentence = batchSentence(tool);
   const trimmed = description.trimEnd();
   return trimmed.length === 0 ? sentence : `${trimmed} ${sentence}`;
+}
+
+/**
+ * The sentence of a core tool every call of which an envelope records
+ * (spec §5.1): with `envelope_handle`, the call is recorded, not sent.
+ */
+export const ENVELOPE_SENTENCE =
+  'With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.';
+
+/** The envelope sentence of a core tool recorded only for some arguments, `when` in words. */
+export function envelopeWhenSentence(when: string): string {
+  return `When ${when}, with envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.`;
+}
+
+/**
+ * The envelope sentence `tool`'s description ends with: from its core
+ * entries, the always form or the "When …" form; `undefined` for a tool no
+ * core entry names — a core tool an envelope does not record carries none.
+ */
+export function envelopeSentence(tool: string): string | undefined {
+  return envelopeSentenceOf(
+    batchEntries().filter(
+      (entry) => entry.tool === tool && entry.set === 'core',
+    ),
+  );
+}
+
+/** The envelope sentence of the core entries of one tool, `undefined` for none. */
+export function envelopeSentenceOf(
+  entries: readonly BatchEntry[],
+): string | undefined {
+  if (entries.length === 0) return undefined;
+  const always = entries.some(
+    (entry) =>
+      (entry.when === undefined || entry.when.length === 0) &&
+      entry.connection === undefined,
+  );
+  if (always) return ENVELOPE_SENTENCE;
+  return envelopeWhenSentence(entries.map(entryWords).join('; or '));
 }

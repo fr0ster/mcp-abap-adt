@@ -19,6 +19,7 @@ export {
 } from './kinds';
 export {
   batchable,
+  envelopable,
   lockAnswersStateHandle,
   longRunning,
   type Note,

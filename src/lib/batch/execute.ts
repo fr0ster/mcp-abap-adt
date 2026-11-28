@@ -193,7 +193,7 @@ function split(
  * response, when SAP answered the envelope, as its status and body — with
  * the step.
  */
-function failureAnswer(error: unknown): McpResult {
+export function failureAnswer(error: unknown): McpResult {
   const read = failureOf(error);
   if (read !== undefined) return answerRead(read);
   return answerFailure(

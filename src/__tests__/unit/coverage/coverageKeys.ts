@@ -282,6 +282,12 @@ export const SENDS_NOTHING: ReadonlySet<CoverageKey> = new Set([
   // runtime files: nothing is asked of SAP (`BaseMcpServer.leftoverCaller`).
   'ListLeftoverSessions',
   'HandlerLeftoverSessionList',
+  // A read envelope created, listed or discarded in the server instance:
+  // nothing is asked of SAP (`createEnvelope`, `listEnvelopes`,
+  // `discardEnvelope`).
+  'CreateReadEnvelope',
+  'ListReadEnvelopes',
+  'DiscardReadEnvelope',
 ]);
 
 /**

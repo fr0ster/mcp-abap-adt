@@ -30,7 +30,11 @@ import {
   LATE_BOUND_UNPOINTED_WORDS,
   LateBoundConnection,
 } from '../../../lib/batch/lateBound';
-import { createRecorder, untilSent } from '../../../lib/batch/recorder';
+import {
+  batchTarget,
+  createRecorder,
+  untilSent,
+} from '../../../lib/batch/recorder';
 import { callTransportRequest } from '../../../lib/callTransport';
 import { createAdtClient } from '../../../lib/clients';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
@@ -683,8 +687,7 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
     owner.begin('communication', { connection: batch, target, recorded: [] });
     const numbers: number[] = [];
     const recorder = createRecorder(
-      batch,
-      owner,
+      batchTarget(batch, owner),
       (n) => numbers.push(n),
       'GetProgram',
     );
@@ -743,8 +746,7 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
       });
     }) as typeof batch.makeAdtRequest;
     const recorder = createRecorder(
-      batch,
-      owner,
+      batchTarget(batch, owner),
       () => undefined,
       'GetProgram',
     );
@@ -776,8 +778,7 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
       return record(request);
     }) as typeof batch.makeAdtRequest;
     const recorder = createRecorder(
-      batch,
-      owner,
+      batchTarget(batch, owner),
       (n) => numbers.push(n),
       'GetProgram',
     );
@@ -815,8 +816,7 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
     owner.begin('communication', { connection: batch, target, recorded: [] });
     const numbers: number[] = [];
     const recorder = createRecorder(
-      batch,
-      owner,
+      batchTarget(batch, owner),
       (n) => numbers.push(n),
       'GetProgram',
     );

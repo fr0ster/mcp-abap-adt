@@ -14,6 +14,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { compactToolSet } from '../../../../compact/src/launcher';
 import { readOnlyToolSet as compactRoSet } from '../../../../compact-ro/src/launcher';
 import { StdioServer } from '../../../../server-runtime/src/stdio/StdioServer';
+import { envelopedDescription } from '../../../embeddable/BaseMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { withBatchSentence } from '../../../lib/batch/sentence';
 import type { ServerVariant } from '../../../lib/clients';
@@ -143,6 +144,8 @@ describe('each declared variant’s tools carry that variant’s description', (
           const accepted: readonly (string | undefined)[] = [
             served.description,
             withBatchSentence(served.description, tool.name),
+            // A core read an envelope admits ends with its envelope note.
+            envelopedDescription(served.description, tool.name, true),
           ];
           assert.ok(accepted.includes(tool.description));
         }

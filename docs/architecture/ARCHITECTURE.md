@@ -469,7 +469,19 @@ export async function handleGetProgram(
 ```
 
 `HandlerContext` contains the `IAbapConnection` and optional `ILogger` -- injected per-request by `BaseMcpServer` -- and,
-where the host gave one, the instance's batch owner (`batch`, an `InstanceBatch`), which the batch tools reach.
+where the host gave one, the instance's batch owner (`batch`, an `InstanceBatch`), which the batch tools reach, and
+its read-envelope owner (`envelopes`, an `InstanceEnvelopes`) with the call's session key (`envelopeKey`).
+
+**Read envelopes.** In the core sets a read the eligibility table admits for the `core` set declares
+`envelope_handle` (`src/lib/batch/envelopeSurface.ts`, shared by the registration and the tool-docs
+generator; every other core tool's schema is loose so a stray `envelope_handle` reaches the dispatch and
+is refused). Called with it, the dispatch finds the envelope for the call's session before taking a
+connection, then records the read on a recorder over the envelope (`envelopeTarget`,
+`src/lib/batch/envelopeTools.ts`) in the call's turn, its waits racing the call's own signal.
+`ExecuteReadEnvelope` reserves its envelope as it arrives, takes the connection, claims it, and sends
+the recorded parts through the phases' sender (`sendPlanned`, `src/lib/batch/phases.ts`) without the
+format correction; the answered runs' handlers resume first, then the failed or unsent runs' calls are
+let go and answered the failure itself. See [Batch Mode](../user-guide/BATCH_MODE.md#envelopes-in-the-core-binaries).
 
 **Batch mode.** While a batch is open, `BaseMcpServer`'s dispatch records each call the eligibility table
 (`tools/batch-handlers.json`) admits — its handler runs on a per-call recorder over adt-clients'

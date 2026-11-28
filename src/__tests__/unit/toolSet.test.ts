@@ -49,6 +49,7 @@ import {
   BackgroundRunHandlersGroup,
   DebugBatchHandlersGroup,
   DebugHandlersGroup,
+  EnvelopeHandlersGroup,
   HighLevelHandlersGroup,
   LeftoverSessionHandlersGroup,
   LeftoverSessionListHandlersGroup,
@@ -114,7 +115,7 @@ const SETS: ReadonlyArray<readonly [string, ToolSet]> = [
 ];
 
 describe('the four tool sets', () => {
-  it('core: readonly (with system), background runs, high, debug, search, the leftover-session list and logoff, the debugger batch; no batch mode', () => {
+  it('core: readonly (with system), background runs, high, debug, search, the leftover-session list and logoff, the debugger batch, the read envelopes; no batch mode', () => {
     const overriding = [
       new HighLevelHandlersGroup(context),
       new DebugHandlersGroup(context),
@@ -130,12 +131,13 @@ describe('the four tool sets', () => {
         new SearchHandlersGroup(context),
         new LeftoverSessionHandlersGroup(context),
         new DebugBatchHandlersGroup(context),
+        new EnvelopeHandlersGroup(context),
         new AbapGitHandlersGroup(context),
       ]),
     );
   });
 
-  it('core-ro: readonly (with system), search, background runs, the leftover-session list; no batch mode', () => {
+  it('core-ro: readonly (with system), search, background runs, the read envelopes, the leftover-session list; no batch mode', () => {
     assert.deepStrictEqual(
       shape(fullReadOnlyToolSet.groups(context, 'stdio', { dataTools: false })),
       shape([
@@ -144,6 +146,7 @@ describe('the four tool sets', () => {
         new SearchHandlersGroup(context),
         new AbapGitHandlersGroup(context, 'reads'),
         new BackgroundRunHandlersGroup(context),
+        new EnvelopeHandlersGroup(context),
         new LeftoverSessionListHandlersGroup(context),
       ]),
     );

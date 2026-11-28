@@ -286,6 +286,7 @@ const VERBS: Readonly<Record<string, readonly string[]>> = {
   Close: ['Closes'],
   Logoff: ['Logs'],
   Discard: ['Discards'],
+  Execute: ['Executes'],
   Set: ['Sets'],
   Wait: ['Waits'],
   Stop: ['Stops'],

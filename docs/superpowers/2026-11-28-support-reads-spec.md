@@ -395,9 +395,15 @@ How they are registered:
   long reads.
 - **`-ro` sets.** These take every entry through the existing groups and
   `compactReadOnlyTools.ts`, because every new entry is a read.
-- **Batch.** The full binaries serve no batch mode. The batch sentences of `HandlerGet` and
-  `HandlerSystem` stay as they are; `tools/batch-handlers.json` and the batch test show the
-  new type and action as recordable, as the other reads of those tools are.
+- **Batch.** The full binaries serve no batch mode. In the compact binaries they are not admitted to batch mode. On a cold discovery cache a support read waits
+  for the discovery answer before it sends its own request, while a batch
+  (`oneRequestPerEntry`) sends every request before any answer comes back. So, as #392
+  treats every read that waits on another answer, the new `HandlerGet` types and the
+  `keyword_documentation` action get no row in `tools/batch-handlers.json`, and in batch
+  mode they run outside it, as such calls do.
+  `tools/batch-handlers.json`, `BATCH_ENTRY_CASES`, `BATCH_MODE.md` and the batch sentences
+  of `HandlerGet` and `HandlerSystem` stay as they are, and the batch tests stay green
+  unchanged. The long-read and background handling (§4.1 "Long read") is not affected.
 - **Access restrictions.** `--deny-actions` takes these eight entries:
   - the four tools by name;
   - `HandlerGet.APPLICATION_LOG_DEFINITION`, `HandlerGet.APPLICATION_JOB_CATALOG`,
@@ -747,8 +753,8 @@ of its form, as §3.3 defines it:
   - the tool counts per binary and transport (core and core-ro +4, compact and compact-ro
     +0);
   - the `HandlerSystem` action list and the `HandlerGet` type list.
-- **`docs/user-guide/ACCESS_RESTRICTIONS.md`** and **`BATCH_MODE.md`**: the new entries,
-  where these pages list tools, types or actions.
+- **`docs/user-guide/ACCESS_RESTRICTIONS.md`**: the new entries, where the page lists tools,
+  types or actions. `BATCH_MODE.md` is unchanged (§4.1 "Batch").
 - **`CHANGELOG.md`**, 24.3.0:
   - the tools, the types and the action;
   - what is not served (the position form, `legacy`);

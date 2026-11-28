@@ -36,8 +36,9 @@ its spec section.
       today): see **Coverage** below;
   - `tools/long-handlers.json`: `longHandlers`, `batchHandlers` and `toolSurface`, in
     step 12;
-  - `tools/batch-handlers.json` with `docs/user-guide/BATCH_MODE.md`: `batchModePage`,
-    `batchHandlers` and the `batch/` tests, in step 18.
+  - `tools/batch-handlers.json` with `docs/user-guide/BATCH_MODE.md` (`batchModePage`,
+    `batchHandlers` and the `batch/` tests): unchanged, because the support reads are not
+    admitted to batch mode (spec §4.1 "Batch"). Step 18 checks that they stay equal.
 
   Searched and not touched by this work, because none of them lists these tools or entries:
   `shipped-readings.json` (a fixed list of tools), `terse-goldens.json`,
@@ -81,9 +82,9 @@ its spec section.
       arguments: here the missing `query` / `topic`).
 
     `listedSchema.test.ts` derives its cases from `SYSTEM_ACTIONS`.
-  - **A batch-recordable entry** (step 18): `tools/batch-handlers.json`, and
-    `BATCH_ENTRY_CASES` in `helpers/batchEntryCases.ts`, whose cases must sample every
-    value an entry's `equals` names (`batchHandlers.test.ts`).
+  - **A batch-recordable entry:** none in this work. `tools/batch-handlers.json` and
+    `BATCH_ENTRY_CASES` (`helpers/batchEntryCases.ts`) are left as they are (spec §4.1
+    "Batch").
 - **Coverage.** Each step that makes a coverage key served (`coverageKeys.ts`: for example
   `GetApplicationJobCatalog#source`, `HandlerGet#APPLICATION_JOB_CATALOG#metadata` or
   `HandlerSystem#keyword_documentation`) does all of this in the same commit:
@@ -364,10 +365,16 @@ registry.
 17. **Close the equality** over every form, kind and enum of the table. With every entry
     registered, it passes.
 18. **Batch and tool sets.**
-    - `tools/batch-handlers.json` and the batch test: the new type and action are
-      recordable. `docs/user-guide/BATCH_MODE.md` is regenerated in this same commit
-      (`batchModePage.test.ts`).
-    - The existing batch sentences of `HandlerGet` and `HandlerSystem` are unchanged.
+    - **Batch: not admitted.** The new `HandlerGet` types and the `keyword_documentation`
+      action get no row in `tools/batch-handlers.json`.
+      - On a cold discovery cache they wait for the discovery answer before their own
+        request, which `oneRequestPerEntry` refuses, as #392 treats every read that waits
+        on another answer (spec §4.1 "Batch").
+      - A unit test proves that a call of each in batch mode runs outside it.
+      - `tools/batch-handlers.json`, `BATCH_ENTRY_CASES`, `docs/user-guide/BATCH_MODE.md`
+        and the batch sentences of `HandlerGet` and `HandlerSystem` stay unchanged, and
+        the batch tests pass unchanged.
+      - The long-read and background handling of step 12 stays as it is.
     - The full binaries still serve no batch mode.
     - The `-ro` sets carry every entry, and the tool counts match.
     - `toolDescriptionsCarryNoLiterals.test.ts` stays green.

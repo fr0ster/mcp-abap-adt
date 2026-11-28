@@ -156,7 +156,9 @@ terminal state per connection. Each connection records one of:
 
 - `logoff-attempted`, set before `disconnect()` is called;
 - `logoff-threw`;
-- `logoff-unconfirmed`.
+- `logoff-unconfirmed`;
+- `logoff-withheld`, after a credential refusal (the refusal marker). No
+  logoff is sent, as today (`openConnections.ts:41`).
 
 A second call for a connection that already has a state sends nothing. That
 holds whether the call comes from a hard-mode helper, a suite, or the root
@@ -166,6 +168,8 @@ it.
 
 What each outcome is reported as:
 
+- A credential refusal forbade the logoff: **"logoff not sent: a credential
+  was refused"**. Nothing is sent.
 - `disconnect()` threw: **"logoff failed"**.
 - `disconnect()` and `flushGoodbye()` resolved: **"logoff not confirmed"**.
   The connection contract (connection 25) cannot tell an answered logoff from
@@ -175,13 +179,15 @@ What each outcome is reported as:
   Distinguishing them is a follow-up for `@mcp-abap-adt/connection` (PR
   description), not worked around here.
 
-Both reports name the locks still owned (`held` / `unlock-sent`) and the
-`unconfirmed` / `delete-sent` objects. They end with this logoff if SAP
-received it, otherwise with SAP's timeout.
+All three reports name the locks still owned (`held` / `unlock-sent`) and the
+`unconfirmed` / `delete-sent` objects. The locks end with this logoff if SAP
+received it, otherwise with SAP's timeout. A withheld logoff leaves only SAP's
+timeout.
 
 - **A soft-mode run connection with something still owned fails the file** on
-  either report, and the failure lists what is left: the locks by object and
-  state, and the objects by name and state. A run connection with nothing
+  any of the three reports, the withheld logoff included. The failure lists
+  what is left: the locks by object and state, and the objects by name and
+  state. A run connection with nothing
   owned reports and passes.
 - **Hard mode is unchanged.** A connection without a registry, such as the
   hard-mode helpers' (`hardMode.ts:909-931`), keeps today's report: a warning,

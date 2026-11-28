@@ -106,16 +106,26 @@ How each step is done:
    - a sibling that cannot be opened is reported, and the run's connection is
      never used for the delete.
 
-10. **The file's logoff (spec §6).** Failing tests first:
-    - an explicit `endTestConnection` that throws, followed by the root hook,
-      sends `disconnect()` twice today;
-    - the root hook only warns on a throw.
+10. **The file's logoff (spec §6).** Failing tests first, each failing on
+    today's harness:
+    - a soft-mode run connection that owns a lock and whose `disconnect()`
+      throws: today the root hook only warns, and the file passes;
+    - an explicit `endTestConnection` that throws, followed by the root hook:
+      today the connection has already left the tracked set
+      (`openConnections.ts:39`), so the root hook neither sees nor reports it;
+    - a credential refusal (the marker) with a lock still owned: today the
+      logoff is skipped in silence (`openConnections.ts:41`), and the file
+      passes.
+
+    A characterization test pins that `disconnect()` is sent once across an
+    explicit call and the root hook. It already holds today, and the new state
+    must keep it.
 
     Then:
     - the per-connection terminal state, with `logoff-attempted` set before
       `disconnect()`, so a second call sends nothing;
-    - the reports "logoff failed" and "logoff not confirmed", each naming the
-      locks and objects still owned;
+    - the reports "logoff failed", "logoff not confirmed" and "logoff not sent:
+      a credential was refused", each naming the locks and objects still owned;
     - a soft-mode run connection with something owned fails the file and lists
       what is left (spec "Decisions");
     - a connection without a registry only warns, which keeps hard mode as it

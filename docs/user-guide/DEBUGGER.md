@@ -746,8 +746,9 @@ snapshots the system lists, outside any debug session (no handle). They need the
 memory snapshot authorization (`S_MEM_SNAP`): **without it the list is empty**,
 not refused, so an empty list may mean a missing authorization. A snapshot is
 read as a `header`, an `overview`, or a `ranking`, `children` or `references`
-view; the last three answer at most `max_objects` objects (default 50), and
-`children` and `references` need the object `key`.
+view; the last three answer at most `max_objects` objects — required, as SAP
+requires a count for these views — and `children` and `references` need the
+object `key`.
 
 ## AMDP
 

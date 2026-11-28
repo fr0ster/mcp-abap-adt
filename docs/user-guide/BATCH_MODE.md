@@ -380,10 +380,12 @@ choice, not a rule: an envelope of one part would be as correct.
   listings with `include_descriptions: true` send each node structure as its own request and take
   each object's description from it; `GetObjectInfo` and `GetObjectsList` take each object's
   from its metadata, in the second phase (above).
-- **Single requests over RFC go one at a time.** Where a tool reads single requests several at a
-  time — the package listings with `include_descriptions: true` and `GetObjectInfo`'s structure,
-  whatever its options (8 at once),
-  `SearchSource` without a communication batch — an RFC connection gets one at a time
+- **Single requests: as many at once as the consumer sets, over RFC one at a time.** Where a tool
+  reads single requests — the package listings with `include_descriptions: true` and
+  `GetObjectInfo`'s structure, whatever its options, and `SearchSource` without a communication
+  batch — it keeps one request in flight unless the consumer sets more with
+  `--requests-in-flight=<requests>` (`MCP_REQUESTS_IN_FLIGHT`, YAML `requests.inFlight`); 24.2.2
+  and earlier kept 8. An RFC connection gets one at a time whatever is set
   (`readsInFlight`, `src/lib/connectionKind.ts`), a batch connection or another view over it
   included: an RFC connection is one ABAP session, and reads sent to it in parallel were lost
   without an error (measured on premise, 2026-09-26, `SearchSource`). The others over RFC are

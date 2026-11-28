@@ -1810,5 +1810,269 @@
     "name": "GetLocalTestClass",
     "inputs": "class_name*, version, start_line, end_line",
     "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckBehaviorDefinition",
+    "inputs": "name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckClass",
+    "inputs": "class_name*, version, source_code",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckDataElement",
+    "inputs": "data_element_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckDdl",
+    "inputs": "ddl_name*, version, ddl_source",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckMetadataExtension",
+    "inputs": "name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckDomain",
+    "inputs": "domain_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckFunctionGroup",
+    "inputs": "function_group_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckFunctionModule",
+    "inputs": "function_group_name*, function_module_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckInterface",
+    "inputs": "interface_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckPackage",
+    "inputs": "package_name*, super_package",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckProgram",
+    "inputs": "program_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckStructure",
+    "inputs": "structure_name*, version, ddl_code",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckTable",
+    "inputs": "table_name*, version, ddl_code",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "CheckTableType",
+    "inputs": "table_type_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "ListServiceBindingTypes",
+    "inputs": "response_format",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "ValidateServiceBinding",
+    "inputs": "service_binding_name*, description, service_definition_name*, package_name*, service_binding_version, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetClassVersions",
+    "inputs": "class_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetClassVersionSource",
+    "inputs": "content_uri*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetClassVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetProgramVersions",
+    "inputs": "program_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetProgramVersionSource",
+    "inputs": "content_uri*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetProgramVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetInterfaceVersions",
+    "inputs": "interface_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetInterfaceVersionSource",
+    "inputs": "content_uri*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetInterfaceVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetFunctionModuleVersions",
+    "inputs": "function_module_name*, function_group_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetFunctionModuleVersionSource",
+    "inputs": "content_uri*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetFunctionModuleVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetTableVersions",
+    "inputs": "table_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetTableVersionSource",
+    "inputs": "content_uri*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetTableVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetStructureVersions",
+    "inputs": "structure_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetStructureVersionSource",
+    "inputs": "content_uri*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetStructureVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetDdlVersions",
+    "inputs": "ddl_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetDdlVersionSource",
+    "inputs": "content_uri*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetDdlVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetBehaviorDefinitionVersions",
+    "inputs": "behavior_definition_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetBehaviorDefinitionVersionSource",
+    "inputs": "content_uri*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetBehaviorDefinitionVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetMetadataExtensionVersions",
+    "inputs": "metadata_extension_name*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetMetadataExtensionVersionSource",
+    "inputs": "content_uri*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetMetadataExtensionVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetTableTypeVersions",
+    "inputs": "table_type_name*",
+    "available_in": "cloud, onprem"
   }
 ]

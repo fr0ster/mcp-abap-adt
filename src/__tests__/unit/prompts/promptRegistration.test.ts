@@ -141,7 +141,7 @@ describe('BaseMcpServer lists the prompts', () => {
     );
     assert.deepEqual(
       server.prompts.map(({ name }) => name),
-      ['get', 'where_used', 'transport'],
+      ['get', 'check', 'where_used', 'transport'],
     );
     server.register(registryOf(compactToolSet, 'stdio', { dataTools: false }));
     const client = await connected(server);

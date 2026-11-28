@@ -984,8 +984,8 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       defineTool(CheckTable_Tool, handleCheckTable),
       defineTool(CheckDdl_Tool, handleCheckDdl),
       // Per-object high-level version-history tools (#30): 13 types ×
-      // {Versions, VersionSource}. HighLevel-only (ReadOnly keeps the generic
-      // GetObjectVersions/GetObjectVersionSource).
+      // {Versions, VersionSource, VersionDiff}; the readonly group serves the
+      // same tools, so a read-only set reads them too.
       ...buildObjectVersionTools().map((entry) =>
         defineTool(entry.toolDefinition, entry.handler),
       ),

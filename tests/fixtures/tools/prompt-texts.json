@@ -70,59 +70,59 @@
     {"listedBy":["onprem mcp-abap-adt-compact","cloud mcp-abap-adt-compact","none mcp-abap-adt-compact"],"value":"Activate the TABLE_TYPE \"SOME_NAME\".\n1. Call HandlerActivate with object_type: \"TABLE_TYPE\", object_name: \"SOME_NAME\".\nTABLE_TYPE takes object_type* and object_name*; * marks a required argument."}
   ],
   "check behavior_definition": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the BEHAVIOR_DEFINITION \"SOME_NAME\".\n1. Call CheckBehaviorDefinition with name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the BEHAVIOR_DEFINITION \"SOME_NAME\".\n1. Call CheckBehaviorDefinition with name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the BEHAVIOR_DEFINITION \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"BEHAVIOR_DEFINITION\", object_name: \"SOME_NAME\".\nBEHAVIOR_DEFINITION takes BEHAVIOR_DEFINITION(object_name*); * marks a required argument."}
   ],
   "check class": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the CLASS \"SOME_NAME\".\n1. Call CheckClass with class_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the CLASS \"SOME_NAME\".\n1. Call CheckClass with class_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the CLASS \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"CLASS\", object_name: \"SOME_NAME\".\nCLASS takes CLASS(object_name*); * marks a required argument."}
   ],
   "check data_element": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the DATA_ELEMENT \"SOME_NAME\".\n1. Call CheckDataElement with data_element_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the DATA_ELEMENT \"SOME_NAME\".\n1. Call CheckDataElement with data_element_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the DATA_ELEMENT \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"DATA_ELEMENT\", object_name: \"SOME_NAME\".\nDATA_ELEMENT takes DATA_ELEMENT(object_name*); * marks a required argument."}
   ],
   "check ddl": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the DDL \"SOME_NAME\".\n1. Call CheckDdl with ddl_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the DDL \"SOME_NAME\".\n1. Call CheckDdl with ddl_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the DDL \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"DDL\", object_name: \"SOME_NAME\".\nDDL takes DDL(object_name*); * marks a required argument."}
   ],
   "check domain": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the DOMAIN \"SOME_NAME\".\n1. Call CheckDomain with domain_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the DOMAIN \"SOME_NAME\".\n1. Call CheckDomain with domain_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the DOMAIN \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"DOMAIN\", object_name: \"SOME_NAME\".\nDOMAIN takes DOMAIN(object_name*); * marks a required argument."}
   ],
   "check function_group": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the FUNCTION_GROUP \"SOME_NAME\".\n1. Call CheckFunctionGroup with function_group_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the FUNCTION_GROUP \"SOME_NAME\".\n1. Call CheckFunctionGroup with function_group_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the FUNCTION_GROUP \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"FUNCTION_GROUP\", object_name: \"SOME_NAME\".\nFUNCTION_GROUP takes FUNCTION_GROUP(object_name*); * marks a required argument."}
   ],
   "check function_module": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the FUNCTION_MODULE \"SOME_NAME\".\n1. Call CheckFunctionModule with function_module_name: \"SOME_NAME\", function_group_name: the function group.\nStill to fill before the call: function_group (The function group the function module belongs to.)."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the FUNCTION_MODULE \"SOME_NAME\".\n1. Call CheckFunctionModule with function_module_name: \"SOME_NAME\", function_group_name: the function group.\nStill to fill before the call: function_group (The function group the function module belongs to.)."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the FUNCTION_MODULE \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"FUNCTION_MODULE\", object_name: the function group, \"|\" and \"SOME_NAME\".\nStill to fill before the call: function_group (The function group the function module belongs to.).\nFUNCTION_MODULE takes FUNCTION_MODULE(object_name* as GROUP|MODULE); * marks a required argument."}
   ],
   "check interface": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the INTERFACE \"SOME_NAME\".\n1. Call CheckInterface with interface_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the INTERFACE \"SOME_NAME\".\n1. Call CheckInterface with interface_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the INTERFACE \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"INTERFACE\", object_name: \"SOME_NAME\".\nINTERFACE takes INTERFACE(object_name*); * marks a required argument."}
   ],
   "check metadata_extension": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the METADATA_EXTENSION \"SOME_NAME\".\n1. Call CheckMetadataExtension with name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the METADATA_EXTENSION \"SOME_NAME\".\n1. Call CheckMetadataExtension with name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the METADATA_EXTENSION \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"METADATA_EXTENSION\", object_name: \"SOME_NAME\".\nMETADATA_EXTENSION takes METADATA_EXTENSION(object_name*); * marks a required argument."}
   ],
   "check package": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the PACKAGE \"SOME_NAME\".\n1. Call CheckPackage with package_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the PACKAGE \"SOME_NAME\".\n1. Call CheckPackage with package_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the PACKAGE \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"PACKAGE\", object_name: \"SOME_NAME\".\nPACKAGE takes PACKAGE(object_name*); * marks a required argument."}
   ],
   "check program": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the PROGRAM \"SOME_NAME\".\n1. Call CheckProgram with program_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the PROGRAM \"SOME_NAME\".\n1. Call CheckProgram with program_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the PROGRAM \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"PROGRAM\", object_name: \"SOME_NAME\".\nPROGRAM takes PROGRAM(object_name*); * marks a required argument."}
   ],
   "check structure": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the STRUCTURE \"SOME_NAME\".\n1. Call CheckStructure with structure_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the STRUCTURE \"SOME_NAME\".\n1. Call CheckStructure with structure_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the STRUCTURE \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"STRUCTURE\", object_name: \"SOME_NAME\".\nSTRUCTURE takes STRUCTURE(object_name*); * marks a required argument."}
   ],
   "check table": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the TABLE \"SOME_NAME\".\n1. Call CheckTable with table_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the TABLE \"SOME_NAME\".\n1. Call CheckTable with table_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the TABLE \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"TABLE\", object_name: \"SOME_NAME\".\nTABLE takes TABLE(object_name*); * marks a required argument."}
   ],
   "check table_type": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Check the TABLE_TYPE \"SOME_NAME\".\n1. Call CheckTableType with table_type_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Check the TABLE_TYPE \"SOME_NAME\".\n1. Call CheckTableType with table_type_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Check the TABLE_TYPE \"SOME_NAME\".\n1. Call HandlerCheckRun with object_type: \"TABLE_TYPE\", object_name: \"SOME_NAME\".\nTABLE_TYPE takes TABLE_TYPE(object_name*); * marks a required argument."}
   ],
   "create behavior_definition": [

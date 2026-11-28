@@ -5,7 +5,7 @@ Generated from the tool definitions the server builds (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. The read envelopes are served here (`CreateReadEnvelope`, `ExecuteReadEnvelope`, `DiscardReadEnvelope`, `ListReadEnvelopes`, [BATCH_MODE.md](BATCH_MODE.md#envelopes-in-the-core-binaries)); compact batch mode (`HandlerBatch`) is the compact binaries'. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 90
+- Total tools: 134
 
 ## Navigation
 
@@ -30,6 +30,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [DiscardBackgroundRun](#discardbackgroundrun-read-only-background-run)
   - [Behavior Definition](#read-only-behavior-definition)
     - [GetBehaviorDefinition](#getbehaviordefinition-read-only-behavior-definition)
+    - [CheckBehaviorDefinition](#checkbehaviordefinition-read-only-behavior-definition)
   - [Behavior Implementation](#read-only-behavior-implementation)
     - [GetBehaviorImplementation](#getbehaviorimplementation-read-only-behavior-implementation)
   - [Class](#read-only-class)
@@ -38,21 +39,58 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetLocalTypes](#getlocaltypes-read-only-class)
     - [GetLocalMacros](#getlocalmacros-read-only-class)
     - [GetLocalTestClass](#getlocaltestclass-read-only-class)
+    - [CheckClass](#checkclass-read-only-class)
   - [Common](#read-only-common)
     - [GetObjectVersions](#getobjectversions-read-only-common)
     - [GetObjectDraft](#getobjectdraft-read-only-common)
     - [GetObjectVersionSource](#getobjectversionsource-read-only-common)
     - [GetObjectVersionDiff](#getobjectversiondiff-read-only-common)
+    - [GetClassVersions](#getclassversions-read-only-common)
+    - [GetClassVersionSource](#getclassversionsource-read-only-common)
+    - [GetClassVersionDiff](#getclassversiondiff-read-only-common)
+    - [GetProgramVersions](#getprogramversions-read-only-common)
+    - [GetProgramVersionSource](#getprogramversionsource-read-only-common)
+    - [GetProgramVersionDiff](#getprogramversiondiff-read-only-common)
+    - [GetInterfaceVersions](#getinterfaceversions-read-only-common)
+    - [GetInterfaceVersionSource](#getinterfaceversionsource-read-only-common)
+    - [GetInterfaceVersionDiff](#getinterfaceversiondiff-read-only-common)
+    - [GetFunctionModuleVersions](#getfunctionmoduleversions-read-only-common)
+    - [GetFunctionModuleVersionSource](#getfunctionmoduleversionsource-read-only-common)
+    - [GetFunctionModuleVersionDiff](#getfunctionmoduleversiondiff-read-only-common)
+    - [GetTableVersions](#gettableversions-read-only-common)
+    - [GetTableVersionSource](#gettableversionsource-read-only-common)
+    - [GetTableVersionDiff](#gettableversiondiff-read-only-common)
+    - [GetStructureVersions](#getstructureversions-read-only-common)
+    - [GetStructureVersionSource](#getstructureversionsource-read-only-common)
+    - [GetStructureVersionDiff](#getstructureversiondiff-read-only-common)
+    - [GetDdlVersions](#getddlversions-read-only-common)
+    - [GetDdlVersionSource](#getddlversionsource-read-only-common)
+    - [GetDdlVersionDiff](#getddlversiondiff-read-only-common)
+    - [GetBehaviorDefinitionVersions](#getbehaviordefinitionversions-read-only-common)
+    - [GetBehaviorDefinitionVersionSource](#getbehaviordefinitionversionsource-read-only-common)
+    - [GetBehaviorDefinitionVersionDiff](#getbehaviordefinitionversiondiff-read-only-common)
+    - [GetMetadataExtensionVersions](#getmetadataextensionversions-read-only-common)
+    - [GetMetadataExtensionVersionSource](#getmetadataextensionversionsource-read-only-common)
+    - [GetMetadataExtensionVersionDiff](#getmetadataextensionversiondiff-read-only-common)
+    - [GetTableTypeVersions](#gettabletypeversions-read-only-common)
   - [Data Element](#read-only-data-element)
     - [GetDataElement](#getdataelement-read-only-data-element)
+    - [CheckDataElement](#checkdataelement-read-only-data-element)
   - [Ddl](#read-only-ddl)
     - [GetDdl](#getddl-read-only-ddl)
+    - [CheckDdl](#checkddl-read-only-ddl)
+  - [Ddlx](#read-only-ddlx)
+    - [CheckMetadataExtension](#checkmetadataextension-read-only-ddlx)
   - [Domain](#read-only-domain)
     - [GetDomain](#getdomain-read-only-domain)
+    - [CheckDomain](#checkdomain-read-only-domain)
   - [Enhancement](#read-only-enhancement)
     - [GetEnhancements](#getenhancements-read-only-enhancement)
     - [GetEnhancementSpot](#getenhancementspot-read-only-enhancement)
     - [GetEnhancementImpl](#getenhancementimpl-read-only-enhancement)
+  - [Function](#read-only-function)
+    - [CheckFunctionGroup](#checkfunctiongroup-read-only-function)
+    - [CheckFunctionModule](#checkfunctionmodule-read-only-function)
   - [Function Group](#read-only-function-group)
     - [GetFunctionGroup](#getfunctiongroup-read-only-function-group)
   - [Function Include](#read-only-function-include)
@@ -67,6 +105,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetMainPrograms](#getmainprograms-read-only-include)
   - [Interface](#read-only-interface)
     - [GetInterface](#getinterface-read-only-interface)
+    - [CheckInterface](#checkinterface-read-only-interface)
   - [Leftover Session](#read-only-leftover-session)
     - [ListLeftoverSessions](#listleftoversessions-read-only-leftover-session)
   - [Message Class](#read-only-message-class)
@@ -77,8 +116,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
   - [Package](#read-only-package)
     - [GetPackageContents](#getpackagecontents-read-only-package)
     - [GetPackage](#getpackage-read-only-package)
+    - [CheckPackage](#checkpackage-read-only-package)
   - [Program](#read-only-program)
     - [GetProgram](#getprogram-read-only-program)
+    - [CheckProgram](#checkprogram-read-only-program)
   - [Read Envelope](#read-only-read-envelope)
     - [CreateReadEnvelope](#createreadenvelope-read-only-read-envelope)
     - [ExecuteReadEnvelope](#executereadenvelope-read-only-read-envelope)
@@ -90,11 +131,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetObjectsByType](#getobjectsbytype-read-only-search)
   - [Service Binding](#read-only-service-binding)
     - [GetServiceBinding](#getservicebinding-read-only-service-binding)
+    - [ListServiceBindingTypes](#listservicebindingtypes-read-only-service-binding)
+    - [ValidateServiceBinding](#validateservicebinding-read-only-service-binding)
   - [Service Definition](#read-only-service-definition)
     - [GetServiceDefinition](#getservicedefinition-read-only-service-definition)
   - [Structure](#read-only-structure)
     - [GetStructuresList](#getstructureslist-read-only-structure)
     - [GetStructure](#getstructure-read-only-structure)
+    - [CheckStructure](#checkstructure-read-only-structure)
   - [System](#read-only-system)
     - [GetServiceBindingPreviewUrl](#getservicebindingpreviewurl-read-only-system)
     - [GetTypeInfo](#gettypeinfo-read-only-system)
@@ -120,9 +164,11 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
   - [Table](#read-only-table)
     - [GetTableSettings](#gettablesettings-read-only-table)
     - [GetTable](#gettable-read-only-table)
+    - [CheckTable](#checktable-read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
   - [Table Type](#read-only-table-type)
     - [GetTableType](#gettabletype-read-only-table-type)
+    - [CheckTableType](#checktabletype-read-only-table-type)
   - [Text Elements](#read-only-text-elements)
     - [GetTextElements](#gettextelements-read-only-text-elements)
   - [Transport](#read-only-transport)
@@ -360,6 +406,20 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
+<a id="checkbehaviordefinition-read-only-behavior-definition"></a>
+#### CheckBehaviorDefinition (Read-Only / Behavior Definition)
+**Description:** [read-only] Checks the syntax of a RAP behavior definition (BDEF).
+
+**Source:** `src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `name` (string, required) - BehaviorDefinition name.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
+
+---
+
 <a id="read-only-behavior-implementation"></a>
 ### Read-Only / Behavior Implementation
 
@@ -466,6 +526,21 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
+<a id="checkclass-read-only-class"></a>
+#### CheckClass (Read-Only / Class)
+**Description:** [read-only] Checks the syntax of an ABAP class (CLAS) as stored or as the source given.
+
+**Source:** `src/handlers/class/high/handleCheckClass.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `class_name` (string, required) - Class name.
+- `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
+- `version` (string, optional, one of: `active`, `inactive`) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active.
+
+---
+
 <a id="read-only-common"></a>
 ### Read-Only / Common
 
@@ -533,6 +608,324 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
+<a id="getclassversions-read-only-common"></a>
+#### GetClassVersions (Read-Only / Common)
+**Description:** [read-only] Reads the version history of an ABAP class (CLAS).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `class_name` (string, required) - ABAP class name.
+
+---
+
+<a id="getclassversionsource-read-only-common"></a>
+#### GetClassVersionSource (Read-Only / Common)
+**Description:** [read-only] Reads an older version of the source code of an ABAP class (CLAS) from its version history.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP class's version history.
+
+---
+
+<a id="getclassversiondiff-read-only-common"></a>
+#### GetClassVersionDiff (Read-Only / Common)
+**Description:** [read-only] Reads two versions of the same ABAP class (CLAS) from its version history and compares them.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP class's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP class's version history.
+
+---
+
+<a id="getprogramversions-read-only-common"></a>
+#### GetProgramVersions (Read-Only / Common)
+**Description:** [read-only] Reads the version history of an ABAP program (PROG), on ABAP Cloud one of SAP's standard programs.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `program_name` (string, required) - ABAP program name.
+
+---
+
+<a id="getprogramversionsource-read-only-common"></a>
+#### GetProgramVersionSource (Read-Only / Common)
+**Description:** [read-only] Reads an older version of the source code of an ABAP program (PROG), on ABAP Cloud one of SAP's standard programs from its version history.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP program's version history.
+
+---
+
+<a id="getprogramversiondiff-read-only-common"></a>
+#### GetProgramVersionDiff (Read-Only / Common)
+**Description:** [read-only] Reads two versions of the same ABAP program (PROG) from its version history and compares them.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP program's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP program's version history.
+
+---
+
+<a id="getinterfaceversions-read-only-common"></a>
+#### GetInterfaceVersions (Read-Only / Common)
+**Description:** [read-only] Reads the version history of an ABAP interface (INTF).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `interface_name` (string, required) - ABAP interface name.
+
+---
+
+<a id="getinterfaceversionsource-read-only-common"></a>
+#### GetInterfaceVersionSource (Read-Only / Common)
+**Description:** [read-only] Reads an older version of the source code of an ABAP interface (INTF) from its version history.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP interface's version history.
+
+---
+
+<a id="getinterfaceversiondiff-read-only-common"></a>
+#### GetInterfaceVersionDiff (Read-Only / Common)
+**Description:** [read-only] Reads two versions of the same ABAP interface (INTF) from its version history and compares them.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP interface's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP interface's version history.
+
+---
+
+<a id="getfunctionmoduleversions-read-only-common"></a>
+#### GetFunctionModuleVersions (Read-Only / Common)
+**Description:** [read-only] Reads the version history of an ABAP function module (FUGR).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Owning function group name (required).
+- `function_module_name` (string, required) - ABAP function module name.
+
+---
+
+<a id="getfunctionmoduleversionsource-read-only-common"></a>
+#### GetFunctionModuleVersionSource (Read-Only / Common)
+**Description:** [read-only] Reads an older version of the source code of an ABAP function module (FUGR) from its version history.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP function module's version history.
+
+---
+
+<a id="getfunctionmoduleversiondiff-read-only-common"></a>
+#### GetFunctionModuleVersionDiff (Read-Only / Common)
+**Description:** [read-only] Reads two versions of the same ABAP function module (FUGR) from its version history and compares them.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP function module's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP function module's version history.
+
+---
+
+<a id="gettableversions-read-only-common"></a>
+#### GetTableVersions (Read-Only / Common)
+**Description:** [read-only] Reads the version history of an ABAP table (TABL).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `table_name` (string, required) - ABAP table name.
+
+---
+
+<a id="gettableversionsource-read-only-common"></a>
+#### GetTableVersionSource (Read-Only / Common)
+**Description:** [read-only] Reads an older version of the source code of an ABAP table (TABL) from its version history.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP table's version history.
+
+---
+
+<a id="gettableversiondiff-read-only-common"></a>
+#### GetTableVersionDiff (Read-Only / Common)
+**Description:** [read-only] Reads two versions of the same ABAP table (TABL) from its version history and compares them.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP table's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP table's version history.
+
+---
+
+<a id="getstructureversions-read-only-common"></a>
+#### GetStructureVersions (Read-Only / Common)
+**Description:** [read-only] Reads the version history of an ABAP structure (TABL).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `structure_name` (string, required) - ABAP structure name.
+
+---
+
+<a id="getstructureversionsource-read-only-common"></a>
+#### GetStructureVersionSource (Read-Only / Common)
+**Description:** [read-only] Reads an older version of the source code of an ABAP structure (TABL) from its version history.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri of a version, from the ABAP structure's version history.
+
+---
+
+<a id="getstructureversiondiff-read-only-common"></a>
+#### GetStructureVersionDiff (Read-Only / Common)
+**Description:** [read-only] Reads two versions of the same ABAP structure (TABL) from its version history and compares them.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the ABAP structure's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the ABAP structure's version history.
+
+---
+
+<a id="getddlversions-read-only-common"></a>
+#### GetDdlVersions (Read-Only / Common)
+**Description:** [read-only] Reads the version history of a CDS view (DDLS).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - CDS view name.
+
+---
+
+<a id="getddlversionsource-read-only-common"></a>
+#### GetDdlVersionSource (Read-Only / Common)
+**Description:** [read-only] Reads an older version of the source code of a CDS view (DDLS) from its version history.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri of a version, from the CDS view's version history.
+
+---
+
+<a id="getddlversiondiff-read-only-common"></a>
+#### GetDdlVersionDiff (Read-Only / Common)
+**Description:** [read-only] Reads two versions of the same CDS view (DDLS) from its version history and compares them.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the CDS view's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the CDS view's version history.
+
+---
+
+<a id="getbehaviordefinitionversions-read-only-common"></a>
+#### GetBehaviorDefinitionVersions (Read-Only / Common)
+**Description:** [read-only] Reads the version history of a RAP behavior definition (BDEF).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `behavior_definition_name` (string, required) - RAP behavior definition name.
+
+---
+
+<a id="getbehaviordefinitionversionsource-read-only-common"></a>
+#### GetBehaviorDefinitionVersionSource (Read-Only / Common)
+**Description:** [read-only] Reads an older version of the source code of a RAP behavior definition (BDEF) from its version history.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri of a version, from the RAP behavior definition's version history.
+
+---
+
+<a id="getbehaviordefinitionversiondiff-read-only-common"></a>
+#### GetBehaviorDefinitionVersionDiff (Read-Only / Common)
+**Description:** [read-only] Reads two versions of the same RAP behavior definition (BDEF) from its version history and compares them.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the RAP behavior definition's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the RAP behavior definition's version history.
+
+---
+
+<a id="getmetadataextensionversions-read-only-common"></a>
+#### GetMetadataExtensionVersions (Read-Only / Common)
+**Description:** [read-only] Reads the version history of a CDS metadata extension (DDLX).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `metadata_extension_name` (string, required) - CDS metadata extension name.
+
+---
+
+<a id="getmetadataextensionversionsource-read-only-common"></a>
+#### GetMetadataExtensionVersionSource (Read-Only / Common)
+**Description:** [read-only] Reads an older version of the source code of a CDS metadata extension (DDLX) from its version history.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri of a version, from the CDS metadata extension's version history.
+
+---
+
+<a id="getmetadataextensionversiondiff-read-only-common"></a>
+#### GetMetadataExtensionVersionDiff (Read-Only / Common)
+**Description:** [read-only] Reads two versions of the same CDS metadata extension (DDLX) from its version history and compares them.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version, from the CDS metadata extension's version history.
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version, from the CDS metadata extension's version history.
+
+---
+
+<a id="gettabletypeversions-read-only-common"></a>
+#### GetTableTypeVersions (Read-Only / Common)
+**Description:** [read-only] Reads the version history of an ABAP table type (TTYP).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `table_type_name` (string, required) - ABAP table type name.
+
+---
+
 <a id="read-only-data-element"></a>
 ### Read-Only / Data Element
 
@@ -548,6 +941,20 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `data_element_name` (string, required) - Data element name.
 - `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="checkdataelement-read-only-data-element"></a>
+#### CheckDataElement (Read-Only / Data Element)
+**Description:** [read-only] Checks the syntax of an ABAP data element (DTEL).
+
+**Source:** `src/handlers/data_element/high/handleCheckDataElement.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `data_element_name` (string, required) - Data element name.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -572,6 +979,38 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
+<a id="checkddl-read-only-ddl"></a>
+#### CheckDdl (Read-Only / Ddl)
+**Description:** [read-only] Checks the syntax of a CDS view (DDLS) as stored or as the source given.
+
+**Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `ddl_name` (string, required) - CDS view name to check, passed as ddl_name.
+- `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
+- `version` (string, optional, one of: `active`, `inactive`) - Version to check: 'active' or 'inactive'. Without `version` the active version is checked.
+
+---
+
+<a id="read-only-ddlx"></a>
+### Read-Only / Ddlx
+
+<a id="checkmetadataextension-read-only-ddlx"></a>
+#### CheckMetadataExtension (Read-Only / Ddlx)
+**Description:** [read-only] Checks the syntax of a CDS metadata extension (DDLX).
+
+**Source:** `src/handlers/ddlx/high/handleCheckMetadataExtension.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `name` (string, required) - Metadata extension name.
+- `version` (string, optional (default: active), one of: `active`, `inactive`) - Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back to whichever exists.
+
+---
+
 <a id="read-only-domain"></a>
 ### Read-Only / Domain
 
@@ -587,6 +1026,20 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `domain_name` (string, required) - Domain name.
 - `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="checkdomain-read-only-domain"></a>
+#### CheckDomain (Read-Only / Domain)
+**Description:** [read-only] Checks the syntax of an ABAP domain (DOMA).
+
+**Source:** `src/handlers/domain/high/handleCheckDomain.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `domain_name` (string, required) - Domain name.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -631,6 +1084,38 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `enhancement_name` (string, required) - [read-only] Name of the enhancement implementation
 - `enhancement_spot` (string, required) - Name of the enhancement spot
+
+---
+
+<a id="read-only-function"></a>
+### Read-Only / Function
+
+<a id="checkfunctiongroup-read-only-function"></a>
+#### CheckFunctionGroup (Read-Only / Function)
+**Description:** [read-only] Checks the syntax of an ABAP function group (FUGR).
+
+**Source:** `src/handlers/function/high/handleCheckFunctionGroup.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
+
+---
+
+<a id="checkfunctionmodule-read-only-function"></a>
+#### CheckFunctionModule (Read-Only / Function)
+**Description:** [read-only] Checks the syntax of an ABAP function module (FUGR) of a function group (FUGR).
+
+**Source:** `src/handlers/function/high/handleCheckFunctionModule.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the function module.
+- `function_module_name` (string, required) - Function module name.
+- `version` (string, optional, one of: `active`, `inactive`) - Version to check: 'active' or 'inactive'. Default: active.
 
 ---
 
@@ -789,6 +1274,20 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
+<a id="checkinterface-read-only-interface"></a>
+#### CheckInterface (Read-Only / Interface)
+**Description:** [read-only] Checks the syntax of an ABAP interface (INTF).
+
+**Source:** `src/handlers/interface/high/handleCheckInterface.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `interface_name` (string, required) - Interface name.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
+
+---
+
 <a id="read-only-leftover-session"></a>
 ### Read-Only / Leftover Session
 
@@ -889,6 +1388,20 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
+<a id="checkpackage-read-only-package"></a>
+#### CheckPackage (Read-Only / Package)
+**Description:** [read-only] Checks the syntax of an ABAP package (DEVC).
+
+**Source:** `src/handlers/package/high/handleCheckPackage.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `package_name` (string, required) - Package name.
+- `super_package` (string, optional) - Optional, and not read by the check endpoint — see CheckPackageLow. Requiring it refused the call before any request was made, for a package with no parent.
+
+---
+
 <a id="read-only-program"></a>
 ### Read-Only / Program
 
@@ -907,6 +1420,20 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `program_name` (string, required) - Program name.
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="checkprogram-read-only-program"></a>
+#### CheckProgram (Read-Only / Program)
+**Description:** [read-only] Checks the syntax of an ABAP program (PROG) or report.
+
+**Source:** `src/handlers/program/high/handleCheckProgram.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `program_name` (string, required) - Program name.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 
@@ -1029,6 +1556,34 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
+<a id="listservicebindingtypes-read-only-service-binding"></a>
+#### ListServiceBindingTypes (Read-Only / Service Binding)
+**Description:** [read-only] Lists the service binding (SRVB) types the system offers, such as OData V2 and OData V4, in the format asked. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
+
+**Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
+
+**Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
+- `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Shape of the answer: the document as the server sent it, the same parsed, or a flat list of the type names.
+
+---
+
+<a id="validateservicebinding-read-only-service-binding"></a>
+#### ValidateServiceBinding (Read-Only / Service Binding)
+**Description:** [read-only] Validates a new OData service binding (SRVB) for a service definition (SRVD), in the package (DEVC) and version given, by SAP's transport check of its name and package.
+
+**Source:** `src/handlers/service_binding/high/handleValidateServiceBinding.ts`
+
+**Parameters:**
+- `description` (string, optional) - Optional description used during validation.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `package_name` (string, required) - ABAP package of the binding, which the validation checks.
+- `service_binding_name` (string, required) - Service binding name to validate.
+- `service_binding_version` (string, optional) - Service binding version (for example: 1.0). Accepted for backward compatibility; the transport check this now runs does not read it.
+- `service_definition_name` (string, required) - Service definition linked to binding. Accepted for backward compatibility; the transport check this now runs does not read it.
+
+---
+
 <a id="read-only-service-definition"></a>
 ### Read-Only / Service Definition
 
@@ -1084,6 +1639,21 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `structure_name` (string, required) - Structure name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="checkstructure-read-only-structure"></a>
+#### CheckStructure (Read-Only / Structure)
+**Description:** [read-only] Checks the syntax of an ABAP structure (TABL) as stored or as the source given.
+
+**Source:** `src/handlers/structure/high/handleCheckStructure.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
+- `structure_name` (string, required) - Structure name.
+- `version` (string, optional, one of: `active`, `inactive`) - Version to check: 'active' or 'inactive'. Without `version` the active version is checked.
 
 ---
 
@@ -1477,6 +2047,21 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
+<a id="checktable-read-only-table"></a>
+#### CheckTable (Read-Only / Table)
+**Description:** [read-only] Checks the syntax of an ABAP database table (TABL) as stored or as the source given.
+
+**Source:** `src/handlers/table/high/handleCheckTable.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
+- `table_name` (string, required) - Table name.
+- `version` (string, optional, one of: `active`, `inactive`, `new`) - Version to check: 'active', 'inactive', or 'new'. Without `version` the active version is checked.
+
+---
+
 <a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
 **Description:** [read-only] Reads the data of an ABAP database table (TABL) or CDS view (DDLS), as SE16 previews it, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
@@ -1509,6 +2094,20 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `table_type_name` (string, required) - Table type name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="checktabletype-read-only-table-type"></a>
+#### CheckTableType (Read-Only / Table Type)
+**Description:** [read-only] Checks an ABAP table type (TTYP) for errors and warnings.
+
+**Source:** `src/handlers/table_type/high/handleCheckTableType.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `table_type_name` (string, required) - Table type name.
+- `version` (string, optional, one of: `active`, `inactive`) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
 
 ---
 

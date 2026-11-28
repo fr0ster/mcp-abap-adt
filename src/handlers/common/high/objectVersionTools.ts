@@ -4,7 +4,8 @@
  * For each versioned object_type this factory builds a pair of tools that
  * mirror the existing high-level Get<X> accessor (e.g. GetClass → GetClassVersions
  * / GetClassVersionSource), so development (HighLevel) clients can read version
- * history without enabling the generic ReadOnly group.
+ * history without the generic tools. The readonly group serves the same
+ * tools, so the read-only sets read them too.
  *
  *   Get<Display>Versions       — version history of that object.
  *   Get<Display>VersionSource  — source of one version, by its opaque content_uri.
@@ -12,7 +13,7 @@
  * Both delegate to the SAME resolveVersionedObject dispatch + IAdtObject methods
  * (getVersions / getVersionSource) used by the generic ReadOnly handlers, so the
  * wire behaviour is identical. The generic GetObjectVersions/GetObjectVersionSource
- * (ReadOnly group) stay; these are HighLevel-only per-type equivalents.
+ * (ReadOnly group) stay beside these per-type equivalents.
  */
 
 import * as z from 'zod';

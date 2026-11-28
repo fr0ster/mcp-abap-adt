@@ -500,9 +500,16 @@ adt-clients takes the whole source, always. **Activation stays a separate call.*
 - a list of edits, all in **one include**. Edits in two includes are refused, naming both. One
   call is one write.
 
-The sequence, one snapshot under one lock:
+The sequence, one snapshot under one lock. Before it, the include of the edits must be known, to
+know the lock target: a full address, a `ref`, an include-relative diff and an insert into an
+include name it, and the call reads nothing before the lock; a **short form** names none, so the
+call reads the outline once before the lock, only to find that include. That outline is not
+trusted for anything else: everything is checked again on the one outline under the lock. So
+there are two traces: `LOCK`, source, outline, navigation, `PUT`, `UNLOCK`; and, with a short
+form, one outline before the `LOCK`, then the same.
 
-1. **Lock** the lock target of the include (table below). From here on, whatever ends the call
+1. **Lock** the lock target of the include (table below).
+ From here on, whatever ends the call
    unlocks first: the sequence runs inside lib's `withLock` (`src/lib/strategies/withLock.ts`),
    which releases on every path after a successful lock and reports a lock it could not release.
 2. **Read the include once**, under the lock, at `version: "inactive"`: the working version, the

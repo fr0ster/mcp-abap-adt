@@ -733,6 +733,11 @@ export interface PlanSent {
   readonly refusedItems: ReadonlyMap<number, Error>;
   /** The items whose run was not sent. */
   readonly unsent: ReadonlySet<number>;
+  /** Every run of the plan, in order: what its envelope came to, absent for a run not sent. */
+  readonly runs: readonly {
+    readonly run: readonly number[];
+    readonly sent?: SentEnvelope;
+  }[];
   /**
    * A stop that ends the whole call — an oversized correction envelope, the
    * endpoint's absence: every part not answered was settled with it, and
@@ -770,15 +775,18 @@ export async function sendPlanned<R>(
   const refusedItems = new Map<number, Error>();
   // Items whose envelope was not sent: the phase ended before it.
   const unsent = new Set<number>();
+  const runs: { run: readonly number[]; sent?: SentEnvelope }[] = [];
   for (const [at, run] of envelopes.entries()) {
     const members = new Set(run);
     const parts = pending.filter((part) => members.has(part.item));
     if (ended !== undefined) {
       settleUnsent(parts, ended.error);
       for (const item of run) unsent.add(item);
+      runs.push({ run });
       continue;
     }
     const sent = await sendEnvelope(context, phase, parts, rules.correction);
+    runs.push({ run, sent });
     if (sent.oversized !== undefined || sent.absent !== undefined) {
       const stop = sent.oversized !== undefined ? sent.oversized : sent.absent;
       // Nothing else is sent: every part not answered settles with it.
@@ -786,7 +794,18 @@ export async function sendPlanned<R>(
         pending.filter((part) => !members.has(part.item)),
         stop,
       );
-      return { envelope, refusedItems, unsent, stopped: { error: stop } };
+      // The later runs are not sent.
+      for (const later of envelopes.slice(at + 1)) {
+        for (const item of later) unsent.add(item);
+        runs.push({ run: later });
+      }
+      return {
+        envelope,
+        refusedItems,
+        unsent,
+        runs,
+        stopped: { error: stop },
+      };
     }
     const results =
       rules.settlements === undefined
@@ -823,7 +842,7 @@ export async function sendPlanned<R>(
       ended = await rules.endsOn({ at, run, sent, results });
     }
   }
-  return { envelope, refusedItems, unsent };
+  return { envelope, refusedItems, unsent, runs };
 }
 
 /** What one envelope's dispatch came to. */

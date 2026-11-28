@@ -6,6 +6,10 @@ import type { AdtHeaderPort } from '../lib/adtHeaders/AdtHeaderPairs';
 import type { BackgroundRunTools } from '../lib/backgroundRuns/port';
 import type { BatchAvailability } from '../lib/batch/availability';
 import type { InstanceBatch } from '../lib/batch/InstanceBatch';
+import type {
+  InstanceEnvelopes,
+  SessionKey,
+} from '../lib/batch/InstanceEnvelopes';
 import type { DebuggerInstance } from '../lib/debugger/DebuggerInstance';
 import type { LeftoverSessions } from '../lib/leftoverSessions/LeftoverSessions';
 import type { LeftoverSessionTools } from '../lib/leftoverSessions/port';
@@ -49,6 +53,13 @@ export interface HandlerContext {
    * `batch_mode_unavailable` then.
    */
   batch?: InstanceBatch;
+  /**
+   * The instance's read envelopes (spec §3), and the session key of the
+   * call (§4): what the envelope tools and a read given an
+   * `envelope_handle` work on. Absent: `envelopes_unavailable`.
+   */
+  envelopes?: InstanceEnvelopes;
+  envelopeKey?: () => SessionKey;
   /**
    * Whether the call's destination has the communication batch, for the
    * internal batches of the multi-request reads (`runPhase`,

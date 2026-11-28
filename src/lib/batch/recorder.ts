@@ -153,6 +153,15 @@ export interface RecordingTarget {
   recorded(kind: SessionKind): void;
   /** The batch's next number. */
   nextNumber(): number;
+  /**
+   * The refusal of `request` before it is recorded, when the batch refuses
+   * it beside the session kind (an envelope's second node structure);
+   * `number` is the call's, when a part of it was recorded. Absent: none.
+   */
+  admit?(
+    request: IAbapRequestOptions,
+    number: number | undefined,
+  ): ServerRefusal | undefined;
   /** Records `request` (it may throw, recording nothing): its part, settled when the batch is sent. */
   record(request: IAbapRequestOptions): Promise<IAdtWireResponse>;
   connect(): Promise<void>;
@@ -254,6 +263,16 @@ export function createRecorder(
         const rejected = Promise.reject<IAdtWireResponse>(refused);
         // A handler that never reads it leaves no unhandled rejection: the
         // dispatch answers the refusal (`otherKind()`).
+        rejected.catch(() => undefined);
+        return rejected;
+      }
+      // The batch's own refusal of the request (an envelope's second node
+      // structure): as a refusal of its kind, nothing recorded, every later
+      // part of the call refused with it.
+      const admitted = target.admit?.(request, taken);
+      if (admitted !== undefined) {
+        refused ??= admitted;
+        const rejected = Promise.reject<IAdtWireResponse>(refused);
         rejected.catch(() => undefined);
         return rejected;
       }

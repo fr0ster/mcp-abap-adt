@@ -316,7 +316,7 @@ An event statement is recognised by its leading tokens, compared case-insensitiv
   This is decided on every addressing path: by address and short form from the outline the read
   already takes; by `ref`, a `PE` target makes the read take the program's outline too (spec
   §2.3), so a `ref` made before a `GET` event appeared is refused like any other; under the lock,
-  on the fresh outline.
+  on its one outline read under the lock.
 
 Unit inputs: every row as the start; every row as the end of a preceding event; `AT FIRST`,
 `AT NEW`, `GET TIME` inside an event (not an end); each refused statement inside an event; a
@@ -359,7 +359,8 @@ cloud (both measured), one by one on any other variant.
 | part with `source` and `outline` given (the locked write) | navigation where the path above has it; **no outline request, no source `GET`** |
 | `member` | none (it reads the outline given) |
 | `insertion` | navigation where its container's `part` has it; no outline request, no source `GET` |
-| update | spec §5.5 |
+| update | spec §5.8, the write-path trace table |
+
 
 ## 3. interfaces-adt, adt-clients, adt-strategies
 
@@ -429,13 +430,13 @@ adt-clients and adt-strategies, depending on them and on interfaces-adt by semve
   write never takes the position or link as its location (spec §5.5).
 - **The end is derived, always**: for every kind and every path, `firstLine`/`lastLine` come from
   `scanner.locate` over the text; SAP's `end` only feeds the `end_mismatch` comparison.
-- **`member`**: an include is a source of the object when, in the fresh outline, it is the root's
+- **`member`**: an include is a source of the object when, in the outline given, it is the root's
   own source, the include of any element, or a listed include element (`PROG/I`, `FUGR/I`) or
   module (`FUGR/FF`); a class's local include (`…/oo/classes/<the class>/includes/<x>`) is the
   class's by its address, whether or not an element sits in it; a function module's one source is
   itself. Otherwise `include_not_member`.
 - **`insertion`**: locates the container in `source.text` (an element container through `part`,
-  both sides of a class); checks the new name against the fresh outline's elements in the
+  both sides of a class); checks the new name against the given outline's elements in the
   container's scope (`already_exists`); asks `scanner.anchors`, which finds the section statement
   and its last statement (`section_missing`), the `ENDCLASS` / `ENDINTERFACE` line, or the
   include's last statement, each checked not to share its line (`shares_lines`); a class whose
@@ -445,8 +446,9 @@ adt-clients and adt-strategies, depending on them and on interfaces-adt by semve
   and a `ref` without position; its part is the whole module source. An object `FUGR/FF` is
   located the same way with no outline request; `getObjectOutline` is never called for it.
 - **`source` given**: every target is located in `source.text`; a target whose include differs
-  from `source.include` is `start_mismatch` `include`; the outline and navigation are requested
-  afresh; no source `GET`.
+  from `source.include` is `start_mismatch` `include`; no source `GET`. With `outline` given too
+  (the locked write) no outline is requested and only the navigation is; without it the outline is
+  requested once, as for any part read.
 - **The lexer and `BlockEndScanner`**: design §5.2 and §5.4 and spec §2.1; identity over the whole
   address, scope from the lexer's own block stack. Plain string code.
 - `LocatedPart.etag` is the `etag` header of the source read's wire answer.
@@ -543,8 +545,9 @@ Arguments: `UpdateSourcePartArgs` (spec §1.4). The sequence:
 
 1. **Before the lock (not authoritative)**: the include of every edit: an include-relative diff's
    or an include container's `include`; a full address's `include`; a `ref`'s decoded
-   `address.include`; a short form's, from one `outline` call (its only use). All must be one,
-   else `edits_span_includes`. The lock target from spec §2.2.
+   `address.include`; a short form's, from one `outline` call before the lock (its only use: the
+   include, so the lock target is known). All must be one, else `edits_span_includes`. The lock
+   target from spec §2.2.
 2. **Under the lock** (`withLock`): that include's reader `GET`s it once, at `inactive`: T and its
    `etag`. `sourceHash(T)` must equal `source_hash`, else `source_changed` `hash`. A passed `etag`
    must equal SAP's when SAP served one, else `source_changed` `etag`.
@@ -630,11 +633,17 @@ Arguments: `UpdateSourcePartArgs` (spec §1.4). The sequence:
   asked, `kinds` only when asked).
 - **Write path through the real analyzer** (unit; recording connection; the shipped
   `AdtCodeAnalyzer` and scanner, not a fake):
-  - the happy path's trace is exactly: `LOCK` (stateful); the include's source `GET`, once; the
-    outline `GET`, once (a function group: its two; a function module: none); the navigation
-    envelope (program elements only); one `PUT` of the merged text; `UNLOCK` (stateful). The `PUT`
-    body is T with the edits applied, byte for byte; a second source `GET` or a second outline
-    `GET` anywhere fails the test;
+  - the happy path's trace is exactly, per case ("outline" is one `GET …/objectstructure`, a
+    function group's two, a function module's none):
+
+    | Case | Trace |
+    |---|---|
+    | full address, `ref`, include-relative diff, include container | `LOCK`; source `GET`; outline; navigation (program elements only); `PUT`; `UNLOCK` |
+    | at least one short form | outline (before the lock, for the include); `LOCK`; source `GET`; outline; navigation (program elements only); `PUT`; `UNLOCK` |
+
+    `LOCK` and `UNLOCK` stateful, the rest stateless. The `PUT` body is T with the edits applied,
+    byte for byte. Any request beyond its row fails the test: a second source `GET`, an outline
+    under the lock beyond the one, an outline before the lock without a short form;
   - drift, each row asserting its result, and for a refusal zero `PUT` and `UNLOCK` sent:
 
     | Hash | Caller `etag` | SAP `etag` | Result |

@@ -34,7 +34,8 @@ export function notThroughAdt(name: string, type: string): string | undefined {
  * its entry in the tables (`ENHO`, `ENHS`; spec 3.6): a code is no filter
  * value, and the subtype is in each hit's `adtcore:type`, which the search
  * answers for every subtype of the main type (measured on premise,
- * 2026-10-02).
+ * 2026-10-02). No bound of the server's on the search (#391): SAP's own
+ * applies.
  */
 export async function enhancementTypeOf(
   connection: IAbapConnection,
@@ -45,10 +46,7 @@ export async function enhancementTypeOf(
   try {
     const searched = await createAdtClient(connection)
       .getUtils({ ...ourUtils, search: utilSearchHits })
-      .search(
-        { query: name, objectType, maxResults: 20 },
-        { analyse: analyseException },
-      );
+      .search({ query: name, objectType }, { analyse: analyseException });
     // A search that fails says nothing about the type; the caller keeps the
     // failure it already has.
     if (!searched.ok) return undefined;

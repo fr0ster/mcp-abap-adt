@@ -40,6 +40,20 @@ export function carryConnectionKind(
  * both hits, as HTTP does. SearchSource's sequential version and the
  * package walks' `concurrentReader` read through this.
  */
+/**
+ * An embedder's bound on the requests in flight (`requestsInFlight`): a
+ * positive whole number, else a throw naming `name`. The configured one is
+ * read by `REQUESTS_IN_FLIGHT_ROW`.
+ */
+export function requestsInFlightOf(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error(
+      `Invalid ${name}: must be a positive whole number of requests`,
+    );
+  }
+  return value;
+}
+
 export function readsInFlight<P>(
   connection: IAbapConnection,
   parallel: P,

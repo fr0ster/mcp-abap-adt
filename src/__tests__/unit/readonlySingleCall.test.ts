@@ -254,20 +254,31 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     ]);
   });
 
-  it('SearchObject calls search({query, maxResults})', async () => {
+  // No bound of the server's (#391): none given, none handed on.
+  it('SearchObject calls search({query}) when no maxResults is given', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
     await handleSearchObject(context as any, { object_name: 'ZCL*' });
     const call = seen.calls.filter((c) => c.member === 'search').at(-1);
-    assert.deepStrictEqual(call?.args, [{ query: 'ZCL*', maxResults: 100 }]);
+    assert.deepStrictEqual(call?.args, [{ query: 'ZCL*' }]);
   });
 
-  it('GetAdtTypes calls getAllTypes(999, "*", "usedByProvider")', async () => {
+  // #391, the owner: the consumer states the count; none given, none is
+  // handed on, and SAP's own bound applies.
+  it('GetAdtTypes calls getAllTypes(undefined, "*", "usedByProvider") when no max_item_count is given', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
     await handleGetAdtTypes(context as any, {});
     const call = seen.calls.filter((c) => c.member === 'getAllTypes').at(-1);
-    assert.deepStrictEqual(call?.args, [999, '*', 'usedByProvider']);
+    assert.deepStrictEqual(call?.args, [undefined, '*', 'usedByProvider']);
+  });
+
+  it('GetAdtTypes hands max_item_count on as given', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleGetAdtTypes(context as any, { max_item_count: 500 });
+    const call = seen.calls.filter((c) => c.member === 'getAllTypes').at(-1);
+    assert.deepStrictEqual(call?.args, [500, '*', 'usedByProvider']);
   });
 
   it('GetInactiveObjects calls getInactiveObjects() with no arguments', async () => {
@@ -354,13 +365,17 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     );
   });
 
-  it('GetSqlQuery calls getSqlQuery({sql_query, row_number})', async () => {
+  // No row bound of the server's (#391): the required row_number, as given.
+  it('GetSqlQuery calls getSqlQuery({sql_query, row_number}) with the row_number given', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
-    await handleGetSqlQuery(context as any, { sql_query: 'SELECT 1' });
+    await handleGetSqlQuery(context as any, {
+      sql_query: 'SELECT 1',
+      row_number: 3,
+    });
     const call = seen.calls.filter((c) => c.member === 'getSqlQuery').at(-1);
     assert.deepStrictEqual(call?.args, [
-      { sql_query: 'SELECT 1', row_number: 100 },
+      { sql_query: 'SELECT 1', row_number: 3 },
       { headers: DEFAULT_ADT_HEADERS['utils.getSqlQuery'] },
     ]);
   });

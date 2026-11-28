@@ -19,7 +19,10 @@ import {
   levelOf,
 } from '../../../lib/strategies/detail';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import { DATA_ANSWERS } from '../../system/readonly/handleGetSqlQuery';
+import {
+  DATA_ANSWERS,
+  ROW_BOUND_WORDS,
+} from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
   name: 'GetTableContents',
@@ -36,10 +39,7 @@ export const TOOL_DEFINITION = {
     table_name: requiredText('Table name is required').describe(
       'Name of the ABAP table',
     ),
-    max_rows: z
-      .number()
-      .optional()
-      .describe('Maximum number of rows to retrieve'),
+    max_rows: z.number().describe(ROW_BOUND_WORDS),
     // This tool's `inputSchema` is a bare zod raw shape (`scripts/list-tools.ts`
     // reads that shape's optionality off `.isOptional()`), not the
     // `{type:'object', properties, required}` JSON Schema `DETAIL_PROPERTY`
@@ -61,7 +61,8 @@ export async function handleGetTableContents(
 ) {
   const { connection, logger } = context;
   const tableName = args.table_name;
-  const maxRows = args.max_rows || 100;
+  // The consumer's count as given, `0` included (#391).
+  const maxRows = args.max_rows;
   const detail = detailOf(args);
 
   logger?.info(`Reading table contents: ${tableName} (max_rows=${maxRows})`);
@@ -80,12 +81,13 @@ export async function handleGetTableContents(
     { tool: 'GetTableContents', detail },
     () =>
       withAdtHeaders(context, 'utils.getSqlQuery', (headers) =>
-        createAdtClient(connection, logger)
-          .getUtils(ourUtils)
-          .getSqlQuery(
-            { sql_query: sqlQuery, row_number: maxRows },
-            { headers, analyse: analyseException },
-          ),
+        createAdtClient(connection, logger).getUtils(ourUtils).getSqlQuery(
+          { sql_query: sqlQuery, row_number: maxRows },
+          {
+            headers,
+            analyse: analyseException,
+          },
+        ),
       ),
     (reading) => {
       logger?.debug(
@@ -99,6 +101,7 @@ export async function handleGetTableContents(
       )({
         sqlQuery,
         rowNumber: maxRows,
+        boundName: 'max_rows',
         reading,
       });
     },

@@ -111,7 +111,7 @@ import {
   systemKindOf,
   withSystemKindOf,
 } from '../lib/connectionFactory.js';
-import { isRfcConnection } from '../lib/connectionKind.js';
+import { isRfcConnection, requestsInFlightOf } from '../lib/connectionKind.js';
 import {
   createDebuggerInstance,
   type DebuggerInstance,
@@ -471,6 +471,7 @@ export abstract class BaseMcpServer extends McpServer {
   private readonly searchLineMatch: LineMatchStrategy | undefined;
   /** The consumer's bound on the parts of one envelope, from the options; absent, none. */
   private readonly envelopeBound: number | undefined;
+  private readonly inFlightBound: number | undefined;
 
   /**
    * The running runs, by `run_handle`: each one's control over its one
@@ -620,6 +621,13 @@ export abstract class BaseMcpServer extends McpServer {
      */
     partsPerEnvelope?: number | undefined;
     /**
+     * The consumer's bound on the requests a call keeps in flight at once
+     * where it reads several objects one request each
+     * (`--requests-in-flight`): a positive whole number, else the
+     * constructor throws. Absent: one at a time.
+     */
+    requestsInFlight?: number | undefined;
+    /**
      * The owner of the running background runs (their controls, by
      * `run_handle`): handed by a host that serves one client through several
      * instances (Streamable HTTP's per-request instances, SSE's per-stream
@@ -755,6 +763,10 @@ export abstract class BaseMcpServer extends McpServer {
       options.partsPerEnvelope === undefined
         ? undefined
         : partsPerEnvelopeOf(options.partsPerEnvelope, 'partsPerEnvelope');
+    this.inFlightBound =
+      options.requestsInFlight === undefined
+        ? undefined
+        : requestsInFlightOf(options.requestsInFlight, 'requestsInFlight');
     this.runOwner = options.backgroundRunOwner ?? new BackgroundRunOwner();
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
@@ -1374,11 +1386,17 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private searchStrategies(): Pick<
     HandlerContext,
-    'sapAnswerStrategy' | 'lineMatchStrategy' | 'partsPerEnvelope'
+    | 'sapAnswerStrategy'
+    | 'lineMatchStrategy'
+    | 'partsPerEnvelope'
+    | 'requestsInFlight'
   > {
     return {
       ...(this.envelopeBound !== undefined && {
         partsPerEnvelope: this.envelopeBound,
+      }),
+      ...(this.inFlightBound !== undefined && {
+        requestsInFlight: this.inFlightBound,
       }),
       ...(this.searchSapAnswers !== undefined && {
         sapAnswerStrategy: this.searchSapAnswers,

@@ -246,6 +246,15 @@ describe('the MCP tool surface', () => {
         'debug/DebugTakeOverListener': 'breakpoints',
         'high/ValidateServiceBinding': 'package_name',
         'high/CreateDomain': 'package_name',
+        // **A fourth, decided by the owner (#391).** The data tools' row
+        // count is required: the model states it, the server picks none.
+        'data/GetSqlQuery': 'row_number',
+        'data/GetTableContents': 'max_rows',
+        // and MemorySnapshotGet/Delta's `max_objects`: SAP requires a count
+        // of the ranking, children and references views, and the server's
+        // 50 went.
+        'debug/MemorySnapshotGet': 'max_objects',
+        'debug/MemorySnapshotDelta': 'max_objects',
       };
       const tightened = MAY_TIGHTEN_REQUIRED[tool];
       // **19.0.0, internal batches (spec §11).** A parallelism knob the
@@ -315,6 +324,13 @@ describe('the MCP tool surface', () => {
         'runtime/RuntimeRunProgram': ['background'],
         'compact/HandlerProfileView': ['mode', 'top'],
         'compact/HandlerDumpList': ['feed_type'],
+        // #391 (the owner: no bound of the server's): the AMDP table read
+        // asked SAP for 100 records whatever the caller wanted; `row_number`,
+        // optional, no default, as compact getDataPreview already took it.
+        'debug/AmdpDebugGetTable': ['row_number'],
+        // #391: the object types list asked SAP for 999 whatever the caller
+        // wanted; `max_item_count`, optional, no default.
+        'system/GetAdtTypes': ['max_item_count'],
         // Issue #261: the dumps feed filters on the attributes its descriptor
         // declares; the user filter was the only one reachable before.
         // 19.0.0, several feeds per call (spec §11): `feed_types` beside

@@ -375,12 +375,12 @@ function casesOf(
     {
       key: `${variant} HandlerGetData object_name`,
       tool: 'HandlerGetData',
-      args: { object_name: 'TAB_A' },
+      args: { object_name: 'TAB_A', max_rows: 100 },
     },
     {
       key: `${variant} HandlerGetData sql_query`,
       tool: 'HandlerGetData',
-      args: { sql_query: 'SELECT carrid FROM scarr' },
+      args: { sql_query: 'SELECT carrid FROM scarr', max_rows: 100 },
     },
   );
   return cases;

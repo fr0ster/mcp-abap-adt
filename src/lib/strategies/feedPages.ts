@@ -10,9 +10,14 @@
  * oldest entry it answered.
  *
  * So a longer list is that link followed: the same request again with its
- * `to`, until the caller's count is reached, SAP stops offering a next page,
- * or the ceiling is hit. What remains is answered as `next_to`, which the
- * caller passes back as `to` to go on.
+ * `to`, until the caller's count is reached or SAP stops offering a next
+ * page; without a count, until SAP stops offering one. What remains is
+ * answered as `next_to`, which the caller passes back as `to` to go on.
+ *
+ * **No count and no ceiling of the server's** (fr0ster/mcp-abap-adt#391):
+ * the 50 a caller who named none got, and the 1000 no caller could pass,
+ * are gone. A request without `$top` answered 100 dumps of more (BTP ABAP
+ * environment, 2026-11-27; `$top=0` the same, `$top=500` 100).
  */
 import { rawOf } from '@mcp-abap-adt/adt-strategies';
 import type {
@@ -30,18 +35,8 @@ import {
 import { attributeOf, parseStructure, walkStructure } from './reading';
 import { succeededWith } from './sequence';
 
-/**
- * What a request without `$top` answers — the descriptor's `paging size`.
- * It is the count a caller who names none gets, read the same way as any
- * other, so its `next_to` is ours and not SAP's inclusive link.
- */
-export const FEED_PAGE_DEFAULT = 50;
-
-/** The most one request answers — the descriptor's `paging max`. */
+/** The most one request answers — the descriptor's `paging max`, SAP's. */
 export const FEED_PAGE_MAX = 100;
-
-/** The most one call of ours collects, however many are asked for. */
-export const FEED_ENTRIES_CEILING = 1000;
 
 export interface FeedPage<T> {
   entries: T[];
@@ -103,7 +98,7 @@ export function feedPage<T>(
 }
 
 export interface FeedPaging {
-  /** How many entries the caller wants; absent — {@link FEED_PAGE_DEFAULT}. */
+  /** How many entries the caller wants, a whole number of at least 1; absent — every one SAP offers. */
   maxResults?: number | undefined;
   /** The upper time bound the first request carries. */
   to?: string | undefined;
@@ -152,8 +147,8 @@ export function secondBefore(bound: string): string {
 }
 
 /**
- * Requests page after page until `maxResults` entries are collected, SAP
- * offers no next page, or {@link FEED_ENTRIES_CEILING} is reached.
+ * Requests page after page until `maxResults` entries are collected or SAP
+ * offers no next page; without `maxResults`, until SAP offers no next page.
  *
  * **`to` is inclusive.** The next page starts with the entries stamped with
  * the previous page's last second again (BTP ABAP environment, 2026-10-01:
@@ -189,10 +184,9 @@ export async function feedPages<T>(
   paging: FeedPaging,
   identity: FeedEntryIdentity<T>,
 ): Promise<IAdtResponse<FeedPage<T>, IAdtError>> {
-  const wanted = Math.min(
-    Math.max(1, Math.floor(paging.maxResults ?? FEED_PAGE_DEFAULT)),
-    FEED_ENTRIES_CEILING,
-  );
+  // The caller's count as given (the schemas hold it to a whole number of
+  // at least 1); none, every entry SAP offers.
+  const wanted = paging.maxResults ?? Number.POSITIVE_INFINITY;
   // One beyond the count: the first entry not answered marks the boundary.
   const reading = wanted + 1;
   const entries: T[] = [];

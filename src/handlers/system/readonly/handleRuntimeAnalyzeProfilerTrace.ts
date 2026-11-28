@@ -48,7 +48,9 @@ export const TOOL_DEFINITION = {
     top: z
       .number()
       .optional()
-      .describe('Number of top rows for summary. Default: 10.'),
+      .describe(
+        'Number of top-ranked rows for the summary; absent, every row, ranked.',
+      ),
     with_system_events: z
       .boolean()
       .optional()
@@ -153,12 +155,13 @@ function rankOf(value: number | undefined): number {
 function summarizeView<R extends TraceRow>(
   rows: readonly R[],
   rank: (row: R) => number | undefined,
-  top: number,
+  top: number | undefined,
 ): RankedSummary {
-  const topRecords = [...rows]
-    .sort((a, b) => rankOf(rank(b)) - rankOf(rank(a)))
-    .slice(0, Math.max(1, top))
-    .map(flattenRow);
+  // The consumer's count as given, 0 included; absent, every row (#391).
+  const ranked = [...rows].sort((a, b) => rankOf(rank(b)) - rankOf(rank(a)));
+  const topRecords = (top === undefined ? ranked : ranked.slice(0, top)).map(
+    flattenRow,
+  );
 
   return { total_records: rows.length, top_records: topRecords };
 }
@@ -171,7 +174,7 @@ export async function handleRuntimeAnalyzeProfilerTrace(
 
   const view = args.view ?? 'hitlist';
   const traceIdOrUri = args.trace_id_or_uri;
-  const top = args.top ?? 10;
+  const top = args.top;
   const profiler = new AdtRuntimeClient(connection, logger).getProfiler(
     ourProfiler,
   );

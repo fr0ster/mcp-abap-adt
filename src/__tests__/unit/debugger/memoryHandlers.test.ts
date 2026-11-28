@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { format } from 'node:util';
-import { handleMemorySnapshotDelta } from '../../../handlers/debugger/debug/handleMemorySnapshotDelta';
-import { handleMemorySnapshotGet } from '../../../handlers/debugger/debug/handleMemorySnapshotGet';
+import {
+  handleMemorySnapshotDelta,
+  TOOL_DEFINITION as SnapshotDeltaTool,
+} from '../../../handlers/debugger/debug/handleMemorySnapshotDelta';
+import {
+  handleMemorySnapshotGet,
+  TOOL_DEFINITION as SnapshotGetTool,
+} from '../../../handlers/debugger/debug/handleMemorySnapshotGet';
 import { handleMemorySnapshotList } from '../../../handlers/debugger/debug/handleMemorySnapshotList';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { assertMatchObject } from '../../helpers/assertions';
@@ -81,6 +87,7 @@ describe('MemorySnapshotGet', () => {
       const r: any = await handleMemorySnapshotGet(ctx(conn), {
         snapshot_id: 'S1',
         view,
+        max_objects: 10,
       });
       assert.equal(r.isError, false);
       assert.equal(conn.requests.length, 1);
@@ -90,16 +97,26 @@ describe('MemorySnapshotGet', () => {
   }
   it('defaults to the overview', async () => {
     const conn = ok();
-    await handleMemorySnapshotGet(ctx(conn), { snapshot_id: 'S1' });
+    await handleMemorySnapshotGet(ctx(conn), {
+      snapshot_id: 'S1',
+      max_objects: 10,
+    });
     assert.ok(conn.requests[0].url.includes('S1/overview'));
   });
-  it('ranking sends the required limit, 50 by default and as given', async () => {
-    const a = ok();
-    await handleMemorySnapshotGet(ctx(a), {
-      snapshot_id: 'S1',
-      view: 'ranking',
-    });
-    assert.ok(sent(a).includes('maxNumberOfObjects=50'));
+  // No count of the server's (#391, the owner): max_objects is required,
+  // and SAP requires a count of these views.
+  it('the schema refuses a call without max_objects', () => {
+    assert.equal(
+      SnapshotGetTool.inputSchema.safeParse({ snapshot_id: 'S1' }).success,
+      false,
+    );
+    assert.equal(
+      SnapshotDeltaTool.inputSchema.safeParse({ from_id: 'A1', to_id: 'B2' })
+        .success,
+      false,
+    );
+  });
+  it('ranking sends the limit as given', async () => {
     const b = ok();
     await handleMemorySnapshotGet(ctx(b), {
       snapshot_id: 'S1',
@@ -136,6 +153,7 @@ describe('MemorySnapshotGet', () => {
         const r: any = await handleMemorySnapshotGet(ctx(conn), {
           snapshot_id: 'S1',
           view,
+          max_objects: 10,
         });
         assert.equal(r.isError, true);
         assert.equal(conn.requests.length, 0);
@@ -146,6 +164,7 @@ describe('MemorySnapshotGet', () => {
     const r: any = await handleMemorySnapshotGet(ctx(ok()), {
       snapshot_id: 'S1',
       detail: 'raw',
+      max_objects: 10,
     });
     assert.equal(r.content[0].text, DOC);
   });
@@ -157,6 +176,7 @@ describe('MemorySnapshotDelta', () => {
     const r: any = await handleMemorySnapshotDelta(ctx(conn), {
       from_id: 'A1',
       to_id: 'B2',
+      max_objects: 10,
     });
     assert.equal(r.isError, false);
     assert.equal(conn.requests[0].method, 'GET');
@@ -178,17 +198,19 @@ describe('MemorySnapshotDelta', () => {
       to_id: 'B2',
       view: 'children',
       key: 'K1',
+      max_objects: 10,
     });
     assert.ok(sent(b).includes('K1'));
-    assert.ok(sent(b).includes('maxNumberOfObjects=50'));
+    assert.ok(sent(b).includes('maxNumberOfObjects=10'));
     const c = ok();
     await handleMemorySnapshotDelta(ctx(c), {
       from_id: 'A1',
       to_id: 'B2',
       view: 'references',
       key: 'K2',
+      max_objects: 10,
     });
-    assert.ok(sent(c).includes('maxNumberOfReferences=50'));
+    assert.ok(sent(c).includes('maxNumberOfReferences=10'));
   });
   it('a missing key sends nothing', async () => {
     const conn = recordingConnection([]);
@@ -196,6 +218,7 @@ describe('MemorySnapshotDelta', () => {
       from_id: 'A1',
       to_id: 'B2',
       view: 'children',
+      max_objects: 10,
     });
     assert.equal(r.isError, true);
     assert.equal(conn.requests.length, 0);

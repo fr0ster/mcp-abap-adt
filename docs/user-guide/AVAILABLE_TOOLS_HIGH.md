@@ -416,7 +416,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
-- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
+- `max_findings` (integer, optional) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Absent, SAP's own.
 - `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
 - `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
 
@@ -2716,7 +2716,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_descriptions` (boolean, optional (default: false)) - Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false
 - `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
-- `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
+- `max_depth` (integer, optional) - Maximum depth for recursive package traversal. Absent: every level.
 - `package_name` (string, optional) - Package name (give this or package_names)
 - `package_names` (array, optional) - Several package names, read together (give this or package_name)
 

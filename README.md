@@ -374,6 +374,11 @@ is the answer. To bound it, start with `--batch-parts-per-envelope=<parts>`
 envelope, each read's requests kept together. 24.2.1 and earlier split at 300 reads in some of
 those tools; `--batch-parts-per-envelope=300` gives about that size.
 
+Where such a tool reads one request at a time instead (`SearchSource` on a destination without an
+ADT batch, the package walks with descriptions), the server keeps one request in flight unless the
+consumer sets more: `--requests-in-flight=<requests>` (`MCP_REQUESTS_IN_FLIGHT`, YAML
+`requests.inFlight`). Over RFC it is always one. 24.2.2 and earlier kept 8.
+
 ## Prompts
 
 Every binary lists MCP prompts beside its tools: ready-made requests an MCP client offers the
@@ -879,6 +884,13 @@ wins over the environment, which wins over the configuration file):
 `false` in a higher form turns them off again. A value other than empty, null, `true` or `false`
 stops the start; an empty value or YAML null counts as not given, as for every parameter, and the
 next form decides.
+
+**How many records.** The count is the consumer's, and required: `row_number` (`GetSqlQuery`),
+`max_rows` (`GetTableContents`, `HandlerGetData`), sent to SAP as given. SAP refuses `0` (and a
+negative count) with `400`, and 2147483646 is the largest count it accepts (measured on the BTP
+ABAP environment, 2026-11-27). When fewer records come back than the selection holds, the answer
+says so in its head — `# rows 50 of 899, cut at row_number 50` — and at `medium` / `full` in
+`rows_listed` against `total_rows`, with `cut_by`.
 
 On Streamable HTTP and SSE it is a start parameter of the server; no request header turns it on.
 Without it the tools are not listed, and a call of one is answered that the tool is not found.

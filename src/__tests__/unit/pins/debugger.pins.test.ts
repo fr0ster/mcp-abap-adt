@@ -631,7 +631,7 @@ describe('onprem', () => {
       variant: 'onprem',
       stand: 'server',
       answers: LOGON.onprem,
-      args: { snapshot_id: SNAPSHOT_FROM },
+      args: { snapshot_id: SNAPSHOT_FROM, max_objects: 50 },
       expected: [
         {
           method: 'GET',
@@ -699,7 +699,7 @@ describe('onprem', () => {
       variant: 'onprem',
       stand: 'server',
       answers: LOGON.onprem,
-      args: { from_id: SNAPSHOT_FROM, to_id: SNAPSHOT_TO },
+      args: { from_id: SNAPSHOT_FROM, to_id: SNAPSHOT_TO, max_objects: 50 },
       expected: [
         {
           method: 'GET',
@@ -1165,7 +1165,7 @@ describe('cloud', () => {
       variant: 'cloud',
       stand: 'server',
       answers: LOGON.cloud,
-      args: { snapshot_id: SNAPSHOT_FROM },
+      args: { snapshot_id: SNAPSHOT_FROM, max_objects: 50 },
       expected: [
         {
           method: 'GET',
@@ -1257,7 +1257,7 @@ describe('cloud', () => {
       variant: 'cloud',
       stand: 'server',
       answers: LOGON.cloud,
-      args: { from_id: SNAPSHOT_FROM, to_id: SNAPSHOT_TO },
+      args: { from_id: SNAPSHOT_FROM, to_id: SNAPSHOT_TO, max_objects: 50 },
       expected: [
         {
           method: 'GET',

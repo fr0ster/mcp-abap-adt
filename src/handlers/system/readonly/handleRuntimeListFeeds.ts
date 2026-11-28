@@ -79,8 +79,6 @@ import {
   levelOf,
 } from '../../../lib/strategies/detail';
 import {
-  FEED_ENTRIES_CEILING,
-  FEED_PAGE_DEFAULT,
   FEED_PAGE_MAX,
   type FeedPage,
   feedPage,
@@ -163,9 +161,11 @@ const FIELDS = {
     ),
   max_results: z
     .number()
+    .int()
+    .min(1)
     .optional()
     .describe(
-      `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: ${FEED_PAGE_DEFAULT}.`,
+      `Most entries to return, a whole number of at least 1; absent, every entry of the range. SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked.`,
     ),
   from: z
     .string()

@@ -212,7 +212,6 @@ const DEFAULTS = {
   include_subpackages: true,
   object_types: SCAN_OBJECT_TYPES,
   exclude_comments: false,
-  concurrency: 8,
   version: DEFAULT_VERSION,
 };
 
@@ -305,10 +304,10 @@ export async function runSearchSource(
   // Absent, the answer's hits are not limited. Given, the hits count in the
   // scan's order, so the targets are read one after another.
   const maxTotal = input.max_hits;
-  const concurrency =
-    maxTotal !== undefined
-      ? 1
-      : Math.min(16, Math.max(1, input.concurrency ?? DEFAULTS.concurrency));
+  // The reads in flight: the caller's, as given (the handler hands the
+  // consumer's `--requests-in-flight`); none given, one — no number and no
+  // cap of the server's (#391).
+  const concurrency = maxTotal !== undefined ? 1 : (input.concurrency ?? 1);
   // The hits answered so far, and whether the scan stopped at `max_hits`.
   let answered = 0;
   let stopped = false;

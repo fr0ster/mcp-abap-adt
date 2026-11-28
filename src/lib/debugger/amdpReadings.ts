@@ -314,15 +314,8 @@ export function terseAmdpFrame(f: AmdpFrame): TerseAmdpFrame {
   };
 }
 
-function terseStack(stack: AmdpFrame[]): {
-  stack: TerseAmdpFrame[];
-  stack_depth?: number;
-} {
-  const kept = terseFrames(stack, terseAmdpFrame);
-  return {
-    stack: kept.frames,
-    ...(kept.depth ? { stack_depth: kept.depth } : {}),
-  };
+function terseStack(stack: AmdpFrame[]): { stack: TerseAmdpFrame[] } {
+  return { stack: terseFrames(stack, terseAmdpFrame).frames };
 }
 
 /** Shortens by count, never by precision: the ids that tell events apart stay. */
@@ -334,7 +327,6 @@ export function terseAmdpEvent(e: AmdpEvent): {
   variables: Array<{ name: string; value: string }>;
   breakpoints?: AmdpBreakpointState[];
   stack?: TerseAmdpFrame[];
-  stack_depth?: number;
 } {
   return {
     kind: e.kind,

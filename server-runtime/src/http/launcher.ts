@@ -220,6 +220,10 @@ export async function launch(
     ...(config.batchPartsPerEnvelope !== undefined && {
       partsPerEnvelope: config.batchPartsPerEnvelope,
     }),
+    // --requests-in-flight: the consumer's bound; absent, one at a time.
+    ...(config.requestsInFlight !== undefined && {
+      requestsInFlight: config.requestsInFlight,
+    }),
   });
   installTransportShutdown({
     begin: () => server.beginShutdown(),

@@ -20,13 +20,16 @@ export const SNAPSHOT_VIEW_PROPERTIES = {
     .string()
     .optional()
     .describe('Object key, for children and references.'),
+  // No count of the server's (#391, the owner): required. SAP requires a
+  // count of the ranking, children and references views (a request without
+  // one is answered 400; adt-clients' API reference).
   max_objects: z
     .number()
     .int()
     .min(1)
-    .default(50)
-    .optional()
-    .describe('Objects in a ranking, children or references answer.'),
+    .describe(
+      'Most objects in a ranking, children or references answer, required; SAP requires a count for these views.',
+    ),
 };
 
 export const TOOL_DEFINITION = {
@@ -54,11 +57,9 @@ export function requireKey(args: {
   return args.key;
 }
 
-/** The limit of a view, or the default the schema states; its minimum is the schema's. */
-export function maxObjectsOf(args: {
-  max_objects?: number | undefined;
-}): number {
-  return args.max_objects ?? 50;
+/** The count of a view, the consumer's, required by the schema (#391). */
+export function maxObjectsOf(args: { max_objects: number }): number {
+  return args.max_objects;
 }
 
 export async function handleMemorySnapshotGet(

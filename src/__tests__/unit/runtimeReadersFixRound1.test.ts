@@ -339,6 +339,37 @@ describe('RuntimeAnalyzeProfilerTrace', () => {
     assert.equal(body.summary.top_records[0].grossTime_time, 900);
   });
 
+  // No count of the server's (#391): without top every row is ranked and
+  // answered; 0 answers none.
+  it('hitlist without top: every entry, ranked', async () => {
+    const entries = Array.from({ length: 12 }, (_, n) => ({
+      index: n + 1,
+      description: `entry ${n + 1}`,
+      hitCount: 1,
+      grossTime: { time: n + 1, percentage: 1 },
+    }));
+    profiler = { read: mock.fn(async () => okResponse({ entries })) };
+
+    const result: any = await handleRuntimeAnalyzeProfilerTrace(
+      context as any,
+      { trace_id_or_uri: 'trace-1', view: 'hitlist' },
+    );
+    const body = JSON.parse(result.content[0].text);
+    assert.equal(body.summary.total_records, 12);
+    assert.equal(body.summary.top_records.length, 12);
+    assert.equal(body.summary.top_records[0].description, 'entry 12');
+
+    const none: any = await handleRuntimeAnalyzeProfilerTrace(context as any, {
+      trace_id_or_uri: 'trace-1',
+      view: 'hitlist',
+      top: 0,
+    });
+    assert.equal(
+      JSON.parse(none.content[0].text).summary.top_records.length,
+      0,
+    );
+  });
+
   it('db_accesses: ranks by accessTime.total, a different field from hitlist/statements', async () => {
     const dbAccesses = {
       accesses: [

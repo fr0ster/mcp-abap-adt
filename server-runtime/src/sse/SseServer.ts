@@ -165,6 +165,12 @@ export interface SseServerOptions {
    * Absent: no bound.
    */
   partsPerEnvelope?: number | undefined;
+  /**
+   * The consumer's bound on the requests a call keeps in flight
+   * (`--requests-in-flight`), handed to every instance. Absent: one at a
+   * time.
+   */
+  requestsInFlight?: number | undefined;
 }
 
 type SessionEntry = {
@@ -225,6 +231,7 @@ export class SseServer {
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
   private readonly partsPerEnvelope: number | undefined;
+  private readonly requestsInFlight: number | undefined;
   /** The SAP system type every stream's instance builds for. */
   private readonly systemType: SapEnvironment | undefined;
   /** The running background runs' owner: this server's, shared by every stream's instance. */
@@ -274,6 +281,7 @@ export class SseServer {
     this.sapAnswerStrategy = opts?.sapAnswerStrategy;
     this.lineMatchStrategy = opts?.lineMatchStrategy;
     this.partsPerEnvelope = opts?.partsPerEnvelope;
+    this.requestsInFlight = opts?.requestsInFlight;
     this.batchSettings =
       opts?.batch === undefined
         ? undefined
@@ -475,6 +483,7 @@ export class SseServer {
           sapAnswerStrategy?: SapAnswerStrategy;
           lineMatchStrategy?: LineMatchStrategy;
           partsPerEnvelope?: number;
+          requestsInFlight?: number;
           batch?: InstanceBatch;
           heldLocks: HeldLocks;
           adtHeaderPairs?: AdtHeaderPairs;
@@ -519,6 +528,9 @@ export class SseServer {
         }),
         ...(this.partsPerEnvelope !== undefined && {
           partsPerEnvelope: this.partsPerEnvelope,
+        }),
+        ...(this.requestsInFlight !== undefined && {
+          requestsInFlight: this.requestsInFlight,
         }),
         ...(this.accessChecks !== undefined && {
           accessChecks: this.accessChecks,

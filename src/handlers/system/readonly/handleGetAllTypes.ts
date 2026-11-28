@@ -57,6 +57,16 @@ export const TYPES_LISTS: RowSchemas<{ items: INamedItem[] }> = {
 /** The head the type listing opens with. */
 export const TYPES_HEADS = [headShape('count', 'how many there are')];
 
+/**
+ * What SAP does with `maxItemCount`, measured on the BTP ABAP environment
+ * (2026-11-27): without it, 100 of 375 object types (`0` and `-1` the same);
+ * 999 to 2147483647 all 375; 2147483648 refused `400` ("Overflow converting
+ * from …"). The consumer states the count (#391, the owner); none given,
+ * none is sent.
+ */
+const MAX_ITEM_COUNT_WORDS =
+  'Most object types to read. Absent: SAP gives at most 100; the largest count it accepts is 2147483647.';
+
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
   available_in: ['onprem', 'cloud'] as const,
@@ -71,6 +81,7 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe('Type name to validate (optional)'),
+    max_item_count: z.number().int().optional().describe(MAX_ITEM_COUNT_WORDS),
     ...DETAIL_SHAPE,
   }),
 } as const;
@@ -116,7 +127,9 @@ export async function handleGetAdtTypes(
           ...ourUtils,
           types: readingAt(TYPE_READINGS, levelOf(args)),
         })
-        .getAllTypes(999, '*', 'usedByProvider', { analyse: analyseException }),
+        .getAllTypes(args.max_item_count, '*', 'usedByProvider', {
+          analyse: analyseException,
+        }),
     answered,
   );
 }

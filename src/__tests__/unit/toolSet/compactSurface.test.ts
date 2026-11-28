@@ -108,6 +108,12 @@ describe('the compact tool surface', () => {
     HandlerCreate: ['program_type'],
   };
 
+  /** The parameters that became required by decision, by tool. */
+  const TIGHTENED: Readonly<Record<string, readonly string[]>> = {
+    // #391, the owner: the data tools' row count is the model's to state.
+    HandlerGetData: ['max_rows'],
+  };
+
   it('loses no parameter and changes none from optional to required', () => {
     const byName = new Map(frozen.map((row) => [row.name, row]));
     for (const row of current) {
@@ -120,7 +126,12 @@ describe('the compact tool surface', () => {
         {
           tool: row.name,
           missing: was.filter(
-            (p) => !now.includes(p) && !(REMOVED[row.name] ?? []).includes(p),
+            (p) =>
+              !now.includes(p) &&
+              !(REMOVED[row.name] ?? []).includes(p) &&
+              !(
+                (TIGHTENED[row.name] ?? []).includes(p) && now.includes(`${p}*`)
+              ),
           ),
         },
         { tool: row.name, missing: [] },

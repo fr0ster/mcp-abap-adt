@@ -106,10 +106,9 @@ const FIELDS = {
   maxDepth: z
     .number()
     .int()
-    .default(1)
     .optional()
     .describe(
-      "[read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.",
+      "[read-only] Maximum tree depth; absent, every level. 0 is the object alone. Every object's own type folders and their contents are shown at depth 1; a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types stay at one tier whatever the value.",
     ),
   enrich: z
     .boolean()
@@ -200,12 +199,6 @@ export const TOOL_DEFINITION = {
     schemaOn,
   ),
 } as const;
-
-function getDefaultDepth(parent_type: string): number {
-  const type = parent_type?.toUpperCase() || '';
-  if (type.startsWith('PROG/') || type.startsWith('FUGR/')) return 2;
-  return 1;
-}
 
 interface TreeNode {
   OBJECT_TYPE: string;
@@ -1052,13 +1045,12 @@ async function objectInfo(
   logger?.info(
     `Building object info tree for ${objects.map((o) => `${o.type}/${o.name}`).join(', ')}`,
   );
-  const depthOf = (type: string) =>
-    typeof args.maxDepth === 'number' && Number.isInteger(args.maxDepth)
-      ? args.maxDepth
-      : getDefaultDepth(type);
+  // The consumer's depth; absent, no bound of the server's (#391): every
+  // subpackage is walked, as deep as the package goes.
+  const maxDepth = args.maxDepth ?? Number.POSITIVE_INFINITY;
   const enrich = typeof args.enrich === 'boolean' ? args.enrich : true;
   const describe = args.include_descriptions === true;
-  const asked = objects.map((o) => ({ ...o, maxDepth: depthOf(o.type) }));
+  const asked = objects.map((o) => ({ ...o, maxDepth }));
 
   const shown = listAnswerAt(INFO_ANSWERS, levelOf(args));
   let ended: Ended = {};

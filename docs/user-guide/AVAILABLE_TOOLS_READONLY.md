@@ -232,7 +232,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
-- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
+- `max_findings` (integer, optional) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Absent, SAP's own.
 - `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
 - `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
 
@@ -516,7 +516,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `detailed` (boolean, optional) - [read-only] true: every field of each enhancement, as read; false (default): each enhancement by name, type and source. Either way every object read is answered, one without enhancements with total_enhancements 0
 - `include_nested` (boolean, optional) - [read-only] true: also the enhancements of every include of a program or function group
-- `max_includes` (integer, optional) - [read-only] With include_nested: how many includes are read (default 50)
+- `max_includes` (integer, optional) - [read-only] With include_nested: how many includes are read; absent, every include found
 - `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects)
 - `object_type` (string, optional) - [read-only] Type of the ABAP object
 - `objects` (array, optional) - [read-only] Several objects, read together (give this or object_name and object_type)
@@ -771,7 +771,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_descriptions` (boolean, optional) - Include each object's description in the response. The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes (default: false)
 - `include_subpackages` (boolean, optional) - Include contents of subpackages recursively (default: false)
-- `max_depth` (number, optional) - Maximum depth for recursive package traversal (default: 5)
+- `max_depth` (number, optional) - Maximum depth for recursive package traversal; absent, every level
 - `package_name` (string, optional) - Name of the ABAP package (give this or package_names)
 - `package_names` (array, optional) - Names of several ABAP packages, read together (give this or package_name)
 
@@ -824,7 +824,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
-- `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
+- `maxResults` (number, optional) - [read-only] Most results to read. Absent: SAP gives at most 200.
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
 - `object_type` (string, optional) - [read-only] Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class).
 
@@ -1029,7 +1029,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `top` (number, optional) - Number of top rows for summary. Default: 10.
+- `top` (number, optional) - Number of top-ranked rows for the summary; absent, every row, ranked.
 - `trace_id_or_uri` (string, required) - Profiler trace ID or full trace URI.
 - `view` (string, optional (default: hitlist), one of: `hitlist`, `statements`, `db_accesses`)
 - `with_system_events` (boolean, optional) - Include system events.
@@ -1050,7 +1050,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `feed_type` (string, optional, one of: `descriptors`, `variants`, `dumps`, `system_messages`, `gateway_errors`) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
 - `feed_types` (array, optional) - Several feeds, read together with the same filters (give this or feed_type).
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
-- `max_results` (number, optional) - Most entries to return, up to 1000; SAP answers at most 100 per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: 50.
+- `max_results` (integer, optional) - Most entries to return, a whole number of at least 1; absent, every entry of the range. SAP answers at most 100 per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked.
 - `object_name` (string, optional) - Dumps whose terminated object name contains this text, in any case.
 - `package` (string, optional) - Dumps whose object package contains this text, in any case.
 - `runtime_error` (string, optional) - Dumps whose runtime error contains this text, in any case.
@@ -1131,7 +1131,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `enrich` (boolean, optional (default: true)) - [read-only] Whether to add description and package via SearchObject (default true)
 - `include_descriptions` (boolean, optional (default: false)) - [read-only] Include each leaf's description, read from the leaf's metadata once the structure is read: one more read per leaf (in ADT batch envelopes where the system serves them), which on a large tree takes most of the call (default false)
-- `maxDepth` (integer, optional (default: 1)) - [read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.
+- `maxDepth` (integer, optional) - [read-only] Maximum tree depth; absent, every level. 0 is the object alone. Every object's own type folders and their contents are shown at depth 1; a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types stay at one tier whatever the value.
 - `objects` (array, optional) - [read-only] Several objects, read together (give this or parent_type and parent_name)
 - `parent_name` (string, optional) - [read-only] Parent object name
 - `parent_type` (string, optional) - [read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P); with parent_name, or give objects
@@ -1157,6 +1157,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `max_item_count` (integer, optional) - Most object types to read. Absent: SAP gives at most 100; the largest count it accepts is 2147483647.
 - `validate_type` (string, optional) - Type name to validate (optional)
 
 ---
@@ -1234,7 +1235,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_descriptions` (boolean, optional (default: false)) - Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false
 - `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
-- `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
+- `max_depth` (integer, optional) - Maximum depth for recursive package traversal. Absent: every level.
 - `package_name` (string, optional) - Package name (give this or package_names)
 - `package_names` (array, optional) - Several package names, read together (give this or package_name)
 
@@ -1251,7 +1252,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
-- `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
+- `row_number` (number, required) - [read-only] Most records to read, required. SAP refuses 0, and the largest count it accepts is 2147483646.
 - `sql_query` (string, required) - SQL query to execute
 
 ---
@@ -1323,7 +1324,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
-- `max_rows` (number, optional) - Maximum number of rows to retrieve
+- `max_rows` (number, required) - [read-only] Most records to read, required. SAP refuses 0, and the largest count it accepts is 2147483646.
 - `table_name` (string, required) - Name of the ABAP table
 
 ---

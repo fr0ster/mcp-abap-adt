@@ -94,9 +94,10 @@ const FIELDS = {
   max_depth: z
     .number()
     .int()
-    .default(5)
     .optional()
-    .describe('Maximum depth for recursive package traversal. Default: 5'),
+    .describe(
+      'Maximum depth for recursive package traversal. Absent: every level.',
+    ),
   include_descriptions: z
     .boolean()
     .default(false)
@@ -195,7 +196,8 @@ function walkOf(
 
 interface TreeOptions {
   includeSubpackages: boolean;
-  maxDepth: number;
+  /** The consumer's depth; absent, the walk has no bound (#391). */
+  maxDepth?: number | undefined;
   includeDescriptions: boolean;
 }
 
@@ -417,10 +419,15 @@ function treeOf(
     tree: assembleTree(packageName, walked),
     metadata: {
       include_subpackages: options.includeSubpackages,
-      max_depth: options.maxDepth,
+      ...depthOf(options),
       include_descriptions: options.includeDescriptions,
     },
   };
+}
+
+/** The depth given, for the answer's metadata; nothing when none was given. */
+function depthOf(options: TreeOptions): { max_depth?: number } {
+  return options.maxDepth === undefined ? {} : { max_depth: options.maxDepth };
 }
 
 /**
@@ -549,7 +556,7 @@ const TREE_ANSWERS: ListAnswerTable<TreeAnswerRead, TreeAnswer> = {
     tree: assembleTree(packageName, walked),
     metadata: {
       include_subpackages: options.includeSubpackages,
-      max_depth: options.maxDepth,
+      ...depthOf(options),
       include_descriptions: options.includeDescriptions,
     },
   }),
@@ -692,12 +699,12 @@ async function answeredGetPackageTree(
     );
     const options: TreeOptions = {
       includeSubpackages: args.include_subpackages !== false,
-      maxDepth: args.max_depth || 5,
+      maxDepth: args.max_depth,
       includeDescriptions: args.include_descriptions === true,
     };
 
     logger?.info(
-      `Fetching package tree for ${packageNames.join(', ')} (include_subpackages: ${options.includeSubpackages}, max_depth: ${options.maxDepth}) using adt-clients`,
+      `Fetching package tree for ${packageNames.join(', ')} (include_subpackages: ${options.includeSubpackages}, max_depth: ${options.maxDepth ?? 'every level'}) using adt-clients`,
     );
 
     // Walked here, not in the client. `getPackageHierarchy` makes one request

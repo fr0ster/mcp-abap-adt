@@ -685,6 +685,7 @@ export class AmdpSession<O = HandlerContext> {
   getTable(
     variable: string,
     query?: string,
+    rowNumber?: number,
   ): Promise<
     DebugView<{ rows: Array<Record<string, string>>; columns: string[] }>
   > {
@@ -699,7 +700,7 @@ export class AmdpSession<O = HandlerContext> {
             debuggerId: open.mainId,
             debuggeeId: this.requireDebuggee(),
             variableName: variable.toUpperCase(),
-            rowNumber: 100,
+            ...(rowNumber === undefined ? {} : { rowNumber }),
             ...(query ? { query } : {}),
             headers,
           }),
@@ -812,11 +813,15 @@ export class AmdpSession<O = HandlerContext> {
       throw failedAt(new DebugRequestError(messageOf(answer)), answer, 'step');
     return { value: 'moving', raw: '' };
   }
-  /** Batch path: the rows of a table variable at the break, up to 100. */
+  /**
+   * Batch path: the rows of a table variable at the break, as many as asked;
+   * none asked, SAP's own count (no bound of the server's, #391).
+   */
   async recordTable(
     recorder: IAbapConnection,
     variable: string,
     query?: string,
+    rowNumber?: number,
   ): Promise<
     DebugView<{ rows: Array<Record<string, string>>; columns: string[] }>
   > {
@@ -830,7 +835,7 @@ export class AmdpSession<O = HandlerContext> {
           debuggerId: open.mainId,
           debuggeeId: debuggee,
           variableName: variable.toUpperCase(),
-          rowNumber: 100,
+          ...(rowNumber === undefined ? {} : { rowNumber }),
           ...(query ? { query } : {}),
           headers,
         }),

@@ -72,7 +72,9 @@ const FIELDS = {
   max_depth: z
     .number()
     .optional()
-    .describe('Maximum depth for recursive package traversal (default: 5)'),
+    .describe(
+      'Maximum depth for recursive package traversal; absent, every level',
+    ),
   include_descriptions: z
     .boolean()
     .optional()

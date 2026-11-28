@@ -342,6 +342,15 @@ it is the answer. It applies as the strategies above do: the exporter's on
 `getHandlerEntries()` and `registerOnServer`, the hosting server's
 (`EmbeddableMcpServer`'s `partsPerEnvelope`) on `createRegistry()`.
 
+## Requests in flight
+
+`requestsInFlight` (a positive whole number, else the constructor throws) is
+the consumer's bound on the requests a call keeps in flight at once where a
+tool reads several objects one request each (`SearchSource` without an ADT
+batch, the package walks with descriptions). Absent: one at a time; over RFC
+always one. It applies as `partsPerEnvelope` does (`EmbeddableMcpServer`'s
+`requestsInFlight` on `createRegistry()`).
+
 ## Logging
 
 Pass a logger (`Logger` from `@mcp-abap-adt/logger`):

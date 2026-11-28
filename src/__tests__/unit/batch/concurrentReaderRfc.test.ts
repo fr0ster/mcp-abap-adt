@@ -1,8 +1,8 @@
 /**
  * The package walks' single-request reader (`concurrentReader`, used by
  * `GetPackageContents` and `GetPackageTree` when they read descriptions)
- * keeps `NODE_READ_CONCURRENCY` requests in flight over HTTP and one over
- * RFC — the rule SearchSource follows (`readsInFlight`): an RFC connection
+ * keeps the consumer's bound in flight over HTTP (`--requests-in-flight`;
+ * absent, one — #391) and one over RFC — the rule SearchSource follows (`readsInFlight`): an RFC connection
  * is one ABAP session, and reads sent to it in parallel were lost without
  * an error (measured on premise, 2026-09-26).
  */
@@ -14,10 +14,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { withSystemKindOf } from '../../../lib/connectionFactory';
 import { isRfcConnection, readsInFlight } from '../../../lib/connectionKind';
-import {
-  concurrentReader,
-  NODE_READ_CONCURRENCY,
-} from '../../../lib/strategies/packageWalk';
+import { concurrentReader } from '../../../lib/strategies/packageWalk';
+
+/** The consumer's bound these cases run with. */
+const IN_FLIGHT = 8;
+
 import { withinTurns } from '../../helpers/withinTurns';
 
 /** A connection of `kind`: only its configuration is read. */
@@ -32,6 +33,7 @@ async function mostInFlight(kind: 'rfc' | 'http', items: number) {
   const context = {
     connection: connectionOf(kind),
     logger: undefined,
+    requestsInFlight: IN_FLIGHT,
   } as unknown as HandlerContext;
   let inFlight = 0;
   let most = 0;
@@ -53,9 +55,9 @@ async function mostInFlight(kind: 'rfc' | 'http', items: number) {
 }
 
 describe('concurrentReader: reads in flight by connection kind', () => {
-  it(`over HTTP: ${NODE_READ_CONCURRENCY} at once`, async () => {
+  it(`over HTTP: ${IN_FLIGHT} at once`, async () => {
     const { most, results } = await mostInFlight('http', 20);
-    assert.equal(most, NODE_READ_CONCURRENCY);
+    assert.equal(most, IN_FLIGHT);
     assert.deepStrictEqual(
       results.map((r) => (r.ok ? r.value : undefined)),
       Array.from({ length: 20 }, (_, i) => i * 2),

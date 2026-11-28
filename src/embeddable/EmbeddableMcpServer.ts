@@ -126,6 +126,12 @@ export interface EmbeddableMcpServerBaseOptions {
    * bound — a phase's independent reads go in one envelope.
    */
   partsPerEnvelope?: number;
+  /**
+   * The consumer's bound on the requests a call keeps in flight at once
+   * where it reads several objects one request each: a positive whole
+   * number, else the constructor throws. Absent: one at a time.
+   */
+  requestsInFlight?: number;
 
   /**
    * The corrected request header pairs of the systems this instance talks
@@ -358,6 +364,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       }),
       ...(options.partsPerEnvelope !== undefined && {
         partsPerEnvelope: options.partsPerEnvelope,
+      }),
+      ...(options.requestsInFlight !== undefined && {
+        requestsInFlight: options.requestsInFlight,
       }),
       ...(options.batch !== undefined && { batch: options.batch }),
       ...(options.heldLocks !== undefined && {

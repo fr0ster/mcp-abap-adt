@@ -237,7 +237,7 @@ describe('path 1: a server instance', () => {
       'table_not_allowed',
       listedAccessChecks({ deniedTables: [parseTableEntry('MARA', NAME)] }),
       'GetTableContents',
-      { table_name: 'MARA', background: false },
+      { table_name: 'MARA', max_rows: 5, background: false },
       'table_not_allowed',
       'the data of MARA is not readable through this server',
     ],

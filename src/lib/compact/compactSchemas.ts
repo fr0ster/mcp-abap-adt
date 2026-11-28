@@ -1464,7 +1464,7 @@ export const compactProfileViewSchema = z.object({
     .number()
     .optional()
     .describe(
-      'Number of top-ranked rows to include when mode is "analyze". Default 10. Ignored for mode "raw".',
+      'Number of top-ranked rows to include when mode is "analyze"; absent, every row, ranked. Ignored for mode "raw".',
     ),
   with_system_events: z
     .boolean()
@@ -2383,7 +2383,7 @@ function systemProperties(
       .optional()
       .describe(
         said(actions, {
-          search_object: 'maximum number of results to return (default 100).',
+          search_object: 'most results to read; absent, SAP gives at most 200.',
         }),
       ),
     detail: z
@@ -2495,7 +2495,7 @@ function systemProperties(
       .optional()
       .describe(
         said(actions, {
-          package_tree: 'maximum depth of the walk (default 5).',
+          package_tree: 'maximum depth of the walk; absent, every level.',
         }),
       ),
     include_descriptions: z
@@ -2762,12 +2762,17 @@ function getDataProperties(sql: boolean) {
   };
 }
 
+/**
+ * The row count: required, the consumer's, sent as given (#391). Measured on
+ * the BTP ABAP environment (2026-11-27): SAP refuses 0, and 2147483646 is the
+ * largest it accepts.
+ */
 const MAX_ROWS = {
   max_rows: z
     .number()
-    .default(100)
-    .optional()
-    .describe('Maximum number of rows returned.'),
+    .describe(
+      'Most records to read, required. SAP refuses 0, and the largest count it accepts is 2147483646.',
+    ),
 };
 
 /** `detail`, the data tools' own: how much of the rows' answer to return. */

@@ -39,7 +39,6 @@ import {
 import { handleGetObjectInfo as handleGetObjectInfoOf } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
-import { NODE_READ_CONCURRENCY } from '../../../lib/strategies/packageWalk';
 import { corpusBody, corpusSidecar } from '../../helpers/adtCorpus';
 import { assertMatchObject } from '../../helpers/assertions';
 import {
@@ -1782,18 +1781,23 @@ describe('GetPackageTree with descriptions: a metadata read SAP answered 401', (
   });
 
   it('more packages than are read at once: no metadata read starts after it', async () => {
+    // The consumer's bound on the requests in flight (#391).
+    const IN_FLIGHT = 8;
     const names = Array.from(
-      { length: NODE_READ_CONCURRENCY + 4 },
+      { length: IN_FLIGHT + 4 },
       (_, i) => `ZPKG_${String(i).padStart(2, '0')}`,
     );
     const fake = system({
       refuse: { 'GET /sap/bc/adt/packages/zpkg_00': 401 },
     });
     const result = await withinTurns(
-      handleGetPackageTree(contextOn(fake), {
-        package_names: names,
-        include_descriptions: true,
-      }),
+      handleGetPackageTree(
+        { ...contextOn(fake), requestsInFlight: IN_FLIGHT },
+        {
+          package_names: names,
+          include_descriptions: true,
+        },
+      ),
     );
     assert.equal((result as { isError?: boolean }).isError, true);
     assertMatchObject(payloadOf(result), {
@@ -1804,7 +1808,7 @@ describe('GetPackageTree with descriptions: a metadata read SAP answered 401', (
       r.url.includes('/sap/bc/adt/packages/'),
     );
     // Only the reads already started when the refusal answered.
-    assert.equal(metadataReads.length, NODE_READ_CONCURRENCY);
+    assert.equal(metadataReads.length, IN_FLIGHT);
     assert.equal(nodeReads(fake).length, 0);
   });
 });

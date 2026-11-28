@@ -142,7 +142,7 @@ per request.
 - `object_name` — search_object: object name or mask (e.g. 'MARA*'). where_used: name of the object (with object_type), a function module as 'GROUP|FM_NAME'.
 - `object_type` — search_object: Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class). where_used: Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): CLAS/OC (class), INTF/OI (interface), PROG/P (program), PROG/I (include), FUGR/F (functiongroup), FUGR/FF (function, functionmodule, function_module, func), DEVC/K (package), DDLS/DF (view), VIEW/DV (dbview), TABL/DT (table), TABL/DS (structure, stru), TTYP/DA, DOMA/DD (domain), DTEL/DE (dataelement), DCLS/DL, BDEF/BDO, DDLX/EX, SRVD/SRV, SRVB/SVB, DSFD/SCF, DSFI/SFI, XSLT/VT, MSAG/N, FTG2/FT, AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB, PROG/PX. A function module is named as object_name says. PROG/PX is a program's or a function group's text elements; container says which. A name is written in lower case: view is a CDS view (DDLS/DF). A value in upper case is a code, a main type or a search name of the system's object types list first, so VIEW is the dictionary views (VIEW/DV); it is a name only when it is none of these (CLASS is class). A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
 - `container` — where_used: with object_type PROG/PX, required: whose text elements they are, program or function_group; taken by PROG/PX alone.
-- `maxResults` — search_object: maximum number of results to return (default 100).
+- `maxResults` — search_object: most results to read; absent, SAP gives at most 200.
 - `detail` — search_source, search_object, where_used, package_tree, transports, atc_findings, atc_results, atc_result: How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objects` — where_used: several objects, read together (give this or object_name and object_type); the type filters apply to every object.
 - `enable_all_types` — where_used: true selects every object type of the where-used scope (default false, the SAP default scope).
@@ -151,7 +151,7 @@ per request.
 - `in_object` — where_used: one object that uses it, as a where-used answer names it (type and name): the answer is then its usages only, each with its method or section and source line; once per using object whose code lines are wanted.
 - `package_name` — package_tree: package name (give this or package_names).
 - `package_names` — package_tree: several package names, read together (give this or package_name).
-- `max_depth` — package_tree: maximum depth of the walk (default 5).
+- `max_depth` — package_tree: maximum depth of the walk; absent, every level.
 - `include_descriptions` — package_tree: each object's description in the answer (default false).
 - `debug` — package_tree: diagnostic metadata in the answer (counts, types, hierarchy; default false).
 - `user` — transports: the SAP user id whose requests are listed (default the session's user).
@@ -311,7 +311,7 @@ per request.
 - `trace_id_or_uri` (required) — Profiler trace id or URI.
 - `view` (required) — Profiler trace view kind.
 - `mode` — "raw" returns the parsed trace payload as-is (default). "analyze" returns a compact summary instead — totals plus the top-ranked entries — via the same trace view.
-- `top` — Number of top-ranked rows to include when mode is "analyze". Default 10. Ignored for mode "raw".
+- `top` — Number of top-ranked rows to include when mode is "analyze"; absent, every row, ranked. Ignored for mode "raw".
 - `with_system_events` — Include system events in analysis.
 - `id` — Optional statement/access id.
 - `with_details` — Include detailed payload.
@@ -394,7 +394,7 @@ per request.
 - `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself.
 - `object_name` — Table or CDS view whose rows are read, all columns. Used when sql_query is absent.
 - `sql_query` — ABAP SQL SELECT naming the columns, conditions and order to read.
-- `max_rows` — Maximum number of rows returned.
+- `max_rows` (required) — Most records to read, required. SAP refuses 0, and the largest count it accepts is 2147483646.
 - `detail` — How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ### HandlerCreate

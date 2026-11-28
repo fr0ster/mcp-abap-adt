@@ -239,17 +239,10 @@ export const TOOL_DEFINITION = {
 
 type SearchSourceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
-// Over RFC the sequential version (a destination with no communication batch)
-// runs one fetch at a time (`readsInFlight`, where the measurement is told);
-// over HTTP its default, 8 at once.
-
-/** `args` with `concurrency` set only where the connection bounds it. */
-function withReadsInFlight<A extends object>(
-  args: A,
-  inFlight: number | undefined,
-): A & { concurrency?: number } {
-  return inFlight === undefined ? args : { ...args, concurrency: inFlight };
-}
+// The sequential version (a destination with no communication batch) keeps
+// as many fetches in flight as the consumer set (`--requests-in-flight`;
+// absent, one — no number of the server's, #391), and one over RFC
+// (`readsInFlight`, where the measurement is told).
 
 /**
  * What each hit is read as, selected before the scan: the `answer` given, or
@@ -364,7 +357,13 @@ async function answeredSearchSource(
   try {
     const result = await runSearchSourceWithContext(
       context,
-      withReadsInFlight(asked, readsInFlight(context.connection, undefined)),
+      {
+        ...asked,
+        concurrency: readsInFlight(
+          context.connection,
+          context.requestsInFlight ?? 1,
+        ),
+      },
       // The server's strategies, set from its options; absent, the shipped
       // ones — the one place their default lives (DO24).
       {

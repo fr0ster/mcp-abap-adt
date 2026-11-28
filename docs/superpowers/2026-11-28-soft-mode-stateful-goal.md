@@ -27,9 +27,11 @@ step, and not a cleanup step.
 
 - **One connection per test file, cleanup included.** No new connection, no
   sibling and no new logon replaces the session a network error interrupted.
-  Today's package cleanup passes `force_new_connection: true`
-  (`IncludeHighHandlers.test.ts:207`, `TableTypeHighHandlers.test.ts:308`),
-  which opens a fresh one. That is in scope and changes.
+  The one named exception is the package delete. It keeps its own lock-free
+  sibling session (`force_new_connection: true`, `src/lib/packageSessions.ts`),
+  as the server does, because a session that created a package cannot delete
+  it (PAK/058, `handleDeletePackage.ts:87`). That sibling holds no lock of the
+  run and replaces nothing.
 - **Each outcome is read as `sessionLoss.ts` reads it** (`spentBy`):
   - a network error (no typed verdict) keeps the session, and the run
     keeps owning its locks;

@@ -132,20 +132,23 @@ A mutating step whose outcome is `network` may have been applied by SAP.
 - When locks are still owned at that point, the report says that they end
   with this logoff if SAP received it, else with SAP's timeout.
 
-## 7. Package cleanup on one connection
+## 7. Package cleanup: the one sibling session
 
-`force_new_connection: true` on `DeletePackage` (`IncludeHighHandlers.test.ts:207`,
-`TableTypeHighHandlers.test.ts:308`) opens a sibling session. The goal's
-invariant puts cleanup on the file's one connection. But a package that this
-session created cannot be deleted by the same session: PAK/058, `CL_PACKAGE`'s
-instance buffer (`handleDeletePackage.ts:85-94`, adt-clients `ERRATA.md`). So
-dropping the flag makes the package delete fail on every run, network or not.
+`DeletePackage` keeps `force_new_connection: true`
+(`IncludeHighHandlers.test.ts:207`, `TableTypeHighHandlers.test.ts:308`).
+A session that created a package cannot delete it: PAK/058, `CL_PACKAGE`'s
+instance buffer (`handleDeletePackage.ts:85-94`, adt-clients `ERRATA.md`).
+The delete therefore runs in its own lock-free sibling session, opened through
+`src/lib/packageSessions.ts` as the server opens it. This is the one named
+exception to the one-connection invariant. The sibling holds no lock of the
+run and replaces nothing, and the run's session keeps its locks.
 
-**For the owner, before the plan:** either the package delete keeps its own
-short-lived sibling (it holds no lock of the run and replaces nothing; the
-run's session keeps its locks), or the suites stop creating their own package
-and work in a shared one (`shared_dependencies.package`). This spec does
-neither until the owner chooses.
+- The package delete comes after `releaseAll` and the object deletes
+  (section 4), as now.
+- It is sent once, like every other step.
+- A `network` outcome leaves the package listed as not deleted.
+- A sibling that cannot be opened is reported, and the run's connection is
+  never used for the delete.
 
 ## 8. Tests that prove it
 

@@ -534,7 +534,7 @@ one envelope cannot hold a request built from another's answer. Each is refused
 
 <!-- batch-handlers:start -->
 
-49 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+67 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Compact sets (`mcp-abap-adt-compact`, `-compact-http`, `-compact-sse`, and their `-ro` binaries for the reads)
 
@@ -593,6 +593,24 @@ one envelope cannot hold a request built from another's answer. Each is refused
 
 | Tool | Recorded | Sends |
 |---|---|---|
+| `GetBehaviorDefinition` | every call | one request: GET the behavior definition's source, or with part metadata its metadata document, at the version asked |
+| `GetBehaviorImplementation` | every call | one request: GET the behavior pool's source, or with part metadata its metadata document, at the version asked |
 | `GetClass` | every call | one request: GET the class source, or with part metadata its metadata document, at the version asked |
+| `GetDataElement` | every call | one request: GET the data element's metadata document at the version asked |
+| `GetDdl` | every call | one request: GET the DDL source's source, or with part metadata its metadata document, at the version asked |
+| `GetDomain` | every call | one request: GET the domain's metadata document at the version asked |
+| `GetFunctionGroup` | every call | one request: GET the function group's metadata document at the version asked |
+| `GetFunctionInclude` | every call | one request: GET the function group's include's source, or with part metadata its metadata document, at the version asked |
+| `GetFunctionModule` | when part is metadata | one request: GET the function module's metadata document at the group given, checked against that group locally |
+| `GetInclude` | every call | one request: GET the include's source, or with part metadata its metadata document, at the version asked |
+| `GetInterface` | every call | one request: GET the interface's source, or with part metadata its metadata document, at the version asked |
+| `GetMetadataExtension` | every call | one request: GET the metadata extension's source, or with part metadata its metadata document, at the version asked |
+| `GetPackage` | every call | one request: GET the package's metadata document at the version asked |
+| `GetProgram` | every call | one request: GET the program's source, or with part metadata its metadata document, at the version asked |
+| `GetServiceBinding` | every call | one request: GET the active service binding, or with part metadata its metadata document |
+| `GetServiceDefinition` | every call | one request: GET the service definition's source, or with part metadata its metadata document, at the version asked |
+| `GetStructure` | every call | one request: GET the structure's source, or with part metadata its metadata document, at the version asked |
+| `GetTable` | every call | one request: GET the table's source, or with part metadata its metadata document, at the version asked |
+| `GetTableType` | every call | one request: GET the table type's metadata document at the version asked |
 
 <!-- batch-handlers:end -->

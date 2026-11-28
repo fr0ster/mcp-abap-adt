@@ -51,13 +51,22 @@ the system.
   Measured on cloud and on premise, one object of each type per kind:
   - the source and the metadata document both answered `200`, namespaced names included
     (on premise);
-  - an absent template name answered `404`;
+  - an absent template name answered `404` (object document only, on both kinds);
   - the source was a JSON document: a header, plus the subobjects (APLO), the class (SAJC)
     or the catalog name (SAJT);
   - the metadata document was an ADT object document with a description, language and
     links.
 
   The fields of other objects of these types are unverified.
+
+  An absent name, both the object document and the source:
+  - Measured on cloud, with a 7-character name: `404` for all three types.
+  - Measured on cloud, with a 21-character name: `404` for SAJC and SAJT. APLO answered
+    `500` "Application Server Error", "Data was lost while copying a value". That a name
+    longer than the type's name field causes it is inferred, not verified. The answer
+    reaches the model as SAP's failure, like any other.
+  - On premise only the template object document is measured. The APLO and SAJC reads, and
+    the template source, are unverified.
 
   Finding these objects needs no new tool. The interfaces-adt search tables list `APLO`,
   `SAJC` and `SAJT` on both variants, and `SearchObject` checks its type against those
@@ -95,15 +104,19 @@ the system.
        - position form: a position inside a statement answers that statement's topic, not
          the start page;
        - each definition read: an existing name answers its document, and an absent name
-         answers `404`.
+         that fits the type's name field answers `404`, for both the object document and
+         the source.
      - A tool is listed on a kind (`available_in`) when at least one of its forms is
        eligible there.
      - A form not eligible on the kind of the system reached is refused as not served,
        with no request, whatever discovery says. Which forms are eligible on which kind is
        a static table in the code, beside its live tests.
      - As measured:
-       - on `onprem` and `cloud`, the query form, the topic form and the three definition
-         reads are eligible;
+       - on `onprem` and `cloud`, the query form and the topic form are eligible;
+       - on `cloud`, the three definition reads are eligible;
+       - on `onprem`, no definition read is eligible yet: only the template object document
+         is measured absent there. Each type becomes eligible once both its absent-name reads
+         answer `404`;
        - the position form is eligible nowhere yet, since the one position tried answered
          the start page; its live test has to show a statement's topic first;
        - on `legacy`, no definition read is eligible: the recorded 7.40 discovery lists

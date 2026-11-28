@@ -10,6 +10,7 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ToolResultLike } from '../../../../lib/toolResult';
 import {
   getCleanupAfter,
   getCleanupAfterRun,
@@ -26,18 +27,22 @@ import {
   configuredSystemKindOf,
   NO_KIND_STATED,
 } from '../configuredSystemKind';
+import { heldLocksIfAny, heldLocksOf, leavesALock } from '../heldLiveLocks';
 import { createTestLogger, type LoggerWithExtras } from '../loggerHelpers';
 import { PackageGuardRefusal } from '../packageGuard';
 import { primeSystemContext } from '../primeSystemContext';
+import { credentialRefused } from '../refusalGuard';
 import { skipRunningTest } from '../runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../sessionHelpers';
+import { answerOutcome, StepFailure } from '../stepOutcome';
 import type { CaseParams, TestCase } from '../testConfigSchema';
 import { thrownWords } from '../thrownValue';
 import {
   createHardModeClient,
+  getHardModeConfig,
   type HardModeClient,
   isHardModeEnabled,
   parseToolText,
@@ -86,6 +91,16 @@ function reportedAuthType(connection: object): string | undefined {
 }
 
 export type TLambda = (context: LambdaTesterContext) => Promise<void>;
+
+/** Whether a direct call's answer is a tool answer (the handlers' `ToolResultLike`). */
+function isToolResult(value: unknown): value is ToolResultLike {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'content' in value &&
+    Array.isArray(value.content)
+  );
+}
 type HandlerLikeResponse = {
   isError: boolean;
   content: Array<{ type: 'text'; text: string }>;
@@ -133,6 +148,12 @@ export class LambdaTester {
   protected testFailed = false;
   /** A test that skipped itself created nothing, so nothing is deleted. */
   protected testSkipped = false;
+  /**
+   * The suite deletes what it created in its own `after`, whatever the
+   * outcome (`deletesInItsOwnAfter`): a failed test's objects are then not
+   * kept for analysis, and the failed-test warning must not say they are.
+   */
+  protected suiteDeletesWhateverTheOutcome = false;
   /** Why the tester does not run at all: no system kind stated. */
   protected kindSkip: string | undefined;
   /** Why the tester has no case to run: the config key it lacks, or why it could not start. */
@@ -200,9 +221,9 @@ export class LambdaTester {
         throw new Error(stated.skip);
       }
       isCloudSystem = stated.isCloudSystem;
-      const hardModeEnabled =
-        config?.environment?.integration_hard_mode?.enabled === true ||
-        config?.integration_hard_mode?.enabled === true;
+      // One source for hard or soft mode (#394): the same reading the
+      // calls take (`isHardMode`).
+      const hardModeEnabled = getHardModeConfig(config).enabled;
 
       // Load environment variables only for in-process mode
       if (!hardModeEnabled) {
@@ -327,6 +348,9 @@ export class LambdaTester {
       const connectionResult = await createTestConnectionAndSession();
       connection = connectionResult.connection;
       session = connectionResult.session;
+      // A soft-mode run connection: the locks it holds are owned by its
+      // registry until SAP answered their release (#394, spec §3).
+      heldLocksOf(connection);
 
       // Resolve system context for tests (set SAP_MASTER_SYSTEM from YAML if not already set)
       const testCtx = resolveTestSystemContext();
@@ -400,12 +424,92 @@ export class LambdaTester {
     }
   }
 
+  /** The handles the run connection owned when the test began. */
+  private ownedAtStart = new Set<string>();
+
+  /** The locks the run connection owned when the test began. */
+  protected locksAtStart(): void {
+    const connection = this.context?.connection;
+    const locks =
+      connection === undefined ? undefined : heldLocksIfAny(connection);
+    this.ownedAtStart = new Set(
+      (locks?.stillHeld ?? []).map((lock) => lock.lock_handle),
+    );
+  }
+
+  /**
+   * The locks this test left owned after its cleanup's release: a step it
+   * passed over (a success whose own unlock failed on the network) ends the
+   * test as failed (#394), naming them.
+   */
+  private locksLeftByThisTest(): readonly string[] {
+    const connection = this.context?.connection;
+    const locks =
+      connection === undefined ? undefined : heldLocksIfAny(connection);
+    return (locks?.stillOwned ?? [])
+      .filter(({ lock }) => !this.ownedAtStart.has(lock.lock_handle))
+      .map(
+        ({ lock, state }) =>
+          `${lock.object_type} ${lock.object_name} (${state})`,
+      );
+  }
+
+  /**
+   * Declares that the suite deletes what it created in its own `after`,
+   * whatever the outcome (a live suite on a shared system leaves nothing
+   * behind): the after-each delete still follows the YAML policy, and a
+   * failed test's warning says the suite deletes its objects.
+   */
+  deletesInItsOwnAfter(): void {
+    this.suiteDeletesWhateverTheOutcome = true;
+  }
+
+  /**
+   * Sends, once, the unlock of every lock the soft-mode run connection still
+   * holds (`held`), each on the handler context that took it; a lock whose
+   * unlock was already sent is not sent again, and every lock still owned is
+   * reported. Nothing after a credential refusal; nothing in hard mode, where
+   * the server owns its locks.
+   */
+  protected async releaseOwnedLocks(): Promise<void> {
+    const connection = this.context?.connection;
+    if (connection === undefined) return;
+    const locks = heldLocksIfAny(connection);
+    if (locks === undefined || locks.stillHeld.length === 0) return;
+    const logger = this.context?.logger;
+    if (credentialRefused()) {
+      for (const { lock, state } of locks.stillOwned) {
+        logger?.warn?.(
+          `🔒 not released after a credential refusal (${state}): ${lock.object_type} ${lock.object_name}`,
+        );
+      }
+      return;
+    }
+    await locks.releaseAll(undefined, (line) => logger?.warn?.(`🔒 ${line}`));
+  }
+
   /**
    * Cleanup after test - checks if cleanup is needed and performs it
    * Checks YAML parameters first, then calls cleanup lambda from test
    * This method is designed to be safe to call even if test failed
    */
   protected async cleanupAfter(): Promise<void> {
+    // Locks first, unconditionally (#394, spec §4): whatever the YAML
+    // policy says about deleting, every lock still `held` is released, once.
+    await this.releaseOwnedLocks();
+    const left = this.locksLeftByThisTest();
+    await this.cleanupAfterPolicy();
+    // The deletes ran as the policy says; a lock the test left still owned
+    // fails it now.
+    if (left.length > 0) {
+      throw new CleanupFailure(
+        `the test left a lock its release did not reach SAP for: ${left.join('; ')}`,
+      );
+    }
+  }
+
+  /** The YAML policy's part of the cleanup: the deletes. */
+  private async cleanupAfterPolicy(): Promise<void> {
     if (!this.context || !this.testCase) {
       this.context?.logger?.warn?.(
         '⚠️ Cleanup skipped: context or testCase not available',
@@ -429,7 +533,9 @@ export class LambdaTester {
     if (!getCleanupAfterRun(this.testCase, this.testFailed)) {
       if (this.testFailed) {
         this.context.logger?.warn?.(
-          '🔎 Test failed — cleanup skipped, its objects are kept for analysis. Delete them once analysed, or set test_settings.cleanup_on_failure: true to have them deleted anyway.',
+          this.suiteDeletesWhateverTheOutcome
+            ? '🔎 Test failed — the after-each delete is skipped; the suite deletes its objects in its own after hook, whatever the outcome.'
+            : '🔎 Test failed — cleanup skipped, its objects are kept for analysis. Delete them once analysed, or set test_settings.cleanup_on_failure: true to have them deleted anyway.',
         );
         return;
       }
@@ -601,6 +707,7 @@ export class LambdaTester {
 
     this.testFailed = false;
     this.testSkipped = false;
+    this.locksAtStart();
     try {
       // Execute test function (lambda) with context
       // Lambda decides what messages to log and whether to pass logger to handlers
@@ -639,7 +746,28 @@ export class LambdaTester {
     directCall: () => Promise<T>,
   ): Promise<T | HandlerLikeResponse> {
     if (!this.isHardMode()) {
-      return directCall();
+      // Soft mode (#394): judged as `send`/`liveCall` judge a live step — a
+      // lock the answer left taken in, a success that is not `ok` by its
+      // outcome (its own unlock failed, or its lock went with a lost session)
+      // ends the step. A failure answer is the suite's to judge.
+      const answer = await directCall();
+      if (isToolResult(answer)) {
+        const connection = this.context?.connection;
+        if (connection !== undefined && leavesALock(answer)) {
+          heldLocksOf(connection).takeInLeftLocked(answer);
+        }
+        if (answer.isError !== true) {
+          const outcome = answerOutcome(answer);
+          if (outcome !== 'ok') {
+            throw new StepFailure(
+              toolName,
+              outcome,
+              answer.content?.[0]?.text ?? '',
+            );
+          }
+        }
+      }
+      return answer;
     }
 
     const mcp = await this.getHardModeClient();

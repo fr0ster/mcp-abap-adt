@@ -72,7 +72,15 @@ import { getSystemType } from '../../helpers/configHelpers';
 import { systemsDescribe } from '../../helpers/live';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { ownedObjectsOf } from '../../helpers/ownedObjects';
 import { withRootDescription } from '../../helpers/rootDescription';
+import {
+  type Answer,
+  answerOf,
+  type SoftSteps,
+  softSteps,
+} from '../../helpers/softSteps';
+import { StepFailure } from '../../helpers/stepOutcome';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { McpSession } from '../../helpers/testers/hardMode';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -91,27 +99,6 @@ const IncludeParams = z.looseObject({
   include_name: z.string().optional(),
   update_source_code: z.string().optional(),
 });
-
-/** A tool's answer as the model reads it: the error flag and the first text. */
-type Answer = { isError: boolean; text: string };
-
-/** Read a handler's result (typed `unknown` by the compact routes). */
-function answerOf(value: unknown): Answer {
-  if (typeof value !== 'object' || value === null) {
-    throw new Error(`Not a tool answer: ${String(value)}`);
-  }
-  const isError = 'isError' in value && value.isError === true;
-  const content = 'content' in value ? value.content : undefined;
-  const first: unknown = Array.isArray(content) ? content[0] : undefined;
-  const text =
-    typeof first === 'object' &&
-    first !== null &&
-    'text' in first &&
-    typeof first.text === 'string'
-      ? first.text
-      : '';
-  return { isError, text };
-}
 
 /** A field of a parsed JSON value, or `undefined`. */
 function field(value: unknown, key: string): unknown {
@@ -158,62 +145,36 @@ systemsDescribe(['onprem'], 'Include High-Level Handlers Integration', () => {
   /** Set once the case runs here: only then is absence read back. */
   let ran = false;
   let handlerContext: HandlerContext | undefined;
-  /** What this run created and has not deleted yet, in creation order. */
-  const created: Array<{ kind: 'package' | 'include'; name: string }> = [];
-  /** A compact lock this run holds, released before any delete. */
-  let heldLock: { name: string; handle: string } | undefined;
+  /**
+   * The run's steps on its connection (#394): what it created and the locks
+   * it holds are owned there until SAP answered their delete or release,
+   * and nothing is sent twice.
+   */
+  let steps: SoftSteps | undefined;
   /** Each step's answer, for the log the run is read from. */
   const record = (label: string, answer: Answer) =>
     logger?.info(
       `[answer] ${label}: ${answer.isError ? 'isError ' : ''}${answer.text}`,
     );
 
-  const forget = (name: string) => {
-    const index = created.findIndex((entry) => entry.name === name);
-    if (index >= 0) created.splice(index, 1);
-  };
-
-  /** Delete everything still listed, the package last. Idempotent. */
+  /** Release every held lock, then delete what is owned, the package last. Each once. */
   const deleteEverything = async () => {
     const context = handlerContext;
-    if (context === undefined) return;
-    if (heldLock !== undefined) {
-      const lock = heldLock;
-      heldLock = undefined;
-      record(
-        `cleanup HandlerUnlock ${lock.name}`,
-        answerOf(
-          await handleHandlerUnlock(context, {
-            object_type: 'INCLUDE',
-            object_name: lock.name,
-            lock_handle: lock.handle,
-          }),
-        ),
-      );
-    }
-    for (const entry of [...created].reverse()) {
-      if (entry.kind !== 'include') continue;
-      const answer = answerOf(
-        await handleDeleteInclude(context, { include_name: entry.name }),
-      );
-      record(`cleanup DeleteInclude ${entry.name}`, answer);
-      if (!answer.isError) forget(entry.name);
-    }
-    for (const entry of [...created]) {
-      if (entry.kind !== 'package') continue;
-      const answer = answerOf(
-        await handleDeletePackage(context, {
-          package_name: entry.name,
+    if (context === undefined || steps === undefined) return;
+    await steps.cleanUp(['include', 'package'], {
+      include: (name) => handleDeleteInclude(context, { include_name: name }),
+      package: (name) =>
+        handleDeletePackage(context, {
+          package_name: name,
           force_new_connection: true,
         }),
-      );
-      record(`cleanup DeletePackage ${entry.name}`, answer);
-      if (!answer.isError) forget(entry.name);
-    }
+    });
   };
 
   before(async () => {
     tester = new LambdaTester('create_include', 'builder_include', 'incl-high');
+    // Whatever the outcome, its after hook deletes what the run created.
+    tester.deletesInItsOwnAfter();
     await tester.beforeAll(
       async (context: LambdaTesterContext) => {
         if (context.hasConfig) {
@@ -221,6 +182,7 @@ systemsDescribe(['onprem'], 'Include High-Level Handlers Integration', () => {
             connection: context.connection,
             logger: context.logger,
           });
+          steps = softSteps(context.connection, record);
         }
       },
       async () => deleteEverything(),
@@ -248,7 +210,12 @@ systemsDescribe(['onprem'], 'Include High-Level Handlers Integration', () => {
         }),
       );
       record(`absence SearchObject ${PACKAGE}`, pkg);
-      assertEquals(created, []);
+      assertEquals(
+        handlerContext === undefined
+          ? []
+          : ownedObjectsOf(handlerContext.connection).stillOwned,
+        [],
+      );
       assert.equal(includes.isError, false);
       assert.equal(includes.text.includes(NAME_PREFIX), false);
       assert.equal(pkg.isError, false);
@@ -271,18 +238,13 @@ systemsDescribe(['onprem'], 'Include High-Level Handlers Integration', () => {
       const source = params.update_source_code;
       if (!source) throw new Error('update_source_code is required');
 
-      /** A step that must succeed: its answer, or the test ends with it. */
-      const must = async (label: string, call: () => Promise<unknown>) => {
-        const answer = answerOf(await call());
-        record(label, answer);
-        if (answer.isError) {
-          throw new Error(`${label} was refused: ${answer.text}`);
-        }
-        return answer;
-      };
+      const run = steps;
+      if (run === undefined) throw new Error('No steps');
+      /** A step that must succeed: its answer, or the test ends with its outcome. */
+      const must = run.must;
 
       // The package of the run: local, no transport.
-      await must(`CreatePackage ${PACKAGE}`, () =>
+      await run.create('package', PACKAGE, `CreatePackage ${PACKAGE}`, () =>
         handleCreatePackage(
           context,
           CreatePackage.inputSchema.parse({
@@ -294,17 +256,15 @@ systemsDescribe(['onprem'], 'Include High-Level Handlers Integration', () => {
           }),
         ),
       );
-      created.push({ kind: 'package', name: PACKAGE });
 
       // CreateInclude: inactive, with the comment header SAP writes.
-      await must(`CreateInclude ${INCLUDE}`, () =>
+      await run.create('include', INCLUDE, `CreateInclude ${INCLUDE}`, () =>
         handleCreateInclude(context, {
           include_name: INCLUDE,
           package_name: PACKAGE,
           description,
         }),
       );
-      created.push({ kind: 'include', name: INCLUDE });
 
       // GetInclude, both parts: a source of no code, the document. SAP
       // writes a comment header naming the include into the new one
@@ -396,24 +356,21 @@ systemsDescribe(['onprem'], 'Include High-Level Handlers Integration', () => {
       );
 
       // Compact: lock, write the source, then the metadata, unlock.
-      const locked = answerOf(
-        await handleHandlerLock(context, {
-          object_type: 'INCLUDE',
-          object_name: INCLUDE,
-        }),
+      const handle = await run.lock(
+        { type: 'INCLUDE', name: INCLUDE },
+        `HandlerLock INCLUDE ${INCLUDE}`,
+        () =>
+          handleHandlerLock(context, {
+            object_type: 'INCLUDE',
+            object_name: INCLUDE,
+          }),
+        (held) =>
+          handleHandlerUnlock(context, {
+            object_type: 'INCLUDE',
+            object_name: INCLUDE,
+            lock_handle: held,
+          }),
       );
-      // The lock's answer carries the handle: never logged.
-      logger?.info(
-        `[answer] HandlerLock INCLUDE ${INCLUDE}: ${locked.isError ? `isError ${locked.text}` : 'locked'}`,
-      );
-      if (locked.isError) {
-        throw new Error(`HandlerLock was refused: ${locked.text}`);
-      }
-      const handle = field(parsed(locked.text), 'lock_handle');
-      if (typeof handle !== 'string' || handle === '') {
-        throw new Error('HandlerLock answered no lock handle');
-      }
-      heldLock = { name: INCLUDE, handle };
 
       const compactSource = `${source}* written through HandlerUpdate ${RUN}\n`;
       await must(`HandlerUpdate INCLUDE ${INCLUDE} source`, () =>
@@ -448,14 +405,7 @@ systemsDescribe(['onprem'], 'Include High-Level Handlers Integration', () => {
           lock_handle: handle,
         }),
       );
-      await must(`HandlerUnlock INCLUDE ${INCLUDE}`, () =>
-        handleHandlerUnlock(context, {
-          object_type: 'INCLUDE',
-          object_name: INCLUDE,
-          lock_handle: handle,
-        }),
-      );
-      heldLock = undefined;
+      await run.unlock(handle, `HandlerUnlock INCLUDE ${INCLUDE}`);
 
       const inactiveSource = await must(
         `HandlerGet INCLUDE ${INCLUDE} source (inactive)`,
@@ -522,27 +472,36 @@ systemsDescribe(['onprem'], 'Include High-Level Handlers Integration', () => {
 
       // DeleteInclude, then a create of the same name right after: SAP's
       // answer recorded as sent.
-      await must(`DeleteInclude ${INCLUDE}`, () =>
+      await run.remove(INCLUDE, `DeleteInclude ${INCLUDE}`, () =>
         handleDeleteInclude(context, { include_name: INCLUDE }),
       );
-      forget(INCLUDE);
-      const recreated = answerOf(
-        await handleCreateInclude(context, {
-          include_name: INCLUDE,
-          package_name: PACKAGE,
-          description,
-        }),
-      );
-      record(
-        `CreateInclude ${INCLUDE} again, right after the delete`,
-        recreated,
-      );
-      if (!recreated.isError) {
-        created.push({ kind: 'include', name: INCLUDE });
-        await must(`DeleteInclude ${INCLUDE} (the re-created one)`, () =>
-          handleDeleteInclude(context, { include_name: INCLUDE }),
+      // SAP's answer to a create right after the delete is recorded as
+      // sent: it may refuse it. The object is owned before it is sent.
+      let recreated: Answer | undefined;
+      try {
+        recreated = await run.create(
+          'include',
+          INCLUDE,
+          `CreateInclude ${INCLUDE} again, right after the delete`,
+          () =>
+            handleCreateInclude(context, {
+              include_name: INCLUDE,
+              package_name: PACKAGE,
+              description,
+            }),
         );
-        forget(INCLUDE);
+      } catch (error) {
+        // Only SAP's refusal is an answer here; any other outcome ends the test.
+        if (!(error instanceof StepFailure) || error.outcome !== 'refused') {
+          throw error;
+        }
+      }
+      if (recreated !== undefined) {
+        await run.remove(
+          INCLUDE,
+          `DeleteInclude ${INCLUDE} (the re-created one)`,
+          () => handleDeleteInclude(context, { include_name: INCLUDE }),
+        );
         const gone = await must(`SearchObject ${INCLUDE}`, () =>
           handleSearchObject(context, { object_name: INCLUDE }),
         );
@@ -550,22 +509,27 @@ systemsDescribe(['onprem'], 'Include High-Level Handlers Integration', () => {
       }
 
       // A second include through the compact create and delete.
-      await must(`HandlerCreate INCLUDE ${COMPACT_INCLUDE}`, () =>
-        handleHandlerCreate(context, {
-          object_type: 'INCLUDE',
-          include_name: COMPACT_INCLUDE,
-          package_name: PACKAGE,
-          description,
-        }),
+      await run.create(
+        'include',
+        COMPACT_INCLUDE,
+        `HandlerCreate INCLUDE ${COMPACT_INCLUDE}`,
+        () =>
+          handleHandlerCreate(context, {
+            object_type: 'INCLUDE',
+            include_name: COMPACT_INCLUDE,
+            package_name: PACKAGE,
+            description,
+          }),
       );
-      created.push({ kind: 'include', name: COMPACT_INCLUDE });
-      await must(`HandlerDelete INCLUDE ${COMPACT_INCLUDE}`, () =>
-        handleHandlerDelete(context, {
-          object_type: 'INCLUDE',
-          include_name: COMPACT_INCLUDE,
-        }),
+      await run.remove(
+        COMPACT_INCLUDE,
+        `HandlerDelete INCLUDE ${COMPACT_INCLUDE}`,
+        () =>
+          handleHandlerDelete(context, {
+            object_type: 'INCLUDE',
+            include_name: COMPACT_INCLUDE,
+          }),
       );
-      forget(COMPACT_INCLUDE);
     });
   });
 });

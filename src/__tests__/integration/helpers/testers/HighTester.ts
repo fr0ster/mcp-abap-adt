@@ -12,8 +12,11 @@ import type {
   ToolArgs,
 } from '../../../../lib/handlers/interfaces';
 import { getCleanupAfter } from '../configHelpers';
+import { heldLocksOf } from '../heldLiveLocks';
 import type { LoggerWithExtras } from '../loggerHelpers';
+import { ownedObjectsOf } from '../ownedObjects';
 import { skipRunningTest } from '../runningTest';
+import { outcomeOf, StepFailure, type StepOutcome } from '../stepOutcome';
 import type { CaseParams } from '../testConfigSchema';
 import { createHandlerContext, delay } from '../testHelpers';
 import { thrownStatus, thrownWords } from '../thrownValue';
@@ -128,6 +131,59 @@ function thrownResponseText(error: unknown): string {
 }
 
 /**
+ * Whether a failed step may be sent again as a transient conflict after a
+ * delete and create (#394, spec §2): only a step SAP answered and refused
+ * (`refused`) — never one that failed on the network, unclassified, in a lost
+ * session or after a credential refusal, whatever its words —, and then only
+ * under the conflict rule: a `409` (the stale TADIR entry; SAP's advice:
+ * "Repeat the function"), or SAP not yet past a prior deletion
+ * (`SWB_TOOL019`, "description is missing", the object directory entry).
+ */
+export function isTransientConflict(
+  outcome: StepOutcome,
+  status: number | undefined,
+  text: string,
+): boolean {
+  if (outcome !== 'refused') return false;
+  return (
+    status === 409 ||
+    text.includes('object directory entry') ||
+    text.includes('already exists') ||
+    text.includes('SWB_TOOL') ||
+    text.includes('description is missing')
+  );
+}
+
+/**
+ * A soft step's answer applied to its connection's locks: a lock it left
+ * behind taken in. A lost session is the wire's to attribute, to the
+ * connection it happened on (`observeWire`) — never the run connection's
+ * for a sibling's answer.
+ */
+export function softOutcomeApplied(
+  connection: object,
+  _outcome: StepOutcome,
+  answer: { content?: { text?: string }[] } | undefined,
+): void {
+  const locks = heldLocksOf(connection);
+  if (answer !== undefined) locks.takeInLeftLocked(answer);
+}
+
+/** A failed answer's integer `status`, if its payload states one. */
+function statusOf(text: string): number | undefined {
+  try {
+    const payload: unknown = JSON.parse(text);
+    const status =
+      typeof payload === 'object' && payload !== null
+        ? Reflect.get(payload, 'status')
+        : undefined;
+    return Number.isInteger(status) ? Number(status) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * @deprecated Use LambdaTester instead
  */
 export class HighTester extends LambdaTester {
@@ -189,16 +245,30 @@ export class HighTester extends LambdaTester {
             logger: logger || undefined,
           });
           const deleteArgs = this.buildDeleteArgs(context);
-          const deleteResponse = await deleteFunction.call(
-            handlerContext,
-            deleteArgs,
+          // Sent once (#394, spec §5): a delete already sent and not
+          // answered ok is not sent again.
+          const sent = await ownedObjectsOf(connection).delete(objectName, () =>
+            deleteFunction.call(handlerContext, deleteArgs),
           );
-
-          if (deleteResponse?.isError) {
+          // A lock the delete's own handler left behind is still owned.
+          if (sent !== undefined) {
+            softOutcomeApplied(
+              connection,
+              sent.outcome,
+              'answer' in sent ? sent.answer : undefined,
+            );
+          }
+          if (sent === undefined) {
+            logger?.warn?.(
+              `cleanup: deletion of ${objectName} unconfirmed: its delete was sent before and not answered ok; not sent again`,
+            );
+          } else if (sent.outcome !== 'ok') {
             const errorMsg =
-              deleteResponse.content?.[0]?.text || 'Unknown error';
+              'answer' in sent
+                ? sent.answer.content?.[0]?.text || 'Unknown error'
+                : thrownWords(sent.thrown);
             logger?.error?.(
-              `Delete failed: ${errorMsg}. Object left in SAP system.`,
+              `Delete failed (${sent.outcome}): ${errorMsg}. Object left in SAP system.`,
             );
           } else {
             logger?.success?.(`✅ cleanup: deleted ${objectName} successfully`);
@@ -238,22 +308,31 @@ export class HighTester extends LambdaTester {
       await this.runInHardMode();
       return;
     }
+    this.locksAtStart();
 
+    const connection = this.context.connection;
     const handlerContext = createHandlerContext({
-      connection: this.context.connection,
+      connection,
       logger: this.context.logger,
     });
     const logger = this.context.logger;
     const { create, update } = this.workflowFunctions;
+    const objectName = this.context.objectName;
 
     try {
-      // Execute create workflow
+      // Execute create workflow: the object is owned before the create is
+      // sent, so a create whose answer was lost is still deleted (#394).
       {
-        logger?.info(`   • create ${this.context.objectName}`);
+        logger?.info(`   • create ${objectName}`);
         const args = this.buildCreateArgs(this.context);
-        await this.retryOnConflict(
-          () => create.call(handlerContext, args),
-          `Create ${this.context.objectName}`,
+        await this.softStep(
+          () =>
+            objectName
+              ? ownedObjectsOf(connection).create('object', objectName, () =>
+                  create.call(handlerContext, args),
+                )
+              : outcomeOf(() => create.call(handlerContext, args)),
+          `Create ${objectName}`,
           logger,
           5,
           8000,
@@ -263,11 +342,11 @@ export class HighTester extends LambdaTester {
 
       // Execute update workflow
       {
-        logger?.info(`   • update ${this.context.objectName}`);
+        logger?.info(`   • update ${objectName}`);
         const args = this.buildUpdateArgs(this.context);
-        await this.retryOnConflict(
-          () => update.call(handlerContext, args),
-          `Update ${this.context.objectName}`,
+        await this.softStep(
+          () => outcomeOf(() => update.call(handlerContext, args)),
+          `Update ${objectName}`,
           logger,
         );
         logger?.info(`   ✅ update completed`);
@@ -345,6 +424,52 @@ export class HighTester extends LambdaTester {
   }
 
   /**
+   * A soft-mode step (#394, spec §2): its outcome read from typed fields, a
+   * lock its handler left behind (`left_locked`) taken into the connection's
+   * registry, and any outcome but `ok` ends the test. A step SAP refused
+   * with a transient conflict is sent again (`isTransientConflict`); nothing
+   * else ever is.
+   */
+  private async softStep(
+    send: () => Promise<
+      | { outcome: StepOutcome; answer: { content?: { text?: string }[] } }
+      | { outcome: StepOutcome; thrown: unknown }
+    >,
+    label: string,
+    logger?: LoggerWithExtras | null,
+    maxRetries = 2,
+    delayMs = 3000,
+  ): Promise<void> {
+    const connection = this.context?.connection;
+    // The one retry site (`retryOnConflict`): a failed step is thrown as a
+    // `StepFailure`, which it sends again only under `isTransientConflict`.
+    await this.retryOnConflict(
+      async () => {
+        const sent = await send();
+        const text =
+          'answer' in sent
+            ? (sent.answer.content?.[0]?.text ?? '')
+            : thrownWords(sent.thrown);
+        if (connection !== undefined) {
+          softOutcomeApplied(
+            connection,
+            sent.outcome,
+            'answer' in sent ? sent.answer : undefined,
+          );
+        }
+        if (sent.outcome === 'ok') return;
+        const status =
+          'answer' in sent ? statusOf(text) : thrownStatus(sent.thrown);
+        throw new StepFailure(label, sent.outcome, text, status);
+      },
+      label,
+      logger,
+      maxRetries,
+      delayMs,
+    );
+  }
+
+  /**
    * Retry operation on transient SAP errors after delete+create:
    * - HTTP 409 Conflict (TADIR stale entry) — SAP's recommendation: "Repeat the function."
    * - SWB_TOOL019 "description is missing" — SAP hasn't propagated prior deletion yet
@@ -360,15 +485,30 @@ export class HighTester extends LambdaTester {
       try {
         return await operation();
       } catch (error) {
+        // A soft-mode step's failure (#394): sent again only when SAP
+        // refused it with a transient conflict; nothing else ever is.
+        if (error instanceof StepFailure) {
+          if (
+            isTransientConflict(error.outcome, error.status, error.detail) &&
+            attempt < maxRetries
+          ) {
+            logger?.warn?.(
+              `⚠️ ${label}: transient SAP error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
+            );
+            await delay(delayMs);
+            continue;
+          }
+          throw error;
+        }
         const errorMsg = thrownWords(error);
         const responseData = thrownResponseText(error);
-        const isTransientConflict =
+        const transient =
           thrownStatus(error) === 409 ||
           errorMsg.includes('object directory entry') ||
           errorMsg.includes('already exists') ||
           responseData.includes('SWB_TOOL') ||
           responseData.includes('description is missing');
-        if (isTransientConflict && attempt < maxRetries) {
+        if (transient && attempt < maxRetries) {
           logger?.warn?.(
             `⚠️ ${label}: transient SAP error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
           );

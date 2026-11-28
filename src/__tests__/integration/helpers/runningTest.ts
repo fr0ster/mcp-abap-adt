@@ -22,6 +22,11 @@ export function useRunningTest(t: TestContext | undefined): void {
   running = t;
 }
 
+/** The full name of the case running now, if any. */
+export function runningTestName(): string | undefined {
+  return running?.fullName;
+}
+
 const logger = createTestLogger('skip');
 
 /**

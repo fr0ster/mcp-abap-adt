@@ -35,6 +35,7 @@ import {
   liveSuite,
   recordCreated,
 } from '../helpers/live';
+import { isHardModeEnabled } from '../helpers/testers/hardMode';
 
 const SUFFIX = randomBytes(2).toString('hex').toUpperCase();
 const PACKAGE = `$ZMCPTL${SUFFIX}`;
@@ -116,6 +117,10 @@ liveSuite(['onprem'], 'a top-level package', () => {
     }
     held = handle;
 
+    // Soft mode sends the unlock once (#394): it is no longer the after
+    // hook's to send, whatever it answers; the run connection's registry
+    // owns the lock until SAP answered it. Hard mode as on main.
+    if (!isHardModeEnabled()) held = undefined;
     succeeded('HandlerUnlock', await unlock(handle));
     held = undefined;
   });

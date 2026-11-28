@@ -94,7 +94,14 @@ import {
 } from '../../helpers/configHelpers';
 import { assertEquals, assertMatches } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { ownedObjectsOf } from '../../helpers/ownedObjects';
 import { servedSuite } from '../../helpers/servedHere';
+import {
+  type Answer,
+  answerOf,
+  type SoftSteps,
+  softSteps,
+} from '../../helpers/softSteps';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -112,26 +119,6 @@ const TableTypeParams = z.looseObject({
   row_type_name: z.string().optional(),
   update_access_type: z.string().optional(),
 });
-
-/** A tool's answer as the model reads it: the error flag and the first text. */
-type Answer = { isError: boolean; text: string };
-
-/** Read a handler's result (typed `unknown` by the compact routes). */
-function answerOf(value: unknown): Answer {
-  if (typeof value !== 'object' || value === null) {
-    throw new Error(`Not a tool answer: ${String(value)}`);
-  }
-  const isError = 'isError' in value && value.isError === true;
-  const content = 'content' in value ? value.content : undefined;
-  const first: unknown = Array.isArray(content) ? content[0] : undefined;
-  if (typeof first !== 'object' || first === null) return { isError, text: '' };
-  // A text item, or a json item (GetTypeInfo) read as its JSON text.
-  if ('text' in first && typeof first.text === 'string') {
-    return { isError, text: first.text };
-  }
-  if ('json' in first) return { isError, text: JSON.stringify(first.json) };
-  return { isError, text: '' };
-}
 
 /** A field of a parsed JSON value, or `undefined`. */
 function field(value: unknown, key: string): unknown {
@@ -252,65 +239,39 @@ describe('TableType High-Level Handlers Integration', () => {
   /** The package the run works in; its own on premise. */
   let packageName = OWN_PACKAGE;
   let transportRequest: string | undefined;
-  /** What this run created and has not deleted yet, in creation order. */
-  const created: Array<{ kind: 'package' | 'table_type'; name: string }> = [];
-  /** A compact lock this run holds, released before any delete. */
-  let heldLock: { name: string; handle: string } | undefined;
+  /**
+   * The run's steps on its connection (#394): what it created and the locks
+   * it holds are owned there until SAP answered their delete or release,
+   * and nothing is sent twice.
+   */
+  let steps: SoftSteps | undefined;
   /** Each step's answer, for the log the run is read from. */
   const record = (label: string, answer: Answer) =>
     logger?.info(
       `[answer] ${label}: ${answer.isError ? 'isError ' : ''}${answer.text}`,
     );
 
-  const forget = (name: string) => {
-    const index = created.findIndex((entry) => entry.name === name);
-    if (index >= 0) created.splice(index, 1);
-  };
   const transport = () =>
     transportRequest === undefined
       ? {}
       : { transport_request: transportRequest };
 
-  /** Delete everything still listed, the package last. Idempotent. */
+  /** Release every held lock, then delete what is owned, the package last. Each once. */
   const deleteEverything = async () => {
     const context = handlerContext;
-    if (context === undefined) return;
-    if (heldLock !== undefined) {
-      const lock = heldLock;
-      heldLock = undefined;
-      record(
-        `cleanup HandlerUnlock ${lock.name}`,
-        answerOf(
-          await handleHandlerUnlock(context, {
-            object_type: 'TABLE_TYPE',
-            object_name: lock.name,
-            lock_handle: lock.handle,
-          }),
-        ),
-      );
-    }
-    for (const entry of [...created].reverse()) {
-      if (entry.kind !== 'table_type') continue;
-      const answer = answerOf(
-        await handleDeleteTableType(context, {
-          table_type_name: entry.name,
+    if (context === undefined || steps === undefined) return;
+    await steps.cleanUp(['table_type', 'package'], {
+      table_type: (name) =>
+        handleDeleteTableType(context, {
+          table_type_name: name,
           ...transport(),
         }),
-      );
-      record(`cleanup DeleteTableType ${entry.name}`, answer);
-      if (!answer.isError) forget(entry.name);
-    }
-    for (const entry of [...created]) {
-      if (entry.kind !== 'package') continue;
-      const answer = answerOf(
-        await handleDeletePackage(context, {
-          package_name: entry.name,
+      package: (name) =>
+        handleDeletePackage(context, {
+          package_name: name,
           force_new_connection: true,
         }),
-      );
-      record(`cleanup DeletePackage ${entry.name}`, answer);
-      if (!answer.isError) forget(entry.name);
-    }
+    });
   };
 
   before(async () => {
@@ -319,6 +280,8 @@ describe('TableType High-Level Handlers Integration', () => {
       'builder_table_type',
       'ttyp-high',
     );
+    // Whatever the outcome, its after hook deletes what the run created.
+    tester.deletesInItsOwnAfter();
     await tester.beforeAll(
       async (context: LambdaTesterContext) => {
         if (context.hasConfig) {
@@ -326,6 +289,7 @@ describe('TableType High-Level Handlers Integration', () => {
             connection: context.connection,
             logger: context.logger,
           });
+          steps = softSteps(context.connection, record);
         }
       },
       async () => deleteEverything(),
@@ -346,7 +310,7 @@ describe('TableType High-Level Handlers Integration', () => {
         await handleSearchObject(context, { object_name: `${NAME_PREFIX}*` }),
       );
       record(`absence SearchObject ${NAME_PREFIX}*`, tableTypes);
-      assertEquals(created, []);
+      assertEquals(ownedObjectsOf(context.connection).stillOwned, []);
       assert.equal(tableTypes.isError, false);
       assert.equal(tableTypes.text.includes(NAME_PREFIX), false);
       if (packageName === OWN_PACKAGE) {
@@ -383,15 +347,10 @@ describe('TableType High-Level Handlers Integration', () => {
         throw new Error('row_type_name and update_access_type are required');
       }
 
-      /** A step that must succeed: its answer, or the test ends with it. */
-      const must = async (label: string, call: () => Promise<unknown>) => {
-        const answer = answerOf(await call());
-        record(label, answer);
-        if (answer.isError) {
-          throw new Error(`${label} was refused: ${answer.text}`);
-        }
-        return answer;
-      };
+      const run = steps;
+      if (run === undefined) throw new Error('No steps');
+      /** A step that must succeed: its answer, or the test ends with its outcome. */
+      const must = run.must;
 
       if (getSystemType() === 'cloud') {
         // The build package, checked before anything is created; the
@@ -399,19 +358,22 @@ describe('TableType High-Level Handlers Integration', () => {
         packageName = ownPackage();
         transportRequest = resolveTransportRequest(ctx.testCase);
       } else {
-        await must(`CreatePackage ${OWN_PACKAGE}`, () =>
-          handleCreatePackage(
-            context,
-            CreatePackage.inputSchema.parse({
-              package_name: OWN_PACKAGE,
-              super_package: '$TMP',
-              description: `Table type suite run ${RUN}`,
-              package_type: 'development',
-              software_component: 'LOCAL',
-            }),
-          ),
+        await run.create(
+          'package',
+          OWN_PACKAGE,
+          `CreatePackage ${OWN_PACKAGE}`,
+          () =>
+            handleCreatePackage(
+              context,
+              CreatePackage.inputSchema.parse({
+                package_name: OWN_PACKAGE,
+                super_package: '$TMP',
+                description: `Table type suite run ${RUN}`,
+                package_type: 'development',
+                software_component: 'LOCAL',
+              }),
+            ),
         );
-        created.push({ kind: 'package', name: OWN_PACKAGE });
       }
 
       // CreateTableType with a definition, activated: the stored
@@ -429,17 +391,20 @@ describe('TableType High-Level Handlers Integration', () => {
         key_definition: 'standard',
         key_kind: 'nonUnique',
       };
-      const createdAnswer = await must(`CreateTableType ${TABLE_TYPE}`, () =>
-        handleCreateTableType(context, {
-          detail: 'full',
-          table_type_name: TABLE_TYPE,
-          package_name: packageName,
-          description,
-          ...transport(),
-          ...definition,
-        }),
+      const createdAnswer = await run.create(
+        'table_type',
+        TABLE_TYPE,
+        `CreateTableType ${TABLE_TYPE}`,
+        () =>
+          handleCreateTableType(context, {
+            detail: 'full',
+            table_type_name: TABLE_TYPE,
+            package_name: packageName,
+            description,
+            ...transport(),
+            ...definition,
+          }),
       );
-      created.push({ kind: 'table_type', name: TABLE_TYPE });
       const createdStored = storedOf(createdAnswer);
       assertMatches(createdStored, definition);
       // Activated: read after the activation, at the active version.
@@ -573,25 +538,24 @@ describe('TableType High-Level Handlers Integration', () => {
 
       // A definition SAP stores and refuses to activate: the refusal
       // carries what SAP stored.
-      const refused = answerOf(
-        await handleCreateTableType(context, {
-          detail: 'full',
-          table_type_name: REFUSED_TABLE_TYPE,
-          package_name: packageName,
-          description,
-          ...transport(),
-          row_type_kind: 'dictionaryType',
-          row_type_name: rowTypeName,
-          access_type: 'sorted',
-          key_definition: 'empty',
-        }),
-      );
-      record(
+      // Owned whatever the answer: the cleanup deletes what exists.
+      const { answer: refused } = await run.attempt(
+        'table_type',
+        REFUSED_TABLE_TYPE,
         `CreateTableType ${REFUSED_TABLE_TYPE} sorted + empty key`,
-        refused,
+        () =>
+          handleCreateTableType(context, {
+            detail: 'full',
+            table_type_name: REFUSED_TABLE_TYPE,
+            package_name: packageName,
+            description,
+            ...transport(),
+            row_type_kind: 'dictionaryType',
+            row_type_name: rowTypeName,
+            access_type: 'sorted',
+            key_definition: 'empty',
+          }),
       );
-      // Listed whatever the answer: the cleanup deletes what exists.
-      created.push({ kind: 'table_type', name: REFUSED_TABLE_TYPE });
       assert.equal(refused.isError, true);
       assertMatches(storedOf(refused), {
         access_type: 'sorted',
@@ -599,25 +563,30 @@ describe('TableType High-Level Handlers Integration', () => {
       });
       // The activation refused: the inactive version the wait read.
       assert.equal(storedVersionOf(refused), 'inactive');
-      await must(`DeleteTableType ${REFUSED_TABLE_TYPE}`, () =>
-        handleDeleteTableType(context, {
-          table_type_name: REFUSED_TABLE_TYPE,
-          ...transport(),
-        }),
+      await run.remove(
+        REFUSED_TABLE_TYPE,
+        `DeleteTableType ${REFUSED_TABLE_TYPE}`,
+        () =>
+          handleDeleteTableType(context, {
+            table_type_name: REFUSED_TABLE_TYPE,
+            ...transport(),
+          }),
       );
-      forget(REFUSED_TABLE_TYPE);
 
       // Compact: every member on a second table type.
-      await must(`HandlerCreate TABLE_TYPE ${COMPACT_TABLE_TYPE}`, () =>
-        handleHandlerCreate(context, {
-          object_type: 'TABLE_TYPE',
-          table_type_name: COMPACT_TABLE_TYPE,
-          package_name: packageName,
-          description,
-          ...transport(),
-        }),
+      await run.create(
+        'table_type',
+        COMPACT_TABLE_TYPE,
+        `HandlerCreate TABLE_TYPE ${COMPACT_TABLE_TYPE}`,
+        () =>
+          handleHandlerCreate(context, {
+            object_type: 'TABLE_TYPE',
+            table_type_name: COMPACT_TABLE_TYPE,
+            package_name: packageName,
+            description,
+            ...transport(),
+          }),
       );
-      created.push({ kind: 'table_type', name: COMPACT_TABLE_TYPE });
       const bare = await must(
         `HandlerGet TABLE_TYPE ${COMPACT_TABLE_TYPE} metadata`,
         () =>
@@ -632,24 +601,21 @@ describe('TableType High-Level Handlers Integration', () => {
         throw new Error('HandlerGet metadata answered no document');
       }
 
-      const locked = answerOf(
-        await handleHandlerLock(context, {
-          object_type: 'TABLE_TYPE',
-          object_name: COMPACT_TABLE_TYPE,
-        }),
+      const handle = await run.lock(
+        { type: 'TABLE_TYPE', name: COMPACT_TABLE_TYPE },
+        `HandlerLock TABLE_TYPE ${COMPACT_TABLE_TYPE}`,
+        () =>
+          handleHandlerLock(context, {
+            object_type: 'TABLE_TYPE',
+            object_name: COMPACT_TABLE_TYPE,
+          }),
+        (held) =>
+          handleHandlerUnlock(context, {
+            object_type: 'TABLE_TYPE',
+            object_name: COMPACT_TABLE_TYPE,
+            lock_handle: held,
+          }),
       );
-      // The lock's answer carries the handle: never logged.
-      logger?.info(
-        `[answer] HandlerLock TABLE_TYPE ${COMPACT_TABLE_TYPE}: ${locked.isError ? `isError ${locked.text}` : 'locked'}`,
-      );
-      if (locked.isError) {
-        throw new Error(`HandlerLock was refused: ${locked.text}`);
-      }
-      const handle = field(parsed(locked.text), 'lock_handle');
-      if (typeof handle !== 'string' || handle === '') {
-        throw new Error('HandlerLock answered no lock handle');
-      }
-      heldLock = { name: COMPACT_TABLE_TYPE, handle };
       const compactDefinition: {
         row_type_kind: RowTypeKind;
         data_type: string;
@@ -686,14 +652,10 @@ describe('TableType High-Level Handlers Integration', () => {
           ...transport(),
         }),
       );
-      await must(`HandlerUnlock TABLE_TYPE ${COMPACT_TABLE_TYPE}`, () =>
-        handleHandlerUnlock(context, {
-          object_type: 'TABLE_TYPE',
-          object_name: COMPACT_TABLE_TYPE,
-          lock_handle: handle,
-        }),
+      await run.unlock(
+        handle,
+        `HandlerUnlock TABLE_TYPE ${COMPACT_TABLE_TYPE}`,
       );
-      heldLock = undefined;
 
       await must(`HandlerValidate TABLE_TYPE ${FREE_NAME}`, () =>
         handleHandlerValidate(context, {
@@ -769,14 +731,16 @@ describe('TableType High-Level Handlers Integration', () => {
           object_name: COMPACT_TABLE_TYPE,
         }),
       );
-      await must(`HandlerDelete TABLE_TYPE ${COMPACT_TABLE_TYPE}`, () =>
-        handleHandlerDelete(context, {
-          object_type: 'TABLE_TYPE',
-          table_type_name: COMPACT_TABLE_TYPE,
-          ...transport(),
-        }),
+      await run.remove(
+        COMPACT_TABLE_TYPE,
+        `HandlerDelete TABLE_TYPE ${COMPACT_TABLE_TYPE}`,
+        () =>
+          handleHandlerDelete(context, {
+            object_type: 'TABLE_TYPE',
+            table_type_name: COMPACT_TABLE_TYPE,
+            ...transport(),
+          }),
       );
-      forget(COMPACT_TABLE_TYPE);
 
       await must(`ActivateObjects ${TABLE_TYPE} TTYP/DA`, () =>
         handleActivateObjects(context, {
@@ -789,13 +753,12 @@ describe('TableType High-Level Handlers Integration', () => {
         () => handleGetTableType(context, { table_type_name: TABLE_TYPE }),
       );
       assert.equal(definitionOf(activatedRead)?.access_type, 'sorted');
-      await must(`DeleteTableType ${TABLE_TYPE}`, () =>
+      await run.remove(TABLE_TYPE, `DeleteTableType ${TABLE_TYPE}`, () =>
         handleDeleteTableType(context, {
           table_type_name: TABLE_TYPE,
           ...transport(),
         }),
       );
-      forget(TABLE_TYPE);
     });
   });
 });

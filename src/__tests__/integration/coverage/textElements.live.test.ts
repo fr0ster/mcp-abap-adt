@@ -46,6 +46,7 @@ import {
   releaseHeldLocks,
   request,
   succeeded,
+  unlockSending,
 } from './ownObjects';
 
 const SUFFIX = randomBytes(2).toString('hex').toUpperCase();
@@ -362,6 +363,7 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       lock_handle: handle,
       transport_request: request(),
     });
+    unlockSending(String(handle));
     const unlocked = await liveCall('HandlerLock', {
       action: 'unlock',
       object_type: 'PROGRAM_TEXT_ELEMENTS',
@@ -416,6 +418,7 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       lock_handle: handle,
       transport_request: request(),
     });
+    unlockSending(String(handle));
     const unlocked = await liveCall('HandlerLock', {
       action: 'unlock',
       object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
@@ -470,6 +473,7 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       lock_handle: handle,
       transport_request: request(),
     });
+    unlockSending(String(handle));
     const unlocked = await liveCall('HandlerLock', {
       action: 'unlock',
       object_type: 'CLASS_TEXT_ELEMENTS',

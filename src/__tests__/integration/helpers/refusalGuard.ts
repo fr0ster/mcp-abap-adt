@@ -129,6 +129,38 @@ export async function guardedSend<T>(
   }
 }
 
+/**
+ * What watches a guarded connection's wire (#394): the soft-mode lock
+ * registry (`heldLiveLocks.ts`) registers one, so every LOCK and UNLOCK a
+ * run connection sends — a suite's, a handler's own, the in-process
+ * server's — and every session it loses reach that connection's registry.
+ * Registered here, not imported, so this file stays free of the registry.
+ */
+export interface WireObserver {
+  sending(connection: GuardedConnection, options: IAbapRequestOptions): void;
+  answered(
+    connection: GuardedConnection,
+    options: IAbapRequestOptions,
+    response: {
+      readonly data?: unknown;
+      readonly headers?: unknown;
+      readonly sessionLost?: unknown;
+    },
+  ): void;
+  threw(
+    connection: GuardedConnection,
+    options: IAbapRequestOptions,
+    thrown: unknown,
+  ): void;
+}
+
+const wireObservers: WireObserver[] = [];
+
+/** Registers an observer of every guarded connection's wire. */
+export function observeWire(observer: WireObserver): void {
+  wireObservers.push(observer);
+}
+
 /** The members of a connection the helpers and the server read. */
 export type GuardedConnection = Pick<
   CreatedConnection,
@@ -161,10 +193,26 @@ export function refusalGuardedConnection(
 ): GuardedConnection {
   const guarded: GuardedConnection = {
     connect: () => guardedSend('a logon', () => connection.connect()),
-    makeAdtRequest: <T = unknown, D = unknown>(options: IAbapRequestOptions) =>
-      guardedSend(`${options.method ?? 'a request'} ${options.url}`, () =>
-        connection.makeAdtRequest<T, D>(options),
-      ),
+    makeAdtRequest: async <T = unknown, D = unknown>(
+      options: IAbapRequestOptions,
+    ) => {
+      for (const observer of wireObservers) observer.sending(guarded, options);
+      try {
+        const response = await guardedSend(
+          `${options.method ?? 'a request'} ${options.url}`,
+          () => connection.makeAdtRequest<T, D>(options),
+        );
+        for (const observer of wireObservers) {
+          observer.answered(guarded, options, response);
+        }
+        return response;
+      } catch (error) {
+        for (const observer of wireObservers) {
+          observer.threw(guarded, options, error);
+        }
+        throw error;
+      }
+    },
     disconnect: () => guardedSend('a logoff', () => connection.disconnect()),
     flushGoodbye: (timeoutMs) => connection.flushGoodbye(timeoutMs),
     getBaseUrl: () => connection.getBaseUrl(),

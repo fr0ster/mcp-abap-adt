@@ -43,6 +43,9 @@ import { handleUpdateDdl } from '../../../handlers/ddl/low/handleUpdateDdl';
 import { handleGetInactiveObjects } from '../../../handlers/system/readonly/handleGetInactiveObjects';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { assertNotSharedDependency } from './configHelpers';
+import { heldLocksOf } from './heldLiveLocks';
+import { ownedObjectsOf } from './ownedObjects';
+import { answerOutcome, thrownOutcome } from './stepOutcome';
 import {
   delay,
   extractErrorMessage,
@@ -117,6 +120,14 @@ async function writeViewSource(
   }
   const lockData = handlerAnswer(locked, z.looseObject({}));
   const lockHandle = extractLockHandle(lockData);
+  // Owned until SAP answered its unlock (#394): the unlock below is sent
+  // once; a lock it did not release stays owned and is reported.
+  const locks = heldLocksOf(context.connection);
+  locks.hold({
+    object_type: 'ddl',
+    object_name: view.name,
+    lock_handle: lockHandle,
+  });
 
   const failures: string[] = [];
   try {
@@ -126,24 +137,26 @@ async function writeViewSource(
       lock_handle: lockHandle,
       ...(transportRequest && { transport_request: transportRequest }),
     })) as HandlerAnswer;
-    if (written.isError) {
-      failures.push(`write refused: ${extractErrorMessage(written)}`);
-    }
+    const failure = writeAnswered(context.connection, written);
+    if (failure !== undefined) failures.push(failure);
   } catch (error: unknown) {
     failures.push(`write threw: ${(error as Error)?.message ?? String(error)}`);
   }
+  locks.unlockSent(lockHandle);
   try {
     const released = (await handleUnlockObject(context, {
       object_type: 'ddl',
       object_name: view.name,
       lock_handle: lockHandle,
     })) as HandlerAnswer;
+    locks.unlockAnswered(lockHandle, answerOutcome(released));
     if (released.isError) {
       failures.push(
         `the lock was NOT released and stays on ${view.name}: ${extractErrorMessage(released)}`,
       );
     }
   } catch (error: unknown) {
+    locks.unlockAnswered(lockHandle, thrownOutcome(error));
     failures.push(
       `the lock was NOT released and stays on ${view.name}: ${(error as Error)?.message ?? String(error)}`,
     );
@@ -151,6 +164,19 @@ async function writeViewSource(
   if (failures.length > 0) {
     throw new Error(`${view.name}: ${failures.join('; ')}`);
   }
+}
+
+/** What a view's write answered, as a failure line; `undefined` when it is ok. */
+export function writeAnswered(
+  connection: object,
+  written: HandlerAnswer,
+): string | undefined {
+  const locks = heldLocksOf(connection);
+  locks.takeInLeftLocked(written);
+  const outcome = answerOutcome(written);
+  return outcome === 'ok'
+    ? undefined
+    : `write failed (${outcome}): ${extractErrorMessage(written)}`;
 }
 
 /**
@@ -179,12 +205,22 @@ export async function createView(
   );
 
   logger?.info?.(`   * create view: ${view.name}`);
-  const created = (await handleCreateDdl(context, {
-    ddl_name: view.name,
-    description: view.description,
-    package_name: packageName,
-    ...(transportRequest && { transport_request: transportRequest }),
-  })) as HandlerAnswer;
+  // Owned before it is sent (#394): a create whose answer was lost is
+  // still deleted by the cleanup.
+  let created: HandlerAnswer = { isError: true, content: [] };
+  await ownedObjectsOf(context.connection).create(
+    'view',
+    view.name,
+    async () => {
+      created = (await handleCreateDdl(context, {
+        ddl_name: view.name,
+        description: view.description,
+        package_name: packageName,
+        ...(transportRequest && { transport_request: transportRequest }),
+      })) as HandlerAnswer;
+      return created;
+    },
+  );
   if (created.isError) {
     throw new Error(
       `create view ${view.name}: ${extractErrorMessage(created)}`,
@@ -227,10 +263,24 @@ export async function deleteView(
     return [message];
   }
   try {
-    const deleted = (await handleDeleteDdl(context, {
-      ddl_name: view.name,
-      ...(transportRequest && { transport_request: transportRequest }),
-    })) as HandlerAnswer;
+    // Sent once (#394): a delete already sent and not answered ok is not
+    // sent again.
+    let deleted: HandlerAnswer = { isError: true, content: [] };
+    const sent = await ownedObjectsOf(context.connection).delete(
+      view.name,
+      async () => {
+        deleted = (await handleDeleteDdl(context, {
+          ddl_name: view.name,
+          ...(transportRequest && { transport_request: transportRequest }),
+        })) as HandlerAnswer;
+        return deleted;
+      },
+    );
+    if (sent === undefined) {
+      const detail = `view ${view.name}: deletion unconfirmed; its delete was sent before and not answered ok, not sent again`;
+      logger?.error?.(detail);
+      return [detail];
+    }
     if (deleted.isError) {
       const detail = extractErrorMessage(deleted);
       // A view the run never got as far as creating is not a leftover.

@@ -13,9 +13,11 @@ import {
   resolvePackageName,
   resolveTransportRequest,
 } from '../helpers/configHelpers';
-import { HeldLiveLocks, type HeldLock } from '../helpers/heldLiveLocks';
+import type { HeldLock } from '../helpers/heldLiveLocks';
 import { type LiveAnswer, livePrepare } from '../helpers/live';
+import { liveLocks, liveSucceeded } from '../helpers/liveSteps';
 import { CREATION_PACKAGES } from '../helpers/packageGuard';
+import { isHardModeEnabled } from '../helpers/testers/hardMode';
 
 /** Whether the configured system is the on-premise one. */
 export const onPremise = (): boolean => configuredSystemKind() === 'onprem';
@@ -52,10 +54,12 @@ export function onRequest(): { transport_request?: string } {
   return given === undefined ? {} : { transport_request: given };
 }
 
-/** The answer, or the case fails naming the step and what was answered. */
+/**
+ * The answer, or the case fails naming the step and what was answered — in
+ * soft mode by the answer's outcome (`liveSucceeded`, #394).
+ */
 export function succeeded(step: string, answer: LiveAnswer): LiveAnswer {
-  if (answer.isError) throw new Error(`${step}: ${answer.text}`);
-  return answer;
+  return liveSucceeded(step, answer);
 }
 
 /** A member of a JSON value, read by shape. */
@@ -70,8 +74,22 @@ export function payloadOf(answer: LiveAnswer): unknown {
   return JSON.parse(answer.text);
 }
 
-/** The compact locks the suites' cases hold until SAP answers their unlock. */
-const heldLocks = new HeldLiveLocks();
+/**
+ * The compact locks the suites' cases hold until SAP answers their unlock:
+ * the run connection's registry in soft mode (#394), so the file's close
+ * sees them.
+ */
+const heldLocks = {
+  hold: (lock: HeldLock) => liveLocks().hold(lock),
+  released: (handle: string) => liveLocks().released(handle),
+  unlockSent: (handle: string) => liveLocks().unlockSent(handle),
+  releaseAll: (
+    ...args: Parameters<ReturnType<typeof liveLocks>['releaseAll']>
+  ) => liveLocks().releaseAll(...args),
+  get stillOwned() {
+    return liveLocks().stillOwned;
+  },
+};
 
 /** Records a lock handle the case now holds. */
 export function holdLock(lock: HeldLock): void {
@@ -84,6 +102,16 @@ export function lockReleased(handle: string): void {
 }
 
 /**
+ * The case is about to send the unlock of `handle`. In soft mode the lock is
+ * then `unlock-sent` and the suite's end does not send it again (#394:
+ * nothing is resent); hard mode keeps its own behaviour, the suite's end
+ * unlocking what is still held.
+ */
+export function unlockSending(handle: string): void {
+  if (!isHardModeEnabled()) heldLocks.unlockSent(handle);
+}
+
+/**
  * The unlock of every lock a case still holds, each attempted whatever the
  * others answered; a lock SAP still holds is named in the suite's output,
  * and the suite goes on to its deletions.
@@ -93,4 +121,16 @@ export async function releaseHeldLocks(): Promise<void> {
     (lock) => livePrepare('HandlerLock', { action: 'unlock', ...lock }),
     (line) => console.log(`[held locks] ${line}`),
   );
+}
+
+/**
+ * Names every lock a case still holds, sending nothing: for a suite whose
+ * cases send their unlock themselves, once.
+ */
+export function reportHeldLocks(): void {
+  for (const { lock, state } of heldLocks.stillOwned) {
+    console.log(
+      `[held locks] still held (${state}): ${lock.object_type} ${lock.object_name}`,
+    );
+  }
 }

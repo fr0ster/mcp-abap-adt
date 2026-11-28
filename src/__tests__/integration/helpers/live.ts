@@ -80,16 +80,19 @@ import {
 import { getTestDestination } from './authHelpers';
 import { configuredSystemKind } from './configHelpers';
 import { NO_KIND_STATED } from './configuredSystemKind';
+import { heldLocksOf, leavesALock } from './heldLiveLocks';
 import { closeEvery } from './launchedServers';
 import { endTestConnection, trackConnection } from './openConnections';
 import { primeSystemContext } from './primeSystemContext';
 import {
   credentialRefused,
+  type GuardedConnection,
   guardedTestConnection,
   markCredentialRefused,
   refusalAnswered,
   refuseAfterMarker,
 } from './refusalGuard';
+import { answerOutcome, StepFailure } from './stepOutcome';
 import { testConfigPathFromEnv } from './testConfigPath';
 import {
   createHardModeClient,
@@ -358,6 +361,25 @@ export function hasTestConfig(): boolean {
   );
 }
 
+const fileConnections = new Map<SystemKind, Promise<GuardedConnection>>();
+
+/**
+ * The file's run connection of `kind` (#394): opened and logged on once,
+ * every suite of the file takes it, and the file's close logs it off (it is
+ * tracked). A failed open is not kept: the next suite opens again.
+ */
+export function fileRunConnection(
+  kind: SystemKind,
+  open: () => Promise<GuardedConnection>,
+): Promise<GuardedConnection> {
+  const known = fileConnections.get(kind);
+  if (known !== undefined) return known;
+  const opened = open();
+  fileConnections.set(kind, opened);
+  opened.catch(() => fileConnections.delete(kind));
+  return opened;
+}
+
 /** The runner of a live run on the configured destination. */
 async function liveRunner(system: SystemKind): Promise<LiveRunner> {
   const destination = await getTestDestination();
@@ -368,13 +390,23 @@ async function liveRunner(system: SystemKind): Promise<LiveRunner> {
     guardedTestConnection(destination.settings, destination.credential, {
       kind: system,
     });
-  const connection = trackConnection(open());
-  await connection.connect();
-  // The responsible person and master system a change is made for, as the
-  // integration testers state them.
-  await primeSystemContext(connection);
   const user = destination.settings.username ?? '';
-  if (isHardModeEnabled()) return hardRunner(system, user, connection);
+  const logOn = async () => {
+    const connection = trackConnection(open());
+    await connection.connect();
+    // The responsible person and master system a change is made for, as
+    // the integration testers state them.
+    await primeSystemContext(connection);
+    return connection;
+  };
+  if (isHardModeEnabled()) return hardRunner(system, user, await logOn());
+  // Soft mode: one run connection per file (#394), every suite's; its
+  // registry sees its wire from the first request on.
+  const connection = await fileRunConnection(system, async () => {
+    const opened = await logOn();
+    heldLocksOf(opened);
+    return opened;
+  });
   // The in-process server uses the guarded connection as given; its fresh
   // connections are guarded siblings.
   return softRunner({
@@ -430,7 +462,9 @@ export function liveSuite(
     () => liveRunner(kind),
     async (ending) => {
       await ending.close();
-      await endTestConnection(ending.connection());
+      // Soft mode: the file's one run connection is logged off by the
+      // file's close (it is tracked), after every suite of the file.
+      if (isHardModeEnabled()) await endTestConnection(ending.connection());
     },
     body,
   );
@@ -647,6 +681,24 @@ async function send(tool: string, args: ToolArgs): Promise<LiveAnswer> {
   refuseAfterStop(tool);
   const answer = await current().call(tool, args);
   if (isCredentialRefusal(answer)) markCredentialRefused();
+  return judgedInSoftMode(tool, answer);
+}
+
+/**
+ * Soft mode (#394): a lock the answer left behind is taken into the run
+ * connection's registry, and a success that is not `ok` by its outcome — its
+ * own unlock failed on the network, or its lock went with a lost session —
+ * ends the step, whatever the suite checks of the answer. A failure answer
+ * is the suite's to judge, as before. Hard mode: the answer as it came.
+ */
+function judgedInSoftMode(tool: string, answer: LiveAnswer): LiveAnswer {
+  if (isHardModeEnabled()) return answer;
+  if (leavesALock(answer)) {
+    heldLocksOf(current().connection()).takeInLeftLocked(answer);
+  }
+  if (answer.isError) return answer;
+  const outcome = answerOutcome(answer);
+  if (outcome !== 'ok') throw new StepFailure(tool, outcome, answer.text);
   return answer;
 }
 
@@ -673,7 +725,7 @@ export async function liveCall(
   });
   const answer = await run.call(tool, args);
   if (isCredentialRefusal(answer)) markCredentialRefused();
-  return answer;
+  return judgedInSoftMode(tool, answer);
 }
 
 /**
@@ -728,6 +780,8 @@ export async function expectNameFree(read: LiveRead): Promise<void> {
 
 /** What the test created, each with the delete that removes it, in creation order. */
 const created: Array<{ tool: string; args: ToolArgs }> = [];
+/** Soft mode: deletes sent and not answered ok — never sent again (#394). */
+const deleteSent: Array<{ tool: string; args: ToolArgs }> = [];
 
 /** Records an object the test created, with the call that deletes it. */
 export function recordCreated(deleteTool: string, args: ToolArgs): void {
@@ -743,6 +797,56 @@ export function recordCreated(deleteTool: string, args: ToolArgs): void {
  * leftovers report, and the cleanup fails.
  */
 export async function deleteRecorded(): Promise<void> {
+  if (isHardModeEnabled()) return deleteRecordedInHardMode();
+  const failures: string[] = [];
+  try {
+    for (let at = created.length - 1; at >= 0; at -= 1) {
+      const record = created[at];
+      if (record === undefined) continue;
+      // Refused before anything is sent (the marker, the stop): the record
+      // stays, not sent.
+      refuseAfterMarker(record.tool);
+      refuseAfterStop(record.tool);
+      // Sent once (#394): recorded as sent before it is sent; one not
+      // answered ok is never sent again, and is reported.
+      created.splice(at, 1);
+      deleteSent.push(record);
+      const names = Object.values(record.args).filter(
+        (value): value is string => typeof value === 'string',
+      );
+      let answer: LiveAnswer;
+      try {
+        answer = await send(record.tool, record.args);
+      } catch (error) {
+        failures.push(
+          `${record.tool} ${JSON.stringify(record.args)}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        continue;
+      }
+      // Judged by its outcome: a success whose own unlock failed is not
+      // done (send() ends it above); an absent object is.
+      const done =
+        answerOutcome(answer) === 'ok' ||
+        isNotFound(answer) ||
+        isGoneOnDelete(answer, names);
+      if (done) {
+        deleteSent.splice(deleteSent.indexOf(record), 1);
+      } else {
+        failures.push(
+          `${record.tool} ${JSON.stringify(record.args)}: ${answer.text}`,
+        );
+      }
+    }
+  } finally {
+    if (created.length > 0 || deleteSent.length > 0) reportRemaining();
+  }
+  if (failures.length > 0) {
+    throw new Error(`cleanup failed:\n${failures.join('\n')}`);
+  }
+}
+
+/** Hard mode's cleanup, as on main: a failed delete keeps its record. */
+async function deleteRecordedInHardMode(): Promise<void> {
   const failures: string[] = [];
   const kept: Array<{ tool: string; args: ToolArgs }> = [];
   try {
@@ -833,6 +937,11 @@ export function recordTransportEntry(entry: {
 function reportRemaining(): void {
   for (const record of created) {
     reportLeftover(`object ${record.tool} ${JSON.stringify(record.args)}`);
+  }
+  for (const record of deleteSent) {
+    reportLeftover(
+      `object ${record.tool} ${JSON.stringify(record.args)} (deletion unconfirmed: sent once, not answered ok)`,
+    );
   }
   for (const transportNumber of createdRequests) {
     reportLeftover(`request ${transportNumber}`);
@@ -1196,6 +1305,7 @@ export function leftovers(): string[] {
 /** Forgets every record of this module: for the live helpers' own tests, between cases. */
 export function resetLiveRecords(): void {
   created.length = 0;
+  deleteSent.length = 0;
   createdRequests.length = 0;
   journal.length = 0;
   configured.clear();

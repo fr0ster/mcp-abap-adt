@@ -45,6 +45,7 @@ import {
   releaseHeldLocks,
   request,
   succeeded,
+  unlockSending,
 } from './ownObjects';
 
 const SUFFIX = randomBytes(2).toString('hex').toUpperCase();
@@ -146,6 +147,7 @@ liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
       lock_handle: handle,
       transport_request: request(),
     });
+    unlockSending(String(handle));
     const unlocked = await liveCall('HandlerLock', {
       action: 'unlock',
       object_type: 'TABLE_SETTINGS',

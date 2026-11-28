@@ -153,7 +153,10 @@ const WRITE_VERBS = [
   'Move',
   'SortAndCompress',
 ];
+/** Named by a write verb, they change nothing in SAP: a read envelope lives in the server instance. */
+const READ_ONLY_BY_NAME = new Set(['CreateReadEnvelope']);
 function isWriteTool(name) {
+  if (READ_ONLY_BY_NAME.has(name)) return false;
   let rest = name.startsWith('Handler') ? name.slice('Handler'.length) : name;
   if (rest.startsWith('Transport')) rest = rest.slice('Transport'.length);
   return (

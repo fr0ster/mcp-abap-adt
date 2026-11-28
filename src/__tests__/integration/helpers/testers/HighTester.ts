@@ -154,6 +154,18 @@ export function isTransientConflict(
   );
 }
 
+/** A soft step's outcome applied to its connection's locks. */
+export function softOutcomeApplied(
+  connection: object,
+  outcome: StepOutcome,
+  answer: { content?: { text?: string }[] } | undefined,
+): void {
+  const locks = heldLocksOf(connection);
+  if (answer !== undefined) locks.takeInLeftLocked(answer);
+  // A lost session ended every lock of it (SAP released them).
+  if (outcome === 'session-lost') locks.sessionLost();
+}
+
 /** A failed answer's integer `status`, if its payload states one. */
 function statusOf(text: string): number | undefined {
   try {
@@ -235,6 +247,14 @@ export class HighTester extends LambdaTester {
           const sent = await ownedObjectsOf(connection).delete(objectName, () =>
             deleteFunction.call(handlerContext, deleteArgs),
           );
+          // A lock the delete's own handler left behind is still owned.
+          if (sent !== undefined) {
+            softOutcomeApplied(
+              connection,
+              sent.outcome,
+              'answer' in sent ? sent.answer : undefined,
+            );
+          }
           if (sent === undefined) {
             logger?.warn?.(
               `cleanup: deletion of ${objectName} unconfirmed: its delete was sent before and not answered ok; not sent again`,
@@ -426,8 +446,12 @@ export class HighTester extends LambdaTester {
           'answer' in sent
             ? (sent.answer.content?.[0]?.text ?? '')
             : thrownWords(sent.thrown);
-        if ('answer' in sent && connection !== undefined) {
-          heldLocksOf(connection).takeInLeftLocked(sent.answer);
+        if (connection !== undefined) {
+          softOutcomeApplied(
+            connection,
+            sent.outcome,
+            'answer' in sent ? sent.answer : undefined,
+          );
         }
         if (sent.outcome === 'ok') return;
         const status =

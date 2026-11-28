@@ -139,6 +139,8 @@ export function softSteps(
     step: { answer: Answer; outcome: ReturnType<typeof answerOutcome> },
   ): Answer => {
     locks.takeInLeftLocked(asResult(step.answer));
+    // A lost session ended every lock of it (SAP released them).
+    if (step.outcome === 'session-lost') locks.sessionLost();
     record(label, step.answer);
     if (step.outcome !== 'ok') {
       throw new StepFailure(label, step.outcome, step.answer.text);
@@ -207,6 +209,7 @@ export function softSteps(
       owned.mayExist(kind, name);
       const step = await sent(call);
       locks.takeInLeftLocked(asResult(step.answer));
+      if (step.outcome === 'session-lost') locks.sessionLost();
       record(label, step.answer);
       return step;
     },
@@ -249,6 +252,9 @@ export function softSteps(
           await owned.delete(name, async () => {
             const step = await sent(() => deleter(name));
             answer = step.answer;
+            // A lock the delete's own handler left behind is still owned.
+            locks.takeInLeftLocked(asResult(step.answer));
+            if (step.outcome === 'session-lost') locks.sessionLost();
             return asResult(step.answer);
           });
           record(`cleanup delete ${kind} ${name}`, answer);

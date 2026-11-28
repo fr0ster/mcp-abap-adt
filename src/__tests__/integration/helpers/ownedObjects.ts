@@ -106,10 +106,16 @@ export class OwnedObjects {
     name: string,
     call: () => Promise<T>,
   ): Promise<Sent<T> | undefined> {
-    const entry = this.find(name);
-    if (entry?.state === 'delete-sent') return undefined;
-    const wasUnconfirmed = entry?.state === 'unconfirmed';
-    if (entry !== undefined) entry.state = 'delete-sent';
+    const found = this.find(name);
+    if (found?.state === 'delete-sent') return undefined;
+    const wasUnconfirmed = found?.state === 'unconfirmed';
+    // Recorded before it is sent, whoever made the object: a delete is sent
+    // once even for a name nobody recorded.
+    if (found === undefined) {
+      this.owned.push({ kind: 'unrecorded', name, state: 'delete-sent' });
+    } else {
+      found.state = 'delete-sent';
+    }
     const sent = await send(call);
     const gone =
       sent.outcome === 'ok' ||

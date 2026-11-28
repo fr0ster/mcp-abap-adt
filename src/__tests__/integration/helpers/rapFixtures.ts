@@ -137,10 +137,8 @@ async function writeViewSource(
       lock_handle: lockHandle,
       ...(transportRequest && { transport_request: transportRequest }),
     })) as HandlerAnswer;
-    locks.takeInLeftLocked(written);
-    if (written.isError) {
-      failures.push(`write refused: ${extractErrorMessage(written)}`);
-    }
+    const failure = writeAnswered(context.connection, written);
+    if (failure !== undefined) failures.push(failure);
   } catch (error: unknown) {
     failures.push(`write threw: ${(error as Error)?.message ?? String(error)}`);
   }
@@ -166,6 +164,21 @@ async function writeViewSource(
   if (failures.length > 0) {
     throw new Error(`${view.name}: ${failures.join('; ')}`);
   }
+}
+
+/** What a view's write answered, as a failure line; `undefined` when it is ok. */
+export function writeAnswered(
+  connection: object,
+  written: HandlerAnswer,
+): string | undefined {
+  const locks = heldLocksOf(connection);
+  locks.takeInLeftLocked(written);
+  const outcome = answerOutcome(written);
+  // A lost session ended every lock of it (SAP released them).
+  if (outcome === 'session-lost') locks.sessionLost();
+  return outcome === 'ok'
+    ? undefined
+    : `write failed (${outcome}): ${extractErrorMessage(written)}`;
 }
 
 /**

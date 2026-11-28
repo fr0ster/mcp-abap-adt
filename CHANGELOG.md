@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - every step's outcome is read from the answer's typed fields, any outcome but `ok` ends the test, and nothing is sent twice;
   - locks and created objects are owned by the connection until SAP answered their release or delete;
   - cleanup releases every held lock before the YAML policy decides about deletes;
+  - every soft-mode `liveSuite` of a file shares the file's one run connection, and the coverage suites' locks are that connection's;
   - the package delete keeps its own lock-free sibling session (PAK/058);
   - a soft-mode connection that still owns a lock, or an object whose create or delete is unconfirmed, fails the file at its logoff and names what is left.
 

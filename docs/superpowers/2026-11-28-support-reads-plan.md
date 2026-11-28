@@ -48,6 +48,42 @@ its spec section.
 
   A step that adds or changes a tool, a compact type or an action regenerates every file in
   this list that the tool or entry appears in.
+- **Lists an entry must join.** A search of `src/` and `src/__tests__` for the lists that
+  name every long tool, every `HandlerSystem` action or every `HandlerGet` type found the
+  ones below. Each is changed in the same step as the entry it lists. Lists that are only
+  samples (some tools or actions, for one test's cases) are not listed here.
+  - **A full tool that declares `detail`** (steps 8–11): `JSON_ANSWERING` in
+    `detailSurface.test.ts`, which compares its exact set with the tools that declare
+    `detail`.
+  - **A long tool** (step 12):
+    - `LONG_TOOLS` (`src/lib/longTools.ts`);
+    - `tools/long-handlers.json`;
+    - `LONG_BY_REQUESTS` in `sources/batchHandlers.test.ts` (exact set equality);
+    - `LONG_TOOL_ARGS` in `longTools/harness.ts` (the arguments of the parameterised
+      long-tool tests).
+  - **A `HandlerGet` type** (step 13):
+    - `CompactObjectType` and `COMPACT_OBJECT_TYPES` (`compactObjectTypes.ts`);
+    - `compactMatrix.ts`;
+    - `compactDescriptions.ts` (a `Record` over the types);
+    - `COMPACT_READ_ROUTES` and `READ_ONPREM` (`adtProjections.ts`);
+    - the name properties and the per-type takes map (`compactSchemas.ts`);
+    - the route table of `compactReadRoutes.ts` and `SOURCE_REFUSALS` in
+      `compactGetRefusals.ts`, with the metadata part's table in `compactPartRoutes.ts`.
+      Their keys are kept equal by `compactGetRefusals.test.ts`.
+
+    `projectionWalk.test.ts` walks every projected value and needs no entry, but its run
+    must reach each new type's route.
+  - **A `HandlerSystem` action** (step 14):
+    - `SYSTEM_ACTIONS`, `SYSTEM_ACTION_TOOLS`, `ACTION_WORDS`, `SYSTEM_PAIRS` and
+      `COMPACT_SYSTEM_TAKES` (`compactSchemas.ts`);
+    - `ARGS` in `handlerSystem/longTool.test.ts` (a `Record` over the actions);
+    - `MISSING` in `handlerSystem/argumentsBeforeConnection.test.ts` (each action's required
+      arguments: here the missing `query` / `topic`).
+
+    `listedSchema.test.ts` derives its cases from `SYSTEM_ACTIONS`.
+  - **A batch-recordable entry** (step 18): `tools/batch-handlers.json`, and
+    `BATCH_ENTRY_CASES` in `helpers/batchEntryCases.ts`, whose cases must sample every
+    value an entry's `equals` names (`batchHandlers.test.ts`).
 - **Coverage.** Each step that makes a coverage key served (`coverageKeys.ts`: for example
   `GetApplicationJobCatalog#source`, `HandlerGet#APPLICATION_JOB_CATALOG#metadata` or
   `HandlerSystem#keyword_documentation`) does all of this in the same commit:
@@ -287,7 +323,9 @@ registry.
     - **Coverage:** the ledger row, the unit pins, the live file (`…/readOnly/system/`)
       written with its `liveCall`s, and the count +1.
 12. **The long read.**
-    - Add `GetAbapKeywordDocumentation` to `LONG_TOOLS` and `tools/long-handlers.json`.
+    - Add `GetAbapKeywordDocumentation` to `LONG_TOOLS`, `tools/long-handlers.json`,
+      `LONG_BY_REQUESTS` (`sources/batchHandlers.test.ts`) and `LONG_TOOL_ARGS`
+      (`longTools/harness.ts`), in one commit.
     - Tests: the equality test, a `run_handle`, the background answer equal to the in-call
       answer, and the no-limits tests on the 184 KB page at every level.
 13. **Compact `HandlerGet`:** the three types in `CompactObjectType`,

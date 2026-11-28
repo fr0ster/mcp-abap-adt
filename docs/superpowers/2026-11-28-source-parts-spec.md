@@ -553,8 +553,8 @@ Arguments: `UpdateSourcePartArgs` (spec §1.4). The sequence:
    must equal SAP's when SAP served one, else `source_changed` `etag`.
 3. **One outline, membership and location in T**, all from reads made under the lock:
    - `analyzer.outline(object, { version: 'inactive' })` once: O (a function group: its two
-     outline requests; a function module: none, O is the module alone). O is the only outline of
-     the call;
+     outline requests; a function module: none, O is the module alone). O is the only outline
+     under the lock; a short form's pre-lock outline (step 1) only names the include;
    - `analyzer.member(object, include, { outline: O })` for every call, whatever its edits: the
      include must be a source of the object by O, else `include_not_member`. This is the only
      authority for an include-relative diff and an include container;

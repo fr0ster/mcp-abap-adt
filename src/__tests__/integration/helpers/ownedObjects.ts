@@ -117,6 +117,13 @@ export class OwnedObjects {
     return sent;
   }
 
+  /** Records an object SAP may have made, whatever its create answers: `unconfirmed`. */
+  mayExist(kind: string, name: string): void {
+    if (this.find(name) === undefined) {
+      this.owned.push({ kind, name, state: 'unconfirmed' });
+    }
+  }
+
   /** Records an object made outside `create` (one already confirmed). */
   exists(kind: string, name: string): void {
     if (this.find(name) === undefined) {

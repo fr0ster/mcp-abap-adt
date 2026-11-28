@@ -834,9 +834,13 @@ export async function sendPlanned<R>(
     } else if (refusal !== undefined && !refusal.ok) {
       ended = { error: refusal.error };
     } else if (
+      rules.settlements === undefined &&
       sent.failed !== undefined &&
       failureOf(sent.failed.error) !== undefined
     ) {
+      // With no settlements to read (an envelope's execution), a credential
+      // refusal on the wire ends the sending; the phases decide by their
+      // reads' settlements, as before.
       ended = { error: sent.failed.error };
     } else {
       ended = await rules.endsOn({ at, run, sent, results });

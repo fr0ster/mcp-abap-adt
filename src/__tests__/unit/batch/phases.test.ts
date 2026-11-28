@@ -397,3 +397,60 @@ describe('runPhaseOutcome: what ends a phase over several envelopes', () => {
     assert.ok(last !== undefined && !last.ok && last.error === refusal);
   });
 });
+
+describe('runPhaseOutcome: an envelope failure the reads absorb, with failuresEnd false', () => {
+  it('a credential refusal of the envelope that every read absorbs ends nothing: the later envelopes are sent', async () => {
+    const refusal = new AuthRefusedError(
+      authError['credential-refused']({ credential: 'token' }),
+      'request',
+    );
+    let count = 0;
+    const fake = envelopeConnection((parts) => {
+      count += 1;
+      if (count === 1) throw refusal;
+      return envelopeResponse(
+        parts.map((p) => ({ status: 200, statusText: 'OK', body: p.url })),
+      );
+    });
+    const context: HandlerContext = {
+      connection: fake.connection,
+      logger: undefined,
+      batchAvailability: createBatchAvailability(),
+      partsPerEnvelope: 2,
+    };
+    const outcome = await withinTurns(
+      runPhaseOutcome(
+        context,
+        [0, 1, 2, 3, 4],
+        async (item, c) => {
+          try {
+            return String(
+              (
+                await c.makeAdtRequest({
+                  url: `/sap/bc/adt/x/${item}`,
+                  method: 'GET',
+                  timeout: 0,
+                })
+              ).data,
+            );
+          } catch {
+            return 'absorbed';
+          }
+        },
+        { failuresEnd: false },
+      ),
+      2000,
+    );
+    assert.equal(fake.envelopes.length, 3);
+    assert.deepStrictEqual(
+      outcome.results.map((r) => (r.ok ? r.value : 'failed')),
+      [
+        'absorbed',
+        'absorbed',
+        '/sap/bc/adt/x/2',
+        '/sap/bc/adt/x/3',
+        '/sap/bc/adt/x/4',
+      ],
+    );
+  });
+});

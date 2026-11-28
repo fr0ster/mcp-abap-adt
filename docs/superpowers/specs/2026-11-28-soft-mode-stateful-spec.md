@@ -1,136 +1,178 @@
 # Spec: soft-mode tests keep their stateful SAP session through a network drop
 
 Goal: `docs/superpowers/2026-11-28-soft-mode-stateful-goal.md` (#394). This spec
-says what changes in the soft-mode harness and its suites. Everything here is
-test code under `src/__tests__/`. Nothing changes in `src/lib`, `src/handlers`,
-the server packages or the dependencies.
+says what changes in the soft-mode harness and its suites. The code that
+changes is test code under `src/__tests__/`. The docs that change are
+`src/__tests__/integration/README.md` and `CHANGELOG.md`. Nothing changes in
+`src/lib`, `src/handlers`, the server packages or the dependencies.
 
-## 1. What a failed step is
+## 1. What a step's outcome is
 
-Soft-mode code reads one outcome per call, through one shared helper,
-`stepOutcome(answer | thrown)` in `src/__tests__/integration/helpers/`. It reads
-typed fields only, never words:
+Soft-mode code reads each call's outcome through one shared helper,
+`stepOutcome(answer | thrown, connection)`, in
+`src/__tests__/integration/helpers/`. It reads typed fields only. Words are
+never a verdict: not `LOCK_WENT_WITH_SESSION_WORDS`, not a message, not a
+response body.
 
-| Outcome | Read from | Effect on what the run owns |
-|---|---|---|
-| `ok` | a non-error answer | none |
-| `credential` | the existing `isCredentialRefusal` / `refusalAnswered` (`refusalGuard.ts`) | the marker is latched as today; nothing more is sent |
-| `session-lost` | a typed session verdict as `spentBy` reads it (`sessionLost`, `ADT_SESSION_REPLACED`, `ADT_NOT_CONNECTED`), on the thrown value or the answer's failure entries | every lock of the session is dropped as released by SAP and reported; nothing is sent for them |
-| `network` | a network error code (`NETWORK_ERROR_CODES` of `@mcp-abap-adt/interfaces-network`) on the thrown value or as an answer entry's `code` | nothing is released; the locks stay owned |
-| `refused` | any other error answer or throw | as today |
+| Outcome | Read from | Locks the run owns | A create whose answer this is |
+|---|---|---|---|
+| `ok` | a non-error answer with no failed-release carrier | none changed | confirmed |
+| `credential` | the existing `isCredentialRefusal` / `refusalAnswered` (`refusalGuard.ts`) | kept; the marker is latched and nothing more is sent | kept as `unconfirmed` |
+| `session-lost` | a typed session verdict as `spentBy` reads it (`sessionLost`, `ADT_SESSION_REPLACED`, `ADT_NOT_CONNECTED`) | those of **the connection that answered** are dropped as released by SAP and reported | kept as `unconfirmed` |
+| `network` | a network error code (`NETWORK_ERROR_CODES` of `@mcp-abap-adt/interfaces-network`) on the thrown value or in an answer's failure entry `code` | kept | kept as `unconfirmed` |
+| `unclassified` | a failure whose fields cannot say whether SAP answered (the `client_threw` entry, a throw with no typed field) | kept | kept as `unconfirmed` |
+| `refused` | a failure SAP answered (an integer `status` or a typed SAP message) | kept | removed: SAP refused it |
 
-`network` and `refused` both end the step, and so the test. They differ only in
-what cleanup and the report may assume.
-
-The plan's first step pins, with a unit test against the ADT stand-in
-(`helpers/adtStandIn.ts`), which field of a handler's answer carries the
-network code and the session verdict. That covers the direct throw, a
-strategy's failure entry and the `client_threw` entry. A path that drops them
-is reported to the owner and not patched in `src/lib`, because the goal allows
-no server change. Until it is settled, such an answer reads as `refused`, which
-keeps its locks owned, the safe side.
+- **A successful answer can carry a failed step.** `withLock` answers success
+  with a `cleanup` carrier when the body landed and the release failed
+  (`src/lib/strategies/withLock.ts:219-233`). `stepOutcome` reads that carrier
+  on success answers too. A release that failed on the network or
+  `unclassified` makes the step's outcome `network` / `unclassified`. A
+  release SAP refused gives `ok`, and its lock is still taken in (section 3).
+- **Only the answering connection is affected by a verdict.** `stepOutcome`
+  gets the connection the call ran on. A `session-lost` from the package
+  delete's sibling (section 7) touches no lock of the run's connection.
+- Which field carries what is pinned first (plan, step 1). Anything not
+  pinned reads `unclassified`, the safe side for locks and creates.
 
 ## 2. The step that fails ends the test, and nothing is resent
 
-`must` in the suites and `LambdaTester.run` keep throwing on a failed step
-(`IncludeHighHandlers.test.ts:278`, `LambdaTester.ts:622`). The thrown error
-now names its outcome (`network`, `session-lost`, …) as a fact.
-`HighTester.retryOnConflict` stays as it is: it resends a `409` or one of SAP's
-transient conflicts, never a network error. No other step is ever sent twice.
-That holds for cleanup steps too.
+Every outcome but `ok` ends the step, and so the test. That covers `must` in
+the suites, `LambdaTester.run` (`LambdaTester.ts:622`) and `HighTester.run`.
+The thrown error names its outcome as a fact.
 
-## 3. One lock registry per test file: `HeldLiveLocks`
+No request is sent twice, cleanup included.
 
-Every soft-mode lock goes through one registry, the existing `HeldLiveLocks`
-(`helpers/heldLiveLocks.ts`). One instance per test file sits beside the
-tracked connection, so it is reachable from the root `after`.
+`HighTester.retryOnConflict` (`HighTester.ts:352-382`) changes. It reads
+`stepOutcome` first and may resend only on `refused`, under its existing
+conflict rule (a `409`, SAP's transient conflict). A `network`,
+`unclassified`, `credential` or `session-lost` outcome is never resent,
+whatever its message or body contains.
 
-- A suite records a handle as soon as `HandlerLock` / `LockObject` answers it
-  (`hold`).
-- `released` is called only on an unlock answered `ok`, or when the session is
-  `session-lost`. A failed unlock (`network`, `refused`) keeps the lock.
-- Locks a high-level handler left behind are taken in as well. A failed
-  `withLock` release answers `left_locked: true` with `lock_handle` and
-  `object` (`src/lib/strategies/withLock.ts`, `leftLocked`), at the top level
-  or under `cleanup`. The harness reads every handler answer it gets
-  (`HighTester`, `LambdaTester`, `must`) and `hold`s each such lock. An answer
-  naming `LOCK_WENT_WITH_SESSION_WORDS` holds nothing.
-- `releaseAll` is called **once**, from the suite's cleanup, before any delete,
-  as `heldLiveLocks.ts` does today. It sends an unlock only for a lock whose
-  unlock was never sent. The registry marks a lock `unlock-sent` when a suite
-  sends its unlock inline. A lock whose unlock was sent and failed, whether on
-  the network or refused, is not sent again: it stays owned and is reported.
+## 3. The lock registry: `HeldLiveLocks` per connection
+
+One `HeldLiveLocks` (`helpers/heldLiveLocks.ts`) per soft-mode run
+connection, attached to it when `LambdaTester` / a suite builds its soft
+context. The connection is the key.
+
+Each lock has one of three states:
+
+- `held`: the handle is answered and no unlock has been sent;
+- `unlock-sent`: an unlock was sent and not answered `ok`, a `withLock`
+  release included;
+- released: the lock is removed.
+
+The rules:
+
+- A suite records a handle as soon as `HandlerLock` / `LockObject` answers it.
+- A `withLock` carrier with `left_locked: true` and `lock_handle` (top level or
+  under `cleanup`, failure or success answer) is recorded as **`unlock-sent`**.
+  `withLock` already sent its unlock (`withLock.ts:76-124`), so it is never
+  sent again. A carrier without `left_locked` (the spent-session case) records
+  nothing.
+- A lock is removed on an unlock answered `ok`, or on `session-lost` from its
+  own connection. Any other outcome of an unlock leaves it `unlock-sent`.
+- `releaseAll` sends an unlock only for locks in `held` and marks each one
+  `unlock-sent` before sending. It never sends for an `unlock-sent` lock.
 
 Replaced by the registry:
 
-- the `heldLock` variable that is cleared before its unlock is sent
+- the `heldLock` variable cleared before its unlock is sent
   (`IncludeHighHandlers.test.ts:180-182`, `TableTypeHighHandlers.test.ts:278-280`);
-- the unlock attempted once in `finally`, whose handle then goes out of scope
-  (`rapFixtures.ts:writeViewSource`, the direct-call path of
-  `NarrowedCompactTools.test.ts:245`): the handle is `hold`-ed before the write
-  and `released` only on an `ok` unlock;
-- the failed-lock path that ends the workflow
-  (`TableTypeHighHandlers.test.ts:645`): unchanged, except that a lock answer
-  lost to the network leaves nothing to `hold`, because there is no handle. A
-  lost lock response is the lost-response case in section 5.
+- the inline unlock whose handle then goes out of scope (`rapFixtures.ts`,
+  `writeViewSource`; the direct-call path of `NarrowedCompactTools.test.ts:245`).
+  Each becomes `hold`, then an unlock recorded through the registry.
 
-## 4. Cleanup order and policy
+## 4. When locks are released and objects deleted
 
-Cleanup runs as now (`afterEach` → `cleanupAfter`, a suite's `after`), with
-the same YAML policy (`getCleanupAfterRun`, `cleanup_on_failure`,
-`skip_cleanup`, `cleanup_after`). A failed test keeps its objects unless the
-policy says otherwise. A suite that deletes whatever the outcome
-(`deleteEverything`) still does.
+Per test, in `afterEach` (`LambdaTester.afterEach` → `cleanupAfter`), in this
+order:
 
-The order is fixed:
+1. **Locks first, unconditionally.** `releaseAll` runs on the test's
+   connection before the YAML policy is read. The early returns of
+   `cleanupAfter` for a skipped test, a failed test that keeps its objects, or
+   cleanup turned off (`LambdaTester.ts:416-440`) come after it. A skipped test
+   holds no lock, so nothing is sent.
+2. **Deletes as the policy says.** The policy is `getCleanupAfterRun`,
+   `cleanup_on_failure`, `skip_cleanup` and `cleanup_after`, unchanged. A
+   failed test keeps its objects unless the policy says otherwise, and a
+   network failure is a failed test like any other. A suite that deletes
+   whatever the outcome (`deleteEverything`) still does.
 
-1. `releaseAll` once. Locks are always released, whatever the delete policy.
-2. The deletes the policy orders, each sent once.
-3. The file's logoff (section 6).
+A suite's own `after` runs these two steps for what its tests left, in the
+same order. The file's logoff (section 6) comes last.
 
-After a `credential` outcome nothing is sent, as today. After `session-lost`
-nothing is sent for the dropped locks, and the deletes still run on the same
-connection only if the connection reports itself connected; otherwise they
-are reported as not sent.
+Nothing is sent after `credential`. After `session-lost` of the run's
+connection, deletes are sent only if that connection reports itself
+connected. Otherwise they are reported as not sent.
 
-## 5. A lost response
+## 5. Ambiguous mutations: creates and deletes
 
-A mutating step whose outcome is `network` may have been applied by SAP.
+Each object a suite or helper creates is recorded with one of these states:
 
-- **Create:** a suite's `created` list gets the name *before* the create is
-  sent, marked `unconfirmed`. An `ok` answer confirms it. A `refused` answer
-  removes it. A `network` answer keeps it. Cleanup deletes an `unconfirmed`
-  entry like any other. An answer that it does not exist (`404`) is then
-  success, not a failure. This touches `created.push` in
-  `IncludeHighHandlers.test.ts`, `TableTypeHighHandlers.test.ts` and the
-  package entries.
-- **Lock:** a lock whose answer was lost has no handle the harness could hold.
-  It is reported as "a lock may be held in this session" with the object
-  named. The file's logoff (section 6) is what ends it. Without that logoff,
-  SAP's timeout ends it.
-- **Unlock:** a `network` unlock keeps the lock owned and reported. It is not
-  sent again.
+- `unconfirmed`: recorded before the create is sent;
+- `exists`: the create was answered `ok`;
+- `delete-sent`: a delete was sent and not answered `ok`;
+- removed: a delete was answered `ok`, or the create was `refused`.
+
+The rules:
+
+- A create's `network`, `unclassified`, `credential` or `session-lost` outcome
+  leaves it `unconfirmed`. Cleanup deletes an `unconfirmed` object like an
+  `exists` one, and a `404` to that delete counts as removed.
+- A delete, in the workflow or in cleanup, marks the object `delete-sent`
+  before it is sent. An `ok` answer removes it. Any other answer leaves it
+  `delete-sent`. Cleanup **never** sends a delete for a `delete-sent` object;
+  it reports it as "deletion unconfirmed".
+- A lock whose answer was lost has no handle to hold. Its object is reported
+  as "a lock may be held in this session". The file's logoff, if SAP receives
+  it, or else SAP's timeout ends that lock.
+
+This covers every creator and deleter:
+
+- `created` in `IncludeHighHandlers.test.ts`, including its in-workflow
+  `DeleteInclude` at `:525`, and in `TableTypeHighHandlers.test.ts`, package
+  entries included;
+- `rapFixtures.ts` (`createView`, `deleteView`) and its callers;
+- `HighTester`'s generic create and its auto-generated delete cleanup
+  (`HighTester.ts:166-211, 250-260`).
 
 ## 6. The file's logoff
 
-`endTestConnection` (`openConnections.ts:32-44`) changes:
+`endTestConnection` / `closeTrackedConnections` (`openConnections.ts`) get one
+terminal state per connection. Each connection records one of:
 
-- The connection leaves the `open` set only after `disconnect()` returned,
-  not before (`openConnections.ts:39`).
-- It is sent once. A throw is reported as `logoff failed` with the locks
-  still owned (`HeldLiveLocks.stillHeld`) and the `unconfirmed` objects
-  named, and the root `after` fails the file. Today it only warns
-  (`openConnections.ts:63-70`).
-- **A finished `disconnect()` / `flushGoodbye()` is reported as "logoff
-  written", never "logged off".** The connection contract (connection 25:
-  `disconnect()` logs a failed write without throwing, and `flushGoodbye()`
-  resolves on an answer and on a transport failure alike) gives the harness
-  no way to tell an answered logoff from a lost one. Telling them apart needs
-  a connection change, which the goal excludes. It is reported to the owner
-  as a follow-up for `@mcp-abap-adt/connection`, not worked around here (no
-  probe request before the logoff, which would be another send).
-- When locks are still owned at that point, the report says that they end
-  with this logoff if SAP received it, else with SAP's timeout.
+- `logoff-attempted`, set before `disconnect()` is called;
+- `logoff-threw`;
+- `logoff-unconfirmed`.
+
+A second call for a connection that already has a state sends nothing. That
+holds whether the call comes from a hard-mode helper, a suite, or the root
+`after` in `closeConnectionsPreload.ts:15-16`. The connection stays in the
+tracked set until its state is terminal, so the root hook can see and report
+it.
+
+What each outcome is reported as:
+
+- `disconnect()` threw: **"logoff failed"**.
+- `disconnect()` and `flushGoodbye()` resolved: **"logoff not confirmed"**.
+  The connection contract (connection 25) cannot tell an answered logoff from
+  a lost one. `disconnect()` logs a failed write without throwing, and
+  `flushGoodbye()` resolves on an answer and on a transport failure alike. The
+  harness therefore never reports a logoff as written or as done.
+  Distinguishing them is a follow-up for `@mcp-abap-adt/connection` (PR
+  description), not worked around here.
+
+Both reports name the locks still owned (`held` / `unlock-sent`) and the
+`unconfirmed` / `delete-sent` objects. They end with this logoff if SAP
+received it, otherwise with SAP's timeout.
+
+- **A soft-mode run connection with something still owned fails the file** on
+  either report. A run connection with nothing owned reports and passes.
+- **Hard mode is unchanged.** A connection without a registry, such as the
+  hard-mode helpers' (`hardMode.ts:909-931`), keeps today's report: a warning,
+  never a file failure. Only the exactly-once state applies to it, and that
+  sends nothing it did not send before.
 
 ## 7. Package cleanup: the one sibling session
 
@@ -143,31 +185,71 @@ The delete therefore runs in its own lock-free sibling session, opened through
 exception to the one-connection invariant. The sibling holds no lock of the
 run and replaces nothing, and the run's session keeps its locks.
 
-- The package delete comes after `releaseAll` and the object deletes
-  (section 4), as now.
-- It is sent once, like every other step.
-- A `network` outcome leaves the package listed as not deleted.
+- The package delete comes after the run's locks are released and its
+  objects deleted (section 4), as now.
+- It follows section 5's `delete-sent` rule, and is sent once.
+- Its outcome is read against the sibling (section 1), so its `session-lost`
+  touches nothing of the run's connection.
 - A sibling that cannot be opened is reported, and the run's connection is
   never used for the delete.
 
-## 8. Tests that prove it
+## 8. The network cut for a live run
 
-- Unit tests (node:test, ADT stand-in, no SAP):
-  - `stepOutcome` for each row of section 1;
-  - `HeldLiveLocks` keeps a lock on `network` / `refused` and drops it on
-    `ok` / `session-lost`, and takes in a `left_locked` answer;
-  - `endTestConnection` keeps the connection tracked until `disconnect()`
-    returned, fails the file on a throw, and reports "logoff written";
-  - a create lost to the network is deleted by cleanup, and its `404` counts
-    as success;
-  - no step is sent twice: a recording connection counts every request of a
-    whole failing workflow.
-  
-  Each test is proved load-bearing by breaking its rule once.
-- Live: the owner's onprem run of one include suite with a 5 s cut during the
-  compact lock chain. The cut uses the in-process cut of the deleted probe,
-  rebuilt as a test-only helper that runs only when the run asks for it. The
-  expected result: the test fails `network`, and cleanup releases the lock
-  with the original handle in the same session if the network is back by
-  then. Otherwise the report names the lock as still owned and the logoff as
-  written.
+A test-only helper, `networkCut`, in `src/__tests__/integration/helpers/`:
+
+- **Activation.** It is active only when the run sets
+  `MCP_TEST_NETWORK_CUT_MS` (a positive integer) and
+  `MCP_TEST_NETWORK_CUT_AT=<test name>`. With neither set it patches nothing.
+  A set value that is not valid is refused at file start.
+- **Trigger.** In the named test, the cut starts the moment the registry
+  records the first `held` lock of that test's connection. It ends after the
+  given number of milliseconds.
+- **The cut.** Every open socket of the process is destroyed, and every new
+  one is pointed at `127.0.0.1:9`, which gives `ECONNREFUSED` (the deleted
+  probe's in-process cut).
+- **Report.** Each start and end is reported with its time, so a live log
+  shows which steps ran inside the cut.
+
+## 9. Tests that prove it
+
+Each new rule gets a unit test that **fails on today's harness** and passes
+after the change. Each is proved load-bearing by breaking its rule once.
+Tests that pin today's behaviour (section 1's answer fields, the unchanged
+conflict retry on `refused`) are characterization tests, marked as such, and
+are not counted as regression tests.
+
+**Session continuity**, on a recording connection (`helpers/recordingConnection.ts`)
+over the ADT stand-in, for a workflow whose write fails on the network:
+
+- every request, cleanup included, goes over the same connection instance;
+- `connect()` is called once, so there is no second logon;
+- the session identity and cookies are unchanged from the first request to
+  the logoff;
+- the cleanup unlock carries the original `lock_handle`;
+- only LOCK and UNLOCK are sent stateful;
+- no request is sent twice (the request ledger);
+- the package delete is the only request on another connection, and it is
+  stateless.
+
+**Rules:**
+
+- `stepOutcome` for each row, a success answer carrying a failed release, and
+  attribution to the answering connection.
+- The registry's three states:
+  - `left_locked` is recorded as `unlock-sent` and never sent again;
+  - `releaseAll` runs before the policy returns;
+  - a verdict from the sibling clears nothing of the run's connection.
+- Creates and deletes:
+  - a lost create is deleted by cleanup, and its `404` counts as removed;
+  - a `delete-sent` object is never deleted again;
+  - all of this holds for the include and table-type suites, `rapFixtures`
+    and `HighTester`.
+- `retryOnConflict`: a `network` failure whose words contain "already exists"
+  is not resent.
+- Logoff:
+  - the exactly-once state across an explicit call followed by the root hook;
+  - "logoff failed" and "logoff not confirmed";
+  - the file fails with something owned, and passes with nothing owned;
+  - hard mode's connections only warn.
+- `networkCut`: inactive by default, the trigger at the first `held` lock,
+  and a value that is not valid refused.

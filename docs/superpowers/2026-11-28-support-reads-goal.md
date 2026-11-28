@@ -17,23 +17,24 @@ through MCP, in every binary, the `-ro` ones included, because nothing here chan
   - read one topic by the name a hit list links to;
   - read the topic for a position in a source (the `uri` form of the discovery template).
 
-  The language is the caller's. Measured on cloud: `language=DE` answered the same English
-  page as `EN`, so whether another language is served depends on the system (unverified). Every hit and every link the page carries reaches the
-  model, so the next call can follow it.
-  - Measured on cloud and on premise: the query form answers `200`.
-  - Measured on cloud: the topic form (`object=`) answers `200`. The hit list links only to
-    that form, which the discovery template does not list. The `uri` form answers `200`, but
-    for the position tried (a class source, line 1, column 1) it gave the documentation's
-    start page, so what a position resolves to is unverified.
-    The only media type served is `application/vnd.sap.adt.docu.v1+html`; any other `Accept`
-    gets `406`.
-  - Measured on cloud: a query with no hit answers `200` with a "Not found" page, not `404`.
-    An unknown `version` value answers `500`.
+  The language is the caller's. Every hit and every link the page carries reaches the
+  model, so the next call can follow it. The tool takes no `version`: SAP's default answers
+  (see "`version` is left out" below).
+  - Measured on cloud and on premise:
+    - the query form, the topic form (`object=`) and the `uri` form answer `200`;
+    - the topic form is not in the discovery template, but the hit list links only to it, so
+      it is taken: without it, the agent cannot open a hit;
+    - the only media type served is `application/vnd.sap.adt.docu.v1+html`; any other
+      `Accept` gets `406`;
+    - a query with no hit answers `200` with a "Not found" page, not `404`.
+  - Measured on cloud and on premise: for the position tried (a class source, line 1,
+    column 1) the `uri` form gave the documentation's start page. What a position inside a
+    statement resolves to is unverified.
+  - Measured on cloud: `language=DE` answered the same English page as `EN`. Whether
+    another language is served depends on the system (unverified).
   - Measured on cloud (SAP's `sap-perf-fesrec`): a page read for the first time took up to
     about 100 s on the server, and the same page asked again under 1 s. So no read may carry a
     timeout of the server's choosing, which the limits invariant below already says.
-  - Unverified on premise: the topic form, the `uri` form, the no-hit answer and the
-    `version` values.
 - **Definitions of application log objects, application job catalogs and application job
   templates** (APLO, SAJC, SAJT). The agent can read each one's source and its metadata
   document, by name:
@@ -45,10 +46,8 @@ through MCP, in every binary, the `-ro` ones included, because nothing here chan
   The tools state in their names and descriptions that they read definitions. They read no
   log entries, no job runs, no job logs and no spool. An agent that wants SLG1 or SM37 data
   learns from the description that these tools do not serve it.
-  - Measured on cloud: all six reads (object and source of each type) answer `200`. An absent
-    name answers `404`.
-  - Measured on premise: the APLO and SAJC object reads answer `200`.
-  - Unverified on premise: the SAJT object read and the three source reads.
+  - Measured on cloud and on premise: all six reads (object and source of each type) answer
+    `200`, namespaced names included on premise, and an absent name answers `404`.
   - Finding these objects needs no new tool. The interfaces-adt search tables list `APLO`,
     `SAJC` and `SAJT` on both variants, which is what `SearchObject` checks its type
     against. Measured on cloud and on premise: the quick search for each type answers `200`.
@@ -96,6 +95,11 @@ through MCP, in every binary, the `-ro` ones included, because nothing here chan
   `src/endpoints/objects.ts`, with the name encoded. A namespaced name (`/NS/NAME`) reaches
   SAP as one path segment. The existing application-log members build their path by
   interpolating the raw name, so they move there as well.
+- **`version` is left out.** The discovery template lists it, and the hit list's links carry
+  `version=5`. Measured on cloud and on premise: `1` and `6` answer `500`, while `2`, `3`, `4`,
+  `5` and `X` answer `200` with pages that differ. Which language version each value selects
+  is unverified, so a description could not say what it does. It comes back only once its
+  values are mapped.
 - **No server-chosen limits.** The server sets no result count, size cut, page limit or
   timeout of its own on any of these reads. A hit list and a page are answered whole at the
   chosen `detail`.
@@ -124,7 +128,8 @@ through MCP, in every binary, the `-ro` ones included, because nothing here chan
   - the members, with their result sets and address records;
   - the application-log members moved onto encoded addresses;
   - unit tests and live tests on cloud and on premise;
-  - ERRATA entries for the no-hit `200` and the topic form missing from discovery.
+  - ERRATA entries, measured on both kinds, for the no-hit `200`, the topic form missing
+    from discovery, and the `500` on an unknown `version`.
 - **adt-strategies:** the readings behind each `detail` level that is not `raw`.
 - **mcp-abap-adt 24.3.0:**
   - the full tools, the `HandlerGet` types, the `HandlerSystem` action and the discovery
@@ -147,33 +152,19 @@ through MCP, in every binary, the `-ro` ones included, because nothing here chan
 ## Open questions
 
 1. **What the keyword documentation answers at `terse`.**
-   - The page is 125–175 KB of HTML, about 70% embedded images and 10% style. The topic
+   - The page is 125–185 KB of HTML, about 70% embedded images and 10% style. The topic
      `SELECT` measured 148 KB of HTML and about 10 KB of text.
    - Recommendation:
      - `raw`: the HTML as sent;
      - `terse`: the page's text plus a list of its links (each a topic name and its label),
        an adt-strategies reading;
      - `medium` and `full`: the same text with every link, the external ones included.
-2. **The topic form (`object=`) is not in the discovery template.**
-   - The hit list links only to it. Without it, the agent cannot open a hit.
-   - Recommendation: take it as its own member, gated by the same collection. Measure it on
-     premise with `probe-support-reads-goal.sh` before the spec. If it fails there, drop it
-     on premise.
-3. **`version`.**
-   - The discovery template lists it, and the hit list's links carry `version=5`.
-   - Measured on cloud:
-     - `1` and `6` answer `500`, while `2`, `3`, `4`, `5` and `X` answer `200`;
-     - the pages differ, and which language version each value selects is unverified;
-     - without `version`, the hit list's page names ABAP for Cloud Development.
-   - Recommendation: offer `version` only after the script has mapped its values on both
-     kinds, as an enum of the measured values with each one's meaning. Until then, leave it
-     out and let SAP's default answer.
-4. **Legacy (7.40).**
+2. **Legacy (7.40).**
    - The recorded discovery lists `/sap/bc/adt/docu/abap/langu` with the `uri` template only
      (no `query`, no `version`). Nothing is measured there, and legacy is RFC.
-   - Recommendation: run the script on legacy in its window. List the tool on `legacy` only
-     for the forms that answer `200`. Otherwise keep it off on `legacy` in 24.3.0.
-5. **Tool names.**
+   - Recommendation: measure legacy in its window with the read-only GETs the cloud and
+     on-premise runs used. List the tool on `legacy` only for the forms that answer `200`. Otherwise keep it off on `legacy` in 24.3.0.
+3. **Tool names.**
    - `GetApplicationLogObject` would be found by a search for "application log" and then
      answer no log entries.
    - Recommendation: `GetApplicationLogDefinition`, `GetApplicationJobCatalog` and

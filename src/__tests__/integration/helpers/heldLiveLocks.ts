@@ -20,6 +20,7 @@
  * tested alone.
  */
 import type { ToolResultLike } from '../../../lib/toolResult';
+import { armNetworkCut } from './networkCut';
 import { registerOwnedReporter } from './openConnections';
 import { answerOutcome, type StepOutcome, thrownOutcome } from './stepOutcome';
 
@@ -75,6 +76,7 @@ export class HeldLiveLocks {
    */
   hold(lock: HeldLock, release?: () => Promise<UnlockAnswer>): void {
     this.owned.set(lock.lock_handle, { lock, state: 'held', release });
+    for (const listener of heldListeners) listener();
   }
 
   /** An unlock of `handle` is being sent: `unlock-sent`, and it is never sent again. */
@@ -205,6 +207,9 @@ export class HeldLiveLocks {
   }
 }
 
+/** Called on every `hold`: the live network cut's trigger (`networkCut`). */
+const heldListeners: Array<() => void> = [];
+
 const registries = new WeakMap<object, HeldLiveLocks>();
 
 /** The registry of `connection`: one per run connection, made on first use. */
@@ -228,3 +233,7 @@ registerOwnedReporter((connection) =>
       `lock ${lock.object_type} ${lock.object_name} (${state})`,
   ),
 );
+
+// A live run's network cut, armed when the file loads the registry (spec §8):
+// nothing is patched unless the run asks for it.
+armNetworkCut(process.env, (onHeld) => heldListeners.push(onHeld));

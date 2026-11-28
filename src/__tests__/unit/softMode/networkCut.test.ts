@@ -76,15 +76,24 @@ describe('armNetworkCut', () => {
       (line) => lines.push(line),
       () => name,
     );
+    // Patched at arm time, so the run's pooled sockets are known to the cut.
+    assert.notEqual(http.Agent.prototype.createConnection, before);
+    const agent = new http.Agent();
+    const pooled = agent.createConnection({ host: '127.0.0.1', port: 1 });
+    pooled?.on('error', () => {});
     onHeld?.();
     assert.equal(lines.length, 0, 'not in another test');
-    assert.equal(http.Agent.prototype.createConnection, before);
+    assert.equal(pooled?.destroyed, false);
     name = 'the test';
     onHeld?.();
     onHeld?.();
     assert.equal(lines.length, 1);
     assert.match(lines[0] ?? '', /start .* in "the test", until 2 connection/);
-    const agent = new http.Agent();
+    assert.equal(
+      pooled?.destroyed,
+      true,
+      'a socket opened before the cut is cut',
+    );
     /** A new socket through an agent, as the connection's transport opens one. */
     const refusedTarget = () => {
       const socket = agent.createConnection({ host: '127.0.0.1', port: 1 });
@@ -96,6 +105,7 @@ describe('armNetworkCut', () => {
     refusedTarget();
     assert.equal(lines.length, 2);
     assert.match(lines[1] ?? '', /end .* after 2 refused/);
-    assert.equal(http.Agent.prototype.createConnection, before);
+    onHeld?.();
+    assert.equal(lines.length, 2, 'once per file');
   });
 });

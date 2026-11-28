@@ -9,7 +9,9 @@
  *   other, or a count that is not valid, is refused when the file loads the
  *   lock registry.
  * - **Trigger.** In that test, the moment the registry records the first
- *   `held` lock; once per file.
+ *   `held` lock; once per file. The agents are patched when the cut is armed
+ *   (file load), so the cut destroys every socket the run opened, the pooled
+ *   keep-alive ones included.
  * - **The cut.** `socketCut`: every open socket destroyed, every new one
  *   refused (`ECONNREFUSED`), until that many were refused — then the network
  *   is back. No timer: a live test pauses nowhere (`noLiveBounds.test.ts`),
@@ -72,21 +74,26 @@ export function armNetworkCut(
 ): boolean {
   const plan = networkCutPlan(env);
   if (plan === undefined) return false;
+  // Patched now, at file load, so every socket the run opens is known and a
+  // cut destroys the pooled keep-alive ones too (a patch made at the trigger
+  // saw only sockets opened after it, and the pooled ones carried on).
+  let refused = 0;
+  let ended = false;
+  const cut = installSocketCut(() => {
+    refused += 1;
+    if (refused < plan.refused) return;
+    // The last refused socket is already pointed nowhere; from now on new
+    // sockets reach their target again.
+    cut.restore();
+    ended = true;
+    report(
+      `[network cut] end ${new Date().toISOString()} after ${refused} refused connection(s)`,
+    );
+  });
   let fired = false;
   listen(() => {
-    if (fired || testName() !== plan.at) return;
+    if (fired || ended || testName() !== plan.at) return;
     fired = true;
-    let refused = 0;
-    const cut = installSocketCut(() => {
-      refused += 1;
-      if (refused < plan.refused) return;
-      // The last refused socket is already pointed nowhere; from now on new
-      // sockets reach their target again.
-      cut.uninstall();
-      report(
-        `[network cut] end ${new Date().toISOString()} after ${refused} refused connection(s)`,
-      );
-    });
     cut.cut();
     report(
       `[network cut] start ${new Date().toISOString()} in "${plan.at}", until ${plan.refused} connection(s) are refused`,

@@ -9,10 +9,21 @@ its spec section.
 - **TDD.** First the failing test the spec names, then the change that makes it pass, then
   the repository's own gates: build, `lint:check`, `test:check` and the unit tests. Every
   step ends green; no test is committed red.
-- **Generated docs with each tool.** A step that adds or changes a tool, a compact type or an
-  action regenerates the generated docs in the same commit, so their drift check stays
-  green: the pages of `tools/generate-tools-docs.js`, the compact page, tool search and the
-  prompt listings.
+- **Generated and pinned files with the change.** Every file a test compares against the
+  tool set is regenerated in the same commit as the change it pins, so no check goes red
+  between steps. These files are:
+  - the tool pages `docs/user-guide/AVAILABLE_TOOLS.md`, `AVAILABLE_TOOLS_READONLY.md`
+    and `AVAILABLE_TOOLS_HIGH.md` (`tools/generate-tools-docs.js`), and
+    `compact/docs/AVAILABLE_TOOLS.md`;
+  - `tools/tool-search.json`;
+  - the tool fixtures under `tests/fixtures/tools/`: `listed-schemas.json`,
+    `listed-prompts.json`, `prompt-texts.json`, `http-surface.json`,
+    `stdio-sse-surface.json` and `surface.json`;
+  - `tools/long-handlers.json`, in step 12;
+  - `docs/user-guide/BATCH_MODE.md`, with `tools/batch-handlers.json`, in step 18.
+
+  A step that adds or changes a tool, a compact type or an action regenerates every file
+  that tool or entry appears in.
 - **Small commits.** One logical change per commit, in English, each message ending with the
   attribution lines.
 - **Worktrees.** Work happens in a worktree under the repository's `.worktrees/`. A main
@@ -271,7 +282,8 @@ registry.
     registered, it passes.
 18. **Batch and tool sets.**
     - `tools/batch-handlers.json` and the batch test: the new type and action are
-      recordable.
+      recordable. `docs/user-guide/BATCH_MODE.md` is regenerated in this same commit
+      (`batchModePage.test.ts`).
     - The existing batch sentences of `HandlerGet` and `HandlerSystem` are unchanged.
     - The full binaries still serve no batch mode.
     - The `-ro` sets carry every entry, and the tool counts match.
@@ -288,9 +300,9 @@ registry.
     follows on the owner's go. Each file then gets one hard-mode run.
 20. **Docs** (§4.8):
     - `README.md`;
-    - the generated pages: regenerated in each step that changed a tool (steps 8 to 15), so
-      this step only checks that they are current;
-    - `HANDLERS_MANAGEMENT.md`, `ACCESS_RESTRICTIONS.md` and `BATCH_MODE.md`;
+    - the generated and pinned files: regenerated in the steps that changed what they pin
+      (steps 8 to 18), so this step only checks that they are current;
+    - `HANDLERS_MANAGEMENT.md` and `ACCESS_RESTRICTIONS.md`, which no test pins;
     - the 24.3.0 `CHANGELOG.md` entry, dated on each edit;
     - the docs audit.
 

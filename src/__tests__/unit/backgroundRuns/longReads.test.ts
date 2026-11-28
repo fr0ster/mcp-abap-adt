@@ -46,7 +46,7 @@ import {
   until,
 } from './harness';
 
-const SQL = { sql_query: 'SELECT * FROM placeholder_table' };
+const SQL = { sql_query: 'SELECT * FROM placeholder_table', row_number: 5 };
 const RUN = { class_name: 'PLACEHOLDER_CLASS' };
 
 /** Whether a request is the SQL read (`POST …/datapreview/freestyle`). */
@@ -717,7 +717,7 @@ describe('compact', () => {
     stand = await backgroundStand(new InMemoryBackgroundRuns());
   });
 
-  const TABLE = { object_name: 'PLACEHOLDER_TABLE' };
+  const TABLE = { object_name: 'PLACEHOLDER_TABLE', max_rows: 5 };
 
   it("the compact long tools' background default: HandlerGetData answers a run_handle read by HandlerBackgroundRunGet, once", async () => {
     const started = await stand.a.call('HandlerGetData', TABLE);

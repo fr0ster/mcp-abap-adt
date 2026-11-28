@@ -56,7 +56,7 @@ describe('enhancementTypeOf', () => {
     assert.equal(sent.length, 1);
     assert.equal(sent[0].method, 'GET');
     // No bound of the server's (#391): the search is handed no maxResults.
-    // adt-clients before 48.0.1 adds its own 100; 48.0.1 adds none.
+    // adt-clients before 49.0.0 adds its own 100; 49.0.0 adds none.
     assert.equal(
       (sent[0]?.url ?? '').replace('&maxResults=100', ''),
       '/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=zenh_impl&objectType=ENHO',

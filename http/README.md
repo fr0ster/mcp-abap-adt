@@ -103,9 +103,11 @@ an instance that already holds state (a lock, a batch, a debug session), or of a
 `SessionOpen` answers that same handle and keeps what the instance holds; called without a handle
 it opens a new instance with a handle of its own — each long session is its own instance.
 `SessionClose` with the handle answers `{ "closed": true, "held": { "locks": …, "batch": …,
-"debug_session": … } }` — what the instance held — and once that answer is written the instance
+"envelopes": …, "debug_session": … } }` — what the instance held, the open read envelopes
+counted — and once that answer is written the instance
 leaves the pool and is closed: every SAP session it owns gets its logoff, which releases the locks
-taken in it; an open batch and its recorded calls are dropped unsent; nothing is undone (the
+taken in it; an open batch and its recorded calls, and every open read envelope, are dropped
+unsent; nothing is undone (the
 logoff ends in SAP what the state held); the MCP server closes. From then on the handle answers
 `state is not available` at once, whether or not SAP has answered the logoffs yet; the close
 awaits each logoff's write and its answer with no timer of the server's, and the server's

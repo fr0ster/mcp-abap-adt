@@ -13,7 +13,7 @@ This directory contains all documentation for the `mcp-abap-adt` project, organi
 - **Access restrictions**: deny tools, allow only listed packages, requests or tables; draft detection — [Access restrictions](user-guide/ACCESS_RESTRICTIONS.md)
 - **Read-only and compact binaries**: the twelve binaries and the tools each serves — [Handler sets](user-guide/HANDLERS_MANAGEMENT.md), [Compact tools](../compact/docs/AVAILABLE_TOOLS.md)
 - **MCP prompts** (new in 24.2.0): nine slash-command prompts per binary and kind — [Prompts](user-guide/PROMPTS.md)
-- **Batch mode**: independent calls sent to SAP together (compact binaries) — [Batch Mode](user-guide/BATCH_MODE.md)
+- **Batch mode**: independent calls sent to SAP together (compact binaries: `HandlerBatch`; core binaries: read envelopes by `envelope_handle`) — [Batch Mode](user-guide/BATCH_MODE.md)
 - **Background long reads**: a handle at once, the result read or cancelled later — [Background runs](user-guide/README.md#background-runs-of-the-long-reads)
 - **Terse answers** (new in 24.2.0): TSV for a list, every row answered; `detail` (`terse`, `medium`, `full`, `raw`) chooses the reading — [Answers](../README.md#answers)
 - **Tool search**: keywords and semantic texts per tool — [Tool Search](user-guide/TOOL_SEARCH.md)
@@ -41,7 +41,7 @@ Documentation for end users: configuration, usage, and available tools.
 - Configurator (auto-config): `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`)
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
 - `CLI_OPTIONS.md` - Complete command-line options reference
-- `BATCH_MODE.md` - Batch mode (the compact binaries' `HandlerBatch`): independent calls recorded, sent together at the batch's end, answered by number; which calls are recorded
+- `BATCH_MODE.md` - Batch mode (the compact binaries' `HandlerBatch`) and the read envelopes (the core binaries' `CreateReadEnvelope` / `ExecuteReadEnvelope`): independent calls recorded, sent together, answered by number; which calls are recorded
 - `PROMPTS.md` - The MCP prompts (`create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`) per binary and kind, their `object_type` values, how a client shows them, the refusal (generated)
 - `ACCESS_RESTRICTIONS.md` - Access restrictions: denied actions, allowed packages, requests and tables, the refusals, and `GetObjectDraft`
 - `HANDLERS_MANAGEMENT.md` - The twelve binaries and the tools each serves

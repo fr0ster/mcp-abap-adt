@@ -47,6 +47,7 @@ set, onprem an ECC or S/4HANA system, cloud SAP BTP ABAP Cloud. **New in 24.2.0*
 - **MCP prompts** (**new in 24.2.0**): nine ready-made requests — `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport` — that a client shows as slash commands, each answering the tools to call in order; every binary on onprem and cloud (the `-ro` ones `get`, `where_used`, `transport`, compact `-ro` also `check`) — [MCP Prompts](docs/user-guide/PROMPTS.md).
 - **Terse answers** (**new in 24.2.0**): every tool answers what the next call needs — TSV for a list, every row answered — and `detail` (`terse`, `medium`, `full`, `raw`) chooses the reading before the call — [Answers](#answers).
 - **Batch mode**: record independent calls and send them to SAP together in one ADT batch request (compact binaries, `-ro` included) — [Batch Mode](docs/user-guide/BATCH_MODE.md).
+- **Read envelopes**: collect independent read calls under an `envelope_handle` and send them to SAP together (core binaries, `-ro` included) — [Envelopes in the core binaries](docs/user-guide/BATCH_MODE.md#envelopes-in-the-core-binaries).
 - **Background long reads**: where-used, search, package walks and other long reads answer a handle at once and are read or cancelled later, in every binary — [Background runs](docs/user-guide/README.md#background-runs-of-the-long-reads).
 - **Tool search texts**: every tool carries keywords for BM25 and a sentence for vector search beside its description — [Tool Search](docs/user-guide/TOOL_SEARCH.md).
 - **Long session by `state_handle`**: keep one SAP session across a run of calls over Streamable HTTP — `SessionOpen` / `SessionClose` (compact `HandlerSession`), the `-http` binaries — [Held state and the long session](http/README.md#held-state-and-the-long-session).
@@ -349,6 +350,12 @@ number (from 1, in the order made), `action: 'end'` sends them all and leaves ba
 happens, and `action: 'answers'` reads each call's answer by its number — the answer the tool
 gives outside batch mode for what SAP answered. The full binaries serve no batch mode; their
 debugger batch reads its answers with `DebugBatchAnswers`.
+
+The core binaries (the `-ro` ones included) batch reads by an explicit handle instead:
+`CreateReadEnvelope` answers an `envelope_handle`; a read called with it is recorded under the
+next number and sends nothing; `ExecuteReadEnvelope` sends every recorded read together and
+answers each by its number; `DiscardReadEnvelope` and `ListReadEnvelopes` end or list the open
+envelopes. See [Envelopes in the core binaries](docs/user-guide/BATCH_MODE.md#envelopes-in-the-core-binaries).
 
 A tool that builds a request from an earlier answer is refused in batch mode — a high-level
 create or update, a fallback after a `404`, a poll. Run such work as phases, each its own batch,

@@ -104,6 +104,10 @@ it makes the answer smaller.
   (`#type=PROG%2FPLM;name=…`); navigating either answers `200` at one `#start`. So onprem the
   links do not tell a definition from an implementation (cloud refuses the definition link with
   `400`).
+- In a function group (a delivered one, its include's outline) the two links name different
+  includes, and the implementation link's start lies in the implementation include, not the
+  class-definition include its link names. So the include of a start is taken from SAP's
+  answer, never from the link.
 - A form navigated answers `200` at its `FORM` statement.
 - Three navigations in one batch envelope answered `202`, each part equal to its answer alone.
 - `HEAD` on a source answers `400`.
@@ -321,7 +325,8 @@ element.
    one include, which answers the whole group (§2).
 2. **Find the start.** Navigation on the element's link gives its start line. For a local
    method, the link is the `implementationIdentifier` (cloud refuses the definition link; onprem
-   both are one href). The start is then checked, not trusted: the identity check must find
+   a program's two links are one href). The include is the answer's, which may be another
+   include of the object than the link's. The start is then checked, not trusted: the identity check must find
    `METHOD <name>` inside `CLASS <scope> IMPLEMENTATION`, else `start_mismatch`. The method's
    declaration is read as part of its local class's definition.
 

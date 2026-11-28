@@ -162,6 +162,8 @@ export interface RecordingTarget {
     request: IAbapRequestOptions,
     number: number | undefined,
   ): ServerRefusal | undefined;
+  /** The refusal of a request once the batch has ended (`tool` the call's). Absent: `batch_ended`. */
+  endedRefusal?(tool: string): ServerRefusal;
   /** Records `request` (it may throw, recording nothing): its part, settled when the batch is sent. */
   record(request: IAbapRequestOptions): Promise<IAdtWireResponse>;
   connect(): Promise<void>;
@@ -223,8 +225,9 @@ export function createRecorder(
   // its number is read — reaches no connection: what it would reach is
   // refused `batch_ended`, as a further request is.
   const ended = () => !target.open();
-  const endedRefusal = <T>(): Promise<T> =>
-    Promise.reject<T>(new ServerRefusal('batch_ended'));
+  const endedError = (): ServerRefusal =>
+    target.endedRefusal?.(tool) ?? new ServerRefusal('batch_ended');
+  const endedRefusal = <T>(): Promise<T> => Promise.reject<T>(endedError());
   const recorder: Recorder = {
     connect: () => (ended() ? endedRefusal<void>() : target.connect()),
     getBaseUrl: () =>
@@ -241,9 +244,7 @@ export function createRecorder(
       // The batch ended (or was dropped): nothing more is recorded or sent.
       if (ended()) {
         target.setSessionType(unswitched);
-        const ended = Promise.reject<IAdtWireResponse>(
-          new ServerRefusal('batch_ended'),
-        );
+        const ended = Promise.reject<IAdtWireResponse>(endedError());
         ended.catch(() => undefined);
         return ended;
       }

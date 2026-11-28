@@ -115,7 +115,9 @@ takes a number. One node-structure read per envelope: a second is refused
 (`GetObjectsList`, `GetPackageContents`, `GetObjectInfo`, `SearchSource`), are not recorded.
 
 **Answers.** A number's answer is what the read answers outside an envelope for the same SAP
-answer, with no further request: a part's `404` answers that number only. No `406`/`415`
+answer, with no further request: a part's `404` answers that number only. A recorded read that would send a
+request built from another's answer answers `batch_not_recordable` under its number: an envelope
+records only independent reads, and every read goes stateless. No `406`/`415`
 correction is resent. A failed ADT envelope (SAP's refusal, a transport error, a credential
 refusal, parts that do not match, an answer that cannot be split) answers every number it carried
 with that failure, as it came.
@@ -139,7 +141,8 @@ sends nothing. An unknown handle and another session's handle get the same answe
 a record, a discard or a second execute that comes after it answers `envelope_unavailable`, and an
 execute whose connection fails before it sends gives the envelope back unchanged.
 
-**Lifetime.** No clock of its own. An envelope ends by its execution, a discard, the instance's
+**Lifetime.** What an envelope recorded is held with the envelope, in its instance's held state
+(the long session over Streamable HTTP), never anywhere else. No clock of its own. An envelope ends by its execution, a discard, the instance's
 close (stdin closed, the SSE connection ended, the pool letting the instance go, `SessionClose`,
 the process's shutdown), and over Streamable HTTP and SSE the held state's idle bound
 (`stateIdleMinutes`). An open envelope is held state: over Streamable HTTP it keeps the instance

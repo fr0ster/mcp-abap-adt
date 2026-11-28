@@ -331,7 +331,7 @@ describe('executing an envelope', () => {
     );
   });
 
-  it('a resumed handler that would send another request answers batch_ended', async () => {
+  it('a resumed handler that would send a request built from an answer answers batch_not_recordable', async () => {
     const s = stand(byUrl());
     record(s.envelope, async (c) => {
       await get('/a')(c);
@@ -339,7 +339,11 @@ describe('executing an envelope', () => {
     });
     const answers = await s.run();
     assert.equal(answers[0]?.isError, true);
-    assert.match(textOf(answers[0]), /batch_ended|send nothing more/);
+    assert.match(textOf(answers[0]), /"error":"batch_not_recordable"/);
+    assert.match(
+      textOf(answers[0]),
+      /GetClass sends a request built from another's answer, which an envelope cannot record: call it without envelope_handle/,
+    );
     assert.equal(s.fake.envelopes.length, 1);
   });
 

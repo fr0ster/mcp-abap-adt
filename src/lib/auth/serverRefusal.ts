@@ -389,6 +389,15 @@ export function envelopeLimitWords(bound: number): string {
   return `${bound} envelopes are open, the bound set by --batch-open-envelopes / openEnvelopes; execute or discard one first`;
 }
 
+/**
+ * A recorded read that would send a request built from another's answer:
+ * resumed after its envelope's execution, it sends nothing more
+ * (`batch_not_recordable`).
+ */
+export function envelopeDependentWords(tool: string): string {
+  return `${tool} sends a request built from another's answer, which an envelope cannot record: call it without envelope_handle`;
+}
+
 /** A call given `envelope_handle` that no core entry of `tools/batch-handlers.json` admits. */
 export function envelopeNotRecordableWords(tool: string): string {
   return `${tool} is not recorded into an envelope with these arguments; call it without envelope_handle`;

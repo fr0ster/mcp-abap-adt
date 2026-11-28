@@ -15,6 +15,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { isEnvelopeTool } from '../../../lib/batch/batchTools';
 import { batchEntries } from '../../../lib/batch/eligibility';
+import { envelopeSurfaceOf } from '../../../lib/batch/envelopeSurface';
 import { ENVELOPE_HANDLE_WORDS } from '../../../lib/batch/envelopeTools';
 import { InstanceEnvelopes } from '../../../lib/batch/InstanceEnvelopes';
 import { envelopeSentence } from '../../../lib/batch/sentence';
@@ -99,6 +100,35 @@ describe('the read envelopes on the surface', () => {
     for (const name of admitted) {
       if (!tools.some((tool) => tool.name === name)) {
         faults.push(`${name}: admitted but not served`);
+      }
+    }
+    assert.deepStrictEqual(faults, []);
+  });
+
+  it("the tool-docs generator's builder gives every core tool the description and parameters the server lists", async () => {
+    const tools = await listed(coreRegistry());
+    const definitions = new Map(
+      coreRegistry()
+        .getHandlerGroups()
+        .flatMap((group) => group.getHandlers())
+        .map((entry) => [entry.toolDefinition.name, entry.toolDefinition]),
+    );
+    const faults: string[] = [];
+    for (const tool of tools) {
+      const definition = definitions.get(tool.name);
+      if (definition === undefined || isEnvelopeTool(tool.name)) continue;
+      const built = envelopeSurfaceOf({
+        name: tool.name,
+        description: String(definition.description),
+        inputSchema: definition.inputSchema as never,
+      });
+      if (built.description !== tool.description) {
+        faults.push(`${tool.name}: description`);
+      }
+      const keys = Object.keys(built.inputSchema.shape).sort();
+      const servedKeys = Object.keys(tool.inputSchema.properties ?? {}).sort();
+      if (JSON.stringify(keys) !== JSON.stringify(servedKeys)) {
+        faults.push(`${tool.name}: parameters ${keys} / ${servedKeys}`);
       }
     }
     assert.deepStrictEqual(faults, []);

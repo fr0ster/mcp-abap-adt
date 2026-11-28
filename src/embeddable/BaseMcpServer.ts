@@ -97,6 +97,10 @@ import {
 } from '../lib/batch/batchTools.js';
 import { eligible } from '../lib/batch/eligibility.js';
 import {
+  envelopedDescription,
+  envelopeSurfaceOf,
+} from '../lib/batch/envelopeSurface.js';
+import {
   type EnvelopeArgs,
   type EnvelopeCall,
   envelopeArgsOf,
@@ -146,7 +150,6 @@ import {
 } from '../lib/debugger/ownConnectionTools.js';
 import {
   batchable,
-  envelopable,
   partsOfDescription,
   toolDescription,
 } from '../lib/description';
@@ -2635,7 +2638,11 @@ export abstract class BaseMcpServer extends McpServer {
           const inputSchema =
             enveloping === undefined
               ? withHandle
-              : envelopeSchemaOf(withHandle, enveloping.admitted);
+              : envelopeSurfaceOf({
+                  name: entry.toolDefinition.name,
+                  description: listed.description,
+                  inputSchema: withHandle,
+                }).inputSchema;
           // The prompts read the tool's own schema: an envelope's
           // `envelope_handle` and looseness are the dispatch's.
           promptTools.push({ definition, inputSchema: withHandle });
@@ -2697,15 +2704,23 @@ export abstract class BaseMcpServer extends McpServer {
           this.registerTool(
             entry.toolDefinition.name,
             {
-              description: envelopedDescription(
-                servedDescription(
-                  listed.description,
-                  entry.toolDefinition.name,
-                  sentenced && !runsBesideBatch(entry.toolDefinition.name),
-                ),
-                entry.toolDefinition.name,
-                enveloping?.admitted === true,
-              ),
+              description:
+                enveloping === undefined
+                  ? servedDescription(
+                      listed.description,
+                      entry.toolDefinition.name,
+                      sentenced && !runsBesideBatch(entry.toolDefinition.name),
+                    )
+                  : envelopeSurfaceOf({
+                      name: entry.toolDefinition.name,
+                      description: servedDescription(
+                        listed.description,
+                        entry.toolDefinition.name,
+                        sentenced &&
+                          !runsBesideBatch(entry.toolDefinition.name),
+                      ),
+                      inputSchema: withHandle,
+                    }).description,
               inputSchema,
               ...listed.search,
             },
@@ -4053,25 +4068,6 @@ function destinationContextOf(
  * assembled text (plan step 10.1); one not yet assembled has it appended,
  * as before (until its group of step 10.7 moves it).
  */
-/**
- * `description` with its envelope note appended (spec §5.1) when the tool is
- * admitted into an envelope: a note, so the served text stays an assembled
- * description. Unchanged otherwise.
- */
-export function envelopedDescription(
-  description: string,
-  tool: string,
-  admitted: boolean,
-): string {
-  if (!admitted) return description;
-  const note = envelopable(tool);
-  if (note === undefined) return description;
-  const parts = partsOfDescription(description);
-  return parts === undefined
-    ? `${description.trimEnd()} ${note.text}`
-    : toolDescription({ ...parts, notes: [...(parts.notes ?? []), note] });
-}
-
 export function servedDescription(
   description: string,
   tool: string,
@@ -4086,3 +4082,5 @@ export function servedDescription(
         notes: [...(parts.notes ?? []), batchable(tool)],
       });
 }
+
+export { envelopedDescription };

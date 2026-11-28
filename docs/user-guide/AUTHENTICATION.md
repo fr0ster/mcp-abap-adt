@@ -489,10 +489,22 @@ it arose. A tool never rewrites it:
   turned into an empty result, a `null`, a warning or "not found"; only a `404` where a tool
   defines what absence answers (a source or a package level that is not there) stays absence.
 - **No answer from SAP** — the connection failed: `origin: "connection"` with no `status`
-  and no `raw_body`.
+  and no `raw_body`. When the network failed it carries `connection_cause`, the network code
+  (`ECONNREFUSED`, `ECONNRESET`, `ENOTFOUND`, `EAI_AGAIN`, `ETIMEDOUT`, `EHOSTUNREACH`,
+  `ENETUNREACH`, `EPIPE`). A network failure leaves the SAP session and its locks in place: once
+  the network is back, the next call goes on in the same session, under the same `lock_handle`.
+- **The session is gone** — `session_error` names the connection's session error
+  (`ADT_NOT_CONNECTED`, `ADT_SESSION_REPLACED`; `ADT_RELEASE_PENDING` is not a lost session),
+  and `session_lost` (`ADT_SESSION_REPLACED`) that SAP answered on a replaced session. Either
+  way the locks of that session are gone with it: lock again.
 - **The method failed** — a throw in the client, a reading or the tool itself (a document it
   could not parse, a defect): `error: "client_threw"` and the thrown message, with no `origin`
-  — it is not presented as SAP's answer.
+  — it is not presented as SAP's answer. A throw that carried a listed network code or session
+  error names it the same way (`connection_cause`, `session_error`, `session_lost`).
+- `connection_cause`, `session_error` and `session_lost` are typed codes, never words, an
+  address or a URL. They appear on the answer and on each entry of `failures` and
+  `cleanup.failures` whose failure held them. A write whose own unlock failed on the network
+  answers its success with `cleanup.left_locked: true` and the entry's `connection_cause`.
 - **A tool of several reads** names the read that was refused as its `step`: `GetTypeInfo`
   (`read data element`, `read domain`, `read structure`, `read table type`; a `404` there is the
   kind absent, not a refusal) and `GetTransport` (`read transport request`). Each read is a

@@ -23,6 +23,12 @@ import { randomBytes } from 'node:crypto';
 import { after, it } from 'node:test';
 import { parseDeniedEntry } from '../../../lib/access/deniedActions';
 import {
+  holdLock,
+  lockReleased,
+  reportHeldLocks,
+  unlockSending,
+} from '../coverage/ownObjects';
+import {
   configuredSystemKind,
   resolvePackageName,
   resolveTransportRequest,
@@ -72,6 +78,7 @@ const classSource = (name: string) =>
 
 liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
   after(async () => {
+    reportHeldLocks();
     await deleteRecorded();
   });
 
@@ -231,6 +238,12 @@ liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
           if (typeof handle !== 'string' || handle === '') {
             throw new Error('HandlerLock answered no lock_handle');
           }
+          // Owned until SAP answered its unlock, which is sent once (#394).
+          holdLock({
+            object_type: 'CLASS',
+            object_name: written,
+            lock_handle: handle,
+          });
           try {
             succeeded(
               'HandlerUpdate CLASS',
@@ -243,15 +256,15 @@ liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
               }),
             );
           } finally {
-            succeeded(
-              'HandlerUnlock CLASS',
-              await livePrepare('HandlerLock', {
-                action: 'unlock',
-                object_type: 'CLASS',
-                object_name: written,
-                lock_handle: handle,
-              }),
-            );
+            unlockSending(handle);
+            const unlocked = await livePrepare('HandlerLock', {
+              action: 'unlock',
+              object_type: 'CLASS',
+              object_name: written,
+              lock_handle: handle,
+            });
+            if (unlocked.isError !== true) lockReleased(handle);
+            succeeded('HandlerUnlock CLASS', unlocked);
           }
           succeeded(
             'HandlerCheckRun CLASS',

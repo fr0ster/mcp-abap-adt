@@ -105,3 +105,15 @@ export async function releaseHeldLocks(): Promise<void> {
     (line) => console.log(`[held locks] ${line}`),
   );
 }
+
+/**
+ * Names every lock a case still holds, sending nothing: for a suite whose
+ * cases send their unlock themselves, once.
+ */
+export function reportHeldLocks(): void {
+  for (const { lock, state } of heldLocks.stillOwned) {
+    console.log(
+      `[held locks] still held (${state}): ${lock.object_type} ${lock.object_name}`,
+    );
+  }
+}

@@ -104,15 +104,17 @@ A new class, `src/lib/batch/InstanceEnvelopes.ts`, owns one instance's envelopes
 
 - `holdsState()` is true while any envelope is open.
 - `pending()` is false and `failures()` is empty.
-- `dispose()` drops every envelope: it aborts each one's signal, so every recorded handler
-  settles, sends nothing, and empties the map.
+- `dispose()` drops every envelope: it aborts each one's signal, and with it every recorded
+  call's own signal, so every recorded handler settles, nothing is sent, and the map empties.
 - `observe()` behaves as in `InstanceBatch`.
 
 It holds a `Map<handle, Envelope>`. Each envelope has:
 
 - its handle and its session key (§4);
 - its creation order;
-- its own `AbortController`;
+- its own `AbortController`, the parent of one `AbortController` per recorded call. A call's
+  signal aborts when the envelope's does, or alone (§6.3). The call's recorder races its waits
+  against the call's own signal, not the envelope's;
 - its counter (the last number taken);
 - its recorded calls and their pending parts (§5.3);
 - whether it already holds a node-structure request (§5.4).
@@ -279,15 +281,21 @@ declare. So the key has to reach the dispatch through the schema. The registrati
 `BaseMcpServer` (where `withStateHandle` is applied) registers every core tool's schema in one of
 three forms:
 
-- **An admitted read:** its object schema extended with the declared `envelope_handle` (§5.1).
+- **An admitted read:** the same shape as a loose object (`z.looseObject`), extended with the
+  declared `envelope_handle` (§5.1). Undeclared keys — `background` above all, which a read like
+  `GetClass` does not declare — reach `runCall` as the call gave them.
 - **One of the four envelope tools:** its own schema, as declared.
 - **Every other core tool:** the same shape as a loose object (`z.looseObject`). An undeclared key
   then reaches `runCall`. `runCall` refuses the call with `envelope_not_recordable` when the raw
-  arguments hold `envelope_handle` with any value, `null` and `''` included. It drops every other
-  undeclared key before the handler, so the handler gets the arguments it gets today.
+  arguments hold `envelope_handle` with any value, `null` and `''` included.
 
-  The listed JSON Schema of these tools changes only in `additionalProperties`. A test pins
-  that, and the listing files are regenerated.
+For an admitted read and for every other core tool alike, `runCall` reads what it needs from the
+undeclared keys — `envelope_handle`, and on the recording path `background` (check 5 below) —
+then drops every undeclared key before any handler runs, the ordinary handler included. So a
+handler gets the arguments it gets today, and a call without `envelope_handle` behaves as today.
+
+The listed JSON Schema of the loose tools changes only in `additionalProperties`. A test pins
+that, and the listing files are regenerated.
 
 What the call carries decides the path:
 
@@ -299,13 +307,21 @@ What the call carries decides the path:
 The recording path runs inside `runCall`, before the open-batch check, so a read with a handle
 reaches its envelope even while a compact or debugger batch is open. A call of one of the four
 envelope tools never takes it. Its checks run in this order; each refusal takes no number and
-sends nothing:
+sends nothing.
+
+Checks 1 and 2 run before the dispatch acquires a connection, so a call that names someone
+else's envelope or an unknown one sends nothing, not even a logon:
 
 1. The owner is present, else `envelopes_unavailable`.
 2. The envelope is found for this call's session key (`find`, §4), else `envelope_unavailable`.
+
+The dispatch then acquires the connection as for any call, and the remaining checks run:
+
 3. The tool is admitted for the core set with these arguments over this connection kind
    (`eligible(tool, args, connection, 'core')`), else `envelope_not_recordable`.
-4. The call does not state `background: true`, else `batch_no_background`.
+4. The raw arguments do not state `background: true`, else `batch_no_background`. The check
+   reads the key kept by the loose schema, so a read that does not declare `background` is
+   refused just the same.
 5. The call holds the flow, does not run in the background and is no debugger tool, else
    `envelope_not_recordable`, as compact's `recordCall` checks.
 6. The access restrictions admit it, else their own refusal, checked at the same point as in
@@ -360,12 +376,15 @@ The refusal follows compact's `batch_other_kind` rule:
 `ReadEnvelopeExecute` holds the flow, and the dispatch takes the instance's connection for the
 whole call, as for `HandlerBatch` `end`. The steps run in this order:
 
-1. **The connection.** The dispatch acquires it (`getConnection`) before the handler runs. If
-   that fails, the call answers that failure as any call does, before the claim. The envelope
-   stays open, with its record unchanged, and a later execute can still send it.
-2. **The owner and the session key** (§4): `envelopes_unavailable` or `envelope_unavailable`,
-   before the claim.
-3. **The claim** (`claim`). Before it, nothing of the envelope has changed. After it, the
+1. **The owner and the session key** (§4), before anything else: `envelopes_unavailable` or
+   `envelope_unavailable`, through `find`. The dispatch runs this check for the four envelope
+   tools ahead of connection acquisition (`ENVELOPE_TOOLS`), so a refused execute sends nothing,
+   not even a logon. Create, discard and list need no connection at all and never acquire one.
+2. **The connection.** Only then does the dispatch acquire it (`getConnection`). If that fails,
+   the call answers that failure as any call does, before the claim. The envelope stays open,
+   with its record unchanged, and a later execute can still send it.
+3. **The claim** (`claim`, which repeats the session check; the main flow guarantees that
+   nothing between steps 1 and 3 could have ended the envelope). Before it, nothing of the envelope has changed. After it, the
    envelope is ended, and every outcome below is answered under the numbers.
 4. **An empty envelope** answers `[]`. Nothing is planned or sent.
 5. **The plan.** The pending parts are planned by the consumer's `partsPerEnvelope`:
@@ -384,7 +403,7 @@ The part of `runPhaseOutcome` that sends planned envelopes is extracted into one
 `sendPlanned` (`phases.ts`). The phases and the envelope both call it. Its contract:
 
 - **It takes** the call's context and connection, the pending parts, the plan (runs of item
-  indexes), `correction: boolean`, and `stop(outcome) => boolean | Promise<boolean>`.
+  indexes), `correction: boolean`, and `endsOn(outcome) => boolean | Promise<boolean>`.
 - **For each run in order** it builds a fresh `AdtBatchConnection` (`endpoint: 'communication'`)
   under an `EnvelopeWatch`, records the run's parts on it, executes it, and settles each part
   (resolved with its response, or rejected with its error). Only with `correction` does it then
@@ -395,20 +414,46 @@ The part of `runPhaseOutcome` that sends planned envelopes is extracted into one
     credential refusal, `batch_unsplit`, `batch_parts_mismatch`, or the batch-availability
     absence;
   - `unauthorizedPart`, when some part SAP answered `401`.
-- **After each run** it calls `stop(outcome)`. A `failed` or `unauthorizedPart` run, or `stop`
-  answering `true`, ends the sending. The parts of every later run settle with the ending
-  run's error and are marked unsent.
+- **What ends the sending.**
+  - The sender itself ends it only on the conditions that end every phase today, whatever the
+    caller says: a credential refusal, an oversized correction envelope, and the
+    batch-availability absence verdict (`runPhaseOutcome`, the `oversized` and `absent`
+    branches, and the credential rethrow of `runPhase`).
+  - Every other outcome — a `failed` run, an `unauthorizedPart` run — ends the sending only when
+    the caller's `endsOn(outcome)` answers `true`. After each run the sender calls `endsOn` and
+    honours its answer.
+  - Once the sending ends, the parts of every later run settle with the ending run's error and
+    are marked unsent.
 - **It answers** the outcome of every run, sent or not.
 
-The phases pass `correction: true` and a `stop` that awaits the run's items' settlements and
-applies `rules.after` and `failuresEnd`, which is what they do today. The envelope passes
-`correction: false` and a `stop` that answers `false`, so it decides from the wire alone and no
-handler is awaited between runs. `phases.test.ts` and the existing phase suites must pass
-unchanged.
+**What each caller passes:**
+
+- **The phases** pass `correction: true` and an `endsOn` that is exactly today's policy:
+  - it awaits the run's items' settlements;
+  - it answers `true` for a failed envelope, a failed correction envelope or a `401` part only
+    when `rules.failuresEnd` is not `false`;
+  - it answers `true` when `rules.after` does.
+
+  A phase with `failuresEnd: false` (`packageWalk.ts`) therefore keeps sending after a failed
+  envelope, as it does today. `phases.test.ts`, the package-walk suites and every existing phase
+  suite must pass unchanged, and §9.6 adds a case for `failuresEnd: false` through `sendPlanned`.
+- **The envelope** passes `correction: false` and an `endsOn` that answers `true` for every
+  `failed` and `unauthorizedPart` run, and awaits no handler. Its sending always stops at the
+  first failure.
 
 ### 6.3 Answers by run outcome
 
 When the sending ends, each number is answered by the outcome of the run it belongs to.
+
+The answers are built in two steps, so that no failure cancels an answer that is owed:
+
+1. **The answered runs first.** The calls of every answered run (an `unauthorizedPart` run
+   included) resume and settle before anything is aborted.
+2. **Then the rest.** Only after that does the execute abort the signals of the calls of the
+   failed and unsent runs, call by call through each call's own `AbortController`, and never the
+   envelope's shared signal.
+
+So a failure in the second of three runs leaves the first run's handlers untouched.
 
 - **An answered run** (an `unauthorizedPart` run included): the run's calls' handlers resume
   with their parts, all in parallel, and each builds its number's answer — its projection of a
@@ -418,8 +463,9 @@ When the sending ends, each number is answered by the outcome of the run it belo
 - **A failed run:** its numbers are answered by the execute itself, not by their handlers. Each
   one is the envelope's failure answer, as `failureAnswer` (`execute.ts`) builds it: SAP's outer
   status and body with `step: "execute"`, or the failure reader's answer for a credential refusal
-  or a server refusal. The handlers are let go (the envelope's signal aborted), so no handler can
-  catch, translate or drop that failure.
+  or a server refusal. Each of those calls' handlers is let go through its own signal, after the
+  answered runs have settled. So no handler can catch, translate or drop that failure, and no
+  answered run's handler is touched.
 - **An unsent run:** its numbers are answered by the same failure answer as the run that ended
   the sending. For an `unauthorizedPart` run, that is the `401` part's credential refusal, read
   by the failure reader.
@@ -619,7 +665,9 @@ New file: `envelopeRecording.test.ts`.
     the values `"x"`, `""`, `null` and `42`.
   - An admitted read given `""`, `null` or `42` gets the schema refusal.
   - The four envelope tools are never routed to recording.
-  - `background: true` is refused `batch_no_background`.
+  - `background: true` is refused `batch_no_background` on a read that declares `background` and
+    on one that does not (`GetClass`). Without a handle, an undeclared `background` is dropped
+    before the handler, as today.
   - An access-restricted call is refused before it takes a number, and its package-tree read
     goes out at once.
 - **The listed schemas.** Every non-admitted core tool's listed JSON Schema equals today's apart
@@ -647,7 +695,8 @@ New file: `envelopeExecute.test.ts`, at a counting connection.
     even when the handler of that number would catch the error: SAP's refusal, a transport
     error, a credential refusal, a parts mismatch, unsplit, and the absence verdict.
   - With a bound, a failure in the second of three runs keeps the first run's answers and sends
-    no third. The unsent numbers answer that failure.
+    no third. The unsent numbers answer that failure. The first run's handlers are never
+    aborted: their projections are built, including one whose handler awaits its part slowly.
   - A `401` part ends the sending in the same way.
 - **What it does not do.**
   - No `406`/`415` correction is resent.
@@ -656,8 +705,12 @@ New file: `envelopeExecute.test.ts`, at a counting connection.
 - **The answer.**
   - `keepRawParts` adds `raw`.
   - An empty envelope answers `[]` and sends nothing.
-- **Before the claim.** A connection acquisition that fails leaves the envelope open with its
-  record. A later execute sends it once.
+- **Before the claim.**
+  - A connection acquisition that fails leaves the envelope open with its record, and a later
+    execute sends it once.
+  - An execute naming an unknown or foreign handle on a cold instance makes no request and no
+    logon; the connection factory is never called.
+  - The same holds for a read with a foreign handle.
 - **Once only.**
   - A second execute, a discard after execute, and a record after execute each answer
     `envelope_unavailable`, and the connection counts one send.
@@ -678,7 +731,10 @@ New file: `envelopeExecute.test.ts`, at a counting connection.
 
 ### 9.6 The shared sender
 
-- `phases.test.ts` and every existing phase suite pass unchanged.
+- `phases.test.ts`, the package-walk suites and every existing phase suite pass unchanged.
+- A phase with `failuresEnd: false` keeps sending after a failed envelope through `sendPlanned`,
+  as today, and one with the default stops.
+- An envelope stops at its first failed run.
 - One new case: the phases still send the `406`/`415` correction envelope through `sendPlanned`.
 
 ### 9.7 Surface

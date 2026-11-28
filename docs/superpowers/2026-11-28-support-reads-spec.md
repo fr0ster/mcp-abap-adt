@@ -102,7 +102,9 @@ input answers `undefined`; it never throws and never fabricates a value.
   - An answer that is no `app:service` document reads as `undefined`.
 - **`docuPage`**: `IResultStrategy<IDocuPage | undefined>`.
   - Types:
-    - `IDocuPage` is `{ title: string; text: string; links: readonly DocuLink[] }`.
+    - `IDocuPage` is `{ title: string; text: string; links: readonly DocuLink[];
+      versions: readonly IDocuTopicLink[] }`; `versions` holds every `option` whose
+      `value` is a topic link (its `href` the value), in document order.
     - A `DocuLink` is one of these two shapes:
       - `{ kind: 'topic'; href: string; object: string; version: string | null;
         language: string | null; label: string }`;
@@ -541,7 +543,7 @@ unreadable success stays a success.
 | `detail` | Answer |
 |---|---|
 | `terse` (default) | Text, written by the listing writer:<br>• `# title <title>`<br>• the page text as one line<br>• `# links <count>`<br>• one TSV row per link, in page order: `topic`, object, version (`-` for `null`), language (`-` for `null`), label, href; or `other`, href, label |
-| `medium`, `full` | JSON `{ title, text, links }`, the whole `docuPage` reading |
+| `medium`, `full` | JSON `{ title, text, links, versions }`, the whole `docuPage` reading |
 | `raw` | The HTML as sent |
 
 - Every level holds every link the page carries, as the reading defines it (§2.1).

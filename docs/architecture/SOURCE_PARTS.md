@@ -298,9 +298,13 @@ element.
   - a declaration: its `definitionBlock`;
   - a local class's definition or implementation;
   - the class's own definition: the attributes, signatures and types, without any method body.
-- The analyzer takes the include from the link and the lines and columns from the position. It
-  calls no navigation, and the scanner finds no end here. The lexer still runs over the include,
-  for the boundary check of §5.4.
+- The analyzer takes the include from the link and the start from the position. It calls no
+  navigation. **The end is always derived from the text**, never taken from SAP's position: the
+  scanner finds it from the start, by the same rules as for a program element (the block's
+  terminator; for a declaration, the `.` that ends its statement). SAP's `end` is only compared:
+  a derived end on another line than SAP's is refused (`end_mismatch`), so a stale position that
+  starts at the right method and ends at a later one is never taken. Under the lock this runs on
+  the locked text (§7.2).
 - A method has two sides, `implementation` and `definition`; an interface's method has only
   `definition`. For the class itself, `definition` is the "definitions first" read.
 - **ABAP Doc stays outside.** The `"!` lines above a declaration are not part of its part, as
@@ -396,7 +400,14 @@ another candidate:
 The spec gives the full list of event statements and the test inputs of each rule.
 
 
+**`GET` events.** `GET <node>` is also an ordinary statement (`GET TIME`, …), so the scanner does not
+recognise it as an event. A program whose outline lists any `GET` event has all its events
+refused as parts, since an event's end could run over a `GET` event. This holds on every
+addressing path: a part read of an event, by address, short form or `ref`, reads the program's
+outline to decide it, and a locked write decides it on its fresh outline.
+
 ### 5.3 A function module
+
 
 A function module has no outline (`404`, measured 2026-11-04). It is one element, its whole
 source:
@@ -409,10 +420,10 @@ source:
 - **A part is whole lines**, from the block's first line to its last, exactly as SAP holds them
   (the goal's invariant). Because `end` stops before the period (§2), whole lines are what
   carries the period.
-- **Locating and checking are two steps.** Locating gives the block: SAP's positions for a class
-  or an interface (lines and columns, kept), navigation plus the scanner elsewhere. Checking runs
-  the same lexer over the include, for every kind, and decides whether the block's whole lines
-  hold only that element.
+- **Locating and checking are two steps.** Locating gives the block's start (SAP's position for a
+  class or an interface, navigation elsewhere) and derives its end with the scanner from the text,
+  for every kind. Checking runs the same lexer and decides whether the block's whole lines hold
+  only that element.
 - The check reads the text around the block with the lexer, never by column arithmetic alone:
   - before the start on the first line: only blanks are allowed;
   - after the end on the last line: only the closing period, blanks, a `"` comment and a pragma;

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deprecated
+
+- **`messageClassMessage.create` and `messageClassMessage.delete` of `DEFAULT_ADT_HEADERS` / `AdtOperation` (`@mcp-abap-adt/lib/adt-headers`)** are marked `@deprecated`: they have no effect since adt-clients 48 (the message tools send `messageClassMessage.update`), and they are removed in the next major. They stay in 24.3.0, since removing them would change the exported type in a minor. A type annotation only: nothing reads them at runtime.
+
 ### Fixed
 
 - **`GetObjectsList`: one object's refused metadata read no longer ends the whole list** (#398). At `detail` medium and full the second pass reads each object's metadata; every failed metadata read ended the call but one SAP answered `404`, the only refusal kept as the object's answer — so on ABAP cloud one enhancement's `403` ("No authorization to access the resource", its node URI) threw away the whole list. Now any such refusal is that object's, on the batched and the sequential path alike: it stays in the list with SAP's status and message — the exception document's message, else SAP's text body trimmed, none for an empty body; a `404` the same — (`metadata_error` at medium, `METADATA_ERROR` at full, the `# metadata_error` line at terse), and the rest is read and answered. A `401`, a credential refusal, a failure SAP did not answer and a failed envelope still end the call. Every level now counts the objects carrying a refusal: `# refused <n>` at terse, `refused_objects` at medium and full (`0` when none). `docs/user-guide/BATCH_MODE.md`, "`GetObjectsList`".

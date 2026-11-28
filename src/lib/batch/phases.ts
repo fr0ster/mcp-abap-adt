@@ -274,12 +274,12 @@ function itemView(
 }
 
 /** A part's answer: SAP's response, or the failure it was rejected with. */
-type PartAnswer =
+export type PartAnswer =
   | { ok: true; response: IAdtWireResponse }
   | { ok: false; error: unknown };
 
 /** One recorded part: its first answer, its hand-over, and the call that recorded it. */
-interface RecordedPart {
+export interface RecordedPart {
   first: Promise<PartAnswer>;
   answer(final: PartAnswer): void;
   /** The header-taking call that recorded it, when one did. */
@@ -405,7 +405,7 @@ async function correctPhaseParts(
  * credential's refusal, which ends the call whatever its read makes of it.
  * The error the items not sent settle with.
  */
-type PhaseEnd = { readonly error: unknown } | undefined;
+export type PhaseEnd = { readonly error: unknown } | undefined;
 
 /** A part SAP answered `401`, as its first answer carries it. */
 function unauthorizedPart(firsts: readonly PartAnswer[]): PhaseEnd {
@@ -508,7 +508,7 @@ export async function runPhase<I, R>(
 }
 
 /** One request a read recorded, waiting for its envelope. */
-interface Pending extends RecordedPart {
+export interface Pending extends RecordedPart {
   readonly item: number;
   readonly request: IAbapRequestOptions;
 }
@@ -636,13 +636,141 @@ export async function runPhaseOutcome<I, R>(
     throw checked.refused;
   }
 
-  let envelope: PhaseOutcome<R>['envelope'] = { failed: false };
+  const sent = await sendPlanned<R>(
+    context,
+    planning,
+    pending,
+    checked.envelopes,
+    {
+      correction: true,
+      settlements: (run) =>
+        Promise.all(
+          run.map(
+            (item): Promise<PhaseResult<R>> =>
+              entries[item]?.settled ??
+              Promise.resolve({ ok: false, error: undefined }),
+          ),
+        ),
+      endsOn: async ({ sent: envelopeSent, at, run, results }) => {
+        if (failuresEnd && envelopeSent.failed !== undefined) {
+          return { error: envelopeSent.failed.error };
+        }
+        if (failuresEnd && envelopeSent.end !== undefined)
+          return envelopeSent.end;
+        if (
+          at < checked.envelopes.length - 1 &&
+          rules?.after !== undefined &&
+          (await rules.after(
+            run.flatMap((item) => {
+              const value = items[item];
+              return value === undefined ? [] : [value];
+            }),
+            results ?? [],
+          ))
+        ) {
+          return { error: new Error(NOT_SENT_WORDS) };
+        }
+        return undefined;
+      },
+    },
+  );
+  if (sent.stopped !== undefined) {
+    // Nothing more is sent: every read not answered settles with the
+    // refusal, which is thrown.
+    await Promise.all(entries.map((e) => e.settled));
+    throw sent.stopped.error;
+  }
+  const { envelope, refusedItems, unsent } = sent;
+  const settled = await Promise.all(entries.map((e) => e.settled));
+  const results = settled.map((result, at): PhaseResult<R> => {
+    const refused = refusedItems.get(at);
+    return refused === undefined ? result : { ok: false, error: refused };
+  });
+  return { results, envelope, unsent };
+}
+
+/** One run of the plan as `sendPlanned` sent it, handed to the caller's `endsOn`. */
+export interface SentRun<R> {
+  /** The run's place in the plan, from 0. */
+  readonly at: number;
+  /** The run's item indexes. */
+  readonly run: readonly number[];
+  /** What the run's envelope came to. */
+  readonly sent: SentEnvelope;
+  /** The run's items' settlements, when the caller hands them (`settlements`). */
+  readonly results: readonly PhaseResult<R>[] | undefined;
+}
+
+/**
+ * How `sendPlanned` sends: with or without the format correction, the
+ * caller's settlements of a run's items, and the caller's decision whether
+ * a run's outcome ends the sending, beside the stops the sender always
+ * makes.
+ */
+export interface PlanRules<R> {
+  /** Whether a run's `406`/`415` parts go once more in a correction envelope (`correctPhaseParts`). */
+  readonly correction: boolean;
+  /**
+   * The run's items' settlements, awaited after the run's envelope: a
+   * settlement the failure reader knows ends the sending, whatever
+   * `endsOn` says. Absent: nothing is awaited between runs.
+   */
+  readonly settlements?: (
+    run: readonly number[],
+  ) => Promise<readonly PhaseResult<R>[]>;
+  /** The caller's end of the sending after a run, beside the sender's own stops: the error the later runs settle with. */
+  readonly endsOn: (run: SentRun<R>) => PhaseEnd | Promise<PhaseEnd>;
+}
+
+/** What `sendPlanned` came to. */
+export interface PlanSent {
+  /**
+   * The phase's envelope outcome, as `PhaseOutcome.envelope` reports it:
+   * the first failed envelope's.
+   */
+  readonly envelope: PhaseOutcome<unknown>['envelope'];
+  /** The items of a run refused a second envelope request: each fails with that refusal. */
+  readonly refusedItems: ReadonlyMap<number, Error>;
+  /** The items whose run was not sent. */
+  readonly unsent: ReadonlySet<number>;
+  /**
+   * A stop that ends the whole call — an oversized correction envelope, the
+   * endpoint's absence: every part not answered was settled with it, and
+   * the caller throws or answers it.
+   */
+  readonly stopped?: { readonly error: unknown };
+}
+
+/**
+ * The planned runs sent one after another, each in an envelope of its own
+ * on `context.connection` (`sendEnvelope`), every pending part handed its
+ * answer. The sender always stops — whatever `endsOn` says — on an
+ * oversized correction envelope and on the endpoint's absence (`stopped`,
+ * every part not answered settled with it), on a refused second envelope
+ * request (that run's items fail with it), on a run's envelope failure
+ * the failure reader knows (a credential refusal), and on a run's
+ * settlement the failure reader knows (when `settlements` is given).
+ * Every other outcome ends the sending only when `endsOn` answers an end.
+ * Once ended, the parts of every later run settle with the ending error,
+ * and their items are unsent.
+ */
+export async function sendPlanned<R>(
+  context: HandlerContext,
+  phase: object,
+  pending: readonly Pending[],
+  envelopes: readonly (readonly number[])[],
+  rules: PlanRules<R>,
+): Promise<PlanSent> {
+  const settleUnsent = (parts: readonly Pending[], error: unknown): void => {
+    for (const part of parts) part.answer({ ok: false, error });
+  };
+  let envelope: PhaseOutcome<unknown>['envelope'] = { failed: false };
   let ended: { error: unknown } | undefined;
   // Items of an envelope the phase was refused: nothing of theirs is kept.
   const refusedItems = new Map<number, Error>();
   // Items whose envelope was not sent: the phase ended before it.
   const unsent = new Set<number>();
-  for (const [at, run] of checked.envelopes.entries()) {
+  for (const [at, run] of envelopes.entries()) {
     const members = new Set(run);
     const parts = pending.filter((part) => members.has(part.item));
     if (ended !== undefined) {
@@ -650,34 +778,20 @@ export async function runPhaseOutcome<I, R>(
       for (const item of run) unsent.add(item);
       continue;
     }
-    const sent = await sendEnvelope(context, planning, parts);
-    if (sent.oversized !== undefined) {
-      // Nothing more is sent: every read not answered settles with the
-      // refusal, which is thrown.
-      const refused = sent.oversized;
+    const sent = await sendEnvelope(context, phase, parts, rules.correction);
+    if (sent.oversized !== undefined || sent.absent !== undefined) {
+      const stop = sent.oversized !== undefined ? sent.oversized : sent.absent;
+      // Nothing else is sent: every part not answered settles with it.
       settleUnsent(
         pending.filter((part) => !members.has(part.item)),
-        refused,
+        stop,
       );
-      await Promise.all(entries.map((e) => e.settled));
-      throw refused;
+      return { envelope, refusedItems, unsent, stopped: { error: stop } };
     }
-    if (sent.absent !== undefined) {
-      // The destination has no communication batch: nothing else is sent.
-      settleUnsent(
-        pending.filter((part) => !members.has(part.item)),
-        sent.absent,
-      );
-      await Promise.all(entries.map((e) => e.settled));
-      throw sent.absent;
-    }
-    const results = await Promise.all(
-      run.map(
-        (item): Promise<PhaseResult<R>> =>
-          entries[item]?.settled ??
-          Promise.resolve({ ok: false, error: sent.failed?.error }),
-      ),
-    );
+    const results =
+      rules.settlements === undefined
+        ? undefined
+        : await rules.settlements(run);
     if (sent.failed !== undefined && !envelope.failed) {
       envelope = {
         failed: true,
@@ -686,7 +800,7 @@ export async function runPhaseOutcome<I, R>(
         from: run[0] ?? 0,
       };
     }
-    const refusal = results.find(
+    const refusal = results?.find(
       (result) => !result.ok && failureOf(result.error) !== undefined,
     );
     if (sent.refused !== undefined) {
@@ -700,34 +814,20 @@ export async function runPhaseOutcome<I, R>(
       ended = { error: refused };
     } else if (refusal !== undefined && !refusal.ok) {
       ended = { error: refusal.error };
-    } else if (failuresEnd && sent.failed !== undefined) {
-      ended = { error: sent.failed.error };
-    } else if (failuresEnd && sent.end !== undefined) {
-      ended = sent.end;
     } else if (
-      at < checked.envelopes.length - 1 &&
-      rules?.after !== undefined &&
-      (await rules.after(
-        run.flatMap((item) => {
-          const value = items[item];
-          return value === undefined ? [] : [value];
-        }),
-        results,
-      ))
+      sent.failed !== undefined &&
+      failureOf(sent.failed.error) !== undefined
     ) {
-      ended = { error: new Error(NOT_SENT_WORDS) };
+      ended = { error: sent.failed.error };
+    } else {
+      ended = await rules.endsOn({ at, run, sent, results });
     }
   }
-  const settled = await Promise.all(entries.map((e) => e.settled));
-  const results = settled.map((result, at): PhaseResult<R> => {
-    const refused = refusedItems.get(at);
-    return refused === undefined ? result : { ok: false, error: refused };
-  });
-  return { results, envelope, unsent };
+  return { envelope, refusedItems, unsent };
 }
 
 /** What one envelope's dispatch came to. */
-interface SentEnvelope {
+export interface SentEnvelope {
   /** The envelope request failed: every part's failure, as it came. */
   readonly failed?: { error: unknown; outer: number | undefined };
   /** The phase was refused a second envelope request (`MORE_ENVELOPES_WORDS`). */
@@ -750,6 +850,7 @@ async function sendEnvelope(
   context: HandlerContext,
   phase: object,
   parts: readonly Pending[],
+  correction: boolean,
 ): Promise<SentEnvelope> {
   const watch = outerStatusWatch(context.connection);
   const batch = withSystemKindOf(
@@ -777,15 +878,15 @@ async function sendEnvelope(
   const firsts = await Promise.all(dispatched.map((part) => part.first));
   let end: { error: unknown } | undefined = unauthorizedPart(firsts);
   let oversized: Error | undefined;
-  if (!failed && adtCallScope.getStore()?.recorded !== true) {
-    const correction = await correctPhaseParts(
+  if (correction && !failed && adtCallScope.getStore()?.recorded !== true) {
+    const corrected = await correctPhaseParts(
       context,
       phase,
       dispatched,
       firsts,
     );
-    if (correction.oversized !== undefined) oversized = correction.oversized;
-    end ??= correction.failed ?? unauthorizedPart(correction.answers);
+    if (corrected.oversized !== undefined) oversized = corrected.oversized;
+    end ??= corrected.failed ?? unauthorizedPart(corrected.answers);
   }
   dispatched.forEach((part, at) => {
     const first = firsts[at];

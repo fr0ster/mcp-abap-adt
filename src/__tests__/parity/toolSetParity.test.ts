@@ -990,7 +990,8 @@ for (const transportName of [
         // write, run, debugger, logoff, resume or batch mode.
         // A table's technical settings and the text elements: two more.
         // The abapGit reads on premise, always listed: five more.
-        assert.equal(fullRo.tools.length, onStdio ? 82 : onHttp ? 83 : 81);
+        // The four reads of a class's local includes: four more.
+        assert.equal(fullRo.tools.length, onStdio ? 86 : onHttp ? 87 : 85);
         for (const name of [
           'GetBackgroundRun',
           'ListBackgroundRuns',

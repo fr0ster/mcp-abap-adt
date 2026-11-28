@@ -5,7 +5,7 @@ Generated from the tool definitions the server builds (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. The read envelopes are served here (`CreateReadEnvelope`, `ExecuteReadEnvelope`, `DiscardReadEnvelope`, `ListReadEnvelopes`, [BATCH_MODE.md](BATCH_MODE.md#envelopes-in-the-core-binaries)); compact batch mode (`HandlerBatch`) is the compact binaries'. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 86
+- Total tools: 90
 
 ## Navigation
 
@@ -34,6 +34,10 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetBehaviorImplementation](#getbehaviorimplementation-read-only-behavior-implementation)
   - [Class](#read-only-class)
     - [GetClass](#getclass-read-only-class)
+    - [GetLocalDefinitions](#getlocaldefinitions-read-only-class)
+    - [GetLocalTypes](#getlocaltypes-read-only-class)
+    - [GetLocalMacros](#getlocalmacros-read-only-class)
+    - [GetLocalTestClass](#getlocaltestclass-read-only-class)
   - [Common](#read-only-common)
     - [GetObjectVersions](#getobjectversions-read-only-common)
     - [GetObjectDraft](#getobjectdraft-read-only-common)
@@ -393,6 +397,70 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="getlocaldefinitions-read-only-class"></a>
+#### GetLocalDefinitions (Read-Only / Class)
+**Description:** [read-only] Reads the local definitions of an ABAP class (CLAS).
+
+**Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `class_name` (string, required) - Parent class name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="getlocaltypes-read-only-class"></a>
+#### GetLocalTypes (Read-Only / Class)
+**Description:** [read-only] Reads the local types and implementations of an ABAP class (CLAS).
+
+**Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `class_name` (string, required) - Parent class name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="getlocalmacros-read-only-class"></a>
+#### GetLocalMacros (Read-Only / Class)
+**Description:** [read-only] Reads the local macros of an ABAP class (CLAS).
+
+**Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `class_name` (string, required) - Parent class name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="getlocaltestclass-read-only-class"></a>
+#### GetLocalTestClass (Read-Only / Class)
+**Description:** [read-only] Reads the local test classes of an ABAP class (CLAS).
+
+**Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
+**Parameters:**
+- `class_name` (string, required) - Parent class name.
+- `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 

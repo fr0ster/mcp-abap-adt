@@ -1786,5 +1786,29 @@
     "name": "SwitchAbapGitBranch",
     "inputs": "repository_key*, branch*, create*",
     "available_in": "onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetLocalDefinitions",
+    "inputs": "class_name*, version, start_line, end_line",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetLocalTypes",
+    "inputs": "class_name*, version, start_line, end_line",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetLocalMacros",
+    "inputs": "class_name*, version, start_line, end_line",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetLocalTestClass",
+    "inputs": "class_name*, version, start_line, end_line",
+    "available_in": "cloud, onprem"
   }
 ]

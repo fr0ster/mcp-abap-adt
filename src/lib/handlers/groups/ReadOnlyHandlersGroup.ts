@@ -11,6 +11,22 @@ import {
   handleGetClass,
 } from '../../../handlers/class/high/handleGetClass';
 import {
+  TOOL_DEFINITION as GetLocalDefinitions_Tool,
+  handleGetLocalDefinitions,
+} from '../../../handlers/class/high/handleGetLocalDefinitions';
+import {
+  TOOL_DEFINITION as GetLocalMacros_Tool,
+  handleGetLocalMacros,
+} from '../../../handlers/class/high/handleGetLocalMacros';
+import {
+  TOOL_DEFINITION as GetLocalTestClass_Tool,
+  handleGetLocalTestClass,
+} from '../../../handlers/class/high/handleGetLocalTestClass';
+import {
+  TOOL_DEFINITION as GetLocalTypes_Tool,
+  handleGetLocalTypes,
+} from '../../../handlers/class/high/handleGetLocalTypes';
+import {
   TOOL_DEFINITION as GetObjectDraft_Tool,
   handleGetObjectDraft,
 } from '../../../handlers/common/readonly/handleGetObjectDraft';
@@ -177,9 +193,10 @@ import {
  * Handler group for all readonly (read-only) handlers.
  * Contains handlers that only read data without modifying the ABAP system.
  *
- * Some tools are a COPY of a high-level tool under the same name, handler and
- * schema (the object reads `Get<Type>`, GetUnitTestResult — purely reads, so
- * a read-only caller may use them too). Two tools cannot share one name on one server, so a readonly
+ * Some tools are a COPY of a high-level or debug tool under the same name,
+ * handler and schema (the object reads `Get<Type>`, the local includes of a
+ * class, GetUnitTestResult — purely reads, so a read-only caller may use them
+ * too). Two tools cannot share one name on one server, so a readonly
  * entry whose exact name another exposed group contributes is always
  * withheld, whatever the strategy: a caller granted both groups gets the tool
  * once, from that other group (high). An injected strategy may withhold
@@ -245,6 +262,11 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         handleGetBehaviorImplementation,
       ),
       defineTool(GetClass_Tool, handleGetClass),
+      // The local includes of a class, each read by its own tool.
+      defineTool(GetLocalDefinitions_Tool, handleGetLocalDefinitions),
+      defineTool(GetLocalTypes_Tool, handleGetLocalTypes),
+      defineTool(GetLocalMacros_Tool, handleGetLocalMacros),
+      defineTool(GetLocalTestClass_Tool, handleGetLocalTestClass),
       defineTool(GetDataElement_Tool, handleGetDataElement),
       defineTool(GetDdl_Tool, handleGetDdl),
       defineTool(GetDomain_Tool, handleGetDomain),

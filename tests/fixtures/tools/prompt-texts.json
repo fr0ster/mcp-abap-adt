@@ -345,19 +345,19 @@
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Get the INTERFACE \"SOME_NAME\".\n1. Call HandlerGet with object_type: \"INTERFACE\", interface_name: \"SOME_NAME\", background: false.\nINTERFACE takes INTERFACE(interface_name*); * marks a required argument."}
   ],
   "get local_definitions": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Get the LOCAL_DEFINITIONS of \"SOME_NAME\".\n1. Call GetLocalDefinitions with class_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Get the LOCAL_DEFINITIONS of \"SOME_NAME\".\n1. Call GetLocalDefinitions with class_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Get the LOCAL_DEFINITIONS of \"SOME_NAME\".\n1. Call HandlerGet with object_type: \"LOCAL_DEFINITIONS\", class_name: \"SOME_NAME\", background: false.\nLOCAL_DEFINITIONS takes LOCAL_DEFINITIONS(class_name*); * marks a required argument."}
   ],
   "get local_macros": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Get the LOCAL_MACROS of \"SOME_NAME\".\n1. Call GetLocalMacros with class_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Get the LOCAL_MACROS of \"SOME_NAME\".\n1. Call GetLocalMacros with class_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Get the LOCAL_MACROS of \"SOME_NAME\".\n1. Call HandlerGet with object_type: \"LOCAL_MACROS\", class_name: \"SOME_NAME\", background: false.\nLOCAL_MACROS takes LOCAL_MACROS(class_name*); * marks a required argument."}
   ],
   "get local_test_class": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Get the LOCAL_TEST_CLASS of \"SOME_NAME\".\n1. Call GetLocalTestClass with class_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Get the LOCAL_TEST_CLASS of \"SOME_NAME\".\n1. Call GetLocalTestClass with class_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Get the LOCAL_TEST_CLASS of \"SOME_NAME\".\n1. Call HandlerGet with object_type: \"LOCAL_TEST_CLASS\", class_name: \"SOME_NAME\", background: false.\nLOCAL_TEST_CLASS takes LOCAL_TEST_CLASS(class_name*); * marks a required argument."}
   ],
   "get local_types": [
-    {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Get the LOCAL_TYPES of \"SOME_NAME\".\n1. Call GetLocalTypes with class_name: \"SOME_NAME\"."},
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Get the LOCAL_TYPES of \"SOME_NAME\".\n1. Call GetLocalTypes with class_name: \"SOME_NAME\"."},
     {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Get the LOCAL_TYPES of \"SOME_NAME\".\n1. Call HandlerGet with object_type: \"LOCAL_TYPES\", class_name: \"SOME_NAME\", background: false.\nLOCAL_TYPES takes LOCAL_TYPES(class_name*); * marks a required argument."}
   ],
   "get metadata_extension": [

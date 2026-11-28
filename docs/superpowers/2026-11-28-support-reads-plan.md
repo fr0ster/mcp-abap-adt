@@ -370,7 +370,11 @@ registry.
       - On a cold discovery cache they wait for the discovery answer before their own
         request, which `oneRequestPerEntry` refuses, as #392 treats every read that waits
         on another answer (spec §4.1 "Batch").
-      - A unit test proves that a call of each in batch mode runs outside it.
+      - A unit test, with a communication batch open, calls each new `HandlerGet` type
+        (both parts) and `keyword_documentation` with `background: false`. Each is refused
+        `batch_not_recordable` (`BaseMcpServer.recordCall`), with zero requests on the
+        connection double (discovery included) and no batch entry allocated: the batch's
+        entry count and numbering are unchanged.
       - `tools/batch-handlers.json`, `BATCH_ENTRY_CASES`, `docs/user-guide/BATCH_MODE.md`
         and the batch sentences of `HandlerGet` and `HandlerSystem` stay unchanged, and
         the batch tests pass unchanged.

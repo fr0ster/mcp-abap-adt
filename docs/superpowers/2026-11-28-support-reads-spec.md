@@ -399,8 +399,12 @@ How they are registered:
   for the discovery answer before it sends its own request, while a batch
   (`oneRequestPerEntry`) sends every request before any answer comes back. So, as #392
   treats every read that waits on another answer, the new `HandlerGet` types and the
-  `keyword_documentation` action get no row in `tools/batch-handlers.json`, and in batch
-  mode they run outside it, as such calls do.
+  `keyword_documentation` action get no row in `tools/batch-handlers.json`.
+  - While a communication batch is open, a call of one of them is refused
+    `batch_not_recordable`, with `batchNotRecordableWords` (`BaseMcpServer.recordCall`: the
+    eligibility check against the table, after the background checks).
+  - Nothing is sent, the discovery read included, and no batch entry or number is allocated.
+  - With `background: true` the existing `batch_no_background` refusal answers first.
   `tools/batch-handlers.json`, `BATCH_ENTRY_CASES`, `BATCH_MODE.md` and the batch sentences
   of `HandlerGet` and `HandlerSystem` stay as they are, and the batch tests stay green
   unchanged. The long-read and background handling (§4.1 "Long read") is not affected.

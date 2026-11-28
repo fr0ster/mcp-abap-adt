@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Read envelopes in the core binaries (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries), #392.** The model gathers independent reads into one ADT batch envelope with the read tools it knows: `CreateReadEnvelope` answers an `envelope_handle` (128 random bits) and sends nothing; a read called with it is recorded under the next number and sends nothing; `ExecuteReadEnvelope` sends every recorded read stateless, together, and answers each one under its number — what the read answers outside an envelope for the same SAP answer; `DiscardReadEnvelope` and `ListReadEnvelopes` end or list the open envelopes. See [Envelopes in the core binaries](docs/user-guide/BATCH_MODE.md#envelopes-in-the-core-binaries).
+  - Admitted: 46 single-call core reads in `tools/batch-handlers.json`, now set-aware (`set: "core"`), each proved by its `oneRequestPerEntry` case — the object reads (`GetClass` … `GetTableType`, `GetFunctionModule` for its metadata), the version, draft, outline, structure, type and transaction reads, `SearchObject`, `GetObjectsByType` (one node structure per envelope), the ATC and runtime reads, `ListServiceBindingTypes`, and the data tools where they are served. Each declares the optional `envelope_handle` and its description ends with one sentence about it. Any other tool given `envelope_handle` is refused `envelope_not_recordable`.
+  - A handle is valid only in the session that created it (the instance and its connection context; over Streamable HTTP also its `state_handle` and a digest of the destination and credential headers); an unknown and another session's handle answer `envelope_unavailable` alike. No clock of its own: an envelope ends by its execution, a discard, the instance's close or the held state's idle bound.
+  - `--batch-open-envelopes=<n>` (`MCP_BATCH_OPEN_ENVELOPES`, YAML `batch.openEnvelopes`, an embedder's `openEnvelopes`): the consumer's bound on the open envelopes of an instance; no bound when not given. `--batch-parts-per-envelope` applies to an envelope's execution as to every phase.
+  - `SessionClose`'s `held` names the open envelopes (`envelopes`). Every core tool but the envelope tools is registered as a loose object, so its listed schema now carries `additionalProperties`; its handler gets the arguments it got before.
+  - Measured on ABAP Cloud (2026-11-28): 13 reads of the shared objects in one envelope, each answer equal to the read outside it, without a bound and with a bound of 2.
+
 ### Changed
 
 - **`@mcp-abap-adt/adt-clients` 48, `@mcp-abap-adt/adt-strategies` 0.29, `@mcp-abap-adt/interfaces-adt` 33.** No tool changes for the model: the same tools, arguments and answers.

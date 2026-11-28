@@ -3,7 +3,8 @@
 Goal: `docs/superpowers/2026-11-28-soft-mode-stateful-goal.md`. Spec:
 `docs/superpowers/specs/2026-11-28-soft-mode-stateful-spec.md` (#394).
 
-The code that changes is under `src/__tests__/`. The docs that change are
+The code that changes is under `src/__tests__/`, plus the answer fields of
+step 1 in `src/lib/answer.ts` (spec §0). The docs that change are
 `src/__tests__/integration/README.md` and `CHANGELOG.md` (step 13).
 
 How each step is done:
@@ -20,17 +21,23 @@ How each step is done:
 
 ## Steps
 
-1. **Pin the answer fields (characterization, spec §1).** On the ADT
-   stand-in, tests pin where the network code and the session verdict sit for
-   each failure path a soft-mode step can take:
-   - a direct throw;
-   - a strategy failure entry;
-   - the `client_threw` entry;
-   - a `withLock` carrier on a failure answer;
-   - a `withLock` carrier on a success answer.
+1. **Tool answers name the connection failure (spec §0).** Failing tests
+   first:
+   - `failurePayload` with `connectionCause`, `sessionError` and `sessionLost`;
+   - `thrownEntry` and `answerThrown` for a thrown value with a network code,
+     a session error code, an unlisted code and no code;
+   - on the ADT stand-in with a socket cut, through a real handler:
+     - a high read;
+     - a compact update under a lock;
+     - a high update whose write is cut;
+     - a high update whose unlock is cut, which answers success with a
+       `cleanup` carrier;
+     - an unlock after the session ended.
 
-   A path that drops them goes to the owner as a finding, reads as
-   `unclassified`, and is not patched in `src/lib`.
+     Each answer must carry the field.
+
+   Then the change in `src/lib/answer.ts`, and a CHANGELOG line under
+   `## [Unreleased]` for the new answer fields.
 
 2. **`stepOutcome` (spec §1).** Failing tests first, then the helper:
    - one test per row;
@@ -149,8 +156,8 @@ How each step is done:
     - the package sibling;
     - how to run with `networkCut`.
 
-13. **CHANGELOG.** An entry under the unreleased 24.3.0, dated the day of
-    the change.
+13. **CHANGELOG.** The harness entry under `## [Unreleased]`, beside step 1's
+    line.
 
 14. **Live check (owner).** One include suite on premise, with
     `MCP_TEST_NETWORK_CUT_MS=5000` and `MCP_TEST_NETWORK_CUT_AT` naming its

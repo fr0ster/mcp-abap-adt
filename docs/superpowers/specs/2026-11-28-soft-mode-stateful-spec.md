@@ -2,9 +2,10 @@
 
 Goal: `docs/superpowers/2026-11-28-soft-mode-stateful-goal.md` (#394). This spec
 says what changes in the soft-mode harness and its suites. The code that
-changes is test code under `src/__tests__/`. The docs that change are
-`src/__tests__/integration/README.md` and `CHANGELOG.md`. Nothing changes in
-`src/lib`, `src/handlers`, the server packages or the dependencies.
+changes is test code under `src/__tests__/`, plus one change in `src/lib`
+(section 0). The docs that change are `src/__tests__/integration/README.md` and
+`CHANGELOG.md`. Nothing else changes in `src/lib` or `src/handlers`, nor in the
+server packages or the dependencies.
 
 ## Decisions
 
@@ -17,6 +18,35 @@ changes is test code under `src/__tests__/`. The docs that change are
   fails the test file, and the failure lists what is left (section 6). Hard
   mode keeps its warning.
 - The package delete keeps its own lock-free sibling session (section 7).
+- Tool answers keep the thrown connection error's code and the session-lost
+  verdict as typed fields, on failure entries and on `client_threw`, so the
+  model and the test can tell a network drop, a lost session and a SAP refusal
+  apart (section 0).
+
+## 0. Tool answers name the connection failure
+
+A handler's failure answer drops what tells a network drop from a lost session
+from a SAP refusal. `failurePayload` (`src/lib/answer.ts`) does not copy
+`IAdtError.connectionCause`, `sessionError` or `sessionLost`. The
+`client_threw` answer and entry (`answerThrown` → `local`, `thrownEntry`) copy
+nothing of the thrown value's `code`. Only words remain ("The request failed:
+ECONNREFUSED", "the connection is not connected").
+
+Every failure answer and failure entry gains three optional fields. Each
+appears only when its source holds it:
+
+| Field | From an `IAdtError` | From a thrown value (`client_threw`) |
+|---|---|---|
+| `connection_cause` | `connectionCause` | `code` when it is one of `ADT_CONNECTION_CAUSES` (`@mcp-abap-adt/interfaces-adt`) |
+| `session_error` | `sessionError` | `code` when it is one of `ADT_SESSION_ERROR` (`@mcp-abap-adt/interfaces-adt-connection`) |
+| `session_lost` | `sessionLost` | `sessionLost` when it is one of `ADT_SESSION_ERROR` |
+
+- A thrown value is read guarded (`child`), and only a listed code is kept:
+  never its message, an address or a URL.
+- The fields reach a `withLock` cleanup carrier through its failure entries
+  unchanged.
+- Nothing else in an answer changes.
+
 
 ## 1. What a step's outcome is
 
@@ -30,8 +60,8 @@ response body.
 |---|---|---|---|
 | `ok` | a non-error answer with no failed-release carrier | none changed | confirmed |
 | `credential` | the existing `isCredentialRefusal` / `refusalAnswered` (`refusalGuard.ts`) | kept; the marker is latched and nothing more is sent | kept as `unconfirmed` |
-| `session-lost` | a typed session verdict as `spentBy` reads it (`sessionLost`, `ADT_SESSION_REPLACED`, `ADT_NOT_CONNECTED`) | those of **the connection that answered** are dropped as released by SAP and reported | kept as `unconfirmed` |
-| `network` | a network error code (`NETWORK_ERROR_CODES` of `@mcp-abap-adt/interfaces-network`) on the thrown value or in an answer's failure entry `code` | kept | kept as `unconfirmed` |
+| `session-lost` | a typed session verdict as `spentBy` reads it: `session_lost`, or `session_error` `ADT_SESSION_REPLACED` / `ADT_NOT_CONNECTED` (section 0), on the answer or one of its entries; on a thrown value its `code` / `sessionLost` | those of **the connection that answered** are dropped as released by SAP and reported | kept as `unconfirmed` |
+| `network` | `connection_cause` on the answer or one of its entries (section 0); on a thrown value its `code` in `ADT_CONNECTION_CAUSES` | kept | kept as `unconfirmed` |
 | `unclassified` | a failure whose fields cannot say whether SAP answered (the `client_threw` entry, a throw with no typed field) | kept | kept as `unconfirmed` |
 | `refused` | a failure SAP answered (an integer `status` or a typed SAP message) | kept | removed: SAP refused it |
 

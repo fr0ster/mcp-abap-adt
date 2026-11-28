@@ -9,6 +9,7 @@
  * credential from the headers it is given.
  */
 
+import { createHash } from 'node:crypto';
 import type {
   ConnectionContext,
   ConnectionSource,
@@ -94,7 +95,38 @@ export function headerSource(headers: RequestHeaders): ConnectionSource {
 export function headerContext(headers: RequestHeaders): ConnectionContext {
   // The system context headers enter the request scope
   // (`requestContextFromHeaders`), never the connection context.
-  return { kind: 'built', source: headerSource(headers) };
+  return {
+    kind: 'built',
+    source: headerSource(headers),
+    sessionDigest: sessionDigestOf(headers),
+  };
+}
+
+/** The headers whose values name the destination and its credential (`credentialFromHeaders`). */
+const SESSION_HEADERS = [
+  'x-sap-url',
+  'x-sap-client',
+  'x-sap-jwt-token',
+  'x-sap-login',
+  'x-sap-password',
+] as const;
+
+/**
+ * SHA-256 of the request's destination and credential headers, each name
+ * with its value, an absent one marked absent: the same headers give the
+ * same digest, whatever context object carries it. The value never leaves
+ * the hash.
+ */
+export function sessionDigestOf(headers: RequestHeaders): Buffer {
+  const hash = createHash('sha256');
+  for (const name of SESSION_HEADERS) {
+    const value = header(headers, name);
+    hash.update(
+      JSON.stringify([name, value === undefined ? null : value]),
+      'utf8',
+    );
+  }
+  return hash.digest();
 }
 
 /** How a transport answers a request it could not serve. */

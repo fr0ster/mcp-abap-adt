@@ -37,6 +37,29 @@ export interface SessionKey {
   readonly digest?: Buffer | undefined;
 }
 
+/**
+ * The session key of a call (spec §4.1). Over Streamable HTTP
+ * (`transport: 'http'`) the instance gets a fresh connection context on every
+ * request, so the key is the instance, its state handle and the context's
+ * header digest; on stdio and SSE it is the connection context itself, set
+ * once for the instance or the connection. Nothing is read from SAP.
+ */
+export function sessionKeyOf(call: {
+  readonly transport: 'http' | 'other';
+  readonly instance: object;
+  readonly stateHandle?: string | undefined;
+  readonly context: { readonly sessionDigest?: Buffer | undefined } | null;
+}): SessionKey {
+  if (call.transport === 'http') {
+    return {
+      context: call.instance,
+      stateHandle: call.stateHandle,
+      digest: call.context?.sessionDigest,
+    };
+  }
+  return { context: call.context ?? call.instance };
+}
+
 /** Whether two digests are both absent, or both present and equal, compared in constant time. */
 function sameDigest(a: Buffer | undefined, b: Buffer | undefined): boolean {
   if (a === undefined || b === undefined) return a === b;

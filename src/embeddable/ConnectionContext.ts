@@ -66,4 +66,12 @@ export type ConnectionContext = Source & {
    * not available.
    */
   destination?: string;
+  /**
+   * A SHA-256 digest of the request's destination and credential headers
+   * (`headerContext`: `x-sap-url`, `x-sap-client`, `x-sap-jwt-token`,
+   * `x-sap-login`, `x-sap-password`): what names the session an envelope
+   * was created in over Streamable HTTP (spec §4.1). Kept in memory only;
+   * never logged, answered or persisted. Absent for every other source.
+   */
+  sessionDigest?: Buffer;
 };

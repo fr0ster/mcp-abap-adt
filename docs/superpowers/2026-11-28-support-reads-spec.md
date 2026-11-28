@@ -219,10 +219,14 @@ for the existing `validateName`.
 
 More on these members:
 
-- **Where they live.** `getApplicationJobCatalog`, `getApplicationJobTemplate` and
-  `getKeywordDocumentation` are new factories on `AdtRuntimeClient`, beside
-  `getApplicationLog`. Each takes an optional result set and builds a fresh implementation
-  per call. The result sets are:
+- **Where they live.** `getKeywordDocumentation` is a new factory on `AdtRuntimeClient`.
+  The three definition APIs are rows of the type tables (§1.2), and the conformance check
+  requires an `AdtClient` factory for every table API, so `getApplicationLog`,
+  `getApplicationJobCatalog` and `getApplicationJobTemplate` are `AdtClient` factories,
+  gated by the tables (`AdtServedBy<…>`); `AdtRuntimeClient.getApplicationLog` stays and
+  answers the same handler. The legacy client overrides the three with handlers that
+  refuse with no request. Each factory takes an optional result set and builds a fresh
+  implementation per call. The result sets are:
   - `applicationJobDocuments`: `object` and `source` slots, `rawDocument` by default;
   - `keywordDocumentationDocuments`: `query`, `topic` and `position` slots, `rawDocument`
     by default.
@@ -289,10 +293,12 @@ More on these members:
       (`object`, and `version` and `language` when the link carries them): `200`, and
       non-empty text.
       - **The page is the topic asked for.** The page carries its own topic name, so the
-        test checks that. Its two version-selector links, the topic links labelled
-        "Standard ABAP" and "ABAP Cloud", each carry `object` equal to the topic asked
-        for, compared case-insensitively.
-      - Measured: on cloud and on premise, the selector links of every topic page read
+        test checks that. Its version choices (`docuPage`'s `versions`: the `option`
+        elements of the page's version selector, "Standard ABAP" and "ABAP Cloud", whose
+        values are topic links) each carry `object` equal to the topic asked for,
+        compared case-insensitively. They are `option` values, not `a` elements, so they
+        are not among `links`.
+      - Measured: on cloud and on premise, the version choices of every topic page read
         (four topics) carried the page's own topic name in upper case, against the lower
         case of the link followed.
       - The title is recorded, not asserted: whether it equals the link's label is
@@ -571,7 +577,8 @@ When `bluesMetadata` answers `undefined`, every level answers the document as se
     failure, whatever `detail` says.
 
   So the model gets status `500`, that message, and the HTML page whole, SAP's own text
-  ("Application Server Error … Data was lost while copying a value") inside it. No reading
+  ("Application Server Error" with "Data was lost while copying a value" for the APLO name,
+  "Invalid enumeration value" for `version=1`, on both kinds) inside it. No reading
   is added and nothing in the failure path changes.
 - A unit test pins this on both captured pages: the status, the message, and `raw_body`
   byte-equal to the body.
@@ -738,7 +745,7 @@ of its form, as §3.3 defines it:
     "Not found" title, text containing the keyword, and at least one topic link;
   - a topic followed from that answer's first topic link exactly as it carries it
     (`topic`, `topic_version` and `language`): non-empty text, and the page's two
-    version-selector links ("Standard ABAP", "ABAP Cloud") carrying `object` equal,
+    version choices ("Standard ABAP", "ABAP Cloud") carrying `object` equal,
     case-insensitively, to the topic asked for (§3.3);
   - a no-hit query: the "Not found" page as a success.
 

@@ -511,7 +511,10 @@ The sequence, one snapshot under one lock:
    served with the read, where it served one, and a call that passes `etag` is refused
    `source_changed` too when SAP serves one under the lock and it differs. Where SAP serves none,
    the hash alone decides.
-4. **Locate in T.** `part(object, elements, { version: "inactive", source: T })`: the outline and
+4. **Check membership, then locate in T.** The include must be a source of the object by the
+   outline read afresh under the lock, for every call (an include-relative diff and an insert
+   into an include included); else the call is refused. Then
+   `part(object, elements, { version: "inactive", source: T })`: the outline and
    the navigation are read afresh under the lock, and every element is located in T, never in
    another read. The identity rule (§5.2) and the boundary check (§5.4) run on T: an outline or
    a navigation answer that does not describe T is refused (`start_mismatch`), not trusted.

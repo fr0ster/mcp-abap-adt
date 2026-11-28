@@ -6,7 +6,8 @@ carries how it is known:
 - **Discovery**: checked against the recorded discovery documents in mcp-abap-adt-clients
   (`packages/adt-clients/corpus/adt/discovery/system-description-{basis-740,s4-2025,abap-cloud}--03-discovery.body.xml`).
 - **Measured**: called on the on-premise test system on 2026-11-29.
-- **Claimed**: from the analysis, not yet verified here.
+- **Handler code**: SAP's handler source, read on the on-premise test system on 2026-11-29.
+- **Claimed**: from the analysis, not verified by discovery, measurement or handler code.
 
 ## Conclusion
 
@@ -34,12 +35,41 @@ ABAP version of the target system, rather than the fixed version of a third-part
   follows: `0 "#ANYKW#"`, `1 "#ANYLIT#"`, `2 "#EOF#"`, `3 "#NL#"`, `4 "#COMMENT1#"`,
   `5 "#COMMENT2#"`, `6 "."`, `7 ","`, `8 ":"`, `9 "#PRAGMA#"`, then literal, string-template and
   dynamic-identifier classes.
-- **Measured.** The class `CL_SEDI_ADT_RES_RND` exists on the system. That it is the handler of
-  this endpoint is claimed.
-- **Claimed.** RND stands for "Recursive Non-Descent". Per SAP, Eclipse ADT downloads the ABAP
-  grammar from the backend for local syntax analysis, highlighting and code completion, and the
-  grammar is stored as a `.pad` file.
-- **Claimed.** A variant of the endpoint takes a grammar version parameter.
+**Handler code** (read on the on-premise test system, 2026-11-29):
+- **Registration.** `CL_SEDI_ADT_RES_APP_ABAPSOURCE` registers `/abapsource/parsers/rnd/grammar`
+  as a discoverable resource (description `Parser`, term `parser`) and the template
+  `/abapsource/parsers/rnd/grammar/{version}`, both to the handler `CL_SEDI_ADT_RES_RND`
+  (through `if_sedi_adt_res_rnd_co=>co_class_name`).
+- **`CL_SEDI_ADT_RES_RND->get`**, a subclass of `cl_adt_rest_resource` that implements only `GET`:
+  - It refuses a user without IDE authorisation
+    (`cl_adt_permission_control=>is_authorized_to_use_ide`, else `cx_adt_res_no_authorization`).
+  - It reads the optional URI attribute `version`, one character (`char1`).
+  - It sets the `ETag` to `sy-saprl` followed by the version (`get_etag`). Measured `816` is the
+    release with no version.
+  - It answers `304 Not Modified` when `If-None-Match` equals that `ETag`, so a client can cache
+    the grammar per release and version.
+  - With the query parameter `head=true` it answers no grammar, only the `ETag`.
+  - A URI containing `/release` answers the release (the `ETag`) as the body. No registration
+    for such a path was found in `CL_SEDI_ADT_RES_APP_ABAPSOURCE`.
+  - Otherwise it answers the grammar as plain text through `read_rnd_pad_file`.
+- **Where the grammar comes from.** `read_rnd_pad_file` calls `CL_ABAP_PARSER=>GET_ABAP_PAD_FILE`
+  with no version. That method is implemented by the kernel module `ab_km_get_abap_pad_file`, so
+  the grammar is the kernel's own. The result is converted from the code page into the text.
+  With a version it calls `CL_ABAP_PARSER=>RESTRICT_PAD( version )`, which restricts the grammar
+  to the keywords that table `SYCH_VERSION` allows for that ABAP language version (local class
+  `lcl_restrict`). An empty result is `cx_adt_res_not_found` for resource type `grammer` (SAP's
+  spelling), that is a `404`.
+- **Confirmed by the code:** the version variant exists as a path segment, `.../grammar/{version}`,
+  with the ABAP language version as its value. The internal name "pad file" is SAP's
+  (`read_rnd_pad_file`, `GET_ABAP_PAD_FILE`).
+- **Still claimed:** that RND stands for "Recursive Non-Descent", and that Eclipse ADT uses the
+  grammar for local analysis, highlighting and completion. The server code shows only that the
+  grammar is served.
+
+**No server-side AST in this class.** `CL_ABAP_PARSER` also has `GET_TOKENS( source ) → tokens`
+(kernel module `ab_km_get_tokens`), plus code completion, element info and quick info. It has no
+method that answers a parse tree. Which ADT resource, if any, exposes `GET_TOKENS` was not
+searched.
 
 ## 2. Related endpoints per system
 
@@ -73,10 +103,10 @@ discovery document, not merely mentioned in documentation (Discovery).
 | Type hierarchy | `abapsource/typehierarchy` | Type hierarchy information |
 | A full AST | not found | Needs research |
 
-adt-clients already implements `checkruns` and `objectstructure`. Per the analysis, `checkruns`
-also checks unsaved source, and `objectstructure` answers XML with the positions of declarations
-and implementations (claimed; the outline's positions for classes are measured in
-`SOURCE_PARTS.md`).
+adt-clients already implements `checkruns` and `objectstructure`. adt-clients' check members send
+the source in the request body (`chkrun:artifact` / `chkrun:content`); that SAP checks the sent
+text instead of the saved one is claimed, since the `checkruns` handler was not read. The class
+outline's positions are measured in `SOURCE_PARTS.md`.
 
 ## 4. Parsers for CDS, RAP and DDIC sources
 
@@ -140,8 +170,11 @@ replaces or complements the scanner.
 ## Open questions
 
 1. The grammar format: its header, token table and rule encoding, read from the measured text.
+   It comes from the kernel (`ab_km_get_abap_pad_file`), so no ABAP code documents it.
 2. The RND runtime: whether it is documented, and whether an implementation may be written or
    distributed with this project.
-3. The version parameter: its name and the values a system accepts.
-4. Whether any endpoint answers a parse tree for a given source.
-5. The grammar on SAP_BASIS 7.40 and on ABAP Cloud: measured only on premise so far.
+3. The version segment's values: those in table `SYCH_VERSION` on each system, not yet read.
+4. Whether any ADT resource answers tokens (`CL_ABAP_PARSER=>GET_TOKENS`) or a parse tree for a
+   given source.
+5. The grammar and its handler on SAP_BASIS 7.40 and on ABAP Cloud: read only on premise so far.
+6. The `checkruns` handler: whether it checks the sent source instead of the saved one.

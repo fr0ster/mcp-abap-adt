@@ -11,19 +11,55 @@ its spec section.
   step ends green; no test is committed red.
 - **Generated and pinned files with the change.** Every file a test compares against the
   tool set is regenerated in the same commit as the change it pins, so no check goes red
-  between steps. These files are:
-  - the tool pages `docs/user-guide/AVAILABLE_TOOLS.md`, `AVAILABLE_TOOLS_READONLY.md`
-    and `AVAILABLE_TOOLS_HIGH.md` (`tools/generate-tools-docs.js`), and
-    `compact/docs/AVAILABLE_TOOLS.md`;
-  - `tools/tool-search.json`;
-  - the tool fixtures under `tests/fixtures/tools/`: `listed-schemas.json`,
-    `listed-prompts.json`, `prompt-texts.json`, `http-surface.json`,
-    `stdio-sse-surface.json` and `surface.json`;
-  - `tools/long-handlers.json`, in step 12;
-  - `docs/user-guide/BATCH_MODE.md`, with `tools/batch-handlers.json`, in step 18.
+  between steps. The list was taken from a search of `src/__tests__` for every test that
+  reads a generated file or asserts a count. Each file, with the tests that pin it:
+  - `docs/user-guide/AVAILABLE_TOOLS.md`, `AVAILABLE_TOOLS_READONLY.md` and
+    `AVAILABLE_TOOLS_HIGH.md`, written by `tools/generate-tools-docs.js`:
+    `readOnlyToolsPage`, `httpToolDocs` and `toolDocsGenerator`;
+  - `compact/docs/AVAILABLE_TOOLS.md`: `httpToolDocs`;
+  - `tools/tool-search.json`: `toolSearchTable`, `variantSearchMeta`, `semanticItems` and
+    `listedSchemas`;
+  - under `tests/fixtures/tools/`:
+    - `listed-schemas.json`: `fixtureBytes`, `listedSchemas`, `rebuiltDescriptions`,
+      `hardModeBinaries` and `coverageKeys`;
+    - `variant-surface.json`: `fixtureBytes` and `variantSurface`;
+    - `http-surface.json` and `stdio-sse-surface.json`: `fixtureBytes`,
+      `transportSurface` and `dataTools`;
+    - `listed-prompts.json` and `prompt-texts.json`: `fixtureBytes`, `promptListing` and
+      `toolDocsGenerator`;
+    - `surface.json`: `compactSurface` and `toolSurface`;
+    - `rebuilt-descriptions.json`: `rebuiltDescriptions`;
+    - `changed-handler-requests.json`: `changedHandlerRequests` and `draft.pins`. A new
+      `HandlerGet` type adds its cases (one per value of the dispatching argument per
+      variant), each recorded from the parity stand-in and reviewed in the diff;
+    - `coverage-ledger.json` and the served-tool count in `coverageLedger.test.ts` (329
+      today): see **Coverage** below;
+  - `tools/long-handlers.json`: `longHandlers`, `batchHandlers` and `toolSurface`, in
+    step 12;
+  - `tools/batch-handlers.json` with `docs/user-guide/BATCH_MODE.md`: `batchModePage`,
+    `batchHandlers` and the `batch/` tests, in step 18.
 
-  A step that adds or changes a tool, a compact type or an action regenerates every file
-  that tool or entry appears in.
+  Searched and not touched by this work, because none of them lists these tools or entries:
+  `shipped-readings.json` (a fixed list of tools), `terse-goldens.json`,
+  `stateful-sites.json`, `connection-ends.json`, `separate-runs.json`,
+  `node-test-placed.json`, `low-to-compact.json`, `PROMPTS.md`, `CLIENT_CONFIGURATION.md`
+  and `MIGRATION-24.0.md`. If a step's own run shows otherwise, the file is regenerated in
+  that step.
+
+  A step that adds or changes a tool, a compact type or an action regenerates every file in
+  this list that the tool or entry appears in.
+- **Coverage.** Each step that makes a coverage key served (`coverageKeys.ts`: for example
+  `GetApplicationJobCatalog#source`, `HandlerGet#APPLICATION_JOB_CATALOG#metadata` or
+  `HandlerSystem#keyword_documentation`) does all of this in the same commit:
+  - adds the key's row to `coverage-ledger.json`: its unit file, whose `pinCases` pin it,
+    and its live file per kind, `onprem` and `cloud`, whose `liveCall` calls it;
+  - writes that live file in the step, since the ledger scans live files and does not run
+    them;
+  - moves the served-tool count in `coverageLedger.test.ts`: +1 for each new full tool,
+    while the compact entries add keys but no tool.
+
+  `coverage-debt.json` does not grow: it is the owner's ratchet and only shrinks. The live
+  files written in steps 8–14 run in step 19.
 - **Small commits.** One logical change per commit, in English, each message ending with the
   attribution lines.
 - **Worktrees.** Work happens in a worktree under the repository's `.worktrees/`. A main
@@ -220,6 +256,8 @@ registry.
    - **Wire tests:** the name cases, the parameter set, `Accept`, `timeout: 0`, the request
      counts, failures at every level, and the unreadable success.
    - **Equality:** the tool's eligibility case.
+   - **Coverage:** the ledger rows of `#source` and `#metadata`, the unit pins, the live file
+     (`…/readOnly/support/`) written with its `liveCall`s, and the count +1.
 9. **`GetApplicationJobTemplate`**, the same way.
 10. **`GetApplicationLogDefinition`**, the same way, plus the 21-character APLO `500` at
     every level for both parts: status, message and the whole `raw_body` (§4.4).
@@ -246,6 +284,8 @@ registry.
       - an unreadable success answered as sent.
     - **Wire tests** for both forms.
     - **Equality:** the eligibility cases for the query and topic forms.
+    - **Coverage:** the ledger row, the unit pins, the live file (`…/readOnly/system/`)
+      written with its `liveCall`s, and the count +1.
 12. **The long read.**
     - Add `GetAbapKeywordDocumentation` to `LONG_TOOLS` and `tools/long-handlers.json`.
     - Tests: the equality test, a `run_handle`, the background answer equal to the in-call
@@ -262,6 +302,9 @@ registry.
       the name cases and their `seg()` segments, the parameter set, `Accept`, `timeout: 0`,
       the discovery and read request counts, and the answer at each level.
     - **Equality:** the compact enum cases of the three types.
+    - **Coverage:** the six `HandlerGet#<TYPE>#<part>` rows, their pins and live calls; the
+      count is unchanged.
+    - **Pinned:** the new `changed-handler-requests.json` cases.
 14. **Compact `HandlerSystem`:** `keyword_documentation` in `SYSTEM_ACTIONS`,
     `SYSTEM_ACTION_TOOLS`, `ACTION_WORDS`, `SYSTEM_PAIRS` and `COMPACT_SYSTEM_TAKES`, and
     the new properties through `said()`.
@@ -273,6 +316,8 @@ registry.
       `Accept`, `timeout: 0`, the request counts, and the answer at each level, in the call
       and in the background.
     - **Equality:** the action's enum case.
+    - **Coverage:** the `HandlerSystem#keyword_documentation` row, its pins and live calls;
+      the count is unchanged.
 15. **Legacy.** The compact types and action are left out on `legacy` (`statedEnvironment`),
     and the call-time refusal guards them there. Tests first: they are absent from the
     `legacy` schemas, and a call there is refused with zero requests.
@@ -288,7 +333,7 @@ registry.
     - The full binaries still serve no batch mode.
     - The `-ro` sets carry every entry, and the tool counts match.
     - `toolDescriptionsCarryNoLiterals.test.ts` stays green.
-19. **Live tests** (§4.7), in soft mode. The execution mode is set per tool:
+19. **Live tests** (§4.7), in soft mode: the files written in steps 8–14, now run. The execution mode is set per tool:
     - **Long reads** (`GetAbapKeywordDocumentation`, and the compact `HandlerSystem` and
       `HandlerGet`, which are long reads already and run in the background by default):
       each case runs once with `background: false` and once in the background through

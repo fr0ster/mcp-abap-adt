@@ -285,10 +285,18 @@ More on these members:
       - at least one topic link.
     - **Query** with a term generated to match nothing: `200`, title
       "Not found | ABAP Keyword Documentation".
-    - **Topic.** The first topic link of the hit list, sent with its `object` and its
-      `version`: `200`, with a title other than the start page's and the "Not found"
-      title, and non-empty text. Whether the page title equals the link's label is
-      unverified, so the test records both and asserts neither.
+    - **Topic.** The first topic link of the hit list, sent exactly as the link carries it
+      (`object`, and `version` and `language` when the link carries them): `200`, and
+      non-empty text.
+      - **The page is the topic asked for.** The page carries its own topic name, so the
+        test checks that. Its two version-selector links, the topic links labelled
+        "Standard ABAP" and "ABAP Cloud", each carry `object` equal to the topic asked
+        for, compared case-insensitively.
+      - Measured: on cloud and on premise, the selector links of every topic page read
+        (four topics) carried the page's own topic name in upper case, against the lower
+        case of the link followed.
+      - The title is recorded, not asserted: whether it equals the link's label is
+        unverified.
     - **Link fidelity**, for that topic, kept as a test of the goal's measurement:
       - with its link's `version`, with no `version`, and with the other kind's link value
         (`5` / `X`): the three texts differ pairwise.
@@ -300,9 +308,12 @@ More on these members:
         `4` answered pages of the same size.
     - **`Accept: application/xml`**: `406`.
     - **Position: a measurement, not an eligibility proof.** On the source of a class found
-      at run time (the first class hit of a quick search whose source answers):
-      - the statement is the first line whose first token, after leading blanks, is `DATA`
-        (case-insensitive);
+      at run time:
+      - the class: the quick-search class hits are taken in order, and the first one whose
+        source answers `200` and holds a line whose first token, after leading blanks, is
+        `DATA` (case-insensitive) is used. When no hit qualifies, the test records that and
+        asserts nothing more;
+      - the statement: that class's first such line;
       - the position is that line, and the token's first column, once counted from 1 and
         once from 0, each as `uri=<source uri>#start=<line>,<column>`;
       - the expected topic is a page whose title contains `DATA` and is not the start
@@ -405,17 +416,22 @@ of, or checks the length of a name; the one transformation is the library's `seg
 refused):
 
 - `query?: string` (min 1): a word or phrase to search the documentation for.
-- `topic?: string` (min 1): a topic name, as a documentation link of an earlier answer
-  carries it.
-- `topic_version?: string` (min 1): the `version` that documentation link carries. It is
-  taken only with `topic`. It is named apart from the read `version` that `HandlerSystem`'s
-  `search_source` already takes as an enum, so the two never share one flat property.
-- `language?: string` (min 1): the documentation's language. Without it, the system's
-  default answers.
+- `topic?: string`: a topic name, as a documentation link of an earlier answer carries it.
+- `topic_version?: string`: the `version` that documentation link carries. It is taken only
+  with `topic`.
+  - It is named apart from the read `version` that `HandlerSystem`'s `search_source`
+    already takes as an enum, so the two never share one flat property.
+- `language?: string`: the documentation's language. Without it, the system's default
+  answers.
+
+A link is followed exactly as it is. `topic`, `topic_version` and `language` take any
+string, the empty one included: the reading keeps an empty `version` as `''`. A value that
+is given goes as its parameter, `''` as `version=`, and an absent one is not sent. A
+link's `null` means its parameter was absent, so the caller leaves the argument out.
 - `detail` (`DETAIL_SHAPE`).
 - `background` (the long-read field).
 - **Refinements**, refused by the schema before anything is sent:
-  - exactly one of `query` and `topic`;
+  - exactly one of `query` and `topic`, by presence (`topic: ''` counts as given);
   - `topic_version` without `topic`.
 - **No position argument.** The position form is eligible nowhere (§4.5), so no schema
   offers it.
@@ -685,6 +701,7 @@ full and compact. For each call they assert:
 - the URL, with the `seg()` segment for each name case listed above;
 - `query`, `object`, `language` and `version` present only when given, and no other
   parameter (no `format`, no count, no page);
+- `topic_version: ''` and `language: ''` sent as `version=` and `language=`;
 - the default `Accept` and `timeout: 0`;
 - the request counts of §4.5;
 - how each answer is read.
@@ -704,8 +721,10 @@ of its form, as §3.3 defines it:
 - **Documentation:**
   - a query with the configured keyword: a title that is neither the start page's nor the
     "Not found" title, text containing the keyword, and at least one topic link;
-  - a topic followed from that answer's first topic link with its `topic_version`: a title
-    that is neither of those, and non-empty text;
+  - a topic followed from that answer's first topic link exactly as it carries it
+    (`topic`, `topic_version` and `language`): non-empty text, and the page's two
+    version-selector links ("Standard ABAP", "ABAP Cloud") carrying `object` equal,
+    case-insensitively, to the topic asked for (§3.3);
   - a no-hit query: the "Not found" page as a success.
 
   Each runs once in the call (`background: false`) and once in the background.

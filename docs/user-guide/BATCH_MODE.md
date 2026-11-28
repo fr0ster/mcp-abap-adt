@@ -534,7 +534,7 @@ one envelope cannot hold a request built from another's answer. Each is refused
 
 <!-- batch-handlers:start -->
 
-67 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+94 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Compact sets (`mcp-abap-adt-compact`, `-compact-http`, `-compact-sse`, and their `-ro` binaries for the reads)
 
@@ -593,6 +593,9 @@ one envelope cannot hold a request built from another's answer. Each is refused
 
 | Tool | Recorded | Sends |
 |---|---|---|
+| `GetAdtTypes` | every call | one request: GET the object type list |
+| `GetATCFindings` | every call | one request: GET /sap/bc/adt/atc/worklists/{id} |
+| `GetATCResult` | every call | one request: GET /sap/bc/adt/atc/results/{displayId} |
 | `GetBehaviorDefinition` | every call | one request: GET the behavior definition's source, or with part metadata its metadata document, at the version asked |
 | `GetBehaviorImplementation` | every call | one request: GET the behavior pool's source, or with part metadata its metadata document, at the version asked |
 | `GetClass` | every call | one request: GET the class source, or with part metadata its metadata document, at the version asked |
@@ -602,15 +605,39 @@ one envelope cannot hold a request built from another's answer. Each is refused
 | `GetFunctionGroup` | every call | one request: GET the function group's metadata document at the version asked |
 | `GetFunctionInclude` | every call | one request: GET the function group's include's source, or with part metadata its metadata document, at the version asked |
 | `GetFunctionModule` | when part is metadata | one request: GET the function module's metadata document at the group given, checked against that group locally |
+| `GetInactiveObjects` | every call | one request: GET /sap/bc/adt/activation/inactiveobjects |
 | `GetInclude` | every call | one request: GET the include's source, or with part metadata its metadata document, at the version asked |
 | `GetInterface` | every call | one request: GET the interface's source, or with part metadata its metadata document, at the version asked |
+| `GetMainPrograms` | every call | one request: GET the include's main programs |
+| `GetMessageClass` | every call | one request: GET the message class's metadata document |
+| `GetMessageClassMessage` | every call | one request: GET the message class document, the message read from it locally |
 | `GetMetadataExtension` | every call | one request: GET the metadata extension's source, or with part metadata its metadata document, at the version asked |
+| `GetObjectDraft` | every call | for each part of the object, GET its source or metadata ?version=active, ?version=inactive and ?version=workingArea, all sent together under one number |
+| `GetObjectOutline` | every call | one request: GET the object's outline at the version asked |
+| `GetObjectsByType` | every call | one request: POST /sap/bc/adt/repository/nodestructure for the one node asked; at most one per envelope |
+| `GetObjectStructure` | every call | one request: GET /sap/bc/adt/repository/objectstructure for the object |
+| `GetObjectVersionDiff` | every call | two independent requests under one number: GET each of the two content_uri given, compared locally |
+| `GetObjectVersions` | every call | one request: GET the object's version feed |
+| `GetObjectVersionSource` | every call | one request: GET the content_uri given |
 | `GetPackage` | every call | one request: GET the package's metadata document at the version asked |
 | `GetProgram` | every call | one request: GET the program's source, or with part metadata its metadata document, at the version asked |
 | `GetServiceBinding` | every call | one request: GET the active service binding, or with part metadata its metadata document |
 | `GetServiceDefinition` | every call | one request: GET the service definition's source, or with part metadata its metadata document, at the version asked |
+| `GetSqlQuery` | every call | one request: POST /sap/bc/adt/datapreview/freestyle with the query |
 | `GetStructure` | every call | one request: GET the structure's source, or with part metadata its metadata document, at the version asked |
 | `GetTable` | every call | one request: GET the table's source, or with part metadata its metadata document, at the version asked |
+| `GetTableContents` | every call | one request: POST /sap/bc/adt/datapreview/freestyle with SELECT * FROM the table |
+| `GetTableSettings` | every call | one request: GET the table's technical settings document |
 | `GetTableType` | every call | one request: GET the table type's metadata document at the version asked |
+| `GetTransaction` | every call | one request: GET the transaction's object properties |
+| `ListATCResults` | every call | one request: GET /sap/bc/adt/atc/results?createdBy=… with the filters given |
+| `ListServiceBindingTypes` | every call | one request: GET /sap/bc/adt/businessservices/bindings/bindingtypes |
+| `RuntimeAnalyzeProfilerTrace` | every call | one request: GET the trace's view asked, summarised locally |
+| `RuntimeGetDumpById` | every call | one request: GET /sap/bc/adt/runtime/dump/{id} in the view asked |
+| `RuntimeGetGatewayErrorLog` | every call | one request: GET /sap/bc/adt/gw/errorlog, or one entry's detail |
+| `RuntimeGetProfilerTraceData` | every call | one request: GET the trace's view asked (hit list, statements or DB accesses) |
+| `RuntimeListProfilerTraceFiles` | every call | one request: GET /sap/bc/adt/runtime/traces/abaptraces |
+| `RuntimeListSystemMessages` | every call | one request: GET /sap/bc/adt/runtime/systemmessages |
+| `SearchObject` | every call | one request: GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch with the query |
 
 <!-- batch-handlers:end -->

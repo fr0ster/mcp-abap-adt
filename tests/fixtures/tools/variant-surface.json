@@ -355,9 +355,9 @@
       "descriptions": {
         "ActivateObjects": "Activates several ABAP repository objects of any type together in one activation, such as domains (DOMA), data elements (DTEL) and tables (TABL) at once.",
         "GetIncludesList": "[read-only] Reads every include (PROG) of an ABAP program (PROG) or include, with the includes each one includes, down to the last. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.",
-        "GetObjectVersionDiff": "[read-only] Reads two versions of a class (CLAS), program (PROG), CDS view (DDLS) or other source object from its version history and compares them.",
-        "GetObjectVersions": "[read-only] Reads the version history of an ABAP class (CLAS), program (PROG), interface (INTF), function module (FUGR), table (TABL), structure (TABL), CDS view (DDLS) or other versioned object.",
-        "GetObjectVersionSource": "[read-only] Reads an older version of the source code of an ABAP class (CLAS), program (PROG), function module (FUGR), table (TABL), CDS view (DDLS) or other versioned object from its version history.",
+        "GetObjectVersionDiff": "[read-only] Reads two versions of a class (CLAS), program (PROG), CDS view (DDLS) or other source object from its version history and compares them. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
+        "GetObjectVersions": "[read-only] Reads the version history of an ABAP class (CLAS), program (PROG), interface (INTF), function module (FUGR), table (TABL), structure (TABL), CDS view (DDLS) or other versioned object. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
+        "GetObjectVersionSource": "[read-only] Reads an older version of the source code of an ABAP class (CLAS), program (PROG), function module (FUGR), table (TABL), CDS view (DDLS) or other versioned object from its version history. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
         "GetWhereUsed": "[read-only] Reads where an ABAP class (CLAS), function module (FUGR), table (TABL) or other repository object is used: every object that uses, calls or references it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call."
       },
       "properties": {
@@ -377,17 +377,20 @@
         "GetObjectVersionDiff": [
           "object_type",
           "content_uri_from",
-          "content_uri_to"
+          "content_uri_to",
+          "envelope_handle"
         ],
         "GetObjectVersions": [
           "object_type",
           "object_name",
           "function_group_name",
-          "detail"
+          "detail",
+          "envelope_handle"
         ],
         "GetObjectVersionSource": [
           "object_type",
-          "content_uri"
+          "content_uri",
+          "envelope_handle"
         ],
         "GetWhereUsed": [
           "background",
@@ -552,9 +555,9 @@
       },
       "descriptions": {
         "GetIncludesList": "[read-only] Reads every include (PROG) of an ABAP program (PROG) or include, with the includes each one includes, down to the last. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.",
-        "GetObjectVersionDiff": "[read-only] Reads two versions of a class (CLAS), program (PROG), CDS view (DDLS) or other source object from its version history and compares them.",
-        "GetObjectVersions": "[read-only] Reads the version history of an ABAP class (CLAS), program (PROG), interface (INTF), function module (FUGR), table (TABL), structure (TABL), CDS view (DDLS) or other versioned object.",
-        "GetObjectVersionSource": "[read-only] Reads an older version of the source code of an ABAP class (CLAS), program (PROG), function module (FUGR), table (TABL), CDS view (DDLS) or other versioned object from its version history.",
+        "GetObjectVersionDiff": "[read-only] Reads two versions of a class (CLAS), program (PROG), CDS view (DDLS) or other source object from its version history and compares them. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
+        "GetObjectVersions": "[read-only] Reads the version history of an ABAP class (CLAS), program (PROG), interface (INTF), function module (FUGR), table (TABL), structure (TABL), CDS view (DDLS) or other versioned object. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
+        "GetObjectVersionSource": "[read-only] Reads an older version of the source code of an ABAP class (CLAS), program (PROG), function module (FUGR), table (TABL), CDS view (DDLS) or other versioned object from its version history. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
         "GetWhereUsed": "[read-only] Reads where an ABAP class (CLAS), function module (FUGR), table (TABL) or other repository object is used: every object that uses, calls or references it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call."
       },
       "properties": {
@@ -569,17 +572,20 @@
         "GetObjectVersionDiff": [
           "object_type",
           "content_uri_from",
-          "content_uri_to"
+          "content_uri_to",
+          "envelope_handle"
         ],
         "GetObjectVersions": [
           "object_type",
           "object_name",
           "function_group_name",
-          "detail"
+          "detail",
+          "envelope_handle"
         ],
         "GetObjectVersionSource": [
           "object_type",
-          "content_uri"
+          "content_uri",
+          "envelope_handle"
         ],
         "GetWhereUsed": [
           "background",
@@ -1619,9 +1625,9 @@
       "descriptions": {
         "ActivateObjects": "Activates several ABAP repository objects of any type together in one activation, such as domains (DOMA), data elements (DTEL) and tables (TABL) at once.",
         "GetIncludesList": "[read-only] Reads every include (PROG) of an ABAP program (PROG) or include, with the includes each one includes, down to the last. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.",
-        "GetObjectVersionDiff": "[read-only] Reads two versions of a class (CLAS), program (PROG), CDS view (DDLS) or other source object from its version history and compares them.",
-        "GetObjectVersions": "[read-only] Reads the version history of an ABAP class (CLAS), program (PROG), interface (INTF), function module (FUGR), table (TABL), structure (TABL), CDS view (DDLS) or other versioned object.",
-        "GetObjectVersionSource": "[read-only] Reads an older version of the source code of an ABAP class (CLAS), program (PROG), function module (FUGR), table (TABL), CDS view (DDLS) or other versioned object from its version history.",
+        "GetObjectVersionDiff": "[read-only] Reads two versions of a class (CLAS), program (PROG), CDS view (DDLS) or other source object from its version history and compares them. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
+        "GetObjectVersions": "[read-only] Reads the version history of an ABAP class (CLAS), program (PROG), interface (INTF), function module (FUGR), table (TABL), structure (TABL), CDS view (DDLS) or other versioned object. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
+        "GetObjectVersionSource": "[read-only] Reads an older version of the source code of an ABAP class (CLAS), program (PROG), function module (FUGR), table (TABL), CDS view (DDLS) or other versioned object from its version history. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
         "GetWhereUsed": "[read-only] Reads where an ABAP class (CLAS), function module (FUGR), table (TABL) or other repository object is used: every object that uses, calls or references it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call."
       },
       "properties": {
@@ -1641,17 +1647,20 @@
         "GetObjectVersionDiff": [
           "object_type",
           "content_uri_from",
-          "content_uri_to"
+          "content_uri_to",
+          "envelope_handle"
         ],
         "GetObjectVersions": [
           "object_type",
           "object_name",
           "function_group_name",
-          "detail"
+          "detail",
+          "envelope_handle"
         ],
         "GetObjectVersionSource": [
           "object_type",
-          "content_uri"
+          "content_uri",
+          "envelope_handle"
         ],
         "GetWhereUsed": [
           "background",
@@ -1816,9 +1825,9 @@
       },
       "descriptions": {
         "GetIncludesList": "[read-only] Reads every include (PROG) of an ABAP program (PROG) or include, with the includes each one includes, down to the last. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.",
-        "GetObjectVersionDiff": "[read-only] Reads two versions of a class (CLAS), program (PROG), CDS view (DDLS) or other source object from its version history and compares them.",
-        "GetObjectVersions": "[read-only] Reads the version history of an ABAP class (CLAS), program (PROG), interface (INTF), function module (FUGR), table (TABL), structure (TABL), CDS view (DDLS) or other versioned object.",
-        "GetObjectVersionSource": "[read-only] Reads an older version of the source code of an ABAP class (CLAS), program (PROG), function module (FUGR), table (TABL), CDS view (DDLS) or other versioned object from its version history.",
+        "GetObjectVersionDiff": "[read-only] Reads two versions of a class (CLAS), program (PROG), CDS view (DDLS) or other source object from its version history and compares them. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
+        "GetObjectVersions": "[read-only] Reads the version history of an ABAP class (CLAS), program (PROG), interface (INTF), function module (FUGR), table (TABL), structure (TABL), CDS view (DDLS) or other versioned object. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
+        "GetObjectVersionSource": "[read-only] Reads an older version of the source code of an ABAP class (CLAS), program (PROG), function module (FUGR), table (TABL), CDS view (DDLS) or other versioned object from its version history. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.",
         "GetWhereUsed": "[read-only] Reads where an ABAP class (CLAS), function module (FUGR), table (TABL) or other repository object is used: every object that uses, calls or references it. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call."
       },
       "properties": {
@@ -1833,17 +1842,20 @@
         "GetObjectVersionDiff": [
           "object_type",
           "content_uri_from",
-          "content_uri_to"
+          "content_uri_to",
+          "envelope_handle"
         ],
         "GetObjectVersions": [
           "object_type",
           "object_name",
           "function_group_name",
-          "detail"
+          "detail",
+          "envelope_handle"
         ],
         "GetObjectVersionSource": [
           "object_type",
-          "content_uri"
+          "content_uri",
+          "envelope_handle"
         ],
         "GetWhereUsed": [
           "background",

@@ -203,6 +203,9 @@ There are two seams, each a contract declared where it is accepted (adt-clients'
 1. **The whole analyzer.** lib accepts an analyzer, so lib declares the contract its tools call
    (`CodeAnalyzer`: `outline`, `part`).
    - The server and the exporter take an optional factory, `codeAnalyzer(client, connection)`.
+     `client` builds the members the analyzer calls over a connection it is given (so the
+     analyzer can build them over an envelope too); lib builds it from its own adt-clients client
+     and result sets. `connection` is the call's connection.
    - The composition roots pass the shipped `AdtCodeAnalyzer`.
    - An embedder passes its own: abaplint-based, cached, or anything else that satisfies the
      contract.

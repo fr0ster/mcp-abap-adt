@@ -342,6 +342,17 @@ it is the answer. It applies as the strategies above do: the exporter's on
 `getHandlerEntries()` and `registerOnServer`, the hosting server's
 (`EmbeddableMcpServer`'s `partsPerEnvelope`) on `createRegistry()`.
 
+## Read envelopes
+
+An embedder that serves the core sets gives each instance its own owner of
+the read envelopes: `EmbeddableMcpServer`'s `envelopes` option, `new
+InstanceEnvelopes({ keepRawParts, openEnvelopes })` — never shared between
+instances. `openEnvelopes` is the consumer's bound on the envelopes one
+instance holds open (a positive whole number, else the owner's constructor
+throws; absent, no bound). Without an owner the envelope tools, and every
+read given an `envelope_handle`, answer `envelopes_unavailable`. See
+[Envelopes in the core binaries](../user-guide/BATCH_MODE.md#envelopes-in-the-core-binaries).
+
 ## Logging
 
 Pass a logger (`Logger` from `@mcp-abap-adt/logger`):

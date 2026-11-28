@@ -518,6 +518,9 @@ adt-clients 48 has no message `create` or `delete`: the three message tools send
   round: what that envelope answers is the call's answer.
 - **The batch end** (`HandlerBatch` `action: 'end'`) is unchanged: a call recorded in batch mode is made once, and its part's `406` /
   `415` is that call's answer.
+- **A read envelope's execution** (`ExecuteReadEnvelope`) corrects nothing either: it sends through the
+  phases' sender with the correction off (`sendPlanned`, `correction: false`), so a recorded read's
+  `406` / `415` is its number's answer. The phases keep their correction.
 - A member without a header pair (a search, a source or metadata read) is sent as it is; its
   `406` is its answer.
 

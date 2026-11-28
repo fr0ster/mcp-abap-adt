@@ -40,6 +40,11 @@ export type ServerRefusalCode =
   | 'batch_ended'
   | 'batch_parts_mismatch'
   | 'batch_unsplit'
+  | 'envelopes_unavailable'
+  | 'envelope_unavailable'
+  | 'envelope_limit'
+  | 'envelope_not_recordable'
+  | 'envelope_node_structure'
   | 'long_session_unavailable'
   | 'connection_provider_failed'
   | 'no_connection'
@@ -369,6 +374,40 @@ export function batchOtherKindWords(
     : `${words}. An earlier part of this call was recorded, under number ${recorded}, and will be sent at the batch end; its answer under that number is this refusal`;
 }
 
+/** An envelope tool, or a read with `envelope_handle`, on an instance whose host gave no envelope owner. */
+export const ENVELOPES_UNAVAILABLE_WORDS =
+  'this server instance keeps no envelopes';
+
+/**
+ * An envelope handle that names no envelope of this session: unknown,
+ * another session's, executed, discarded or ended — one answer for all.
+ */
+export const ENVELOPE_UNAVAILABLE_WORDS = 'envelope is not available';
+
+/** A create refused at the consumer's bound on open envelopes (`--batch-open-envelopes`). */
+export function envelopeLimitWords(bound: number): string {
+  return `${bound} envelopes are open, the bound set by --batch-open-envelopes / openEnvelopes; execute or discard one first`;
+}
+
+/** A call given `envelope_handle` that no core entry of `tools/batch-handlers.json` admits. */
+export function envelopeNotRecordableWords(tool: string): string {
+  return `${tool} is not recorded into an envelope with these arguments; call it without envelope_handle`;
+}
+
+/**
+ * A second node-structure request in one envelope. `recorded`: the call's
+ * number, when a part of it was recorded before this one was refused.
+ */
+export function envelopeNodeStructureWords(
+  recorded: number | undefined,
+): string {
+  const words =
+    'this envelope already holds a node structure read; record this one into another envelope';
+  return recorded === undefined
+    ? words
+    : `${words} (the part recorded before it is sent at execution, under number ${recorded})`;
+}
+
 /**
  * `system_type_conflict`'s words: a connection (or a call's context) of one
  * kind, handed to a server, a registration or an exporter whose one kind is
@@ -389,6 +428,9 @@ type WordedCode =
   | 'batch_not_recordable'
   | 'batch_other_kind'
   | 'batch_parts_mismatch'
+  | 'envelope_limit'
+  | 'envelope_not_recordable'
+  | 'envelope_node_structure'
   | AccessRefusalCode;
 
 /**
@@ -451,6 +493,8 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   batch_no_background: BATCH_NO_BACKGROUND_WORDS,
   batch_ended: BATCH_ENDED_WORDS,
   batch_unsplit: BATCH_UNSPLIT_WORDS,
+  envelopes_unavailable: ENVELOPES_UNAVAILABLE_WORDS,
+  envelope_unavailable: ENVELOPE_UNAVAILABLE_WORDS,
   long_session_unavailable: LONG_SESSION_UNAVAILABLE_WORDS,
   connection_provider_failed: CONNECTION_PROVIDER_FAILED_WORDS,
   abapgit_not_served: ABAPGIT_NOT_SERVED_WORDS,
@@ -489,7 +533,10 @@ export class ServerRefusal extends Error {
    * `batch_not_recordable` in `batchNotRecordableWords` or
    * `batchNotServedWords`; `batch_other_kind` in `batchOtherKindWords`;
    * `batch_parts_mismatch` in `batchPartsMismatchWords` or
-   * `batchMorePartsWords`; an access refusal in `accessRefusalWords`.
+   * `batchMorePartsWords`; `envelope_limit` in `envelopeLimitWords`,
+   * `envelope_not_recordable` in `envelopeNotRecordableWords`,
+   * `envelope_node_structure` in `envelopeNodeStructureWords`; an access
+   * refusal in `accessRefusalWords`.
    */
   constructor(code: WordedCode, words: string);
   /** `background_runs_unavailable` for an injected connection with no system known. */
@@ -510,6 +557,9 @@ export class ServerRefusal extends Error {
             code === 'batch_not_recordable' ||
             code === 'batch_other_kind' ||
             code === 'batch_parts_mismatch' ||
+            code === 'envelope_limit' ||
+            code === 'envelope_not_recordable' ||
+            code === 'envelope_node_structure' ||
             code === 'package_not_allowed' ||
             code === 'package_tree_unreadable' ||
             code === 'request_not_allowed' ||

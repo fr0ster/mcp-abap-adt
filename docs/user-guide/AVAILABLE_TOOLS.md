@@ -4,8 +4,8 @@ Generated from the tool definitions the server builds (not from docs).
 
 ## Summary
 
-- Total tools: 306
-- Read-only tools: 75
+- Total tools: 310
+- Read-only tools: 79
 - High-level tools: 196
 - Debug tools: 33
 - Session tools: 2
@@ -19,7 +19,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `debug` -> [Debug Group](#debug-group): `mcp-abap-adt`, `-http`, `-sse`; no `-ro` binary
 - every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list, and in the full binaries logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file
 - every Streamable HTTP binary (`-http`, `-http-ro`) -> [Streamable HTTP Binaries](#streamable-http-binaries): the optional `state_handle` argument on every tool, and the long session (`SessionOpen`, `SessionClose`). No stdio or SSE binary serves these
-- batch mode (record independent calls, send them together, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)) is the compact binaries' alone, one tool, `HandlerBatch`; the binaries on this page serve none, and their tools' descriptions carry no batch sentence. The debugger batch of the full binaries is in the [Debug Group](#debug-group): `DebugBatchBegin`, `DebugBatchEnd`, and `DebugBatchAnswers`, which reads its answers
+- read envelopes (collect independent read calls under an `envelope_handle`, send them together, get every result by its number; see [BATCH_MODE.md](BATCH_MODE.md#envelopes-in-the-core-binaries)): `CreateReadEnvelope`, `ExecuteReadEnvelope`, `DiscardReadEnvelope` and `ListReadEnvelopes`, in every binary on this page; each read an envelope admits declares the optional `envelope_handle` and its description ends with one sentence about it. Compact batch mode (`HandlerBatch`) is the compact binaries'. The debugger batch of the full binaries is in the [Debug Group](#debug-group): `DebugBatchBegin`, `DebugBatchEnd`, and `DebugBatchAnswers`, which reads its answers
 - compact -> [the compact package](../../compact/README.md): `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` (and `-compact-http`, `-compact-sse`, each with its `-ro`)
 
 ## Navigation
@@ -82,6 +82,11 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetPackageContents](#getpackagecontents-read-only-package)
   - [Program](#read-only-program)
     - [GetProgram](#getprogram-read-only-program)
+  - [Read Envelope](#read-only-read-envelope)
+    - [CreateReadEnvelope](#createreadenvelope-read-only-read-envelope)
+    - [DiscardReadEnvelope](#discardreadenvelope-read-only-read-envelope)
+    - [ExecuteReadEnvelope](#executereadenvelope-read-only-read-envelope)
+    - [ListReadEnvelopes](#listreadenvelopes-read-only-read-envelope)
   - [Search](#read-only-search)
     - [GetObjectsByType](#getobjectsbytype-read-only-search)
     - [GetObjectsList](#getobjectslist-read-only-search)
@@ -533,7 +538,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviordefinition-read-only-behavior-definition"></a>
 #### GetBehaviorDefinition (Read-Only / Behavior Definition)
-**Description:** [read-only] Reads the current source code of a RAP behavior definition (BDEF), or its metadata.
+**Description:** [read-only] Reads the current source code of a RAP behavior definition (BDEF), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
@@ -542,6 +547,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -553,7 +559,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviorimplementation-read-only-behavior-implementation"></a>
 #### GetBehaviorImplementation (Read-Only / Behavior Implementation)
-**Description:** [read-only] Reads the current source code of a RAP behavior implementation class (CLAS), or its metadata.
+**Description:** [read-only] Reads the current source code of a RAP behavior implementation class (CLAS), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
@@ -562,6 +568,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -573,7 +580,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclass-read-only-class"></a>
 #### GetClass (Read-Only / Class)
-**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -582,6 +589,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `class_name` (string, required) - Class name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -593,18 +601,20 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectdraft-read-only-common"></a>
 #### GetObjectDraft (Read-Only / Common)
-**Description:** [read-only] Reads whether an ABAP class (CLAS), interface (INTF), program (PROG), CDS view (DDLS), table (TABL) or other development object holds an unactivated change, and whose.
+**Description:** [read-only] Reads whether an ABAP class (CLAS), interface (INTF), program (PROG), CDS view (DDLS), table (TABL) or other development object holds an unactivated change, and whose. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectDraft.ts`
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `function_group_name` (string, optional) - The function group of a FUNCTION_MODULE (required for it).
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `PROGRAM`, `INCLUDE`, `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
 
-**On ABAP Cloud (`cloud`):** [read-only] Reads whether an ABAP class (CLAS), interface (INTF), function module (FUGR), CDS view (DDLS), table (TABL) or other development object holds an unactivated change, and whose.
+**On ABAP Cloud (`cloud`):** [read-only] Reads whether an ABAP class (CLAS), interface (INTF), function module (FUGR), CDS view (DDLS), table (TABL) or other development object holds an unactivated change, and whose. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Parameters (`cloud`):**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `function_group_name` (string, optional) - The function group of a FUNCTION_MODULE (required for it).
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
@@ -613,25 +623,27 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectversiondiff-read-only-common"></a>
 #### GetObjectVersionDiff (Read-Only / Common)
-**Description:** [read-only] Reads two versions of a class (CLAS), program (PROG), CDS view (DDLS) or other source object from its version history and compares them.
+**Description:** [read-only] Reads two versions of a class (CLAS), program (PROG), CDS view (DDLS) or other source object from its version history and compares them. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
 
 **Parameters:**
 - `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from the object's version history).
 - `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from the object's version history).
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`) - Object type (the same value the version history was read with).
 
 ---
 
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
-**Description:** [read-only] Reads the version history of an ABAP class (CLAS), program (PROG), interface (INTF), function module (FUGR), table (TABL), structure (TABL), CDS view (DDLS) or other versioned object.
+**Description:** [read-only] Reads the version history of an ABAP class (CLAS), program (PROG), interface (INTF), function module (FUGR), table (TABL), structure (TABL), CDS view (DDLS) or other versioned object. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`, `table_type`) - Object type.
@@ -640,12 +652,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectversionsource-read-only-common"></a>
 #### GetObjectVersionSource (Read-Only / Common)
-**Description:** [read-only] Reads an older version of the source code of an ABAP class (CLAS), program (PROG), function module (FUGR), table (TABL), CDS view (DDLS) or other versioned object from its version history.
+**Description:** [read-only] Reads an older version of the source code of an ABAP class (CLAS), program (PROG), function module (FUGR), table (TABL), CDS view (DDLS) or other versioned object from its version history. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri of a version, from the object's version history.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`) - Object type (the same value the version history was read with).
 
 ---
@@ -655,7 +668,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getdataelement-read-only-data-element"></a>
 #### GetDataElement (Read-Only / Data Element)
-**Description:** [read-only] Reads an ABAP data element (DTEL) at the version asked, with its domain (DOMA) or built-in type, its labels, search help, package (DEVC) and description.
+**Description:** [read-only] Reads an ABAP data element (DTEL) at the version asked, with its domain (DOMA) or built-in type, its labels, search help, package (DEVC) and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -663,6 +676,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -672,7 +686,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getddl-read-only-ddl"></a>
 #### GetDdl (Read-Only / Ddl)
-**Description:** [read-only] Reads the current source code of a CDS view (DDLS) or classic DDL view, or its metadata.
+**Description:** [read-only] Reads the current source code of a CDS view (DDLS) or classic DDL view, or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
@@ -681,6 +695,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -692,7 +707,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getdomain-read-only-domain"></a>
 #### GetDomain (Read-Only / Domain)
-**Description:** [read-only] Reads an ABAP domain (DOMA) at the version asked, with its data type, length, output format, value table, fixed values, package (DEVC) and description.
+**Description:** [read-only] Reads an ABAP domain (DOMA) at the version asked, with its data type, length, output format, value table, fixed values, package (DEVC) and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -700,6 +715,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -753,13 +769,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctiongroup-read-only-function-group"></a>
 #### GetFunctionGroup (Read-Only / Function Group)
-**Description:** [read-only] Reads an ABAP function group (FUGR) at the version asked, with its package (DEVC), description and contents.
+**Description:** [read-only] Reads an ABAP function group (FUGR) at the version asked, with its package (DEVC), description and contents. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `function_group_name` (string, required) - FunctionGroup name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -770,12 +787,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctioninclude-read-only-function-include"></a>
 #### GetFunctionInclude (Read-Only / Function Include)
-**Description:** [read-only] Reads the current source code of an include (FUGR) of an ABAP function group (FUGR), or its metadata.
+**Description:** [read-only] Reads the current source code of an include (FUGR) of an ABAP function group (FUGR), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/function_include/readonly/handleGetFunctionInclude.ts`
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `function_group_name` (string, required) - Function group containing the include.
 - `include_name` (string, required) - Include name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
@@ -813,7 +831,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctionmodule-read-only-function-module"></a>
 #### GetFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Reads the current source code of an ABAP function module (FUGR), BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP function module (FUGR), BAPI and RFC-enabled ones too, with its parameter signature, or its metadata. When part is metadata, with envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -821,6 +839,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
@@ -834,7 +853,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinclude-read-only-include"></a>
 #### GetInclude (Read-Only / Include)
-**Description:** [read-only] Reads the current source code of an ABAP include (PROG), or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP include (PROG), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
@@ -842,6 +861,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `include_name` (string, required) - Include name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -867,12 +887,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmainprograms-read-only-include"></a>
 #### GetMainPrograms (Read-Only / Include)
-**Description:** [read-only] Reads the main programs (PROG) of an ABAP include (PROG): each program that includes it, or the function group (FUGR) it belongs to.
+**Description:** [read-only] Reads the main programs (PROG) of an ABAP include (PROG): each program that includes it, or the function group (FUGR) it belongs to. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/include/readonly/handleGetMainPrograms.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `include_name` (string, required) - Include name.
 
 ---
@@ -882,7 +903,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterface-read-only-interface"></a>
 #### GetInterface (Read-Only / Interface)
-**Description:** [read-only] Reads the current source code of an ABAP interface (INTF), or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP interface (INTF), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
@@ -890,6 +911,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `interface_name` (string, required) - Interface name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -902,23 +924,25 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmessageclass-read-only-message-class"></a>
 #### GetMessageClass (Read-Only / Message Class)
-**Description:** [read-only] Reads an ABAP message class (MSAG): its messages with their numbers and texts, and its master language.
+**Description:** [read-only] Reads an ABAP message class (MSAG): its messages with their numbers and texts, and its master language. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `message_class_name` (string, required) - Message class name.
 
 ---
 
 <a id="getmessageclassmessage-read-only-message-class"></a>
 #### GetMessageClassMessage (Read-Only / Message Class)
-**Description:** [read-only] Reads one message of an ABAP message class (MSAG) at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time.
+**Description:** [read-only] Reads one message of an ABAP message class (MSAG) at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
@@ -929,7 +953,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextension-read-only-metadata-extension"></a>
 #### GetMetadataExtension (Read-Only / Metadata Extension)
-**Description:** [read-only] Reads the current source code of a CDS metadata extension (DDLX), or its metadata.
+**Description:** [read-only] Reads the current source code of a CDS metadata extension (DDLX), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
@@ -937,6 +961,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `metadata_extension_name` (string, required) - MetadataExtension name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -949,7 +974,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackage-read-only-package"></a>
 #### GetPackage (Read-Only / Package)
-**Description:** [read-only] Reads an ABAP package (DEVC) at the version asked.
+**Description:** [read-only] Reads an ABAP package (DEVC) at the version asked. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -957,6 +982,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -984,7 +1010,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogram-read-only-program"></a>
 #### GetProgram (Read-Only / Program)
-**Description:** [read-only] Reads the current source code of an ABAP program (PROG) or report, on ABAP Cloud one of SAP's standard programs, or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP program (PROG) or report, on ABAP Cloud one of SAP's standard programs, or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -992,10 +1018,58 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="read-only-read-envelope"></a>
+### Read-Only / Read Envelope
+
+<a id="createreadenvelope-read-only-read-envelope"></a>
+#### CreateReadEnvelope (Read-Only / Read Envelope)
+**Description:** [read-only] Creates a collection of read calls under a handle that each of those calls names, sent to SAP together when the collection is executed.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="discardreadenvelope-read-only-read-envelope"></a>
+#### DiscardReadEnvelope (Read-Only / Read Envelope)
+**Description:** [read-only] Discards a collection of recorded read calls and ends its handle, giving how many calls it held.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- `envelope_handle` (string, required) - The handle of the collection, as its creation gave it.
+
+---
+
+<a id="executereadenvelope-read-only-read-envelope"></a>
+#### ExecuteReadEnvelope (Read-Only / Read Envelope)
+**Description:** [read-only] Executes a collection of recorded read calls, sending them to SAP together and giving each call's result under its number, in recording order.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- `envelope_handle` (string, required) - The handle of the collection, as its creation gave it.
+
+---
+
+<a id="listreadenvelopes-read-only-read-envelope"></a>
+#### ListReadEnvelopes (Read-Only / Read Envelope)
+**Description:** [read-only] Lists this session's open collections of read calls, each with its handle and how many calls it has recorded.
+
+**Source:** `src/handlers/read_envelope/readonly/readEnvelopeTools.ts`
+
+**Parameters:**
+- None
 
 ---
 
@@ -1004,11 +1078,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectsbytype-read-only-search"></a>
 #### GetObjectsByType (Read-Only / Search)
-**Description:** [read-only] Reads the objects of one type, such as classes (CLAS), tables (TABL), programs (PROG) or interfaces (INTF), in an ABAP package (DEVC) or other composite object.
+**Description:** [read-only] Reads the objects of one type, such as classes (CLAS), tables (TABL), programs (PROG) or interfaces (INTF), in an ABAP package (DEVC) or other composite object. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `format` (string, optional) - [read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility and answers the same TSV.
 - `node_id` (string, required) - [read-only] Node ID
 - `parent_name` (string, required) - [read-only] Parent object name
@@ -1037,13 +1112,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
-**Description:** [read-only] Finds ABAP repository objects by name or name pattern, of any type or of one: classes (CLAS), programs (PROG), tables (TABL), interfaces (INTF) and every other kind. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Finds ABAP repository objects by name or name pattern, of any type or of one: classes (CLAS), programs (PROG), tables (TABL), interfaces (INTF) and every other kind. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
 - `object_type` (string, optional) - [read-only] Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class).
@@ -1055,13 +1131,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicebinding-read-only-service-binding"></a>
 #### GetServiceBinding (Read-Only / Service Binding)
-**Description:** [read-only] Reads an OData service binding (SRVB) at its active version, with its binding definition, or its package (DEVC), person responsible and description, in the format asked.
+**Description:** [read-only] Reads an OData service binding (SRVB) at its active version, with its binding definition, or its package (DEVC), person responsible and description, in the format asked. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
 - `service_binding_name` (string, required) - Service binding name. Case-insensitive.
@@ -1073,7 +1150,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicedefinition-read-only-service-definition"></a>
 #### GetServiceDefinition (Read-Only / Service Definition)
-**Description:** [read-only] Reads the current source code of a service definition (SRVD), or its metadata.
+**Description:** [read-only] Reads the current source code of a service definition (SRVD), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
@@ -1081,6 +1158,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -1093,7 +1171,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructure-read-only-structure"></a>
 #### GetStructure (Read-Only / Structure)
-**Description:** [read-only] Reads an ABAP structure (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
+**Description:** [read-only] Reads an ABAP structure (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
@@ -1101,6 +1179,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `structure_name` (string, required) - Structure name.
@@ -1142,24 +1221,26 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getadttypes-read-only-system"></a>
 #### GetAdtTypes (Read-Only / System)
-**Description:** [read-only] Reads the repository object types the ABAP system knows, by their type codes.
+**Description:** [read-only] Reads the repository object types the ABAP system knows, by their type codes. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `validate_type` (string, optional) - Type name to validate (optional)
 
 ---
 
 <a id="getinactiveobjects-read-only-system"></a>
 #### GetInactiveObjects (Read-Only / System)
-**Description:** [read-only] Reads the inactive ABAP objects of the system: classes (CLAS), tables (TABL), CDS views (DDLS) and other objects changed and awaiting activation.
+**Description:** [read-only] Reads the inactive ABAP objects of the system: classes (CLAS), tables (TABL), CDS views (DDLS) and other objects changed and awaiting activation. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 
 ---
 
@@ -1196,20 +1277,22 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectoutline-read-only-system"></a>
 #### GetObjectOutline (Read-Only / System)
-**Description:** [read-only] Reads the components of an ABAP class (CLAS), interface (INTF), program (PROG) or function group (FUGR), with where each one is defined in its source.
+**Description:** [read-only] Reads the components of an ABAP class (CLAS), interface (INTF), program (PROG) or function group (FUGR), with where each one is defined in its source. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectOutline.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `PROG/P`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, PROG/P, FUGR/F (class, interface, program, function group).
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
-**On ABAP Cloud (`cloud`):** [read-only] Reads the components of an ABAP class (CLAS), interface (INTF), program (PROG) or function group (FUGR), with where each one is defined in its source.
+**On ABAP Cloud (`cloud`):** [read-only] Reads the components of an ABAP class (CLAS), interface (INTF), program (PROG) or function group (FUGR), with where each one is defined in its source. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Parameters (`cloud`):**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, FUGR/F (class, interface, function group).
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -1218,12 +1301,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectstructure-read-only-system"></a>
 #### GetObjectStructure (Read-Only / System)
-**Description:** [read-only] Reads the structure (TABL) of an ABAP repository object, such as a CDS view (DDLS): its parts and their parts, down to the last level.
+**Description:** [read-only] Reads the structure (TABL) of an ABAP repository object, such as a CDS view (DDLS): its parts and their parts, down to the last level. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `objectname` (string, required) - ADT object name (e.g. /CBY/ACQ_DDL)
 - `objecttype` (string, required) - ADT object type (e.g. DDLS/DF)
 
@@ -1247,7 +1331,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getsqlquery-read-only-system"></a>
 #### GetSqlQuery (Read-Only / System)
-**Description:** [read-only] Reads the data an ABAP SQL SELECT selects from database tables (TABL) and CDS views (DDLS), up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data an ABAP SQL SELECT selects from database tables (TABL) and CDS views (DDLS), up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
 
@@ -1256,6 +1340,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
 - `sql_query` (string, required) - SQL query to execute
 
@@ -1263,12 +1348,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettransaction-read-only-system"></a>
 #### GetTransaction (Read-Only / System)
-**Description:** [read-only] Reads the properties of an ABAP transaction code.
+**Description:** [read-only] Reads the properties of an ABAP transaction code. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `transaction_name` (string, required) - Name of the ABAP transaction
 
 ---
@@ -1315,12 +1401,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimeanalyzeprofilertrace-read-only-system"></a>
 #### RuntimeAnalyzeProfilerTrace (Read-Only / System)
-**Description:** [read-only] Analyzes one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Analyzes one view of an ABAP profiler trace, its hit list, its statements or its database accesses, ranked by time. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `top` (number, optional) - Number of top rows for summary. Default: 10.
 - `trace_id_or_uri` (string, required) - Profiler trace ID or full trace URI.
 - `view` (string, optional (default: hitlist), one of: `hitlist`, `statements`, `db_accesses`)
@@ -1330,12 +1417,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetdumpbyid-read-only-system"></a>
 #### RuntimeGetDumpById (Read-Only / System)
-**Description:** [read-only] Reads an ABAP runtime dump by its id, with a summary of where and why its program (PROG) terminated.
+**Description:** [read-only] Reads an ABAP runtime dump by its id, with a summary of where and why its program (PROG) terminated. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
 
 **Parameters:**
 - `dump_id` (string, required) - The dump's id, or its URI as a dumps feed entry carries it.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `response_mode` (string, optional, one of: `payload`, `summary`, `both`) - What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload. "summary" and "both" need view "default". Default: "both" with view "default", "payload" with the other views.
 - `view` (string, optional (default: default), one of: `default`, `summary`, `formatted`) - Dump view mode: default payload, summary section, or formatted long text. The summary fields are read from view "default" only.
 
@@ -1343,13 +1431,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetgatewayerrorlog-read-only-system"></a>
 #### RuntimeGetGatewayErrorLog (Read-Only / System)
-**Description:** [read-only] Reads the errors of the SAP Gateway error log, the one /IWFND/ERROR_LOG shows, or the detail of one error.
+**Description:** [read-only] Reads the errors of the SAP Gateway error log, the one /IWFND/ERROR_LOG shows, or the detail of one error. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `detail_kind` (string, optional) - The error's detail_kind, from the list: the kind its detail is read under. Required with opid.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `error_url` (string, optional) - An error's detailUri, from the list at detail medium or full: answers that error's detail instead of the list.
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
 - `max_results` (number, optional) - Maximum number of errors to return.
@@ -1361,13 +1450,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetprofilertracedata-read-only-system"></a>
 #### RuntimeGetProfilerTraceData (Read-Only / System)
-**Description:** [read-only] Reads one view of an ABAP profiler trace: its hit list, its statements or its database accesses. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads one view of an ABAP profiler trace: its hit list, its statements or its database accesses. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts`
 
 **Parameters:**
 - `auto_drill_down_threshold` (number, optional) - Auto drill-down threshold (for statements view).
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `id` (number, optional) - Statement node ID (for statements view).
 - `trace_id_or_uri` (string, required) - Profiler trace ID or full ADT trace URI.
 - `view` (string, required, one of: `hitlist`, `statements`, `db_accesses`) - Trace view to retrieve.
@@ -1401,23 +1491,25 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimelistprofilertracefiles-read-only-system"></a>
 #### RuntimeListProfilerTraceFiles (Read-Only / System)
-**Description:** [read-only] Lists the ABAP profiler traces recorded in the system.
+**Description:** [read-only] Lists the ABAP profiler traces recorded in the system. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 
 ---
 
 <a id="runtimelistsystemmessages-read-only-system"></a>
 #### RuntimeListSystemMessages (Read-Only / System)
-**Description:** [read-only] Lists the system messages of the SAP system, the ones SM02 shows, optionally by one author.
+**Description:** [read-only] Lists the system messages of the SAP system, the ones SM02 shows, optionally by one author. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
 - `max_results` (number, optional) - Maximum number of messages to return.
 - `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
@@ -1454,7 +1546,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettable-read-only-table"></a>
 #### GetTable (Read-Only / Table)
-**Description:** [read-only] Reads an ABAP database table (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
+**Description:** [read-only] Reads an ABAP database table (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
@@ -1462,6 +1554,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `table_name` (string, required) - Table name.
@@ -1471,7 +1564,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
-**Description:** [read-only] Reads the data of an ABAP database table (TABL) or CDS view (DDLS), as SE16 previews it, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the data of an ABAP database table (TABL) or CDS view (DDLS), as SE16 previews it, up to the number of records asked. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
 
@@ -1480,6 +1573,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `max_rows` (number, optional) - Maximum number of rows to retrieve
 - `table_name` (string, required) - Name of the ABAP table
 
@@ -1487,11 +1581,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettablesettings-read-only-table"></a>
 #### GetTableSettings (Read-Only / Table)
-**Description:** [read-only] Reads the technical settings of an ABAP database table (TABL) at the version asked.
+**Description:** [read-only] Reads the technical settings of an ABAP database table (TABL) at the version asked. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/table/readonly/handleGetTableSettings.ts`
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `table_name` (string, required) - Table name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -1502,13 +1597,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettabletype-read-only-table-type"></a>
 #### GetTableType (Read-Only / Table Type)
-**Description:** [read-only] Reads an ABAP table type (TTYP) at the version asked, with its element type, access, key, package (DEVC) and description.
+**Description:** [read-only] Reads an ABAP table type (TTYP) at the version asked, with its element type, access, key, package (DEVC) and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `table_type_name` (string, required) - Table type name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -1731,20 +1827,21 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `worklist_id` (string, required) - Worklist identifier an ATC run answered.
 
 ---
 
 <a id="getatcresult-high-level-atc"></a>
 #### GetATCResult (High-Level / Atc)
-**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/atc/high/handleGetATCResult.ts`
 
@@ -1752,6 +1849,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `display_id` (string, required) - Display ID of a stored ATC result.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 
 ---
 
@@ -1768,7 +1866,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listatcresults-high-level-atc"></a>
 #### ListATCResults (High-Level / Atc)
-**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/atc/high/handleListATCResults.ts`
 
@@ -1779,6 +1877,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `central_only` (boolean, optional) - true lists central results only; absent lists every kind.
 - `created_by` (string, required) - Whose results: a user name, or * for every user.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 
 ---
 
@@ -1865,7 +1964,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviordefinition-high-level-behavior-definition"></a>
 #### GetBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Reads the current source code of a RAP behavior definition (BDEF), or its metadata.
+**Description:** [read-only] Reads the current source code of a RAP behavior definition (BDEF), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
@@ -1874,6 +1973,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -1935,7 +2035,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getbehaviorimplementation-high-level-behavior-implementation"></a>
 #### GetBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** [read-only] Reads the current source code of a RAP behavior implementation class (CLAS), or its metadata.
+**Description:** [read-only] Reads the current source code of a RAP behavior implementation class (CLAS), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
@@ -1944,6 +2044,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -2102,7 +2203,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getclass-high-level-class"></a>
 #### GetClass (High-Level / Class)
-**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -2111,6 +2212,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `class_name` (string, required) - Class name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -2685,7 +2787,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getdataelement-high-level-data-element"></a>
 #### GetDataElement (High-Level / Data Element)
-**Description:** [read-only] Reads an ABAP data element (DTEL) at the version asked, with its domain (DOMA) or built-in type, its labels, search help, package (DEVC) and description.
+**Description:** [read-only] Reads an ABAP data element (DTEL) at the version asked, with its domain (DOMA) or built-in type, its labels, search help, package (DEVC) and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -2693,6 +2795,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -2794,7 +2897,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getddl-high-level-ddl"></a>
 #### GetDdl (High-Level / Ddl)
-**Description:** [read-only] Reads the current source code of a CDS view (DDLS) or classic DDL view, or its metadata.
+**Description:** [read-only] Reads the current source code of a CDS view (DDLS) or classic DDL view, or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
@@ -2803,6 +2906,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -2968,7 +3072,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getdomain-high-level-domain"></a>
 #### GetDomain (High-Level / Domain)
-**Description:** [read-only] Reads an ABAP domain (DOMA) at the version asked, with its data type, length, output format, value table, fixed values, package (DEVC) and description.
+**Description:** [read-only] Reads an ABAP domain (DOMA) at the version asked, with its data type, length, output format, value table, fixed values, package (DEVC) and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -2976,6 +3080,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -3157,13 +3262,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctiongroup-high-level-function-group"></a>
 #### GetFunctionGroup (High-Level / Function Group)
-**Description:** [read-only] Reads an ABAP function group (FUGR) at the version asked, with its package (DEVC), description and contents.
+**Description:** [read-only] Reads an ABAP function group (FUGR) at the version asked, with its package (DEVC), description and contents. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `function_group_name` (string, required) - FunctionGroup name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -3238,7 +3344,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** [read-only] Reads the current source code of an ABAP function module (FUGR), BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP function module (FUGR), BAPI and RFC-enabled ones too, with its parameter signature, or its metadata. When part is metadata, with envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -3246,6 +3352,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
@@ -3401,7 +3508,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinterface-high-level-interface"></a>
 #### GetInterface (High-Level / Interface)
-**Description:** [read-only] Reads the current source code of an ABAP interface (INTF), or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP interface (INTF), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
@@ -3409,6 +3516,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `interface_name` (string, required) - Interface name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -3496,23 +3604,25 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmessageclass-high-level-message-class"></a>
 #### GetMessageClass (High-Level / Message Class)
-**Description:** [read-only] Reads an ABAP message class (MSAG): its messages with their numbers and texts, and its master language.
+**Description:** [read-only] Reads an ABAP message class (MSAG): its messages with their numbers and texts, and its master language. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `message_class_name` (string, required) - Message class name.
 
 ---
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** [read-only] Reads one message of an ABAP message class (MSAG) at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time.
+**Description:** [read-only] Reads one message of an ABAP message class (MSAG) at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
@@ -3568,7 +3678,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getmetadataextension-high-level-metadata-extension"></a>
 #### GetMetadataExtension (High-Level / Metadata Extension)
-**Description:** [read-only] Reads the current source code of a CDS metadata extension (DDLX), or its metadata.
+**Description:** [read-only] Reads the current source code of a CDS metadata extension (DDLX), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
@@ -3576,6 +3686,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `metadata_extension_name` (string, required) - MetadataExtension name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -3641,7 +3752,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** [read-only] Reads an ABAP package (DEVC) at the version asked.
+**Description:** [read-only] Reads an ABAP package (DEVC) at the version asked. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -3649,6 +3760,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -3737,7 +3849,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** [read-only] Reads the current source code of an ABAP program (PROG) or report, on ABAP Cloud one of SAP's standard programs, or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP program (PROG) or report, on ABAP Cloud one of SAP's standard programs, or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -3745,6 +3857,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -3828,13 +3941,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicebinding-high-level-service-binding"></a>
 #### GetServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Reads an OData service binding (SRVB) at its active version, with its binding definition, or its package (DEVC), person responsible and description, in the format asked.
+**Description:** [read-only] Reads an OData service binding (SRVB) at its active version, with its binding definition, or its package (DEVC), person responsible and description, in the format asked. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
 - `service_binding_name` (string, required) - Service binding name. Case-insensitive.
@@ -3843,11 +3957,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listservicebindingtypes-high-level-service-binding"></a>
 #### ListServiceBindingTypes (High-Level / Service Binding)
-**Description:** [read-only] Lists the service binding (SRVB) types the system offers, such as OData V2 and OData V4, in the format asked.
+**Description:** [read-only] Lists the service binding (SRVB) types the system offers, such as OData V2 and OData V4, in the format asked. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Shape of the answer: the document as the server sent it, the same parsed, or a flat list of the type names.
 
 ---
@@ -3941,7 +4056,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicedefinition-high-level-service-definition"></a>
 #### GetServiceDefinition (High-Level / Service Definition)
-**Description:** [read-only] Reads the current source code of a service definition (SRVD), or its metadata.
+**Description:** [read-only] Reads the current source code of a service definition (SRVD), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
@@ -3949,6 +4064,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -4043,7 +4159,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructure-high-level-structure"></a>
 #### GetStructure (High-Level / Structure)
-**Description:** [read-only] Reads an ABAP structure (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
+**Description:** [read-only] Reads an ABAP structure (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
@@ -4051,6 +4167,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `structure_name` (string, required) - Structure name.
@@ -4244,7 +4361,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettable-high-level-table"></a>
 #### GetTable (High-Level / Table)
-**Description:** [read-only] Reads an ABAP database table (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
+**Description:** [read-only] Reads an ABAP database table (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
@@ -4252,6 +4369,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `table_name` (string, required) - Table name.
@@ -4389,13 +4507,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettabletype-high-level-table-type"></a>
 #### GetTableType (High-Level / Table Type)
-**Description:** [read-only] Reads an ABAP table type (TTYP) at the version asked, with its element type, access, key, package (DEVC) and description.
+**Description:** [read-only] Reads an ABAP table type (TTYP) at the version asked, with its element type, access, key, package (DEVC) and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `table_type_name` (string, required) - Table type name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -5331,4 +5450,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-27*
+*Last updated: 2026-11-28*

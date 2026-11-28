@@ -6,6 +6,7 @@ import type { IAccessChecks } from '../lib/access/accessChecks.js';
 import type { AdtHeaderPairs } from '../lib/adtHeaders/AdtHeaderPairs.js';
 import type { IBackgroundRuns } from '../lib/backgroundRuns/contract.js';
 import type { InstanceBatch } from '../lib/batch/InstanceBatch.js';
+import type { InstanceEnvelopes } from '../lib/batch/InstanceEnvelopes.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
 import { DataHandlersGroup } from '../lib/handlers/groups/DataHandlersGroup.js';
@@ -143,6 +144,16 @@ export interface EmbeddableMcpServerBaseOptions {
    * `batch_mode_unavailable`.
    */
   batch?: InstanceBatch;
+
+  /**
+   * The owner of this instance's read envelopes, created by the embedder for
+   * this instance alone — `new InstanceEnvelopes({ keepRawParts,
+   * openEnvelopes })`, `openEnvelopes` the consumer's bound on the open
+   * envelopes (a positive whole number, else the owner's constructor
+   * throws; absent, no bound) — never shared with another instance.
+   * Absent: the envelope tools answer `envelopes_unavailable`.
+   */
+  envelopes?: InstanceEnvelopes;
 
   /**
    * The locks this instance takes, created by the embedder for this instance
@@ -360,6 +371,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
         partsPerEnvelope: options.partsPerEnvelope,
       }),
       ...(options.batch !== undefined && { batch: options.batch }),
+      ...(options.envelopes !== undefined && { envelopes: options.envelopes }),
       ...(options.heldLocks !== undefined && {
         heldLocks: options.heldLocks,
       }),

@@ -157,6 +157,7 @@ const GROUP_LEVELS = {
   AbapGitHandlersGroup: 'high',
   DebugHandlersGroup: 'debug',
   DebugBatchHandlersGroup: 'debug',
+  EnvelopeHandlersGroup: 'readonly',
   LeftoverSessionHandlersGroup: 'session',
   LeftoverSessionListHandlersGroup: 'session',
 };
@@ -282,12 +283,24 @@ function documentedTool(definition, groupName, moduleOf) {
   if (level === undefined) {
     throw new Error(`${groupName} has no level on the page`);
   }
-  const schema = jsonSchemaOf(definition.inputSchema);
+  // The core sets serve their tools beside the read envelopes: the same
+  // builder registration uses gives the description and schema served.
+  const served = envelopeSurface().envelopeSurfaceOf(definition);
+  const schema = jsonSchemaOf(served.inputSchema);
   const properties = {};
   for (const [key, stated] of Object.entries(schema.properties || {}))
     properties[key] = listedProperty(stated);
   const variants = {};
-  for (const [kind, variant] of Object.entries(definition.variants || {})) {
+  for (const [kind, given] of Object.entries(definition.variants || {})) {
+    const variant = {
+      ...given,
+      ...envelopeSurface().envelopeSurfaceOf({
+        name: definition.name,
+        description:
+          typeof given.description === 'string' ? given.description : '',
+        inputSchema: given.inputSchema,
+      }),
+    };
     const stated = jsonSchemaOf(variant.inputSchema);
     const variantProperties = {};
     for (const [key, each] of Object.entries(stated.properties || {}))
@@ -305,10 +318,10 @@ function documentedTool(definition, groupName, moduleOf) {
     variants,
     name: definition.name,
     description:
-      typeof definition.description === 'string' ? definition.description : '',
+      typeof served.description === 'string' ? served.description : '',
     inputSchema: {
       properties,
-      required: requiredOf(definition.inputSchema),
+      required: requiredOf(served.inputSchema),
     },
     availableIn: Array.isArray(definition.available_in)
       ? [...definition.available_in]
@@ -347,6 +360,11 @@ function servedEntries(toolSet) {
         group: group.constructor.name,
       })),
     );
+}
+
+/** The built envelope surface builder (`src/lib/batch/envelopeSurface.ts`). */
+function envelopeSurface() {
+  return require(path.join(DIST_ROOT, 'lib', 'batch', 'envelopeSurface.js'));
 }
 
 function builtToolSets() {
@@ -719,7 +737,7 @@ function generateMarkdown(tools, surface, listedPrompts) {
   md += `- \`debug\` -> [Debug Group](#debug-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`; no \`-ro\` binary\n`;
   md += `- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list, and in the full binaries logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file\n`;
   md += `- every Streamable HTTP binary (\`-http\`, \`-http-ro\`) -> [${HTTP_HEADING}](#${anchorFromHeading(HTTP_HEADING)}): the optional \`state_handle\` argument on every tool, and the long session (${surface.sessionTools.map((tool) => `\`${tool.name}\``).join(', ')}). No stdio or SSE binary serves these\n`;
-  md += `- batch mode (record independent calls, send them together, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)) is the compact binaries' alone, one tool, \`HandlerBatch\`; the binaries on this page serve none, and their tools' descriptions carry no batch sentence. The debugger batch of the full binaries is in the [Debug Group](#debug-group): \`DebugBatchBegin\`, \`DebugBatchEnd\`, and \`DebugBatchAnswers\`, which reads its answers\n`;
+  md += `- read envelopes (collect independent read calls under an \`envelope_handle\`, send them together, get every result by its number; see [BATCH_MODE.md](BATCH_MODE.md#envelopes-in-the-core-binaries)): \`CreateReadEnvelope\`, \`ExecuteReadEnvelope\`, \`DiscardReadEnvelope\` and \`ListReadEnvelopes\`, in every binary on this page; each read an envelope admits declares the optional \`envelope_handle\` and its description ends with one sentence about it. Compact batch mode (\`HandlerBatch\`) is the compact binaries'. The debugger batch of the full binaries is in the [Debug Group](#debug-group): \`DebugBatchBegin\`, \`DebugBatchEnd\`, and \`DebugBatchAnswers\`, which reads its answers\n`;
   md += `- compact -> [the compact package](../../compact/README.md): \`mcp-abap-adt-compact\` and \`mcp-abap-adt-compact-ro\` (and \`-compact-http\`, \`-compact-sse\`, each with its \`-ro\`)\n\n`;
 
   md += `## Navigation\n\n`;
@@ -928,7 +946,7 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
 
 /** What the read-only page lists, said on the page. */
 const READ_ONLY_PAGE_INTRO =
-  "Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. Batch mode is the compact binaries' (`HandlerBatch`, [BATCH_MODE.md](BATCH_MODE.md)): none is served here. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).";
+  "Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. The read envelopes are served here (`CreateReadEnvelope`, `ExecuteReadEnvelope`, `DiscardReadEnvelope`, `ListReadEnvelopes`, [BATCH_MODE.md](BATCH_MODE.md#envelopes-in-the-core-binaries)); compact batch mode (`HandlerBatch`) is the compact binaries'. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).";
 
 /** What the high-level page says beside its tools. */
 const HIGH_PAGE_INTRO =

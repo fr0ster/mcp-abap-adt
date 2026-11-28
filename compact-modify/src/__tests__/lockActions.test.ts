@@ -127,9 +127,14 @@ describe('HandlerLock: lock, then unlock through the same tool', () => {
       object_type: 'CLASS',
       object_name: 'ZCL_A',
     };
-    assert.equal(eligible('HandlerLock', unlock, 'http').ok, false);
+    assert.equal(eligible('HandlerLock', unlock, 'http', 'compact').ok, false);
     assert.equal(
-      eligible('HandlerLock', { ...unlock, lock_handle: HANDLE }, 'http').ok,
+      eligible(
+        'HandlerLock',
+        { ...unlock, lock_handle: HANDLE },
+        'http',
+        'compact',
+      ).ok,
       true,
     );
   });

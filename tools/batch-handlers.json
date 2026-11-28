@@ -798,5 +798,282 @@
         "equals": ["atc_result"]
       }
     ]
+  },
+  {
+    "tool": "GetClass",
+    "set": "core",
+    "handler": "src/handlers/class/high/handleGetClass.ts#handleGetClass",
+    "sends": "one request: GET the class source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetInterface",
+    "set": "core",
+    "handler": "src/handlers/interface/high/handleGetInterface.ts#handleGetInterface",
+    "sends": "one request: GET the interface's source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetProgram",
+    "set": "core",
+    "handler": "src/handlers/program/high/handleGetProgram.ts#handleGetProgram",
+    "sends": "one request: GET the program's source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetInclude",
+    "set": "core",
+    "handler": "src/handlers/include/readonly/handleGetInclude.ts#handleGetInclude",
+    "sends": "one request: GET the include's source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetFunctionInclude",
+    "set": "core",
+    "handler": "src/handlers/function_include/readonly/handleGetFunctionInclude.ts#handleGetFunctionInclude",
+    "sends": "one request: GET the function group's include's source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetTable",
+    "set": "core",
+    "handler": "src/handlers/table/high/handleGetTable.ts#handleGetTable",
+    "sends": "one request: GET the table's source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetStructure",
+    "set": "core",
+    "handler": "src/handlers/structure/high/handleGetStructure.ts#handleGetStructure",
+    "sends": "one request: GET the structure's source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetDdl",
+    "set": "core",
+    "handler": "src/handlers/ddl/high/handleGetDdl.ts#handleGetDdl",
+    "sends": "one request: GET the DDL source's source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetServiceDefinition",
+    "set": "core",
+    "handler": "src/handlers/service_definition/high/handleGetServiceDefinition.ts#handleGetServiceDefinition",
+    "sends": "one request: GET the service definition's source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetBehaviorDefinition",
+    "set": "core",
+    "handler": "src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts#handleGetBehaviorDefinition",
+    "sends": "one request: GET the behavior definition's source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetBehaviorImplementation",
+    "set": "core",
+    "handler": "src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts#handleGetBehaviorImplementation",
+    "sends": "one request: GET the behavior pool's source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetMetadataExtension",
+    "set": "core",
+    "handler": "src/handlers/metadata_extension/high/handleGetMetadataExtension.ts#handleGetMetadataExtension",
+    "sends": "one request: GET the metadata extension's source, or with part metadata its metadata document, at the version asked"
+  },
+  {
+    "tool": "GetServiceBinding",
+    "set": "core",
+    "handler": "src/handlers/service_binding/high/handleGetServiceBinding.ts#handleGetServiceBinding",
+    "sends": "one request: GET the active service binding, or with part metadata its metadata document"
+  },
+  {
+    "tool": "GetFunctionModule",
+    "set": "core",
+    "handler": "src/handlers/function_module/high/handleGetFunctionModule.ts#handleGetFunctionModule",
+    "sends": "one request: GET the function module's metadata document at the group given, checked against that group locally",
+    "when": [{ "argument": "part", "equals": ["metadata"] }]
+  },
+  {
+    "tool": "GetDomain",
+    "set": "core",
+    "handler": "src/handlers/domain/high/handleGetDomain.ts#handleGetDomain",
+    "sends": "one request: GET the domain's metadata document at the version asked"
+  },
+  {
+    "tool": "GetDataElement",
+    "set": "core",
+    "handler": "src/handlers/data_element/high/handleGetDataElement.ts#handleGetDataElement",
+    "sends": "one request: GET the data element's metadata document at the version asked"
+  },
+  {
+    "tool": "GetPackage",
+    "set": "core",
+    "handler": "src/handlers/package/high/handleGetPackage.ts#handleGetPackage",
+    "sends": "one request: GET the package's metadata document at the version asked"
+  },
+  {
+    "tool": "GetFunctionGroup",
+    "set": "core",
+    "handler": "src/handlers/function_group/high/handleGetFunctionGroup.ts#handleGetFunctionGroup",
+    "sends": "one request: GET the function group's metadata document at the version asked"
+  },
+  {
+    "tool": "GetTableType",
+    "set": "core",
+    "handler": "src/handlers/table_type/high/handleGetTableType.ts#handleGetTableType",
+    "sends": "one request: GET the table type's metadata document at the version asked"
+  },
+  {
+    "tool": "GetObjectStructure",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleGetObjectStructure.ts#handleGetObjectStructure",
+    "sends": "one request: GET /sap/bc/adt/repository/objectstructure for the object"
+  },
+  {
+    "tool": "GetObjectVersions",
+    "set": "core",
+    "handler": "src/handlers/common/readonly/handleGetObjectVersions.ts#handleGetObjectVersions",
+    "sends": "one request: GET the object's version feed"
+  },
+  {
+    "tool": "GetObjectVersionSource",
+    "set": "core",
+    "handler": "src/handlers/common/readonly/handleGetObjectVersionSource.ts#handleGetObjectVersionSource",
+    "sends": "one request: GET the content_uri given"
+  },
+  {
+    "tool": "GetObjectVersionDiff",
+    "set": "core",
+    "handler": "src/handlers/common/readonly/handleGetObjectVersionDiff.ts#handleGetObjectVersionDiff",
+    "sends": "two independent requests under one number: GET each of the two content_uri given, compared locally"
+  },
+  {
+    "tool": "GetObjectDraft",
+    "set": "core",
+    "handler": "src/handlers/common/readonly/handleGetObjectDraft.ts#handleGetObjectDraft",
+    "sends": "for each part of the object, GET its source or metadata ?version=active, ?version=inactive and ?version=workingArea, all sent together under one number"
+  },
+  {
+    "tool": "GetObjectOutline",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleGetObjectOutline.ts#handleGetObjectOutline",
+    "sends": "one request: GET the object's outline at the version asked"
+  },
+  {
+    "tool": "GetInactiveObjects",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleGetInactiveObjects.ts#handleGetInactiveObjects",
+    "sends": "one request: GET /sap/bc/adt/activation/inactiveobjects"
+  },
+  {
+    "tool": "GetAdtTypes",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleGetAllTypes.ts#handleGetAdtTypes",
+    "sends": "one request: GET the object type list"
+  },
+  {
+    "tool": "GetTransaction",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleGetTransaction.ts#handleGetTransaction",
+    "sends": "one request: GET the transaction's object properties"
+  },
+  {
+    "tool": "GetMessageClass",
+    "set": "core",
+    "handler": "src/handlers/message_class/high/handleGetMessageClass.ts#handleGetMessageClass",
+    "sends": "one request: GET the message class's metadata document"
+  },
+  {
+    "tool": "GetMessageClassMessage",
+    "set": "core",
+    "handler": "src/handlers/message_class/high/handleGetMessageClassMessage.ts#handleGetMessageClassMessage",
+    "sends": "one request: GET the message class document, the message read from it locally"
+  },
+  {
+    "tool": "GetTableSettings",
+    "set": "core",
+    "handler": "src/handlers/table/readonly/handleGetTableSettings.ts#handleGetTableSettings",
+    "sends": "one request: GET the table's technical settings document"
+  },
+  {
+    "tool": "GetMainPrograms",
+    "set": "core",
+    "handler": "src/handlers/include/readonly/handleGetMainPrograms.ts#handleGetMainPrograms",
+    "sends": "one request: GET the include's main programs"
+  },
+  {
+    "tool": "SearchObject",
+    "set": "core",
+    "handler": "src/handlers/search/readonly/handleSearchObject.ts#handleSearchObject",
+    "sends": "one request: GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch with the query"
+  },
+  {
+    "tool": "GetObjectsByType",
+    "set": "core",
+    "handler": "src/handlers/search/readonly/handleGetObjectsByType.ts#handleGetObjectsByType",
+    "sends": "one request: POST /sap/bc/adt/repository/nodestructure for the one node asked; at most one per envelope"
+  },
+  {
+    "tool": "GetATCFindings",
+    "set": "core",
+    "handler": "src/handlers/atc/high/handleGetATCFindings.ts#handleGetATCFindings",
+    "sends": "one request: GET /sap/bc/adt/atc/worklists/{id}"
+  },
+  {
+    "tool": "GetATCResult",
+    "set": "core",
+    "handler": "src/handlers/atc/high/handleGetATCResult.ts#handleGetATCResult",
+    "sends": "one request: GET /sap/bc/adt/atc/results/{displayId}"
+  },
+  {
+    "tool": "ListATCResults",
+    "set": "core",
+    "handler": "src/handlers/atc/high/handleListATCResults.ts#handleListATCResults",
+    "sends": "one request: GET /sap/bc/adt/atc/results?createdBy=… with the filters given"
+  },
+  {
+    "tool": "RuntimeGetDumpById",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleRuntimeGetDumpById.ts#handleRuntimeGetDumpById",
+    "sends": "one request: GET /sap/bc/adt/runtime/dump/{id} in the view asked"
+  },
+  {
+    "tool": "RuntimeListSystemMessages",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleRuntimeListSystemMessages.ts#handleRuntimeListSystemMessages",
+    "sends": "one request: GET /sap/bc/adt/runtime/systemmessages"
+  },
+  {
+    "tool": "RuntimeGetGatewayErrorLog",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts#handleRuntimeGetGatewayErrorLog",
+    "sends": "one request: GET /sap/bc/adt/gw/errorlog, or one entry's detail"
+  },
+  {
+    "tool": "RuntimeListProfilerTraceFiles",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts#handleRuntimeListProfilerTraceFiles",
+    "sends": "one request: GET /sap/bc/adt/runtime/traces/abaptraces"
+  },
+  {
+    "tool": "RuntimeGetProfilerTraceData",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts#handleRuntimeGetProfilerTraceData",
+    "sends": "one request: GET the trace's view asked (hit list, statements or DB accesses)"
+  },
+  {
+    "tool": "RuntimeAnalyzeProfilerTrace",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts#handleRuntimeAnalyzeProfilerTrace",
+    "sends": "one request: GET the trace's view asked, summarised locally"
+  },
+  {
+    "tool": "ListServiceBindingTypes",
+    "set": "core",
+    "handler": "src/handlers/service_binding/high/handleListServiceBindingTypes.ts#handleListServiceBindingTypes",
+    "sends": "one request: GET /sap/bc/adt/businessservices/bindings/bindingtypes"
+  },
+  {
+    "tool": "GetSqlQuery",
+    "set": "core",
+    "handler": "src/handlers/system/readonly/handleGetSqlQuery.ts#handleGetSqlQuery",
+    "sends": "one request: POST /sap/bc/adt/datapreview/freestyle with the query"
+  },
+  {
+    "tool": "GetTableContents",
+    "set": "core",
+    "handler": "src/handlers/table/readonly/handleGetTableContents.ts#handleGetTableContents",
+    "sends": "one request: POST /sap/bc/adt/datapreview/freestyle with SELECT * FROM the table"
   }
 ]

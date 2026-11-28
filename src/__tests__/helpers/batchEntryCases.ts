@@ -13,6 +13,10 @@
  */
 
 import { batchEntries } from '../../lib/batch/eligibility';
+import {
+  SETTINGS_MEDIA_TYPE,
+  settingsDocument,
+} from '../unit/tableSettings/settingsStandIn';
 import { corpusBody } from './adtCorpus';
 
 export interface BatchEntryCase {
@@ -60,6 +64,10 @@ const NAME_FREE = corpusBody(
 const TRANSPORT_DOCUMENT =
   '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="XXXK900001"><tm:request tm:number="XXXK900001"/></tm:root>';
 
+/** A transaction's object properties, the shape ADT answers. */
+const TRANSACTION_PROPERTIES =
+  '<?xml version="1.0" encoding="utf-8"?><opr:objectProperties xmlns:opr="http://www.sap.com/adt/objectproperties"><opr:object text="Transaction text" name="TRAN_A" package="PKG_A" type="TRAN/T" expandable="true"/><opr:property facet="TYPE" name="TRAN/T" displayName="Type"/></opr:objectProperties>';
+
 /** A message class document holding message `001`, the shape ADT answers. */
 const MESSAGE_CLASS_DOCUMENT =
   '<?xml version="1.0" encoding="utf-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="MSAG_A"><mc:messages mc:msgno="001" mc:msgtext="Text" mc:selfexplainatory="false"/></mc:messageClass>';
@@ -96,6 +104,9 @@ const FULL: BatchEntryCase[] = [
   { tool: 'GetServiceBinding', args: { service_binding_name: 'SRVB_A' } },
   { tool: 'ListServiceBindingTypes', args: {} },
   { tool: 'GetClass', args: { class_name: 'CLAS_A' } },
+  // A version: still the one request (a source range, cut from the answer
+  // locally, is `envelopeProjection.test.ts`'s).
+  { tool: 'GetClass', args: { class_name: 'CLAS_A', version: 'inactive' } },
   { tool: 'GetLocalTestClass', args: { class_name: 'CLAS_A' } },
   { tool: 'GetLocalTypes', args: { class_name: 'CLAS_A' } },
   { tool: 'GetLocalDefinitions', args: { class_name: 'CLAS_A' } },
@@ -116,6 +127,26 @@ const FULL: BatchEntryCase[] = [
     args: { metadata_extension_name: 'DDLX_A' },
   },
   { tool: 'GetMessageClass', args: { message_class_name: 'MSAG_A' } },
+  {
+    tool: 'GetObjectOutline',
+    args: { object_type: 'CLAS/OC', object_name: 'CLAS_A' },
+    body: corpusBody('read-outline-class--01-objectstructure'),
+    headers: {
+      'content-type': 'application/vnd.sap.adt.objectstructure.v2+xml',
+    },
+  },
+  {
+    tool: 'GetTransaction',
+    args: { transaction_name: 'TRAN_A' },
+    body: TRANSACTION_PROPERTIES,
+  },
+  {
+    tool: 'GetTableSettings',
+    args: { table_name: 'TAB_A' },
+    body: settingsDocument('TAB_A', 'active'),
+    headers: { 'content-type': SETTINGS_MEDIA_TYPE },
+  },
+  { tool: 'GetMainPrograms', args: { include_name: 'INCL_A' } },
   {
     tool: 'GetMessageClassMessage',
     args: { message_class_name: 'MSAG_A', msgno: '001' },
@@ -233,7 +264,8 @@ const FULL: BatchEntryCase[] = [
   { tool: 'RuntimeGetGatewayErrorLog', args: {} },
   {
     tool: 'RuntimeGetGatewayErrorLog',
-    args: { error_url: '/sap/bc/adt/gw/errorlog/ERROR_A' },
+    args: { error_url: '/sap/bc/adt/gw/errorlog/ERROR_A', detail: 'raw' },
+    body: '<html><body>error detail</body></html>',
   },
 ];
 

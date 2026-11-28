@@ -50,7 +50,7 @@ import { raceRequestSignal } from '../requestSignal';
 import { child, entries, isList } from '../thrownValue';
 import { wireValueOf } from '../wireValue';
 import type { InstanceBatch, PartSettlement, RawPart } from './InstanceBatch';
-import { requestKind, sessionKindLabel } from './sessionKind';
+import { requestKind, type SessionKind, sessionKindLabel } from './sessionKind';
 
 type Session = 'stateful' | 'stateless';
 
@@ -132,18 +132,81 @@ function thrownRawPart(response: unknown): RawPart | undefined {
 }
 
 /**
- * A recorder over `batch` for one call of `owner`'s open batch. `onRecorded`
- * is called once, with the call's number, at its first request. `tool`
- * names the call in a `batch_other_kind` refusal.
+ * What a recorder records into, and the batch it records for: the owner's
+ * numbering, the session kind the batch holds, the signal the call's waits
+ * race, and the request's recording itself — into an `AdtBatchConnection`
+ * (`batchTarget`, compact batch mode and the debugger batch) or kept as a
+ * pending part (an envelope).
  */
-export function createRecorder(
+export interface RecordingTarget {
+  /** Which batch endpoint the requests are for: the debugger's is stateful by default. */
+  readonly endpoint: 'communication' | 'debugger';
+  /** Whether each recorded call keeps its raw parts. */
+  readonly keepRawParts: boolean;
+  /** The signal the call's waits race: aborted when the call is let go. */
+  signal(): AbortSignal;
+  /** Whether the batch is still open: once it is not, a request is refused `batch_ended`. */
+  open(): boolean;
+  /** The session kind the batch holds: its first recorded request's. */
+  kind(): SessionKind | undefined;
+  /** A request of `kind` was recorded. */
+  recorded(kind: SessionKind): void;
+  /** The batch's next number. */
+  nextNumber(): number;
+  /**
+   * The refusal of `request` before it is recorded, when the batch refuses
+   * it beside the session kind (an envelope's second node structure);
+   * `number` is the call's, when a part of it was recorded. Absent: none.
+   */
+  admit?(
+    request: IAbapRequestOptions,
+    number: number | undefined,
+  ): ServerRefusal | undefined;
+  /** The refusal of a request once the batch has ended (`tool` the call's). Absent: `batch_ended`. */
+  endedRefusal?(tool: string): ServerRefusal;
+  /** Records `request` (it may throw, recording nothing): its part, settled when the batch is sent. */
+  record(request: IAbapRequestOptions): Promise<IAdtWireResponse>;
+  connect(): Promise<void>;
+  getBaseUrl(): Promise<string | undefined>;
+  getSessionId(): string | null;
+  setSessionType(type: Session): void;
+  getSessionType(): Session;
+}
+
+/** The target of a call of `owner`'s open batch, recorded into `batch`. */
+export function batchTarget(
   batch: AdtBatchConnection,
   owner: InstanceBatch,
+): RecordingTarget {
+  return {
+    endpoint: owner.mode() === 'debugger' ? 'debugger' : 'communication',
+    keepRawParts: owner.keepRawParts,
+    signal: () => owner.signal(),
+    open: () => owner.opened()?.connection === batch,
+    kind: () => owner.kind(),
+    recorded: (kind) => owner.recorded(kind),
+    nextNumber: () => owner.nextNumber(),
+    record: (request) => batch.makeAdtRequest(request),
+    connect: () => batch.connect(),
+    getBaseUrl: () => batch.getBaseUrl(),
+    getSessionId: () => batch.getSessionId(),
+    setSessionType: (type) => batch.setSessionType(type),
+    getSessionType: () => batch.getSessionType(),
+  };
+}
+
+/**
+ * A recorder over `target` for one call. `onRecorded` is called once, with
+ * the call's number, at its first request. `tool` names the call in a
+ * `batch_other_kind` refusal.
+ */
+export function createRecorder(
+  target: RecordingTarget,
   onRecorded: (n: number) => void,
   tool: string,
 ): Recorder {
-  const dropped = owner.signal();
-  const endpoint = owner.mode() === 'debugger' ? 'debugger' : 'communication';
+  const dropped = target.signal();
+  const endpoint = target.endpoint;
   // The batch connection's default session, which its own recording of a
   // request falls back to (adt-clients: stateful only for the debugger).
   const unswitched: Session =
@@ -161,16 +224,17 @@ export function createRecorder(
   // Once the batch has ended (or was dropped), the handler — resumed when
   // its number is read — reaches no connection: what it would reach is
   // refused `batch_ended`, as a further request is.
-  const ended = () => owner.opened()?.connection !== batch;
-  const endedRefusal = <T>(): Promise<T> =>
-    Promise.reject<T>(new ServerRefusal('batch_ended'));
+  const ended = () => !target.open();
+  const endedError = (): ServerRefusal =>
+    target.endedRefusal?.(tool) ?? new ServerRefusal('batch_ended');
+  const endedRefusal = <T>(): Promise<T> => Promise.reject<T>(endedError());
   const recorder: Recorder = {
-    connect: () => (ended() ? endedRefusal<void>() : batch.connect()),
+    connect: () => (ended() ? endedRefusal<void>() : target.connect()),
     getBaseUrl: () =>
-      ended() ? endedRefusal<string | undefined>() : batch.getBaseUrl(),
-    getSessionId: () => batch.getSessionId(),
-    setSessionType: (type) => batch.setSessionType(type),
-    getSessionType: () => batch.getSessionType(),
+      ended() ? endedRefusal<string | undefined>() : target.getBaseUrl(),
+    getSessionId: () => target.getSessionId(),
+    setSessionType: (type) => target.setSessionType(type),
+    getSessionType: () => target.getSessionType(),
     makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
       // Of the batch's kind, or refused before anything is recorded: the
       // batch connection's session switch, scoped to this request, is
@@ -179,17 +243,15 @@ export function createRecorder(
       // nothing more and takes no number.
       // The batch ended (or was dropped): nothing more is recorded or sent.
       if (ended()) {
-        batch.setSessionType(unswitched);
-        const ended = Promise.reject<IAdtWireResponse>(
-          new ServerRefusal('batch_ended'),
-        );
+        target.setSessionType(unswitched);
+        const ended = Promise.reject<IAdtWireResponse>(endedError());
         ended.catch(() => undefined);
         return ended;
       }
-      const kind = requestKind(request, batch.getSessionType(), endpoint);
-      const holds = owner.kind();
+      const kind = requestKind(request, target.getSessionType(), endpoint);
+      const holds = target.kind();
       if (refused !== undefined || (holds !== undefined && holds !== kind)) {
-        batch.setSessionType(unswitched);
+        target.setSessionType(unswitched);
         refused ??= new ServerRefusal(
           'batch_other_kind',
           batchOtherKindWords(
@@ -205,12 +267,22 @@ export function createRecorder(
         rejected.catch(() => undefined);
         return rejected;
       }
+      // The batch's own refusal of the request (an envelope's second node
+      // structure): as a refusal of its kind, nothing recorded, every later
+      // part of the call refused with it.
+      const admitted = target.admit?.(request, taken);
+      if (admitted !== undefined) {
+        refused ??= admitted;
+        const rejected = Promise.reject<IAdtWireResponse>(refused);
+        rejected.catch(() => undefined);
+        return rejected;
+      }
       // Recorded first: a call takes its number only once a request of it
       // is in the envelope — a batch connection that throws takes none.
-      const recorded = batch.makeAdtRequest(request);
-      owner.recorded(kind);
+      const recorded = target.record(request);
+      target.recorded(kind);
       if (taken === undefined) {
-        taken = owner.nextNumber();
+        taken = target.nextNumber();
         onRecorded(taken);
       }
       count += 1;
@@ -224,7 +296,7 @@ export function createRecorder(
           settled[at] = { state: 'rejected', error };
         },
       );
-      if (owner.keepRawParts) {
+      if (target.keepRawParts) {
         const index = raw.length;
         raw.push(undefined);
         recorded.then(

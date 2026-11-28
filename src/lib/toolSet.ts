@@ -80,6 +80,7 @@ import { AbapGitHandlersGroup } from './handlers/groups/AbapGitHandlersGroup.js'
 import { BackgroundRunHandlersGroup } from './handlers/groups/BackgroundRunHandlersGroup.js';
 import { DataHandlersGroup } from './handlers/groups/DataHandlersGroup.js';
 import { DebugBatchHandlersGroup } from './handlers/groups/DebugBatchHandlersGroup.js';
+import { EnvelopeHandlersGroup } from './handlers/groups/EnvelopeHandlersGroup.js';
 import {
   LeftoverSessionHandlersGroup,
   LeftoverSessionListHandlersGroup,
@@ -361,6 +362,8 @@ export const fullToolSet: ToolSet = {
     // The debugger batch beside the debugger; batch mode is the compact
     // sets' (HandlerBatch).
     new DebugBatchHandlersGroup(context),
+    // The read envelopes (#392): reads recorded by envelope_handle, sent together.
+    new EnvelopeHandlersGroup(context),
     // abapGit, always listed; served where the system's discovery lists it, decided at call time.
     new AbapGitHandlersGroup(context),
     // The long session, on Streamable HTTP alone.
@@ -414,6 +417,8 @@ export const fullReadOnlyToolSet: ToolSet = {
     new AbapGitHandlersGroup(context, 'reads'),
     // The background runs of the long reads: read, listed and cancelled.
     new BackgroundRunHandlersGroup(context),
+    // The read envelopes (#392): reads recorded by envelope_handle, sent together.
+    new EnvelopeHandlersGroup(context),
     ...(servesLeftoverSessions(transport)
       ? [new LeftoverSessionListHandlersGroup(context)]
       : []),

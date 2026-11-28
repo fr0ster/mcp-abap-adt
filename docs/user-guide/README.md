@@ -13,7 +13,7 @@ This directory contains documentation for end users of the MCP ABAP ADT Server.
 - **Access restrictions**: deny tools, allow only listed packages, requests or tables; draft detection — [Access restrictions](ACCESS_RESTRICTIONS.md)
 - **Read-only and compact binaries**: the twelve binaries and the tools each serves — [Handler sets](HANDLERS_MANAGEMENT.md), [Compact tools](../../compact/docs/AVAILABLE_TOOLS.md)
 - **MCP prompts** (new in 24.2.0): nine slash-command prompts per binary and kind — [Prompts](PROMPTS.md)
-- **Batch mode**: independent calls sent to SAP together (compact binaries) — [Batch Mode](BATCH_MODE.md)
+- **Batch mode**: independent calls sent to SAP together (compact binaries: `HandlerBatch`; core binaries: read envelopes by `envelope_handle`) — [Batch Mode](BATCH_MODE.md)
 - **Background long reads**: a handle at once, the result read or cancelled later — [Background runs](README.md#background-runs-of-the-long-reads)
 - **Terse answers** (new in 24.2.0): TSV for a list, every row answered; `detail` (`terse`, `medium`, `full`, `raw`) chooses the reading — [Answers](../../README.md#answers)
 - **Tool search**: keywords and semantic texts per tool — [Tool Search](TOOL_SEARCH.md)
@@ -77,7 +77,7 @@ mcp-abap-adt-http --port=3000 --system-type=<onprem|cloud>
 - **[HANDLERS_MANAGEMENT.md](HANDLERS_MANAGEMENT.md)** - The twelve binaries and the tools each serves
 - **[ACCESS_RESTRICTIONS.md](ACCESS_RESTRICTIONS.md)** - Access restrictions: denied actions, allowed packages, requests and tables, the refusals, and `GetObjectDraft`
 - **[PROMPTS.md](PROMPTS.md)** - The MCP prompts per binary and kind: the prompts, their `object_type` values, how a client shows them, the refusal (auto-generated)
-- **[BATCH_MODE.md](BATCH_MODE.md)** - Batch mode (the compact binaries, `HandlerBatch`): independent calls recorded, sent together at the batch's end, answered by number; which calls are recorded
+- **[BATCH_MODE.md](BATCH_MODE.md)** - Batch mode (the compact binaries, `HandlerBatch`) and the read envelopes (the core binaries, `CreateReadEnvelope` / `ExecuteReadEnvelope`): independent calls recorded, sent together, answered by number; which calls are recorded
 - **[TOOL_SEARCH.md](TOOL_SEARCH.md)** - Tool search: the three texts per tool (`description`, `keywords` for BM25, `semantic` for vectors), where a client reads them
 - **[DEBUGGER.md](DEBUGGER.md)** - The debugger (the write binaries; no `-ro` one): debug sessions, the SAP ids, transports, what ends a session
 - **abapGit** - The git loop on a package, full and compact, on premise and on ABAP Cloud: the tools per system, long runs, what an import writes ([README](../../README.md#abapgit-the-git-loop-on-a-package)); git credentials bound to approved endpoints — stdio's `<name>.abapgit.yaml`, the `x-abapgit-*` headers over HTTP and SSE — for any git host over HTTPS ([AUTHENTICATION.md](AUTHENTICATION.md#abapgit-remotes-approved-endpoints)); link and pull refused under access restrictions ([ACCESS_RESTRICTIONS.md](ACCESS_RESTRICTIONS.md#abapgit))

@@ -143,7 +143,8 @@ describe('the coverage ledger guard', () => {
     // text elements: their reads and writes, four more. abapGit, always
     // listed: thirteen full tools and two compact ones, fifteen more.
     // HandlerUnlock is HandlerLock's action unlock: one fewer.
-    assert.equal(new Set(served.map((tool) => tool.name)).size, 329);
+    // The read envelopes' four tools (#392): four more.
+    assert.equal(new Set(served.map((tool) => tool.name)).size, 333);
     assertEquals(of(findings, 'served-mismatch'), []);
   });
 

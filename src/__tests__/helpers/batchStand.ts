@@ -37,8 +37,11 @@ import {
 } from '../../../compact-readonly-entries/src/group';
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import type { ConnectionSource } from '../../embeddable/ConnectionContext';
+import type { IAccessChecks } from '../../lib/access/accessChecks';
+import type { IBackgroundRuns } from '../../lib/backgroundRuns/contract';
 import type { AnswerEntry } from '../../lib/batch/answers';
 import { InstanceBatch } from '../../lib/batch/InstanceBatch';
+import type { InstanceEnvelopes } from '../../lib/batch/InstanceEnvelopes';
 import { communicationBatch } from '../../lib/batch/tools';
 import { CompactBatchHandlersGroup } from '../../lib/compact/batch/group';
 import * as connectionFactory from '../../lib/connectionFactory';
@@ -50,11 +53,13 @@ import {
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../../lib/handlers/groups';
+import { EnvelopeHandlersGroup } from '../../lib/handlers/groups/EnvelopeHandlersGroup';
 import type {
   HandlerContext,
   IHandlerGroup,
 } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
+import { registerFreshConnectionFactory } from '../../lib/packageSessions';
 import type { HeldLocks } from '../../lib/state/heldLocks';
 import {
   type EnvelopeAnswer,
@@ -171,6 +176,12 @@ class StandServer extends BaseMcpServer {
     owner: InstanceBatch,
     source: ConnectionSource,
     heldLocks?: HeldLocks,
+    envelopes?: InstanceEnvelopes,
+    stateHandleArgument?: boolean,
+    extra: {
+      backgroundRuns?: IBackgroundRuns;
+      accessChecks?: IAccessChecks;
+    } = {},
   ) {
     super({
       name: 'batch-stand',
@@ -179,9 +190,24 @@ class StandServer extends BaseMcpServer {
       systemType: 'onprem',
       batch: owner,
       ...(heldLocks !== undefined ? { heldLocks } : {}),
+      ...(envelopes !== undefined ? { envelopes } : {}),
+      ...(stateHandleArgument === true ? { stateHandleArgument: true } : {}),
+      ...(extra.backgroundRuns !== undefined
+        ? { backgroundRuns: extra.backgroundRuns }
+        : {}),
+      ...(extra.accessChecks !== undefined
+        ? { accessChecks: extra.accessChecks }
+        : {}),
     });
     this.registerHandlers(new CompositeHandlersRegistry(groups));
     this.setConnectionContext({ kind: 'built', source });
+  }
+
+  /** A request's own context, as the Streamable HTTP host sets it on every request. */
+  useContext(
+    context: Parameters<BaseMcpServer['setConnectionContext']>[0],
+  ): void {
+    this.setConnectionContext(context);
   }
 }
 
@@ -201,6 +227,12 @@ export interface Stand {
   loseSession(): void;
   /** The source's next `resolve` fails with `error`. */
   failResolve(error: unknown): void;
+  /** How many times the source was resolved (a connection asked for). */
+  resolves(): number;
+  /** Sets the instance's connection context, as a Streamable HTTP request does. */
+  useContext(
+    context: Parameters<BaseMcpServer['setConnectionContext']>[0],
+  ): void;
   call(name: string, args?: Record<string, unknown>): Promise<Answer>;
   /** HandlerBatch end's answer, parsed. */
   end(): Promise<{ answer: Answer; summary: Record<string, unknown> }>;
@@ -222,6 +254,16 @@ export interface StandOptions {
   groups?: IHandlerGroup[];
   /** Writes down when the shipped tools' handlers return or throw. */
   ledger?: HandlerLedger;
+  /** The read envelopes: the instance's owner, and the four tools served. */
+  envelopes?: InstanceEnvelopes;
+  /** As the Streamable HTTP host: every tool declares `state_handle`. */
+  stateHandleArgument?: boolean;
+  /** Each built connection gives a connection of its own on asking (a long read in the call). */
+  freshConnections?: boolean;
+  /** A background-run strategy: a listed long read runs in the background by default. */
+  backgroundRuns?: IBackgroundRuns;
+  /** The host's access checks. */
+  accessChecks?: IAccessChecks;
 }
 
 /**
@@ -233,18 +275,26 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
     keepRawParts: options.keepRawParts ?? false,
   });
   const built: Fake[] = [];
-  mock.method(connectionFactory, 'createAbapConnection', () => {
+  const fakeConnection = () => {
     const fake = envelopeConnection(
       options.envelope ?? partByPart(options.part),
       directBy(options.part),
     );
     built.push(fake);
+    if (options.freshConnections === true) {
+      registerFreshConnectionFactory(fake.connection, async () =>
+        fakeConnection(),
+      );
+    }
     return fake.connection;
-  });
+  };
+  mock.method(connectionFactory, 'createAbapConnection', fakeConnection);
   const current = credential();
   let failure: { error: unknown } | undefined;
+  let resolved = 0;
   const source: ConnectionSource = {
     resolve: async () => {
+      resolved += 1;
       const failing = failure;
       failure = undefined;
       if (failing !== undefined) throw failing.error;
@@ -261,10 +311,23 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
       ),
       ...(options.groups ?? []),
       new CompactBatchHandlersGroup({ connection: undefined as never }),
+      ...(options.envelopes !== undefined
+        ? [new EnvelopeHandlersGroup({ connection: undefined as never })]
+        : []),
     ],
     owner,
     source,
     options.heldLocks,
+    options.envelopes,
+    options.stateHandleArgument,
+    {
+      ...(options.backgroundRuns !== undefined
+        ? { backgroundRuns: options.backgroundRuns }
+        : {}),
+      ...(options.accessChecks !== undefined
+        ? { accessChecks: options.accessChecks }
+        : {}),
+    },
   );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'batch-stand', version: '1.0.0' });
@@ -304,6 +367,8 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
     failResolve: (error) => {
       failure = { error };
     },
+    resolves: () => resolved,
+    useContext: (context) => server.useContext(context),
     call,
     end: async () => {
       const answer = await call('HandlerBatch', { action: 'end' });

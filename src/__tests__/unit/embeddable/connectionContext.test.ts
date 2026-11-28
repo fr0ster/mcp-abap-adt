@@ -415,8 +415,10 @@ describe('headerContext(headers): the x-sap-* headers as the source', () => {
     const context = server.context();
     assert.equal(context?.kind, 'built');
     // No session id and no metadata: they were read by nothing (D26 E5).
+    // The headers' digest names the envelope session (#392 spec §4.1).
     assert.deepStrictEqual(Object.keys(context ?? {}).sort(), [
       'kind',
+      'sessionDigest',
       'source',
     ]);
     assert.ok(context?.kind === 'built');

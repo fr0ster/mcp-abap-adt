@@ -91,6 +91,24 @@
   },
   {
     "file": "src/lib/batch/recorder.ts",
+    "function": "RecordingTarget.setSessionType",
+    "site": "setSessionType(type: Session)",
+    "count": 1,
+    "window": "none of its own: the declaration of the recording target's member, which a recorded call's member reaches through the recorder to mark the next recorded request's mode",
+    "stateless": "the target's recorded mode falls back to its default after that one request is recorded",
+    "whose": "server"
+  },
+  {
+    "file": "src/lib/batch/recorder.ts",
+    "function": "batchTarget",
+    "site": "setSessionType(type)",
+    "count": 1,
+    "window": "none on the wire: forwards the recorder's mode to the batch connection, which marks the next recorded request (LOCK/UNLOCK) stateful in the batch; no connection is touched",
+    "stateless": "the batch connection's recorded mode falls back to its default after that one request is recorded",
+    "whose": "server"
+  },
+  {
+    "file": "src/lib/batch/recorder.ts",
     "function": "createRecorder",
     "site": "setSessionType(type)",
     "count": 1,

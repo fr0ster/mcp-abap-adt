@@ -17,6 +17,7 @@ import {
   BaseMcpServer,
   type IBackgroundRuns,
   type InstanceBatch,
+  type InstanceEnvelopes,
   type LeftoverSessions,
   type LineMatchStrategy,
   type ResolvedConnection,
@@ -102,6 +103,12 @@ export interface StdioServerOptions {
    * `batch_mode_unavailable`.
    */
   batch?: InstanceBatch;
+  /**
+   * The owner of this instance's read envelopes (the launcher's, one for
+   * the process's one instance). Absent: the envelope tools answer
+   * `envelopes_unavailable`.
+   */
+  envelopes?: InstanceEnvelopes;
   /**
    * `--deferred-logon`: the launcher calls no `connectAtStart`; the first
    * tool call that needs the connection makes it. Absent: `false`.
@@ -191,6 +198,7 @@ export class StdioServer extends BaseMcpServer {
         partsPerEnvelope: opts.partsPerEnvelope,
       }),
       ...(opts?.batch !== undefined && { batch: opts.batch }),
+      ...(opts?.envelopes !== undefined && { envelopes: opts.envelopes }),
       // --deferred-logon --restore-session: the first call's birth takes up
       // the destination's leftover session.
       restoreAtFirstBirth: opts?.restoreAtFirstBirth === true,

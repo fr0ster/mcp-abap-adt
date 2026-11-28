@@ -186,16 +186,18 @@ interface CodeAnalyzer {
   part(object: SourceObject, targets: readonly Target[], options: {
     version: AdtReadVersion;
     source?: { include: string; text: string } | undefined;
+    /** An outline this call already read: used as is, no outline request. */
+    outline?: SourceOutline | undefined;
   }): Promise<Located<readonly LocatedPart[]>>;
-  /** Spec §5.5: is `include` a source of `object`, by the fresh outline. */
-  member(object: SourceObject, include: string, options: { version: AdtReadVersion }):
-    Promise<Located<{ include: string }>>;
+  /** Spec §5.5: is `include` a source of `object`, by the outline given. No request. */
+  member(object: SourceObject, include: string, options: { outline: SourceOutline }):
+    Located<{ include: string }>;
   /**
-   * Spec §5.6: the container located in `source.text` (by `part`), the new name checked absent in
-   * its scope of the fresh outline (`already_exists`), and the anchors from the scanner.
+   * Spec §5.6: the container located in `source.text` (by `part`, with the same outline), the new
+   * name checked absent in its scope of `outline` (`already_exists`), the anchors from the scanner.
    */
   insertion(object: SourceObject, container: InsertContainer, element: InsertElement, options: {
-    version: AdtReadVersion; source: { include: string; text: string };
+    version: AdtReadVersion; source: { include: string; text: string }; outline: SourceOutline;
   }): Promise<Located<{ container: ContainerBlock; anchors: InsertAnchors }>>;
 }
 type CodeAnalyzerFactory =
@@ -354,9 +356,9 @@ cloud (both measured), one by one on any other variant.
 | part: several targets in one include | as above, the source `GET` once |
 | part: targets in two includes | as above, one source `GET` per include |
 | part: function module (`FUGR/FF`, as the object or by address or `ref`) | the module's source `GET` (no outline, no navigation) |
-| part with `source` given (the locked write) | the outline afresh (none for a module), whatever the target's form; navigation where the path above has it; **no source `GET`** |
-| `member` | the outline afresh (a group: both outlines; a module: none, its only source is itself) |
-| `insertion` | the outline afresh; no source `GET` |
+| part with `source` and `outline` given (the locked write) | navigation where the path above has it; **no outline request, no source `GET`** |
+| `member` | none (it reads the outline given) |
+| `insertion` | navigation where its container's `part` has it; no outline request, no source `GET` |
 | update | spec §5.5 |
 
 ## 3. interfaces-adt, adt-clients, adt-strategies
@@ -546,16 +548,19 @@ Arguments: `UpdateSourcePartArgs` (spec §1.4). The sequence:
 2. **Under the lock** (`withLock`): that include's reader `GET`s it once, at `inactive`: T and its
    `etag`. `sourceHash(T)` must equal `source_hash`, else `source_changed` `hash`. A passed `etag`
    must equal SAP's when SAP served one, else `source_changed` `etag`.
-3. **Membership and location in T**, all from reads made under the lock:
-   - `analyzer.member(object, include)` for every call, whatever its edits: the include must be a
-     source of the object by the fresh outline, else `include_not_member`. This is the only
+3. **One outline, membership and location in T**, all from reads made under the lock:
+   - `analyzer.outline(object, { version: 'inactive' })` once: O (a function group: its two
+     outline requests; a function module: none, O is the module alone). O is the only outline of
+     the call;
+   - `analyzer.member(object, include, { outline: O })` for every call, whatever its edits: the
+     include must be a source of the object by O, else `include_not_member`. This is the only
      authority for an include-relative diff and an include container;
-   - `analyzer.part(object, targets, { version: 'inactive', source: { include, text: T } })` for
-     every replace and element-relative diff target: outline and navigation afresh, located in T,
+   - `analyzer.part(object, targets, { version: 'inactive', source: { include, text: T }, outline: O })`
+     for every replace and element-relative diff target: navigation where needed, located in T,
      the end derived from T, identity and boundary checks on T. A target now in another include
      is `source_changed` `include_moved`;
-   - `analyzer.insertion(…, { version: 'inactive', source: { include, text: T } })` for every
-     insert, and the method shape checked against the resolved container
+   - `analyzer.insertion(…, { version: 'inactive', source: { include, text: T }, outline: O })` for
+     every insert, and the method shape checked against the resolved container
      (`insert_shape_mismatch`).
    Every pre-lock location is discarded.
 4. The merge on T (spec §5.6); one write of the merged text with the lock target's handle; unlock.
@@ -581,8 +586,11 @@ Arguments: `UpdateSourcePartArgs` (spec §1.4). The sequence:
     side it states the include ends without a line end, on the added side that it will; anywhere
     else `diff_malformed` `no_newline_marker`;
   - `a` is the first old line; for `b = 0` it is the line after which lines are added (`0` = before
-    line 1); `c` must equal `a` plus the net lines added by earlier hunks (plus 1 when `b = 0`),
-    else `diff_malformed` `new_start`;
+    line 1); `c` must equal `a` plus the net lines added by earlier hunks, plus 1 when `b = 0` and
+    `d > 0` (a pure addition), minus 1 when `d = 0` and `b > 0` (a pure deletion: `@@ -5,1 +4,0 @@`
+    is valid), else `diff_malformed` `new_start`; a hunk with `b = 0` and `d = 0` is
+    `diff_malformed` `counts`;
+
   - hunks ascend by `a` (`hunks_order`); their old ranges and addition points are disjoint
     (`hunks_overlap`);
   - every old line equals the text at its position, line ends excluded (`hunk_mismatch`);
@@ -622,9 +630,11 @@ Arguments: `UpdateSourcePartArgs` (spec §1.4). The sequence:
   asked, `kinds` only when asked).
 - **Write path through the real analyzer** (unit; recording connection; the shipped
   `AdtCodeAnalyzer` and scanner, not a fake):
-  - the happy path's trace is exactly `LOCK` (stateful), the include `GET` once, the outline (and
-    navigation), one `PUT` of the merged text, `UNLOCK` (stateful); the `PUT` body is T with the
-    edits applied, byte for byte; a second source `GET` anywhere fails the test;
+  - the happy path's trace is exactly: `LOCK` (stateful); the include's source `GET`, once; the
+    outline `GET`, once (a function group: its two; a function module: none); the navigation
+    envelope (program elements only); one `PUT` of the merged text; `UNLOCK` (stateful). The `PUT`
+    body is T with the edits applied, byte for byte; a second source `GET` or a second outline
+    `GET` anywhere fails the test;
   - drift, each row asserting its result, and for a refusal zero `PUT` and `UNLOCK` sent:
 
     | Hash | Caller `etag` | SAP `etag` | Result |
@@ -649,7 +659,10 @@ Arguments: `UpdateSourcePartArgs` (spec §1.4). The sequence:
   - a failure after the lock (SAP refusing the `PUT`, a throw in the merge) still sends `UNLOCK`;
   - the lock and write target of every row of spec §2.2.
 - **Merge and diff** (unit): every rule of spec §5.6, each refusal with its payload; pure additions
-  at `0`, `n` (refused) and `1 ≤ k < n` (accepted); `\ No newline at end of file` in valid and
+  at `0`, `n` (refused) and `1 ≤ k < n` (accepted); `new_start` for each hunk form: a change
+  (`b > 0`, `d > 0`), a pure addition (`@@ -3,0 +4,2 @@`), a pure deletion (`@@ -5,1 +4,0 @@`),
+  each accepted with the right `c` and refused with a wrong one, after earlier hunks that add
+  and that remove lines; `b = 0`, `d = 0` refused; `\ No newline at end of file` in valid and
   invalid places; line ends kept; ABAP Doc lines untouched by a `replace`.
 - **Seam** (unit): an embedder's `codeAnalyzer` is called and the shipped one is not.
 - **Compact parity** (unit): each compact part and the update answer exactly what the full tool

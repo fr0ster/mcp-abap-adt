@@ -9,10 +9,12 @@
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import {
+  ADT_CONNECTION_CAUSES,
   ADT_NO_FAILURE,
   type IAdtError,
   type IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
 import { readAdtFailureInCall } from './adtFailureReading';
 import type { IAnswerSerializer } from './answerSerializer';
 import {
@@ -132,6 +134,63 @@ const failures: IAnswerSerializer<FailureAnswer> = {
  * `connection` and `refusal` are both claims about the server, and neither is true
  * when the defect is in this process.
  */
+/**
+ * What names a connection failure on an answer (#394): `connection_cause`
+ * (the network code), `session_error` (the connection's session error) and
+ * `session_lost` (SAP answered on a replaced session) — so a model and a test
+ * tell a network drop, a lost session and SAP's refusal apart without reading
+ * words. Only a listed code is kept: never a message, an address or a URL.
+ */
+interface ConnectionFacts {
+  connection_cause?: string;
+  session_error?: string;
+  session_lost?: string;
+}
+
+const SESSION_ERRORS: readonly string[] = Object.values(ADT_SESSION_ERROR);
+
+/** The connection facts an `IAdtError` states, as its fields type them. */
+function connectionFactsOfError(error: IAdtError): ConnectionFacts {
+  return {
+    ...(error.connectionCause !== undefined && {
+      connection_cause: error.connectionCause,
+    }),
+    ...(error.sessionError !== undefined && {
+      session_error: error.sessionError,
+    }),
+    ...(error.sessionLost !== undefined && {
+      session_lost: error.sessionLost,
+    }),
+  };
+}
+
+/** A member of a thrown value, read guarded: a throwing getter is absent. */
+function guardedChild(thrown: unknown, name: string): unknown {
+  try {
+    return child(thrown, name);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The connection facts a thrown value carries: its `code` when it is a listed
+ * network code or session error, its `sessionLost` when it is a listed
+ * session error. A value from outside the type system, read guarded.
+ */
+function connectionFactsOfThrown(thrown: unknown): ConnectionFacts {
+  const code = guardedChild(thrown, 'code');
+  const lost = guardedChild(thrown, 'sessionLost');
+  const cause = ADT_CONNECTION_CAUSES.find((listed) => listed === code);
+  const session = SESSION_ERRORS.find((listed) => listed === code);
+  const replaced = SESSION_ERRORS.find((listed) => listed === lost);
+  return {
+    ...(cause !== undefined && { connection_cause: cause }),
+    ...(session !== undefined && { session_error: session }),
+    ...(replaced !== undefined && { session_lost: replaced }),
+  };
+}
+
 function local(
   kind: string,
   ctx: AnswerContext,
@@ -143,6 +202,7 @@ function local(
     tool: ctx.tool,
     detail: ctx.detail,
     message,
+    ...connectionFactsOfThrown(thrown),
   };
 
   // A lock left held is a fact about SAP, not about the throw, and it must
@@ -332,6 +392,7 @@ export function failurePayload(
   const status = error.response?.status;
   if (typeof status === 'number') payload.status = status;
   if (error.code !== undefined) payload.code = error.code;
+  Object.assign(payload, connectionFactsOfError(error));
   if (error.adtType !== undefined) payload.adt_type = error.adtType;
   if (error.namespace !== undefined) payload.namespace = error.namespace;
 
@@ -498,7 +559,12 @@ export function thrownEntry(thrown: unknown, step: string): FailureEntry {
   if (read !== undefined) return { ...chainFailurePayload(read), step };
   const carried = methodFailureOf(thrown);
   if (carried !== undefined) return failureEntry(carried, step);
-  return { error: 'client_threw', message: messageOf(thrown), step };
+  return {
+    error: 'client_threw',
+    message: messageOf(thrown),
+    ...connectionFactsOfThrown(thrown),
+    step,
+  };
 }
 
 /**

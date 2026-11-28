@@ -29,6 +29,7 @@ import {
   guardedTestConnection,
   refuseAfterMarker,
 } from './refusalGuard';
+import { getHardModeConfig } from './testers/hardMode';
 import { extractSessionState } from './testHelpers';
 import { thrownWords } from './thrownValue';
 
@@ -159,11 +160,7 @@ export async function createTestConnectionAndSession(): Promise<{
     // A soft-mode run connection (#394): its registry sees its wire from
     // the first request on, whoever sends a LOCK or an UNLOCK on it. Hard
     // mode's helper connection has none, as on main.
-    const testConfig = loadTestConfig();
-    const hardMode =
-      testConfig?.environment?.integration_hard_mode?.enabled === true ||
-      testConfig?.integration_hard_mode?.enabled === true;
-    if (!hardMode) heldLocksOf(connection);
+    if (!getHardModeConfig().enabled) heldLocksOf(connection);
 
     // Connect once (same as adt-clients tests - no double connect)
     await connection.connect();

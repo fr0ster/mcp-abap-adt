@@ -357,20 +357,21 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `worklist_id` (string, required) - Worklist identifier an ATC run answered.
 
 ---
 
 <a id="getatcresult-high-level-atc"></a>
 #### GetATCResult (High-Level / Atc)
-**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Reads a stored ATC result by its display ID: its findings and the counts per priority. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/atc/high/handleGetATCResult.ts`
 
@@ -378,6 +379,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `display_id` (string, required) - Display ID of a stored ATC result.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 
 ---
 
@@ -394,7 +396,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="listatcresults-high-level-atc"></a>
 #### ListATCResults (High-Level / Atc)
-**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists the ATC results the system holds for a user or for every user, newest first, within an age range in days. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/atc/high/handleListATCResults.ts`
 
@@ -405,6 +407,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `central_only` (boolean, optional) - true lists central results only; absent lists every kind.
 - `created_by` (string, required) - Whose results: a user name, or * for every user.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 
 ---
 
@@ -491,7 +494,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinition-high-level-behavior-definition"></a>
 #### GetBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Reads the current source code of a RAP behavior definition (BDEF), or its metadata.
+**Description:** [read-only] Reads the current source code of a RAP behavior definition (BDEF), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
@@ -500,6 +503,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -561,7 +565,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviorimplementation-high-level-behavior-implementation"></a>
 #### GetBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** [read-only] Reads the current source code of a RAP behavior implementation class (CLAS), or its metadata.
+**Description:** [read-only] Reads the current source code of a RAP behavior implementation class (CLAS), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
@@ -570,6 +574,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -728,7 +733,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclass-high-level-class"></a>
 #### GetClass (High-Level / Class)
-**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP class (CLAS), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -737,6 +742,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Parameters:**
 - `class_name` (string, required) - Class name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -1311,7 +1317,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getdataelement-high-level-data-element"></a>
 #### GetDataElement (High-Level / Data Element)
-**Description:** [read-only] Reads an ABAP data element (DTEL) at the version asked, with its domain (DOMA) or built-in type, its labels, search help, package (DEVC) and description.
+**Description:** [read-only] Reads an ABAP data element (DTEL) at the version asked, with its domain (DOMA) or built-in type, its labels, search help, package (DEVC) and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -1319,6 +1325,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -1420,7 +1427,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getddl-high-level-ddl"></a>
 #### GetDdl (High-Level / Ddl)
-**Description:** [read-only] Reads the current source code of a CDS view (DDLS) or classic DDL view, or its metadata.
+**Description:** [read-only] Reads the current source code of a CDS view (DDLS) or classic DDL view, or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
@@ -1429,6 +1436,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -1594,7 +1602,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getdomain-high-level-domain"></a>
 #### GetDomain (High-Level / Domain)
-**Description:** [read-only] Reads an ABAP domain (DOMA) at the version asked, with its data type, length, output format, value table, fixed values, package (DEVC) and description.
+**Description:** [read-only] Reads an ABAP domain (DOMA) at the version asked, with its data type, length, output format, value table, fixed values, package (DEVC) and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -1602,6 +1610,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -1783,13 +1792,14 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctiongroup-high-level-function-group"></a>
 #### GetFunctionGroup (High-Level / Function Group)
-**Description:** [read-only] Reads an ABAP function group (FUGR) at the version asked, with its package (DEVC), description and contents.
+**Description:** [read-only] Reads an ABAP function group (FUGR) at the version asked, with its package (DEVC), description and contents. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `function_group_name` (string, required) - FunctionGroup name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -1864,7 +1874,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** [read-only] Reads the current source code of an ABAP function module (FUGR), BAPI and RFC-enabled ones too, with its parameter signature, or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP function module (FUGR), BAPI and RFC-enabled ones too, with its parameter signature, or its metadata. When part is metadata, with envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -1872,6 +1882,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
@@ -2027,7 +2038,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterface-high-level-interface"></a>
 #### GetInterface (High-Level / Interface)
-**Description:** [read-only] Reads the current source code of an ABAP interface (INTF), or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP interface (INTF), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
@@ -2035,6 +2046,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `interface_name` (string, required) - Interface name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -2122,23 +2134,25 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmessageclass-high-level-message-class"></a>
 #### GetMessageClass (High-Level / Message Class)
-**Description:** [read-only] Reads an ABAP message class (MSAG): its messages with their numbers and texts, and its master language.
+**Description:** [read-only] Reads an ABAP message class (MSAG): its messages with their numbers and texts, and its master language. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `message_class_name` (string, required) - Message class name.
 
 ---
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** [read-only] Reads one message of an ABAP message class (MSAG) at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time.
+**Description:** [read-only] Reads one message of an ABAP message class (MSAG) at its active version, with its number, text, self-explanatory and long-text flags, last changer and change time. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
@@ -2194,7 +2208,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextension-high-level-metadata-extension"></a>
 #### GetMetadataExtension (High-Level / Metadata Extension)
-**Description:** [read-only] Reads the current source code of a CDS metadata extension (DDLX), or its metadata.
+**Description:** [read-only] Reads the current source code of a CDS metadata extension (DDLX), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
@@ -2202,6 +2216,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `metadata_extension_name` (string, required) - MetadataExtension name.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -2267,7 +2282,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** [read-only] Reads an ABAP package (DEVC) at the version asked.
+**Description:** [read-only] Reads an ABAP package (DEVC) at the version asked. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -2275,6 +2290,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -2363,7 +2379,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** [read-only] Reads the current source code of an ABAP program (PROG) or report, on ABAP Cloud one of SAP's standard programs, or its metadata.
+**Description:** [read-only] Reads the current source code of an ABAP program (PROG) or report, on ABAP Cloud one of SAP's standard programs, or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -2371,6 +2387,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -2454,13 +2471,14 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getservicebinding-high-level-service-binding"></a>
 #### GetServiceBinding (High-Level / Service Binding)
-**Description:** [read-only] Reads an OData service binding (SRVB) at its active version, with its binding definition, or its package (DEVC), person responsible and description, in the format asked.
+**Description:** [read-only] Reads an OData service binding (SRVB) at its active version, with its binding definition, or its package (DEVC), person responsible and description, in the format asked. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
 - `service_binding_name` (string, required) - Service binding name. Case-insensitive.
@@ -2469,11 +2487,12 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="listservicebindingtypes-high-level-service-binding"></a>
 #### ListServiceBindingTypes (High-Level / Service Binding)
-**Description:** [read-only] Lists the service binding (SRVB) types the system offers, such as OData V2 and OData V4, in the format asked.
+**Description:** [read-only] Lists the service binding (SRVB) types the system offers, such as OData V2 and OData V4, in the format asked. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Shape of the answer: the document as the server sent it, the same parsed, or a flat list of the type names.
 
 ---
@@ -2567,7 +2586,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getservicedefinition-high-level-service-definition"></a>
 #### GetServiceDefinition (High-Level / Service Definition)
-**Description:** [read-only] Reads the current source code of a service definition (SRVD), or its metadata.
+**Description:** [read-only] Reads the current source code of a service definition (SRVD), or its metadata. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
@@ -2575,6 +2594,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
@@ -2669,7 +2689,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getstructure-high-level-structure"></a>
 #### GetStructure (High-Level / Structure)
-**Description:** [read-only] Reads an ABAP structure (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
+**Description:** [read-only] Reads an ABAP structure (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
@@ -2677,6 +2697,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `structure_name` (string, required) - Structure name.
@@ -2870,7 +2891,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettable-high-level-table"></a>
 #### GetTable (High-Level / Table)
-**Description:** [read-only] Reads an ABAP database table (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description.
+**Description:** [read-only] Reads an ABAP database table (TABL) at the version asked, with its source code, or its package (DEVC), person responsible and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
@@ -2878,6 +2899,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `table_name` (string, required) - Table name.
@@ -3015,13 +3037,14 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettabletype-high-level-table-type"></a>
 #### GetTableType (High-Level / Table Type)
-**Description:** [read-only] Reads an ABAP table type (TTYP) at the version asked, with its element type, access, key, package (DEVC) and description.
+**Description:** [read-only] Reads an ABAP table type (TTYP) at the version asked, with its element type, access, key, package (DEVC) and description. With envelope_handle, the call is recorded under the next number and sent with the other calls of that handle; its result comes back then.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
+- `envelope_handle` (string, optional) - The handle of an open collection of read calls: the call is recorded into it and its result comes back when the collection is executed.
 - `table_type_name` (string, required) - Table type name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 

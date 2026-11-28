@@ -131,3 +131,29 @@ describe('LambdaTester releases locks before the delete policy', () => {
     assert.match(lines.join('\n'), /credential refusal.*ZCL_C/);
   });
 });
+
+describe("a failed test's warning says what happens to its objects", () => {
+  it('a suite that deletes in its own after is not said to keep them', async () => {
+    const tester = new FailedTester(connection());
+    tester.deletesInItsOwnAfter();
+    lines.length = 0;
+    await tester.afterEach();
+    assert.equal(
+      tester.deleted,
+      0,
+      'the after-each delete still follows the policy',
+    );
+    assert.match(
+      lines.join('\n'),
+      /the suite deletes its objects in its own after hook/,
+    );
+    assert.doesNotMatch(lines.join('\n'), /kept for analysis/);
+  });
+
+  it('any other suite keeps them for analysis, and says so', async () => {
+    const tester = new FailedTester(connection());
+    lines.length = 0;
+    await tester.afterEach();
+    assert.match(lines.join('\n'), /kept for analysis/);
+  });
+});

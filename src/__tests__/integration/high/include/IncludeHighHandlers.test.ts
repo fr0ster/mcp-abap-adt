@@ -173,6 +173,8 @@ systemsDescribe(['onprem'], 'Include High-Level Handlers Integration', () => {
 
   before(async () => {
     tester = new LambdaTester('create_include', 'builder_include', 'incl-high');
+    // Whatever the outcome, its after hook deletes what the run created.
+    tester.deletesInItsOwnAfter();
     await tester.beforeAll(
       async (context: LambdaTesterContext) => {
         if (context.hasConfig) {

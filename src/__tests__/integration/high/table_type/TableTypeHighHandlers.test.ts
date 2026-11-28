@@ -280,6 +280,8 @@ describe('TableType High-Level Handlers Integration', () => {
       'builder_table_type',
       'ttyp-high',
     );
+    // Whatever the outcome, its after hook deletes what the run created.
+    tester.deletesInItsOwnAfter();
     await tester.beforeAll(
       async (context: LambdaTesterContext) => {
         if (context.hasConfig) {

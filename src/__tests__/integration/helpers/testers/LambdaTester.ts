@@ -135,6 +135,12 @@ export class LambdaTester {
   protected testFailed = false;
   /** A test that skipped itself created nothing, so nothing is deleted. */
   protected testSkipped = false;
+  /**
+   * The suite deletes what it created in its own `after`, whatever the
+   * outcome (`deletesInItsOwnAfter`): a failed test's objects are then not
+   * kept for analysis, and the failed-test warning must not say they are.
+   */
+  protected suiteDeletesWhateverTheOutcome = false;
   /** Why the tester does not run at all: no system kind stated. */
   protected kindSkip: string | undefined;
   /** Why the tester has no case to run: the config key it lacks, or why it could not start. */
@@ -406,6 +412,16 @@ export class LambdaTester {
   }
 
   /**
+   * Declares that the suite deletes what it created in its own `after`,
+   * whatever the outcome (a live suite on a shared system leaves nothing
+   * behind): the after-each delete still follows the YAML policy, and a
+   * failed test's warning says the suite deletes its objects.
+   */
+  deletesInItsOwnAfter(): void {
+    this.suiteDeletesWhateverTheOutcome = true;
+  }
+
+  /**
    * Sends, once, the unlock of every lock the soft-mode run connection still
    * holds (`held`), each on the handler context that took it; a lock whose
    * unlock was already sent is not sent again, and every lock still owned is
@@ -461,7 +477,9 @@ export class LambdaTester {
     if (!getCleanupAfterRun(this.testCase, this.testFailed)) {
       if (this.testFailed) {
         this.context.logger?.warn?.(
-          '🔎 Test failed — cleanup skipped, its objects are kept for analysis. Delete them once analysed, or set test_settings.cleanup_on_failure: true to have them deleted anyway.',
+          this.suiteDeletesWhateverTheOutcome
+            ? '🔎 Test failed — the after-each delete is skipped; the suite deletes its objects in its own after hook, whatever the outcome.'
+            : '🔎 Test failed — cleanup skipped, its objects are kept for analysis. Delete them once analysed, or set test_settings.cleanup_on_failure: true to have them deleted anyway.',
         );
         return;
       }

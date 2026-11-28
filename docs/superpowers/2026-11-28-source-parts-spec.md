@@ -136,14 +136,32 @@ interface AnalyzerMembers {
 type AnalyzerMembersFactory = (connection: IAbapConnection) => AnalyzerMembers;
 
 interface BlockEndScanner {
-  /** The block that opens at `start` in `text`, checked against `address`; never a guess. */
-  locate(text: string, start: IOutlinePoint, address: FullAddress):
+  /**
+   * The block that opens at `start` in `text`: the identity check against `address`, the end
+   * derived from `text` (never taken from SAP), the boundary check. `sapEnd` is SAP's end where
+   * it gave one (class, interface): a derived end on another line is `end_mismatch`.
+   */
+  locate(text: string, start: IOutlinePoint, address: FullAddress, sapEnd?: IOutlinePoint):
     | { kind: 'ok'; firstLine: number; lastLine: number; shares: Shares }
     | AnalyzerRefusal;
-  /** Design §5.4 and the identity check, for a block whose positions SAP gave. */
-  check(text: string, block: { start: IOutlinePoint; end: IOutlinePoint }, address: FullAddress):
-    | { kind: 'ok'; shares: Shares } | AnalyzerRefusal;
+  /** Where an insert goes in `text`, for a container already located (spec §5.6). */
+  anchors(text: string, container: ContainerBlock, element: InsertElement):
+    | { kind: 'ok'; anchors: InsertAnchors } | AnalyzerRefusal;
 }
+
+/** What an insert needs, all derived from the text the call works on. */
+type InsertElement =
+  | { type: 'form' | 'module' | 'event' | 'local_class' | 'local_interface'; name: string }
+  | { type: 'method'; name: string; section?: 'public' | 'protected' | 'private' | undefined };
+type ContainerBlock =
+  | { kind: 'include' }
+  | { kind: 'class'; definition: LocatedPart; implementation: LocatedPart }
+  | { kind: 'interface'; definition: LocatedPart };
+type InsertAnchors =
+  | { kind: 'include'; afterLine: number }                      // the last statement's last line
+  | { kind: 'class'; definitionAfterLine: number;               // the section's last statement
+      implementationBeforeLine: number }                        // the ENDCLASS line
+  | { kind: 'interface'; definitionBeforeLine: number };        // the ENDINTERFACE line
 
 interface AdtCodeAnalyzerOptions {
   client: AnalyzerMembersFactory;
@@ -169,6 +187,16 @@ interface CodeAnalyzer {
     version: AdtReadVersion;
     source?: { include: string; text: string } | undefined;
   }): Promise<Located<readonly LocatedPart[]>>;
+  /** Spec §5.5: is `include` a source of `object`, by the fresh outline. */
+  member(object: SourceObject, include: string, options: { version: AdtReadVersion }):
+    Promise<Located<{ include: string }>>;
+  /**
+   * Spec §5.6: the container located in `source.text` (by `part`), the new name checked absent in
+   * its scope of the fresh outline (`already_exists`), and the anchors from the scanner.
+   */
+  insertion(object: SourceObject, container: InsertContainer, element: InsertElement, options: {
+    version: AdtReadVersion; source: { include: string; text: string };
+  }): Promise<Located<{ container: ContainerBlock; anchors: InsertAnchors }>>;
 }
 type CodeAnalyzerFactory =
   (client: AnalyzerMembersFactory, connection: IAbapConnection) => CodeAnalyzer;
@@ -182,11 +210,13 @@ type Edit =
   | { kind: 'insert'; container: InsertContainer;
       element: { type: 'form' | 'module' | 'event' | 'local_class' | 'local_interface'; name: string };
       code: string }
-  | { kind: 'insert'; container: InsertContainer;
+  | { kind: 'insert'; container: InsertContainer;                 // a class's method
       element: { type: 'method'; name: string };
-      section?: 'public' | 'protected' | 'private' | undefined;   // a class: required
-      definition: string;
-      implementation?: string | undefined }                      // a class: required
+      section: 'public' | 'protected' | 'private';
+      definition: string; implementation: string }
+  | { kind: 'insert'; container: InsertContainer;                 // an interface's method
+      element: { type: 'method'; name: string };
+      definition: string }
   | { kind: 'diff'; relative_to: 'element'; target: Target; diff: string }
   | { kind: 'diff'; relative_to: 'include'; include: string; diff: string };
 
@@ -199,8 +229,11 @@ interface UpdateSourcePartArgs {
 }
 ```
 
-A method insert into an interface takes no `section` and no `implementation`; into a class both
-are required. The schema states each, so a wrong combination is refused by the schema.
+The schema enforces the two method shapes structurally: one with `section`, `definition` and
+`implementation`, one with `definition` alone; any other combination is refused by the schema.
+Which shape fits is known only once the container is resolved: a class container with the
+interface shape, or an interface container with the class shape, is `insert_shape_mismatch`,
+before anything is written.
 
 ### 1.5 Refusals
 
@@ -216,6 +249,8 @@ with the payload as fields.
 | `duplicate_address` | analyzer | `address` |
 | `ref_invalid` | analyzer | `reason` (`undecodable` \| `foreign_include`) |
 | `start_mismatch` | analyzer | `address`, `field` (`include` \| `type` \| `side` \| `name` \| `scope`), `line` |
+| `end_mismatch` | analyzer | `address`, `sap_end_line`, `derived_end_line` |
+| `include_not_member` | analyzer | `include`, `object` |
 | `bad_nesting` | analyzer | `address`, `line`, `statement` (its first keyword) |
 | `unbalanced` | analyzer | `address`, `line`, `terminator` |
 | `crosses_include` | analyzer | `address`, `line` |
@@ -242,6 +277,7 @@ with the payload as fields.
 | `section_missing` | lib | `address`, `section` |
 | `already_exists` | lib | `address` |
 | `not_writable` | lib | `include` |
+| `insert_shape_mismatch` | lib | `container` (`class` \| `interface`), `edit` |
 
 SAP's refusal of a member's request is the `SapAnswer`, and reaches the model as today's `answer()`
 gives a member's failure: the response kept, SAP's message as SAP wrote it.
@@ -275,6 +311,10 @@ An event statement is recognised by its leading tokens, compared case-insensitiv
   whole lines would carry a declaration that is not the event's); `INCLUDE` (`crosses_include`).
 - **`GET` events**: when the outline lists any `PE` whose name starts with `GET`, every event of
   that program is `not_readable` `get_events`, since their ends could run over a `GET` event.
+  This is decided on every addressing path: by address and short form from the outline the read
+  already takes; by `ref`, a `PE` target makes the read take the program's outline too (spec
+  §2.3), so a `ref` made before a `GET` event appeared is refused like any other; under the lock,
+  on the fresh outline.
 
 Unit inputs: every row as the start; every row as the end of a preceding event; `AT FIRST`,
 `AT NEW`, `GET TIME` inside an event (not an end); each refused statement inside an event; a
@@ -310,11 +350,13 @@ cloud (both measured), one by one on any other variant.
 | part: class or interface, by address | the outline; one source `GET` per distinct include |
 | part: class or interface, by `ref` | one source `GET` per distinct include (no outline, no navigation) |
 | part: program, include or function group, by address | the outline (a group: both); navigation; one source `GET` per distinct include |
-| part: program, include or function group, by `ref` | navigation; one source `GET` per distinct include (no outline) |
+| part: program, include or function group, by `ref` | navigation; one source `GET` per distinct include (no outline, except for an event target: then the outline first, for the `GET`-event rule) |
 | part: several targets in one include | as above, the source `GET` once |
 | part: targets in two includes | as above, one source `GET` per include |
 | part: function module (`FUGR/FF`, as the object or by address or `ref`) | the module's source `GET` (no outline, no navigation) |
-| part with `source` given (the locked write) | the outline afresh (none for a module or a `ref` of a class); navigation where the path above has it; **no source `GET`** |
+| part with `source` given (the locked write) | the outline afresh (none for a module), whatever the target's form; navigation where the path above has it; **no source `GET`** |
+| `member` | the outline afresh (a group: both outlines; a module: none, its only source is itself) |
+| `insertion` | the outline afresh; no source `GET` |
 | update | spec §5.5 |
 
 ## 3. interfaces-adt, adt-clients, adt-strategies
@@ -322,8 +364,11 @@ cloud (both measured), one by one on any other variant.
 ### 3.1 `@mcp-abap-adt/interfaces-adt` (minor)
 
 - **Added**: spec §1.1.
-- **Tests**: type tests: each atom accepts adt-clients 48's `AdtUtils` shape and a hand-written
-  object, and refuses one missing a member or with another signature.
+- **Tests**: type tests against structural fixtures only (hand-written objects): each atom
+  accepts a conforming one and refuses one missing a member or with another signature. That the
+  real `AdtUtils` conforms is adt-clients' test (spec §3.2), since its release adds
+  `getNavigationTarget`.
+
 - **Docs**: CHANGELOG, README atom list — at least these.
 
 ### 3.2 `@mcp-abap-adt/adt-clients` (minor)
@@ -335,7 +380,7 @@ cloud (both measured), one by one on any other variant.
     `navigationTarget` slot (default `rawDocument`) and the caller's `analyse`.
   - A `NAVIGATION` record in `src/endpoints/objects.ts`.
   - `AdtUtils` implements both atoms; `getObjectOutline` and `getNavigationTarget` leave
-    `AwaitingItsAtom`.
+    `AwaitingItsAtom`. A type test asserts the real `AdtUtils` satisfies both interfaces-adt atoms.
   - No partial-update member, no reading.
 - **Tests**:
   - Unit: method, URL, the query for each option combination, headers, no body, one request per
@@ -376,9 +421,23 @@ adt-clients and adt-strategies, depending on them and on interfaces-adt by semve
   `{ "v": 1, "address": FullAddress, "link": string, "position"?: { "start": [l, c], "end": [l, c] } }`.
   Anything that does not parse to exactly this shape is `ref_invalid` `undecodable`; an
   `address.include` that does not start with the object's own ADT address is `foreign_include`.
-  A class or interface `ref` is located at its `position`, then `scanner.check` and identity run on
-  the text read; a program `ref` navigates its `link`, then `scanner.locate` runs. Stale is
-  `start_mismatch`. A write never takes the position or link as its location (spec §5.5).
+  A class or interface `ref` takes its `position`'s start; a program `ref` navigates its `link`.
+  Either way `scanner.locate` runs on the text read: identity, the end derived from the text, and
+  (class, interface) the comparison with SAP's end. Stale is `start_mismatch` or `end_mismatch`. A
+  write never takes the position or link as its location (spec §5.5).
+- **The end is derived, always**: for every kind and every path, `firstLine`/`lastLine` come from
+  `scanner.locate` over the text; SAP's `end` only feeds the `end_mismatch` comparison.
+- **`member`**: an include is a source of the object when, in the fresh outline, it is the root's
+  own source, the include of any element, or a listed include element (`PROG/I`, `FUGR/I`) or
+  module (`FUGR/FF`); a class's local include (`…/oo/classes/<the class>/includes/<x>`) is the
+  class's by its address, whether or not an element sits in it; a function module's one source is
+  itself. Otherwise `include_not_member`.
+- **`insertion`**: locates the container in `source.text` (an element container through `part`,
+  both sides of a class); checks the new name against the fresh outline's elements in the
+  container's scope (`already_exists`); asks `scanner.anchors`, which finds the section statement
+  and its last statement (`section_missing`), the `ENDCLASS` / `ENDINTERFACE` line, or the
+  include's last statement, each checked not to share its line (`shares_lines`); a class whose
+  definition and implementation are in two includes is `spans_includes`.
 - **Function modules**: a `FUGR/FF` element of a group's outline is readable, its address
   `{ include: <module source>, type: 'FUGR/FF', name, scope: [group], side: 'implementation' }`
   and a `ref` without position; its part is the whole module source. An object `FUGR/FF` is
@@ -403,6 +462,15 @@ adt-clients and adt-strategies, depending on them and on interfaces-adt by semve
 - **Identity** (unit): each address field changed alone is `start_mismatch` with that `field`; a
   stale position on a same-named method of another local class; a navigated start on a `METHODS`
   declaration while `implementation` is asked, and the reverse.
+- **Derived end** (unit): a class position with the right start and an end at a later method's
+  `ENDMETHOD` is `end_mismatch`; a declaration whose SAP end spans `TYPES BEGIN OF` … `END OF` as
+  separate statements is `end_mismatch` (fail-closed).
+- **`member` and `insertion`** (unit): a listed include, an element's include, a class local
+  include with no element, a module; an include of another program (`include_not_member`); each
+  anchor kind; `section_missing`; a shared `ENDCLASS` line; `already_exists`; `spans_includes`.
+- **`GET` events** (unit): an event read by address, by short form and by a `ref` made before a
+  `GET` event was added: each `not_readable` `get_events`, the `ref` read's trace including the
+  outline.
 - **Boundary** (unit): `ENDMETHOD. METHOD b.`; a chained declaration; a trailing comment and pragma
   after the end (accepted); ABAP Doc above a declaration (outside the part).
 - **Addresses and `ref`** (unit): duplicates; the short form with zero, one, two matches; `ref`
@@ -478,19 +546,28 @@ Arguments: `UpdateSourcePartArgs` (spec §1.4). The sequence:
 2. **Under the lock** (`withLock`): that include's reader `GET`s it once, at `inactive`: T and its
    `etag`. `sourceHash(T)` must equal `source_hash`, else `source_changed` `hash`. A passed `etag`
    must equal SAP's when SAP served one, else `source_changed` `etag`.
-3. `analyzer.part(object, targets, { version: 'inactive', source: { include, text: T } })` for
-   every replace and element-relative diff target and every element container: outline and
-   navigation afresh, located in T, identity and boundary checks on T. A target now in another
-   include is `source_changed` `include_moved`. Every pre-lock location is discarded.
+3. **Membership and location in T**, all from reads made under the lock:
+   - `analyzer.member(object, include)` for every call, whatever its edits: the include must be a
+     source of the object by the fresh outline, else `include_not_member`. This is the only
+     authority for an include-relative diff and an include container;
+   - `analyzer.part(object, targets, { version: 'inactive', source: { include, text: T } })` for
+     every replace and element-relative diff target: outline and navigation afresh, located in T,
+     the end derived from T, identity and boundary checks on T. A target now in another include
+     is `source_changed` `include_moved`;
+   - `analyzer.insertion(…, { version: 'inactive', source: { include, text: T } })` for every
+     insert, and the method shape checked against the resolved container
+     (`insert_shape_mismatch`).
+   Every pre-lock location is discarded.
 4. The merge on T (spec §5.6); one write of the merged text with the lock target's handle; unlock.
 5. The answer: each edit with its new line range, and `sent_hash`.
 
 ### 5.6 The merge and the diff grammar
 
 - `replace`: the element's whole lines; `shares_lines` when `shares` is not `none`.
-- `insert`: design §7.3's containers table; `already_exists` when the new name exists in that
-  scope of the fresh outline; `section_missing`; `spans_includes`; a shared anchor line is
-  `shares_lines`.
+- `insert`: lib splices the code at the anchors `analyzer.insertion` answered (after
+  `afterLine`, after `definitionAfterLine` and before `implementationBeforeLine`, before
+  `definitionBeforeLine`); every check is the analyzer's (spec §4.1), so lib runs no lexer of its
+  own.
 - Line ends and the final line end: design §7.2.
 - **The diff grammar** (plain string code):
   - hunks only; any line before the first `@@` is `diff_malformed` `header`; file headers (`---`,
@@ -563,7 +640,12 @@ Arguments: `UpdateSourcePartArgs` (spec §1.4). The sequence:
     `ref`; a `replace` of `a` in `METHODS: a, b.`; an element-relative diff of it; an
     element-relative hunk outside the element whose text matches; an insert whose definition and
     implementation are in two includes; a short form whose element moved to another include
-    (`source_changed` `include_moved`);
+    (`source_changed` `include_moved`); **a matching hash and a class position whose start is
+    right and whose end lies at a later method's `ENDMETHOD`** (`end_mismatch`); an
+    include-relative diff and an include-container insert into an include of another object
+    (`include_not_member`); a class-shaped method insert into an interface
+    (`insert_shape_mismatch`); an event `replace` in a program with a `GET` event;
+
   - a failure after the lock (SAP refusing the `PUT`, a throw in the merge) still sends `UNLOCK`;
   - the lock and write target of every row of spec §2.2.
 - **Merge and diff** (unit): every rule of spec §5.6, each refusal with its payload; pure additions

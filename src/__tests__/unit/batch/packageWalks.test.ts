@@ -1149,31 +1149,190 @@ describe('GetObjectsList', () => {
     });
   });
 
-  // Codex round 8: a part's own status is that read's answer. A metadata
-  // part answering 500 inside an envelope SAP answered 200 is a failed read:
-  // full answers the error, and raw the same error, never a success.
-  it('a metadata part refused inside an answered envelope: full and raw the same error', async () => {
+  // #398, the owner's decision: one object's refusal ends no list. A
+  // metadata read SAP answers with any status but 401 (cloud: 403 "No
+  // authorization to access the resource" on an enhancement's node URI) is
+  // that object's: it stays listed with SAP's status and message, the rest
+  // is read and answered, and both paths answer the same.
+  for (const status of [403, 500]) {
+    it(`a metadata read SAP answers ${status}: the object listed with it, the rest answered, on both paths alike`, async () => {
+      const probe = system();
+      await withinTurns(
+        handleGetObjectsListOf(contextOn(probe), {
+          ...single,
+          detail: 'medium',
+        }),
+      );
+      const metadataKey = (probe.envelopes.map(partKeys)[3] ?? [])[0] ?? '';
+      assert.ok(metadataKey.startsWith('GET '), metadataKey);
+      const model = {
+        refuse: { [metadataKey]: status },
+        refuseBody: {
+          [metadataKey]:
+            '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><message lang="EN">No authorization to access the resource</message></exc:exception>',
+        },
+      };
+      const answers: unknown[] = [];
+      for (const batch of ['served', 'absent'] as const) {
+        const result = await withinTurns(
+          handleGetObjectsListOf(contextOn(system(model), batch), {
+            ...single,
+            detail: 'full',
+          }),
+        );
+        const text = textOf(result);
+        assert.equal((result as { isError?: boolean }).isError, false, text);
+        const payload = payloadOf(result);
+        const refused = payload.objects.filter(
+          (o: { METADATA_ERROR?: unknown }) => o.METADATA_ERROR !== undefined,
+        );
+        assert.equal(refused.length, 1, text);
+        assert.deepStrictEqual(refused[0].METADATA_ERROR, {
+          status,
+          message: 'No authorization to access the resource',
+          step: 'read object metadata',
+        });
+        // The refused object is the one whose read SAP refused.
+        assert.equal(refused[0].OBJECT_NAME, nameAt(metadataKey), text);
+        // Every object is still listed, and every other one read: its
+        // description its metadata's.
+        assert.equal(payload.total_objects, 3, text);
+        assert.equal(payload.refused_objects, 1, text);
+        const descriptions: Record<string, string> = {
+          ZINCL_X1: 'Include X1',
+          ZFORM_X: 'Form X',
+          ZEVENT_X: 'Event X',
+        };
+        for (const o of payload.objects as Array<{
+          OBJECT_NAME: string;
+          DESCRIPTION?: string;
+          METADATA_ERROR?: unknown;
+        }>) {
+          if (o.METADATA_ERROR !== undefined) {
+            assert.equal(o.DESCRIPTION, undefined, text);
+            continue;
+          }
+          assert.equal(o.DESCRIPTION, descriptions[o.OBJECT_NAME], text);
+        }
+        assert.equal(
+          payload.objects.filter(
+            (o: { DESCRIPTION?: string }) => o.DESCRIPTION !== undefined,
+          ).length,
+          2,
+          text,
+        );
+        answers.push(payload);
+      }
+      assert.deepStrictEqual(answers[0], answers[1]);
+    });
+  }
+
+  // #398: a refusal whose body is no exception document reaches the model
+  // as SAP sent it, trimmed, on both paths; a 404 the same way.
+  for (const status of [404, 500]) {
+    it(`a metadata read SAP answers ${status} with a text body: its message is that text, on both paths`, async () => {
+      const probe = system();
+      await withinTurns(
+        handleGetObjectsListOf(contextOn(probe), {
+          ...single,
+          detail: 'medium',
+        }),
+      );
+      const metadataKey = (probe.envelopes.map(partKeys)[3] ?? [])[0] ?? '';
+      const model = {
+        refuse: { [metadataKey]: status },
+        refuseBody: { [metadataKey]: '  Service unavailable\n' },
+      };
+      for (const batch of ['served', 'absent'] as const) {
+        const result = await withinTurns(
+          handleGetObjectsListOf(contextOn(system(model), batch), {
+            ...single,
+            detail: 'full',
+          }),
+        );
+        const text = textOf(result);
+        assert.equal((result as { isError?: boolean }).isError, false, text);
+        const refused = payloadOf(result).objects.filter(
+          (o: { METADATA_ERROR?: unknown }) => o.METADATA_ERROR !== undefined,
+        );
+        assert.deepStrictEqual(
+          refused.map((o: { METADATA_ERROR: unknown }) => o.METADATA_ERROR),
+          [
+            {
+              status,
+              message: 'Service unavailable',
+              step: 'read object metadata',
+            },
+          ],
+          `${batch}: ${text}`,
+        );
+      }
+    });
+  }
+
+  // #398: a credential refusal by the connection during pass 2 — before SAP
+  // is asked — is the credentials', not an object's: it ends the call as it
+  // came, on both paths.
+  it('a credential refusal during the metadata reads ends the call, on both paths', async () => {
     const probe = system();
     await withinTurns(
       handleGetObjectsListOf(contextOn(probe), { ...single, detail: 'medium' }),
     );
     const metadataKey = (probe.envelopes.map(partKeys)[3] ?? [])[0] ?? '';
     assert.ok(metadataKey.startsWith('GET '), metadataKey);
-    const model = { refuse: { [metadataKey]: 500 } };
-    const full = await withinTurns(
-      handleGetObjectsListOf(contextOn(system(model)), {
-        ...single,
-        detail: 'full',
-      }),
+    for (const batch of ['served', 'absent'] as const) {
+      const fake = system();
+      let batches = 0;
+      let refusedOnce = false;
+      fake.answerRequests(async (request, previous) => {
+        if (request.url.endsWith('/batch')) {
+          batches += 1;
+          // The node structures' three envelopes, then the metadata's.
+          if (batches === 4) {
+            refusedOnce = true;
+            throw credential();
+          }
+        } else if (keyOf(request.method, request.url) === metadataKey) {
+          refusedOnce = true;
+          throw credential();
+        }
+        return previous(request);
+      });
+      const result = await withinTurns(
+        handleGetObjectsListOf(contextOn(fake, batch), {
+          ...single,
+          detail: 'full',
+        }),
+      );
+      const text = textOf(result);
+      assert.ok(refusedOnce, `${batch}: the refusal was reached`);
+      assert.equal((result as { isError?: boolean }).isError, true, text);
+      assert.equal(payloadOf(result).error, 'authentication_failed', text);
+      assert.ok(!text.includes('METADATA_ERROR'), text);
+    }
+  });
+
+  // #398: a 401 is the credentials', the same for every object: it still
+  // ends the call, on both paths.
+  it('a metadata read SAP answers 401: the call ends with it, on both paths', async () => {
+    const probe = system();
+    await withinTurns(
+      handleGetObjectsListOf(contextOn(probe), { ...single, detail: 'medium' }),
     );
-    const raw = await withinTurns(
-      handleGetObjectsListOf(contextOn(system(model)), {
-        ...single,
-        detail: 'raw',
-      }),
-    );
-    assert.equal((full as { isError?: boolean }).isError, true);
-    assert.deepStrictEqual(raw, full);
+    const metadataKey = (probe.envelopes.map(partKeys)[3] ?? [])[0] ?? '';
+    assert.ok(metadataKey.startsWith('GET '), metadataKey);
+    for (const batch of ['served', 'absent'] as const) {
+      const result = await withinTurns(
+        handleGetObjectsListOf(
+          contextOn(system({ refuse: { [metadataKey]: 401 } }), batch),
+          { ...single, detail: 'full' },
+        ),
+      );
+      const text = textOf(result);
+      assert.equal((result as { isError?: boolean }).isError, true, text);
+      assert.ok(text.includes('401'), text);
+      assert.ok(!text.includes('METADATA_ERROR'), text);
+    }
   });
 
   it('no envelope holds a request needing another of its parts', async () => {

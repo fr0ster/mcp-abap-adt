@@ -44,7 +44,7 @@ set, onprem an ECC or S/4HANA system, cloud SAP BTP ABAP Cloud. **New in 24.2.0*
 - **SAP authorization stays the boundary**: every call runs as the connected SAP user, and the restrictions only take away — [Security](SECURITY.md).
 
 **Work with agents**
-- **MCP prompts** (**new in 24.2.0**): nine ready-made requests — `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport` — that a client shows as slash commands, each answering the tools to call in order; every binary on onprem and cloud (the `-ro` ones `get`, `where_used`, `transport`, compact `-ro` also `check`) — [MCP Prompts](docs/user-guide/PROMPTS.md).
+- **MCP prompts** (**new in 24.2.0**): nine ready-made requests — `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport` — that a client shows as slash commands, each answering the tools to call in order; every binary on onprem and cloud (the `-ro` ones `get`, `check`, `where_used`, `transport`) — [MCP Prompts](docs/user-guide/PROMPTS.md).
 - **Terse answers** (**new in 24.2.0**): every tool answers what the next call needs — TSV for a list, every row answered — and `detail` (`terse`, `medium`, `full`, `raw`) chooses the reading before the call — [Answers](#answers).
 - **Batch mode**: record independent calls and send them to SAP together in one ADT batch request (compact binaries, `-ro` included) — [Batch Mode](docs/user-guide/BATCH_MODE.md).
 - **Read envelopes**: collect independent read calls under an `envelope_handle` and send them to SAP together (core binaries, `-ro` included) — [Envelopes in the core binaries](docs/user-guide/BATCH_MODE.md#envelopes-in-the-core-binaries).

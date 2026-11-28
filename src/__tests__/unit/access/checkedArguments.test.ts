@@ -159,8 +159,6 @@ const FULL: ReadonlyArray<readonly [readonly string[], readonly string[]]> = [
     ['package_name', 'transport_request'],
   ],
   [['CreatePackage'], ['package_name', 'super_package', 'transport_request']],
-  [['CheckPackage'], ['package_name']],
-  [['ValidateServiceBinding'], ['package_name']],
   [
     ['CreateTransportTask', 'SortAndCompressTransportTask'],
     ['transport_number'],

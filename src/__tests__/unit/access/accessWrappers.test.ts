@@ -321,7 +321,8 @@ describe('path 1: a server instance', () => {
         }),
       ),
     );
-    const answer = await client.call('CheckPackage', {
+    const answer = await client.call('CreateClass', {
+      class_name: 'ZC',
       package_name: 'ZOTHER',
     });
     await client.close();
@@ -469,11 +470,11 @@ describe('a package is checked by its own name', () => {
     assert.equal(answer.isError, false, JSON.stringify(answer.body));
   });
 
-  it('checks a package by its own name, its super_package left unchecked', async () => {
+  it('leaves a package check unchecked: it is a read, served by the read-only sets', async () => {
     const connection = recordingConnection();
     const client = await clientOf(instance(connection, allowedPackages('Z*')));
     const answer = await client.call('CheckPackage', {
-      package_name: 'ZFOO',
+      package_name: 'YFOO',
       super_package: 'YROOT',
     });
     await client.close();

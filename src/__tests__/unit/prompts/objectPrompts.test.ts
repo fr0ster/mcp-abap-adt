@@ -290,13 +290,13 @@ describe('served counts (spec §6)', () => {
         'core-ro',
         fullReadOnlyToolSet,
         'onprem',
-        { create: 0, get: 18, delete: 0, activate: 0, check: 0 },
+        { create: 0, get: 22, delete: 0, activate: 0, check: 14 },
       ],
       [
         'core-ro',
         fullReadOnlyToolSet,
         'cloud',
-        { create: 0, get: 18, delete: 0, activate: 0, check: 0 },
+        { create: 0, get: 22, delete: 0, activate: 0, check: 14 },
       ],
       [
         'compact',
@@ -590,7 +590,7 @@ describe('abapPrompts', () => {
       abapPrompts(sourceOf(fullReadOnlyToolSet, 'onprem')).map(
         ({ name }) => name,
       ),
-      ['get', 'where_used', 'transport'],
+      ['get', 'check', 'where_used', 'transport'],
     );
   });
 });

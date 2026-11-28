@@ -22,10 +22,18 @@ import { noConnectionContext } from '../../../lib/handlers/registry/expositionRe
 import { countingConnection } from '../../helpers/batchHarness';
 import { listedJson } from '../../helpers/listedJson';
 
+/** The memory snapshot reads: the readonly group serves them too. */
+const SNAPSHOT_READS = [
+  'MemorySnapshotList',
+  'MemorySnapshotGet',
+  'MemorySnapshotDelta',
+];
 const LEFT_OUT = [
   ...new BackgroundRunHandlersGroup(noConnectionContext()).getHandlers(),
   ...new DebugHandlersGroup(noConnectionContext()).getHandlers(),
-].map((entry) => entry.toolDefinition.name);
+]
+  .map((entry) => entry.toolDefinition.name)
+  .filter((name) => !SNAPSHOT_READS.includes(name));
 const RUN_TOOLS = ['RuntimeRunClass', 'RuntimeRunProgram'];
 
 /** What a tool is handed out or listed with: its name and schema. */

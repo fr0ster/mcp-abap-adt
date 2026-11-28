@@ -106,8 +106,8 @@ const SERVED_COUNTS: Readonly<
     },
   },
   'core-ro': {
-    onprem: { get: 18, where_used: 18, transport: 4 },
-    cloud: { get: 18, where_used: 18, transport: 4 },
+    onprem: { get: 22, check: 14, where_used: 18, transport: 4 },
+    cloud: { get: 22, check: 14, where_used: 18, transport: 4 },
   },
   compact: {
     onprem: {

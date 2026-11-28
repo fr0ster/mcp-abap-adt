@@ -1,4 +1,8 @@
 import {
+  TOOL_DEFINITION as CheckBehaviorDefinition_Tool,
+  handleCheckBehaviorDefinition,
+} from '../../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
+import {
   TOOL_DEFINITION as GetBehaviorDefinition_Tool,
   handleGetBehaviorDefinition,
 } from '../../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
@@ -7,9 +11,30 @@ import {
   handleGetBehaviorImplementation,
 } from '../../../handlers/behavior_implementation/high/handleGetBehaviorImplementation';
 import {
+  TOOL_DEFINITION as CheckClass_Tool,
+  handleCheckClass,
+} from '../../../handlers/class/high/handleCheckClass';
+import {
   TOOL_DEFINITION as GetClass_Tool,
   handleGetClass,
 } from '../../../handlers/class/high/handleGetClass';
+import {
+  TOOL_DEFINITION as GetLocalDefinitions_Tool,
+  handleGetLocalDefinitions,
+} from '../../../handlers/class/high/handleGetLocalDefinitions';
+import {
+  TOOL_DEFINITION as GetLocalMacros_Tool,
+  handleGetLocalMacros,
+} from '../../../handlers/class/high/handleGetLocalMacros';
+import {
+  TOOL_DEFINITION as GetLocalTestClass_Tool,
+  handleGetLocalTestClass,
+} from '../../../handlers/class/high/handleGetLocalTestClass';
+import {
+  TOOL_DEFINITION as GetLocalTypes_Tool,
+  handleGetLocalTypes,
+} from '../../../handlers/class/high/handleGetLocalTypes';
+import { buildObjectVersionTools } from '../../../handlers/common/high/objectVersionTools';
 import {
   TOOL_DEFINITION as GetObjectDraft_Tool,
   handleGetObjectDraft,
@@ -27,13 +52,41 @@ import {
   handleGetObjectVersions,
 } from '../../../handlers/common/readonly/handleGetObjectVersions';
 import {
+  TOOL_DEFINITION as CheckDataElement_Tool,
+  handleCheckDataElement,
+} from '../../../handlers/data_element/high/handleCheckDataElement';
+import {
   TOOL_DEFINITION as GetDataElement_Tool,
   handleGetDataElement,
 } from '../../../handlers/data_element/high/handleGetDataElement';
 import {
+  TOOL_DEFINITION as CheckDdl_Tool,
+  handleCheckDdl,
+} from '../../../handlers/ddl/high/handleCheckDdl';
+import {
   TOOL_DEFINITION as GetDdl_Tool,
   handleGetDdl,
 } from '../../../handlers/ddl/high/handleGetDdl';
+import {
+  TOOL_DEFINITION as CheckMetadataExtension_Tool,
+  handleCheckMetadataExtension,
+} from '../../../handlers/ddlx/high/handleCheckMetadataExtension';
+import {
+  handleMemorySnapshotDelta,
+  TOOL_DEFINITION as MemorySnapshotDelta_Tool,
+} from '../../../handlers/debugger/debug/handleMemorySnapshotDelta';
+import {
+  handleMemorySnapshotGet,
+  TOOL_DEFINITION as MemorySnapshotGet_Tool,
+} from '../../../handlers/debugger/debug/handleMemorySnapshotGet';
+import {
+  handleMemorySnapshotList,
+  TOOL_DEFINITION as MemorySnapshotList_Tool,
+} from '../../../handlers/debugger/debug/handleMemorySnapshotList';
+import {
+  TOOL_DEFINITION as CheckDomain_Tool,
+  handleCheckDomain,
+} from '../../../handlers/domain/high/handleCheckDomain';
 import {
   TOOL_DEFINITION as GetDomain_Tool,
   handleGetDomain,
@@ -50,6 +103,14 @@ import {
   TOOL_DEFINITION as GetEnhancements_Tool,
   handleGetEnhancements,
 } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
+import {
+  TOOL_DEFINITION as CheckFunctionGroup_Tool,
+  handleCheckFunctionGroup,
+} from '../../../handlers/function/high/handleCheckFunctionGroup';
+import {
+  TOOL_DEFINITION as CheckFunctionModule_Tool,
+  handleCheckFunctionModule,
+} from '../../../handlers/function/high/handleCheckFunctionModule';
 import {
   TOOL_DEFINITION as GetFunctionGroup_Tool,
   handleGetFunctionGroup,
@@ -83,6 +144,10 @@ import {
   handleGetMainPrograms,
 } from '../../../handlers/include/readonly/handleGetMainPrograms';
 import {
+  TOOL_DEFINITION as CheckInterface_Tool,
+  handleCheckInterface,
+} from '../../../handlers/interface/high/handleCheckInterface';
+import {
   TOOL_DEFINITION as GetInterface_Tool,
   handleGetInterface,
 } from '../../../handlers/interface/high/handleGetInterface';
@@ -99,6 +164,10 @@ import {
   handleGetMetadataExtension,
 } from '../../../handlers/metadata_extension/high/handleGetMetadataExtension';
 import {
+  TOOL_DEFINITION as CheckPackage_Tool,
+  handleCheckPackage,
+} from '../../../handlers/package/high/handleCheckPackage';
+import {
   TOOL_DEFINITION as GetPackage_Tool,
   handleGetPackage,
 } from '../../../handlers/package/high/handleGetPackage';
@@ -106,6 +175,10 @@ import {
   TOOL_DEFINITION as GetPackageContents_Tool,
   handleGetPackageContents,
 } from '../../../handlers/package/readonly/handleGetPackageContents';
+import {
+  TOOL_DEFINITION as CheckProgram_Tool,
+  handleCheckProgram,
+} from '../../../handlers/program/high/handleCheckProgram';
 import {
   TOOL_DEFINITION as GetProgram_Tool,
   handleGetProgram,
@@ -115,9 +188,21 @@ import {
   handleGetServiceBinding,
 } from '../../../handlers/service_binding/high/handleGetServiceBinding';
 import {
+  handleListServiceBindingTypes,
+  TOOL_DEFINITION as ListServiceBindingTypes_Tool,
+} from '../../../handlers/service_binding/high/handleListServiceBindingTypes';
+import {
+  handleValidateServiceBinding,
+  TOOL_DEFINITION as ValidateServiceBinding_Tool,
+} from '../../../handlers/service_binding/high/handleValidateServiceBinding';
+import {
   TOOL_DEFINITION as GetServiceDefinition_Tool,
   handleGetServiceDefinition,
 } from '../../../handlers/service_definition/high/handleGetServiceDefinition';
+import {
+  TOOL_DEFINITION as CheckStructure_Tool,
+  handleCheckStructure,
+} from '../../../handlers/structure/high/handleCheckStructure';
 import {
   TOOL_DEFINITION as GetStructure_Tool,
   handleGetStructure,
@@ -127,6 +212,10 @@ import {
   handleGetStructuresList,
 } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import {
+  TOOL_DEFINITION as CheckTable_Tool,
+  handleCheckTable,
+} from '../../../handlers/table/high/handleCheckTable';
+import {
   TOOL_DEFINITION as GetTable_Tool,
   handleGetTable,
 } from '../../../handlers/table/high/handleGetTable';
@@ -134,6 +223,10 @@ import {
   TOOL_DEFINITION as GetTableSettings_Tool,
   handleGetTableSettings,
 } from '../../../handlers/table/readonly/handleGetTableSettings';
+import {
+  TOOL_DEFINITION as CheckTableType_Tool,
+  handleCheckTableType,
+} from '../../../handlers/table_type/high/handleCheckTableType';
 import {
   TOOL_DEFINITION as GetTableType_Tool,
   handleGetTableType,
@@ -177,8 +270,10 @@ import {
  * Handler group for all readonly (read-only) handlers.
  * Contains handlers that only read data without modifying the ABAP system.
  *
- * Some tools are a COPY of a high-level tool under the same name, handler and
- * schema (the object reads `Get<Type>`, GetUnitTestResult — purely reads, so
+ * Some tools are a COPY of a high-level or debug tool under the same name,
+ * handler and schema (the object reads `Get<Type>`, the local includes of a
+ * class, the per-type checks and version tools, the service binding types and
+ * validation, GetUnitTestResult, the memory snapshot reads — purely reads, so
  * a read-only caller may use them too). Two tools cannot share one name on one server, so a readonly
  * entry whose exact name another exposed group contributes is always
  * withheld, whatever the strategy: a caller granted both groups gets the tool
@@ -245,6 +340,11 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         handleGetBehaviorImplementation,
       ),
       defineTool(GetClass_Tool, handleGetClass),
+      // The local includes of a class, each read by its own tool.
+      defineTool(GetLocalDefinitions_Tool, handleGetLocalDefinitions),
+      defineTool(GetLocalTypes_Tool, handleGetLocalTypes),
+      defineTool(GetLocalMacros_Tool, handleGetLocalMacros),
+      defineTool(GetLocalTestClass_Tool, handleGetLocalTestClass),
       defineTool(GetDataElement_Tool, handleGetDataElement),
       defineTool(GetDdl_Tool, handleGetDdl),
       defineTool(GetDomain_Tool, handleGetDomain),
@@ -267,6 +367,33 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       // Copies of high-level tools: same name, schema and handler. Withheld
       // by getHandlers() when the high group is exposed alongside.
       defineTool(GetUnitTestResult_Tool, handleGetUnitTestResult),
+      // The checks: a syntax check runs on the system and writes nothing.
+      defineTool(CheckBehaviorDefinition_Tool, handleCheckBehaviorDefinition),
+      defineTool(CheckClass_Tool, handleCheckClass),
+      defineTool(CheckDataElement_Tool, handleCheckDataElement),
+      defineTool(CheckDdl_Tool, handleCheckDdl),
+      defineTool(CheckMetadataExtension_Tool, handleCheckMetadataExtension),
+      defineTool(CheckDomain_Tool, handleCheckDomain),
+      defineTool(CheckFunctionGroup_Tool, handleCheckFunctionGroup),
+      defineTool(CheckFunctionModule_Tool, handleCheckFunctionModule),
+      defineTool(CheckInterface_Tool, handleCheckInterface),
+      defineTool(CheckPackage_Tool, handleCheckPackage),
+      defineTool(CheckProgram_Tool, handleCheckProgram),
+      defineTool(CheckStructure_Tool, handleCheckStructure),
+      defineTool(CheckTable_Tool, handleCheckTable),
+      defineTool(CheckTableType_Tool, handleCheckTableType),
+      // A service binding's types and a new binding's validation.
+      defineTool(ListServiceBindingTypes_Tool, handleListServiceBindingTypes),
+      defineTool(ValidateServiceBinding_Tool, handleValidateServiceBinding),
+      // The per-object version tools: Versions, VersionSource, VersionDiff.
+      ...buildObjectVersionTools().map((entry) =>
+        defineTool(entry.toolDefinition, entry.handler),
+      ),
+      // The memory snapshots the system holds (copies of the debug tools):
+      // reads on the instance's connection, outside any debug session.
+      defineTool(MemorySnapshotList_Tool, handleMemorySnapshotList),
+      defineTool(MemorySnapshotGet_Tool, handleMemorySnapshotGet),
+      defineTool(MemorySnapshotDelta_Tool, handleMemorySnapshotDelta),
     ];
   }
 }

@@ -590,6 +590,17 @@ describe('the MCP tool surface', () => {
    * `UpdateTextElements`, on premise and cloud): adt-clients 46.1.0's
    * `getTableSettings()` and `getTextElements()`. Every other row was checked
    * unchanged.
+   *
+   * **24.3.0: the reads of a class's local includes joined the readonly
+   * group** (`GetLocalDefinitions`, `GetLocalTypes`, `GetLocalMacros`,
+   * `GetLocalTestClass`): copies of the high-level tools, same name, schema
+   * and handler, so a read-only binary reads them. So did every other read
+   * core served outside it: the per-type checks (`Check<Type>`, 14),
+   * `ListServiceBindingTypes`, `ValidateServiceBinding`, the per-type
+   * version tools (`Get<Type>Versions`, `…VersionSource`, `…VersionDiff`,
+   * 28) and the memory snapshot reads (`MemorySnapshotList`, `…Get`,
+   * `…Delta`, copies of the debug tools). Every other row was checked
+   * unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

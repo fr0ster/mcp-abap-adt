@@ -16,10 +16,12 @@ logical change per commit; every commit ends with the session's attribution line
   - mcp-abap-adt-clients, PR B: adt-code-analyzer (section 4), opened only after both releases of
     PR A are on the registry and have passed the post-publication gate;
   - mcp-abap-adt: #401 (section 5).
-- A package builds only against published versions. Each section ends with its package ready to
-  publish: gate green, CHANGELOG written, the owner asked for the version, then the owner merges
-  and publishes. The next section starts only after that version is visible on the registry and
-  has passed the post-publication gate, and its first task moves the dependency to it.
+- **The rule:** a package is published, visible on the registry and through the post-publication
+  gate before any package that depends on it builds against it; the dependent's first task moves
+  its dependency to that version. Each section ends with its package ready to publish: gate
+  green, CHANGELOG written, the owner asked for the version. Sections 2 and 3 share PR A because
+  adt-strategies does not depend on adt-clients; every other section waits for the publication
+  of the packages it depends on.
 - **The post-publication gate**, after every publish and before its consumer starts: in an empty
   directory outside every repository, `npm install <package>@<version> --ignore-scripts` from the
   registry, then load its entry (`node -e "require('<package>')"`); a failure stops the sequence.

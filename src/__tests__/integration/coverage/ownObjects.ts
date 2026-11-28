@@ -16,6 +16,7 @@ import {
 import { HeldLiveLocks, type HeldLock } from '../helpers/heldLiveLocks';
 import { type LiveAnswer, livePrepare } from '../helpers/live';
 import { CREATION_PACKAGES } from '../helpers/packageGuard';
+import { isHardModeEnabled } from '../helpers/testers/hardMode';
 
 /** Whether the configured system is the on-premise one. */
 export const onPremise = (): boolean => configuredSystemKind() === 'onprem';
@@ -81,6 +82,16 @@ export function holdLock(lock: HeldLock): void {
 /** SAP answered the case's unlock of `handle` with a success. */
 export function lockReleased(handle: string): void {
   heldLocks.released(handle);
+}
+
+/**
+ * The case is about to send the unlock of `handle`. In soft mode the lock is
+ * then `unlock-sent` and the suite's end does not send it again (#394:
+ * nothing is resent); hard mode keeps its own behaviour, the suite's end
+ * unlocking what is still held.
+ */
+export function unlockSending(handle: string): void {
+  if (!isHardModeEnabled()) heldLocks.unlockSent(handle);
 }
 
 /**

@@ -26,9 +26,11 @@ import {
   configuredSystemKindOf,
   NO_KIND_STATED,
 } from '../configuredSystemKind';
+import { heldLocksIfAny, heldLocksOf } from '../heldLiveLocks';
 import { createTestLogger, type LoggerWithExtras } from '../loggerHelpers';
 import { PackageGuardRefusal } from '../packageGuard';
 import { primeSystemContext } from '../primeSystemContext';
+import { credentialRefused } from '../refusalGuard';
 import { skipRunningTest } from '../runningTest';
 import {
   createTestConnectionAndSession,
@@ -327,6 +329,9 @@ export class LambdaTester {
       const connectionResult = await createTestConnectionAndSession();
       connection = connectionResult.connection;
       session = connectionResult.session;
+      // A soft-mode run connection: the locks it holds are owned by its
+      // registry until SAP answered their release (#394, spec §3).
+      heldLocksOf(connection);
 
       // Resolve system context for tests (set SAP_MASTER_SYSTEM from YAML if not already set)
       const testCtx = resolveTestSystemContext();
@@ -401,11 +406,38 @@ export class LambdaTester {
   }
 
   /**
+   * Sends, once, the unlock of every lock the soft-mode run connection still
+   * holds (`held`), each on the handler context that took it; a lock whose
+   * unlock was already sent is not sent again, and every lock still owned is
+   * reported. Nothing after a credential refusal; nothing in hard mode, where
+   * the server owns its locks.
+   */
+  protected async releaseOwnedLocks(): Promise<void> {
+    const connection = this.context?.connection;
+    if (connection === undefined) return;
+    const locks = heldLocksIfAny(connection);
+    if (locks === undefined || locks.stillHeld.length === 0) return;
+    const logger = this.context?.logger;
+    if (credentialRefused()) {
+      for (const { lock, state } of locks.stillOwned) {
+        logger?.warn?.(
+          `🔒 not released after a credential refusal (${state}): ${lock.object_type} ${lock.object_name}`,
+        );
+      }
+      return;
+    }
+    await locks.releaseAll(undefined, (line) => logger?.warn?.(`🔒 ${line}`));
+  }
+
+  /**
    * Cleanup after test - checks if cleanup is needed and performs it
    * Checks YAML parameters first, then calls cleanup lambda from test
    * This method is designed to be safe to call even if test failed
    */
   protected async cleanupAfter(): Promise<void> {
+    // Locks first, unconditionally (#394, spec §4): whatever the YAML
+    // policy says about deleting, every lock still `held` is released, once.
+    await this.releaseOwnedLocks();
     if (!this.context || !this.testCase) {
       this.context?.logger?.warn?.(
         '⚠️ Cleanup skipped: context or testCase not available',

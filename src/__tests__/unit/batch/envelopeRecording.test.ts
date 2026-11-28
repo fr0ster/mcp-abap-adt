@@ -39,7 +39,7 @@ const sap = (inner: InnerRequest): PartAnswer => ({
 async function stand(options: { stateHandleArgument?: boolean } = {}) {
   const owner = new InstanceEnvelopes({ keepRawParts: false });
   const s = await batchStand({
-    tools: ['GetClass', 'GetTable'],
+    tools: ['GetClass', 'GetTransport'],
     part: sap,
     envelopes: owner,
     ...options,
@@ -103,15 +103,15 @@ describe('recording by envelope_handle', () => {
     const { s, create } = await stand();
     const handle = await create();
     for (const value of [handle, 'x', '', null, 42]) {
-      const answer = await s.call('GetTable', {
-        table_name: 'TAB_A',
+      const answer = await s.call('GetTransport', {
+        transport_number: 'XXXK900001',
         envelope_handle: value,
       });
       assert.equal(answer.isError, true, JSON.stringify(value));
       assert.equal(payloadOf(answer).error, 'envelope_not_recordable');
       assert.equal(
         payloadOf(answer).message,
-        'GetTable is not recorded into an envelope with these arguments; call it without envelope_handle',
+        'GetTransport is not recorded into an envelope with these arguments; call it without envelope_handle',
       );
     }
     assert.equal(s.resolves(), 0);
